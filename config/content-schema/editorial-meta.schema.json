@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Longevity editorial metadata",
+  "type": "object",
+  "required": [
+    "content_summary",
+    "content_limitations",
+    "commercial_relationship",
+    "next_content_review_date",
+    "editorial_approval_status"
+  ],
+  "properties": {
+    "content_summary": {
+      "type": "string",
+      "minLength": 20
+    },
+    "content_limitations": {
+      "type": "string",
+      "minLength": 20
+    },
+    "evidence_grade": {
+      "enum": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "U",
+        ""
+      ]
+    },
+    "medical_review_required": {
+      "type": "boolean"
+    },
+    "testing_required": {
+      "type": "boolean"
+    },
+    "commercial_relationship": {
+      "enum": [
+        "none",
+        "affiliate",
+        "product_supplied",
+        "sponsored"
+      ]
+    },
+    "next_content_review_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "editorial_approval_status": {
+      "enum": [
+        "idea",
+        "assigned",
+        "researching",
+        "drafting",
+        "editorial_review",
+        "fact_check",
+        "medical_review",
+        "testing_incomplete",
+        "commercial_review",
+        "ready",
+        "published",
+        "update_due",
+        "correction_pending",
+        "archived"
+      ]
+    },
+    "review_score_dimensions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "weight",
+          "score"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "weight": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "score": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 10
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": true
+}

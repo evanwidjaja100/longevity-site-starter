@@ -1,0 +1,16 @@
+.env
+.env.local
+.env.*.local
+!.env.example
+!.env.ci
+vendor/
+node_modules/
+.phpunit.cache/
+coverage/
+playwright-report/
+test-results/
+build/
+.DS_Store
+*.log
+wp-content/uploads/*
+!wp-content/uploads/.gitkeep

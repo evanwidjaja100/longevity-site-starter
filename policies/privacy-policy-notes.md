@@ -1,0 +1,2 @@
+# Privacy Policy Implementation Notes
+A qualified privacy professional should adapt the final policy to actual data flows and target jurisdictions. Inventory hosting/CDN logs, analytics, consent management, newsletter providers, forms, affiliate tracking, cookies, retention, user rights, cross-border transfers, children’s data, and sub-processors. Do not publish a generic template that misrepresents the implemented stack.

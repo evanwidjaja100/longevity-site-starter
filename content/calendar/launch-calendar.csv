@@ -1,0 +1,13 @@
+article_id,order,publish_week,title,pillar,status,testing_required,medical_review_required,primary_question,original_contribution
+LEL-001,1,1,What Longevity Evidence Lab Does—and Does Not Claim,Evidence Literacy,Planned,No,No,What can readers expect from this publication?,Published governance and decision-boundary map
+LEL-002,2,1,What Is Biohacking? An Evidence and Risk Framework,Evidence Literacy,Planned,No,Yes,How should adults evaluate biohacking practices?,Evidence-risk decision matrix
+LEL-003,3,2,How to Read a Health Study Without Being Misled,Evidence Literacy,Planned,No,No,Which study features change confidence in a claim?,Study appraisal worksheet
+LEL-004,4,3,How We Grade Evidence and Test Consumer Products,Evidence Literacy,Planned,No,No,How are evidence grades and product scores produced?,Public methodology and protocol index
+LEL-005,5,4,How to Improve Sleep Before Buying Another Device,Sleep and Circadian Health,Planned,No,Yes,Which lower-risk sleep fundamentals should come first?,Decision tool for escalation and device need
+LEL-006,6,5,How Accurate Are Consumer Sleep Trackers?,Wearables and Consumer Measurement,Planned,No,Yes,What can consumer sleep trackers measure reliably?,Evidence matrix by metric
+LEL-007,7,6,Resistance Training for Healthy Aging: A Beginner Framework,Movement and Physical Capacity,Planned,No,Yes,How can beginners structure resistance training safely?,Progression framework with referral boundaries
+LEL-008,8,7,Foods and Dietary Patterns Associated With Healthy Aging,Nutrition and Healthy Aging,Planned,No,Yes,What dietary patterns have the strongest human evidence?,Affordable meal-component matrix
+LEL-009,9,8,"HRV Explained: Useful Trend, Not Diagnosis",Wearables and Consumer Measurement,Planned,No,Yes,How should consumers interpret HRV trends?,Interpretation boundary diagram
+LEL-010,10,9,Oura Ring Review Using the Published Test Protocol,Consumer Lab,Blocked until real testing,Yes,Yes,Who is the device a good fit for after protocol-compliant testing?,Real test record and downloadable observations
+LEL-011,11,10,Wearable Privacy and Health Data,Wearables and Consumer Measurement,Planned,No,No,What privacy and data-access questions should buyers ask?,Vendor policy comparison table with checked dates
+LEL-012,12,11,Supplement Labels Third-Party Testing and Marketing Red Flags,Supplements and High-Uncertainty Interventions,Planned,No,Yes,How can consumers screen supplement marketing and labels?,Label-reading checklist and certifier-scope matrix

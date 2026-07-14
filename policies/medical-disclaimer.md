@@ -1,0 +1,2 @@
+# Medical Disclaimer
+The information on this site is for general education and is not a substitute for individualized medical advice, diagnosis, or treatment. Consult a qualified healthcare professional before changing medication, supplements, diet, fasting, exercise, sleep interventions, heat or cold exposure, or other health practices—particularly during pregnancy, before surgery, or when managing a chronic condition. In an emergency, contact local emergency services.

@@ -1,0 +1,16 @@
+source_article,destination_article,relationship,anchor_intent,required,publication_dependency,reader_purpose
+LEL-002,LEL-001,Defines publication boundary,what the lab does and does not claim,Yes,Destination first,Understand scope before evaluating interventions
+LEL-003,LEL-001,Provides evidence literacy,our editorial boundaries,No,Destination first,Understand how publication claims are governed
+LEL-004,LEL-003,Supplies methodology,how study quality is assessed,Yes,Destination first,Connect grading rules to study appraisal
+LEL-005,LEL-002,Gives practical implementation,evidence and risk framework,No,Destination first,Apply risk hierarchy before buying devices
+LEL-006,LEL-003,Provides evidence literacy,how validation studies should be read,Yes,Destination first,Interpret accuracy claims cautiously
+LEL-006,LEL-004,Supplies methodology,how we grade evidence,Yes,Destination first,Understand confidence labels
+LEL-007,LEL-002,Provides safety detail,risk framework and escalation points,No,Destination first,Apply general safety boundaries
+LEL-008,LEL-003,Provides evidence literacy,how nutrition studies are interpreted,No,Destination first,Understand observational evidence limitations
+LEL-009,LEL-006,Explains measurement,sleep and recovery sensor limitations,No,Destination first,Compare metric constraints
+LEL-009,LEL-003,Provides evidence literacy,surrogate outcomes and meaningful outcomes,Yes,Destination first,Avoid diagnostic interpretation
+LEL-010,LEL-004,Supplies methodology,published consumer testing protocol,Yes,Destination first,Verify test design before reading conclusions
+LEL-010,LEL-006,Compares products,sleep-tracking accuracy context,Yes,Destination first,Separate device experience from clinical validation
+LEL-011,LEL-004,Supplies methodology,consumer-product evaluation standards,No,Destination first,Understand privacy as a scoring dimension
+LEL-012,LEL-003,Provides evidence literacy,evaluate source quality and conflicts,Yes,Destination first,Assess marketing evidence
+LEL-012,LEL-001,Provides regulatory context,publication claim boundaries,No,Destination first,Understand non-medical-advice scope
