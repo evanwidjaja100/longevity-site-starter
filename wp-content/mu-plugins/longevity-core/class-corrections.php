@@ -76,7 +76,8 @@ final class Corrections {
 		if ( empty( $records ) ) {
 			return '';
 		}
-		$html = '<section class="longevity-update-history" aria-labelledby="longevity-corrections-title"><h2 id="longevity-corrections-title">' . esc_html__( 'Corrections and material updates', 'longevity-core' ) . '</h2><ol>';
+		$heading_id = wp_unique_id( 'longevity-corrections-' );
+		$html = '<section class="longevity-update-history" aria-labelledby="' . esc_attr( $heading_id ) . '"><h2 id="' . esc_attr( $heading_id ) . '">' . esc_html__( 'Corrections and material updates', 'longevity-core' ) . '</h2><ol>';
 		foreach ( $records as $record ) {
 			$date = get_post_meta( $record->ID, 'corrected_date', true );
 			$note = get_post_meta( $record->ID, 'public_correction_note', true );

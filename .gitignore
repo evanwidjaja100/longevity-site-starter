@@ -9,6 +9,7 @@ node_modules/
 coverage/
 playwright-report/
 test-results/
+reports/
 build/
 .DS_Store
 *.log

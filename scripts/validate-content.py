@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import csv
 import re
+import shutil
+import subprocess
 import sys
 from datetime import date, datetime
 from pathlib import Path
@@ -240,9 +242,25 @@ def validate_templates() -> None:
 
 
 def validate_no_tracked_env() -> None:
-    for path in ROOT.glob(".env*"):
-        if path.name not in {".env.example", ".env.ci"}:
-            error(f"{path}: tracked environment files other than .env.example are forbidden")
+    allowed = {".env.example", ".env.ci"}
+    tracked: set[str] = set()
+    if shutil.which("git") and (ROOT / ".git").exists():
+        result = subprocess.run(
+            ["git", "ls-files", ".env*"],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode == 0:
+            tracked.update(line.strip() for line in result.stdout.splitlines() if line.strip())
+    elif (ROOT / "MANIFEST.sha256").exists():
+        for line in (ROOT / "MANIFEST.sha256").read_text(encoding="utf-8").splitlines():
+            if "  " in line:
+                tracked.add(line.split("  ", 1)[1].removeprefix("./"))
+    for name in sorted(item for item in tracked if Path(item).name.startswith(".env")):
+        if Path(name).name not in allowed:
+            error(f"{ROOT / name}: tracked environment files other than .env.example are forbidden")
 
 
 def main() -> int:

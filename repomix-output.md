@@ -39,6 +39,7 @@ The content is organized as follows:
     ci.yml
     scheduled-content-validation.yml
     security.yml
+  dependabot.yml
 config/
   content-schema/
     editorial-meta.schema.json
@@ -118,12 +119,18 @@ docs/
     staging-deployment.md
     vps-deployment.md
   testing/
+    artifacts/
+      baseline-home-1440.png
+      baseline-home-360.png
+      baseline-home-768.png
+      implemented-home-1440.png
     accessibility-checklist.md
     release-acceptance.md
     test-strategy.md
   baseline-audit.md
   final-implementation-report.md
   git-history.md
+  implementation-baseline-ui-ux.md
   implementation-status.md
 operations/
   checklists/
@@ -147,6 +154,8 @@ policies/
 scripts/
   backup-example.sh
   bootstrap.sh
+  create-test-fixtures.php
+  create-test-fixtures.sh
   export-test-data.py
   regenerate-manifest.sh
   restore-test-example.sh
@@ -162,6 +171,7 @@ tests/
   e2e/
     accessibility.spec.js
     core.spec.js
+    visual.spec.js
   fixtures/
     invalid.env
     malicious.env
@@ -178,17 +188,55 @@ wp-content/
   mu-plugins/
     longevity-core/
       assets/
+        admin-governance.css
+        admin-governance.js
         analytics.js
+        blocks.js
+      blocks/
+        article-meta/
+          block.json
+        author-profile/
+          block.json
+        breadcrumbs/
+          block.json
+        content-card-meta/
+          block.json
+        corrections/
+          block.json
+        related-content/
+          block.json
+        review-decision/
+          block.json
+        review-score/
+          block.json
+        reviewer-card/
+          block.json
+        search-filters/
+          block.json
+        source-list/
+          block.json
+        table-of-contents/
+          block.json
+        test-method/
+          block.json
+        trust-summary/
+          block.json
       bootstrap.php
+      class-admin-assets.php
       class-admin-ui.php
       class-affiliate-registry.php
       class-analytics.php
+      class-blocks.php
       class-claims.php
       class-cli.php
+      class-content-discovery.php
       class-content-types.php
       class-corrections.php
+      class-freshness.php
       class-gate-result.php
       class-meta-registry.php
+      class-migrations.php
+      class-public-components.php
       class-publication-gates.php
       class-rest-api.php
       class-review-methodology.php
@@ -260,7 +308,20 @@ wp-content/
         footer.html
         header.html
       patterns/
+        article-introduction.php
         article-trust.php
+        consumer-lab-intro.php
+        corrections-cta.php
+        evidence-guide-grid.php
+        featured-guide.php
+        homepage-hero.php
+        methodology-cta.php
+        newsletter-cta.php
+        publication-identity.php
+        review-verdict.php
+        sources-section.php
+        topic-navigation.php
+        trust-principles.php
       templates/
         404.html
         archive-review.html
@@ -720,11 +781,14 @@ wp-content/
   index.php
 .env.ci
 .env.example
+.gitattributes
 .gitignore
+.npmrc
 .stylelintrc.json
 compose.yaml
 composer.json
 eslint.config.js
+lighthouserc.cjs
 Makefile
 MANIFEST.sha256
 package.json
@@ -779,7 +843,36 @@ jobs:
       - run: docker compose up -d db wordpress
       - run: docker compose run --rm --entrypoint sh wpcli /scripts/bootstrap.sh
       - run: ./scripts/smoke-test.sh
-      - run: docker compose down -v
+      - if: always()
+        run: docker compose down -v
+  browser-tests:
+    runs-on: ubuntu-latest
+    needs: validate
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: cp .env.ci .env
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: docker compose up -d db wordpress
+      - run: docker compose run --rm --entrypoint sh wpcli /scripts/bootstrap.sh
+      - run: docker compose run --rm --entrypoint sh wpcli /scripts/create-test-fixtures.sh
+      - run: npm run test:e2e
+      - run: npm run test:a11y
+      - run: npm run test:lighthouse
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-diagnostics
+          path: |
+            reports/
+            test-results/
+          if-no-files-found: ignore
+      - if: always()
+        run: docker compose down -v
 ````
 
 ## File: .github/workflows/scheduled-content-validation.yml
@@ -835,6 +928,27 @@ jobs:
         run: |
           bad=$(find . -path ./.git -prune -o -type f -perm /022 -print)
           test -z "$bad" || { echo "$bad"; exit 1; }
+````
+
+## File: .github/dependabot.yml
+````yaml
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+  - package-ecosystem: composer
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 5
 ````
 
 ## File: config/content-schema/editorial-meta.schema.json
@@ -2543,6 +2657,114 @@ This history records the focused implementation commits created from the reconst
 - `2a02a52` docs: document production deployment controls
 ````
 
+## File: docs/implementation-baseline-ui-ux.md
+````markdown
+# UI/UX Implementation Baseline
+
+Baseline date: 2026-07-14  
+Repository root: `D:\Desktop\test\longevity-site-starter`
+
+## Scope reviewed
+
+The required repository configuration, CI workflows, architecture, editorial, testing, operations, theme templates, MU-plugin services, scripts, PHP tests, integration tests, and browser tests were inspected before implementation. WordPress remains the canonical CMS, the `longevity-core` MU-plugin remains the governance control plane, and no evidence, reviewer identity, citation, approval, product observation, commercial relationship, or correction record was created.
+
+## Current strengths
+
+- The codebase already uses a portable WordPress modular monolith with a block theme and first-party MU-plugin services.
+- Publication gates, private operational post types, role-specific capabilities, medical-review attestation, scoring, corrections, affiliate controls, conservative schema, analytics, REST health/readiness endpoints, and WP-CLI tooling are present.
+- Public templates already include a skip link, visible focus styles, responsive tables, reduced-motion handling, print rules, trust shortcodes, useful review empty-state copy, and a minimal public health response.
+- Docker Compose configuration is valid and the local WordPress/MySQL stack starts successfully.
+- `package-lock.json` was present. The missing `composer.lock` was generated from the declared constraints with the official Composer Docker image.
+- Composer dependency audit and the existing PHPUnit suite pass.
+
+## Current weaknesses
+
+- The primary navigation uses a `core/page-list` fallback and exposes pages according to WordPress page state instead of a curated reader hierarchy.
+- The homepage is mostly the front-page body plus two query loops. It lacks deliberate trust principles, topic entry points, methodology/corrections navigation, robust content metadata, and conditional Consumer Lab presentation.
+- Cards generally omit featured images, content type, dates, evidence grade, tested state, and medical-review state.
+- Article and review templates have no visible breadcrumbs, source list, table of contents, related-content component, descriptive previous/next titles, or structured review decision summary.
+- Trust rendering is concentrated in `class-shortcodes.php`; no dynamic trust blocks or shared public rendering service exists.
+- The governance meta box is a long linear form and uses raw JSON as the primary score-dimension editor.
+- Search has no allowlisted GET filters and archive/author cards are minimally differentiated.
+- Analytics exposes an event allowlist but does not yet enforce parameter schemas or consent-aware vendor forwarding.
+- No migration/freshness service or internal operational status report exists.
+- Browser tests cover only the homepage, review archive, and health endpoint.
+- Lighthouse budgets and browser CI are not configured.
+- The smoke test's diagnostic grep matches the legitimate CSS custom property name `--wp--preset--color--warning`, causing a false failure.
+- PHPCS references the unavailable `PHPCompatibilityWP` ruleset with the current Composer dependency set.
+
+## Baseline command results
+
+| Command | Result | Notes |
+| --- | --- | --- |
+| `git status` / `git rev-parse --show-toplevel` | Unavailable | Git is not installed or available on `PATH`; repository root was confirmed from the shared workspace context and `.git` directory. |
+| `php -v` | Unavailable on host | PHP checks were run in the official WordPress/Composer containers. |
+| `composer --version` | Unavailable on host | Official `composer:2` Docker image used. |
+| `node --version` | Pass | Node `v24.18.0`. |
+| `npm --version` | Pass | npm `11.16.0`. |
+| `python --version` | Pass | Python `3.14.6`. |
+| `docker --version` | Pass | Docker `29.6.1`. |
+| `docker compose version` | Pass | Docker Compose `v5.2.0`. |
+| `make --version` | Unavailable | GNU Make is not installed. Equivalent commands were run individually where possible. |
+| `docker compose config --quiet` | Pass | Compose interpolation and schema validation succeeded with the existing local `.env`. |
+| `composer validate --strict` | Pass | Executed through `composer:2`. |
+| `composer install --no-interaction --prefer-dist` | Pass | Generated `composer.lock`; installed 35 development packages. |
+| `composer audit --locked` | Pass | No security vulnerability advisories found. |
+| `composer test` | Pass | PHPUnit: 12 tests, 21 assertions. |
+| `composer lint` | Fail | PHPCS cannot resolve the configured `PHPCompatibilityWP` sniff. |
+| Docker-backed `tests/php/run-unit-tests.php` | Pass | Dependency-free fallback tests passed under PHP 8.3. |
+| `npm ci` | Fail | Timed out downloading `write-file-atomic` from the configured internal registry; cleanup also reported a Windows `EPERM` directory error. |
+| `npm audit --audit-level=high` | Pass | Lockfile audit reported 0 vulnerabilities. This does not imply installation succeeded. |
+| `npm run lint` | Fail | `stylelint` was unavailable because `npm ci` did not complete. |
+| `python scripts/validate-content.py` | Fail | Local `.env` is intentionally ignored, but the validator treats every `.env*` file as tracked because it does not consult Git or the manifest. |
+| `docker compose up -d db wordpress` | Pass | MySQL and WordPress became healthy. |
+| `docker compose run --rm --entrypoint sh wpcli /scripts/bootstrap.sh` | Pass | Site bootstrapped at `http://localhost:8080`; policy/legal pages remain drafts and indexing remains disabled. |
+| Homepage HTTP request | Pass | HTTP 200. |
+| `GET /wp-json/longevity/v1/health` | Pass | HTTP 200 with minimal `status`, `version`, and `site` fields. |
+| `scripts/smoke-test.sh` | Fail (false positive) | Requests succeed, but the diagnostic grep matches WordPress global CSS containing `Warning:` as part of a token name. |
+| Existing Playwright / axe tests | Unavailable | npm dependencies and Playwright browsers could not be installed because `npm ci` timed out. |
+| Lighthouse | Unavailable | Lighthouse tooling is not installed and the npm dependency path is currently blocked. |
+
+## Baseline screenshots
+
+Responsive homepage screenshots were captured from the live bootstrapped WordPress site using the in-app browser:
+
+- `docs/testing/artifacts/baseline-home-360.png`
+- `docs/testing/artifacts/baseline-home-768.png`
+- `docs/testing/artifacts/baseline-home-1440.png`
+
+The screenshots confirm accidental `Sample Page` exposure in primary navigation, sparse discovery content, limited card context, and weak footer information architecture.
+
+## Architectural constraints retained
+
+- WordPress remains canonical; no SPA, headless conversion, microservice, GraphQL-first layer, or proprietary CMS dependency may be introduced.
+- Publication readiness, claims/sources, specialist review, testing, scoring, disclosure, corrections, roles, and audit history remain authoritative in the MU-plugin.
+- Existing post types, metadata keys, capabilities, routes, CLI commands, shortcodes, templates, and URLs remain backward compatible.
+- Public components expose only approved, safe metadata and return no output for incomplete state.
+- No critical workflow depends on ACF, a page builder, a commercial plugin, or a proprietary SaaS.
+- Reader safety and evidence integrity outrank conversion.
+
+## Highest-priority screens and services
+
+1. Header navigation and footer link architecture.
+2. Front page hero, trust principles, topic discovery, Start Here path, evidence cards, and conditional Consumer Lab section.
+3. Single article and review templates, including breadcrumbs, TOC, sources, decision context, corrections, and related content.
+4. Shared public rendering service and first-party dynamic blocks.
+5. Governance meta box and score-dimension editor.
+6. Search/filter handling, archive cards, and author identity presentation.
+7. Analytics consent/parameter enforcement, freshness processing, schema/social fallbacks, and operational status.
+8. Browser, accessibility, visual, and CI coverage.
+
+## Assumptions
+
+- Existing local `.env` values are development-only and must not be overwritten or committed.
+- Policy and methodology destinations may be linked by stable intended slugs even while their pages remain drafts locally.
+- Empty public components should teach readers about methodology without implying that evidence review or product testing occurred.
+- Dynamic blocks can use server-rendered PHP with small editor-only registration JavaScript and no public framework runtime.
+- Real production reviewer verification, evidence acquisition, product testing, legal approval, SMTP, consent vendor, analytics vendor, WAF/CDN, backup storage, and monitoring remain external release tasks.
+- Git-based status/diff checks must remain documented as unavailable unless a Git binary becomes available later in the session.
+````
+
 ## File: docs/implementation-status.md
 ````markdown
 # Implementation Status
@@ -2930,6 +3152,369 @@ printf 'Policy and legal pages remain drafts until accountable human approval.\n
 printf 'Search-engine visibility remains disabled; enable it only at production launch.\n'
 ````
 
+## File: scripts/create-test-fixtures.php
+````php
+<?php
+/**
+ * Idempotent synthetic content for local browser and CI tests only.
+ *
+ * All identities, products, sources, and URLs are explicitly synthetic and use
+ * reserved example domains. This file must never be used for production data.
+ */
+
+if ( 'production' === wp_get_environment_type() ) {
+	WP_CLI::error( 'Synthetic fixtures must never run in production.' );
+}
+
+$today       = gmdate( 'Y-m-d' );
+$next_review = gmdate( 'Y-m-d', strtotime( '+180 days' ) );
+$admin_id    = get_current_user_id();
+
+$author = get_user_by( 'login', 'lel_test_author' );
+if ( ! $author ) {
+	$author_id = wp_create_user( 'lel_test_author', wp_generate_password( 32, true, true ), 'author@example.invalid' );
+	if ( is_wp_error( $author_id ) ) {
+		WP_CLI::error( $author_id->get_error_message() );
+	}
+	$author = get_user_by( 'id', $author_id );
+}
+$author->set_role( 'lel_writer' );
+wp_update_user( array( 'ID' => $author->ID, 'display_name' => '[TEST] Synthetic Author', 'description' => 'Synthetic author profile for local and CI route testing only.' ) );
+
+/** Find or create a named post. */
+function lel_fixture_post( string $type, string $slug, string $title, string $content, int $author_id ): int {
+	$found = get_posts(
+		array(
+			'post_type'      => $type,
+			'post_status'    => 'any',
+			'name'           => $slug,
+			'posts_per_page' => 1,
+			'fields'         => 'ids',
+		)
+	);
+	$post_id = empty( $found ) ? 0 : (int) $found[0];
+	$data    = array(
+		'ID'           => $post_id,
+		'post_type'    => $type,
+		'post_status'  => 'draft',
+		'post_name'    => $slug,
+		'post_title'   => $title,
+		'post_content' => $content,
+		'post_excerpt' => 'Synthetic local/CI fixture used to verify the public experience and governance controls.',
+		'post_author'  => $author_id,
+	);
+	$result = $post_id ? wp_update_post( $data, true ) : wp_insert_post( $data, true );
+	if ( is_wp_error( $result ) ) {
+		WP_CLI::error( $result->get_error_message() );
+	}
+	return (int) $result;
+}
+
+/** Apply a metadata map. */
+function lel_fixture_meta( int $post_id, array $values ): void {
+	foreach ( $values as $key => $value ) {
+		update_post_meta( $post_id, $key, $value );
+	}
+}
+
+/** Common publication metadata for synthetic public fixtures. */
+function lel_fixture_public_meta( string $today, string $next_review ): array {
+	return array(
+		'content_summary'              => 'A synthetic page for exercising editorial metadata and public trust components.',
+		'content_scope'                => 'Local and CI rendering behavior only.',
+		'content_limitations'          => 'This is test data, not health guidance, product advice, or real evidence.',
+		'original_contribution'        => 'Automated verification of templates, structured metadata, and publication controls.',
+		'commercial_relationship'      => 'none',
+		'affiliate_disclosure_status'  => 'not_required',
+		'editorial_approval_status'    => 'ready',
+		'correction_status'            => 'none',
+		'last_material_update'         => $today,
+		'next_content_review_date'     => $next_review,
+		'region_scope'                 => 'Synthetic test environment',
+		'uncertainty_statement_present'=> true,
+	);
+}
+
+$category = get_term_by( 'slug', 'evidence-literacy', 'category' );
+if ( ! $category ) {
+	$created  = wp_insert_term( 'Evidence Literacy', 'category', array( 'slug' => 'evidence-literacy' ) );
+	$category = is_wp_error( $created ) ? null : get_term( (int) $created['term_id'], 'category' );
+}
+
+$article_content = <<<'HTML'
+<!-- wp:paragraph {"className":"longevity-fixture-notice"} --><p class="longevity-fixture-notice"><strong>Synthetic test content:</strong> this page exists only in local and CI environments. It is not evidence or health advice.</p><!-- /wp:paragraph -->
+<!-- wp:heading --><h2>What this test guide checks</h2><!-- /wp:heading -->
+<!-- wp:paragraph --><p>This guide checks that long-form editorial content remains readable, predictable, and transparent across common screen sizes. It exercises the article header, metadata, trust summary, table of contents, section anchors, source list, correction history, related content, and footer. Every statement on this page describes software behavior, not human health. The deliberately plain language also helps automated checks find a stable reading order without relying on decorative text or hidden labels.</p><!-- /wp:paragraph -->
+<!-- wp:heading --><h2>How the synthetic evidence label works</h2><!-- /wp:heading -->
+<!-- wp:paragraph --><p>The evidence label attached to this record is test data. Its rationale says exactly that, and its source uses an example domain reserved for documentation. The public renderer should expose the grade as text, explain the uncertainty, and avoid implying that a color alone communicates meaning. A source should appear only when its linked claim is verified and contains bounded public bibliographic fields. Private editorial notes must never be printed into the page.</p><!-- /wp:paragraph -->
+<!-- wp:heading --><h2>Reading order and navigation</h2><!-- /wp:heading -->
+<!-- wp:paragraph --><p>The document has one primary heading followed by sequential section headings. A generated table of contents appears because the article is long enough and contains several sections. Each link points to a stable, unique identifier. Keyboard users should be able to enter through the skip link, continue through the article controls, and reach the correction and related-content areas without a focus trap. Zooming or narrowing the viewport should not hide essential information.</p><!-- /wp:paragraph -->
+<!-- wp:heading --><h2>Trust information</h2><!-- /wp:heading -->
+<!-- wp:paragraph --><p>The trust summary separates publication dates, evidence context, fact-check state, medical-review state, testing state, and commercial relationships. An absent review should be described honestly instead of being framed as a credential. Synthetic records carry conspicuous labels. No real professional identity, institution, product, study, price, outcome, or recommendation is represented here. That boundary is important because development data should not accidentally become public authority.</p><!-- /wp:paragraph -->
+<!-- wp:heading --><h2>Resilient empty states</h2><!-- /wp:heading -->
+<!-- wp:paragraph --><p>Some components intentionally have little data. The interface should omit empty sections or explain what is unavailable without exposing database keys. Search and archive views should offer a useful recovery path. A review archive with no matching filter should not invent a recommendation. Related content should stay bounded and should not repeat the current record. These decisions keep a sparse staging site understandable while preserving room for future verified material.</p><!-- /wp:paragraph -->
+<!-- wp:heading --><h2>Limits of this fixture</h2><!-- /wp:heading -->
+<!-- wp:paragraph --><p>Automated checks cannot establish editorial truth, clinical accuracy, legal compliance, or the validity of a professional credential. They can verify markup, permissions, state transitions, sanitization, accessibility rules, and performance budgets. Human review remains required for real publication. A passing fixture therefore means that the implementation behaves as designed under known inputs; it does not certify any real-world content or operational process.</p><!-- /wp:paragraph -->
+<!-- wp:paragraph --><p>Performance results also depend on the runtime, network, cache, browser, and installed extensions. The local fixture controls only a small part of that environment. Production monitoring must use representative devices and real traffic while respecting consent and privacy. A laboratory score is a release signal, not a promise that every visit will have the same timing.</p><!-- /wp:paragraph -->
+<!-- wp:paragraph --><p>Finally, this record is deliberately easy to identify and remove. Its slug, title, accounts, email domains, claims, and product names all carry test markers. The production launch checklist requires deleting synthetic records and rerunning the public crawl before search visibility is enabled.</p><!-- /wp:paragraph -->
+<!-- wp:paragraph --><p>Additional checks cover responsive images, readable line lengths, high-contrast focus indicators, reduced-motion preferences, print output, and forced-color modes. They also verify that a missing image does not leave an empty visual frame, that dates use machine-readable values, and that linked citations use meaningful labels. These are narrow implementation assertions that can be repeated reliably on every change.</p><!-- /wp:paragraph -->
+<!-- wp:paragraph --><p>The governance layer is exercised separately from presentation. Its synthetic complete records must pass, incomplete records must stay unpublished, and unsupported schema must remain absent. Migration and freshness jobs are bounded and idempotent. Analytics accepts only documented event fields and does not forward events until the relevant consent state is active. Together, these fixtures provide a compact regression surface without claiming to validate real evidence.</p><!-- /wp:paragraph -->
+HTML;
+
+$article_id = lel_fixture_post( 'post', 'test-evidence-guide', '[TEST] Evidence guide rendering', $article_content, $author->ID );
+lel_fixture_meta(
+	$article_id,
+	array_merge(
+		lel_fixture_public_meta( $today, $next_review ),
+		array(
+			'evidence_grade'           => 'U',
+			'evidence_grade_rationale' => 'Unrated synthetic data used only to test the evidence-grade interface.',
+			'evidence_cutoff_date'      => $today,
+			'fact_check_status'         => 'not_required',
+			'medical_review_status'     => 'not_required',
+			'testing_status'            => 'not_required',
+		)
+	)
+);
+if ( $category ) {
+	wp_set_post_terms( $article_id, array( (int) $category->term_id ), 'category' );
+}
+wp_set_post_terms( $article_id, array( 'synthetic-test', 'evidence-interface' ), 'post_tag' );
+
+$claim_id = lel_fixture_post( 'lel_claim', 'test-interface-claim', '[TEST] Interface claim', '', $admin_id );
+lel_fixture_meta(
+	$claim_id,
+	array(
+		'post_id'             => $article_id,
+		'claim_id'            => 'TEST-INTERFACE-001',
+		'claim_text'          => 'This synthetic claim exists only to exercise the verified-source renderer.',
+		'claim_category'      => 'test',
+		'claim_importance'    => 'low',
+		'source_type'         => 'Synthetic test record',
+		'source_title'        => 'Reserved example source for interface testing',
+		'source_authors'      => 'Automated test fixture',
+		'source_url'          => 'https://example.invalid/test-source',
+		'source_identifier'   => 'TEST-SOURCE-001',
+		'publication_date'    => $today,
+		'accessed_date'       => $today,
+		'evidence_grade'      => 'U',
+		'verified_by'         => (string) $admin_id,
+		'verification_date'   => $today,
+		'verification_status' => 'verified',
+		'recheck_date'        => $next_review,
+	)
+);
+
+$reviewer = get_user_by( 'login', 'lel_synthetic_reviewer' );
+if ( ! $reviewer ) {
+	$reviewer_id = wp_create_user( 'lel_synthetic_reviewer', wp_generate_password( 32, true, true ), 'reviewer@example.invalid' );
+	if ( is_wp_error( $reviewer_id ) ) {
+		WP_CLI::error( $reviewer_id->get_error_message() );
+	}
+	$reviewer = get_user_by( 'id', $reviewer_id );
+}
+$reviewer->set_role( 'lel_medical_reviewer' );
+wp_update_user( array( 'ID' => $reviewer->ID, 'display_name' => '[TEST] Synthetic Reviewer' ) );
+update_user_meta( $reviewer->ID, 'professional_credentials', 'Synthetic credential for automated interface testing only; not a real clinician.' );
+update_user_meta( $reviewer->ID, 'credential_verification_status', 'verified' );
+update_user_meta( $reviewer->ID, 'credential_verification_date', $today );
+update_user_meta( $reviewer->ID, 'review_scope', 'Synthetic test records only.' );
+update_user_meta( $reviewer->ID, 'conflict_disclosure', 'Synthetic identity; no real-world professional relationship.' );
+
+$medical_id = lel_fixture_post( 'post', 'test-medically-reviewed-article', '[TEST] Medical review workflow', $article_content, $author->ID );
+$medical_claim_id = lel_fixture_post( 'lel_claim', 'test-medical-claim', '[TEST] Medical workflow claim', '', $admin_id );
+lel_fixture_meta(
+	$medical_claim_id,
+	array(
+		'post_id'             => $medical_id,
+		'claim_id'            => 'TEST-MEDICAL-001',
+		'claim_text'          => 'Synthetic statement used only to exercise medical-review gating.',
+		'source_type'         => 'Synthetic test record',
+		'source_title'        => 'Reserved example source for medical workflow testing',
+		'source_url'          => 'https://example.invalid/test-medical-source',
+		'verification_status' => 'verified',
+		'verified_by'         => (string) $admin_id,
+		'verification_date'   => $today,
+	)
+);
+lel_fixture_meta(
+	$medical_id,
+	array_merge(
+		lel_fixture_public_meta( $today, $next_review ),
+		array(
+			'material_health_claims'          => true,
+			'fact_check_status'                => 'complete',
+			'fact_checked_by'                  => $admin_id,
+			'fact_checked_date'                => $today,
+			'next_fact_check_date'             => $next_review,
+			'medical_review_required'          => true,
+			'medical_review_status'            => 'complete',
+			'medical_reviewer_user_id'         => $reviewer->ID,
+			'medical_reviewer_credentials'     => 'Synthetic credential for automated interface testing only.',
+			'medical_review_scope'             => 'full_article',
+			'medical_review_sections'          => 'All synthetic sections.',
+			'medical_review_limitations'       => 'No real medical assertions were reviewed.',
+			'medical_review_conflicts'         => 'Synthetic identity; no real conflicts.',
+			'medical_review_revision_status'   => 'not_applicable',
+			'medical_review_date'              => $today,
+			'next_medical_review_date'         => $next_review,
+			'medical_review_version'           => 'test-1.0',
+			'medical_review_attested'          => true,
+			'testing_status'                   => 'not_required',
+		)
+	)
+);
+
+$protocol_id = lel_fixture_post( 'lel_protocol', 'test-wearable-protocol', '[TEST] Wearable protocol', '', $admin_id );
+lel_fixture_meta(
+	$protocol_id,
+	array(
+		'protocol_id'                      => 'TEST-WEARABLE',
+		'protocol_version'                 => '1.0',
+		'product_category'                 => 'Synthetic wearable',
+		'effective_date'                   => '2025-01-01',
+		'minimum_test_duration'            => 'Three synthetic sessions',
+		'required_observations'            => 'Rendering and state checks only.',
+		'required_comparison_methods'      => 'Synthetic comparison fixture.',
+		'required_environmental_conditions'=> 'Local or CI runtime.',
+		'required_disclosure_fields'       => 'Synthetic product and acquisition labels.',
+		'known_limitations'                 => 'No physical product was tested.',
+		'protocol_reviewer_user_id'         => $admin_id,
+		'approval_date'                     => '2025-01-01',
+		'approval_status'                   => 'approved',
+	)
+);
+
+$record_id = lel_fixture_post( 'lel_test_record', 'test-wearable-record', '[TEST] Wearable test record', '', $admin_id );
+lel_fixture_meta(
+	$record_id,
+	array(
+		'product_name'       => 'Example Device TEST-1',
+		'unit_identifier'    => 'SYNTHETIC-UNIT-001',
+		'acquisition_method' => 'purchased',
+		'tester_user_ids'    => (string) $admin_id,
+		'test_start_date'    => '2025-02-01',
+		'test_end_date'      => '2025-02-03',
+		'protocol_id'        => 'TEST-WEARABLE',
+		'protocol_version'   => '1.0',
+		'raw_observations'   => 'Synthetic observations for template verification only.',
+		'measurement_equipment'=> 'No physical equipment; software fixture.',
+		'failures'           => 'None recorded in the synthetic run.',
+		'deviations'         => 'Physical testing not applicable.',
+		'comparison_devices' => 'Example Comparator TEST-2.',
+		'environment'        => 'Local Docker environment.',
+		'evidence_references'=> 'https://example.invalid/test-method',
+		'conflicts'          => 'Synthetic test data only.',
+		'approval_status'    => 'approved',
+		'approved_by'        => $admin_id,
+		'approval_date'      => $today,
+	)
+);
+
+$review_content = '<!-- wp:paragraph --><p><strong>Synthetic product review:</strong> no physical product, purchase, endorsement, or recommendation is represented.</p><!-- /wp:paragraph --><!-- wp:heading --><h2>Decision context</h2><!-- /wp:heading --><p>This local fixture verifies that the decision summary appears before commercial actions and that score confidence remains distinct from the score.</p><!-- wp:heading --><h2>Method</h2><!-- /wp:heading --><p>The linked approved record and matching protocol version are synthetic. The interface must say what was and was not tested.</p><!-- wp:heading --><h2>Limitations</h2><!-- /wp:heading --><p>No physical performance, price, durability, accuracy, or health outcome was measured.</p>';
+$review_id      = lel_fixture_post( 'review', 'test-valid-review', '[TEST] Valid review workflow', $review_content, $author->ID );
+$dimensions     = array(
+	array( 'name' => 'Interface clarity', 'score' => 4.0, 'weight' => 50.0 ),
+	array( 'name' => 'Metadata completeness', 'score' => 3.6, 'weight' => 50.0 ),
+);
+lel_fixture_meta(
+	$review_id,
+	array_merge(
+		lel_fixture_public_meta( $today, $next_review ),
+		array(
+			'testing_required'          => true,
+			'testing_status'            => 'complete',
+			'testing_start_date'        => '2025-02-01',
+			'testing_end_date'          => '2025-02-03',
+			'testing_duration'          => 'Three synthetic sessions',
+			'testing_methodology_url'   => 'https://example.invalid/test-method',
+			'testing_protocol_version'  => '1.0',
+			'test_record_id'            => $record_id,
+			'product_acquisition_method'=> 'purchased',
+			'review_score'              => 3.8,
+			'review_score_version'      => '1.0',
+			'review_score_confidence'   => 'Low confidence',
+			'review_score_dimensions'   => $dimensions,
+			'best_for'                  => 'Testing the complete review interface.',
+			'not_for'                   => 'Any real purchase or health decision.',
+			'tested_product_model'      => 'Example Device TEST-1',
+			'comparison_set'            => 'Example Comparator TEST-2',
+			'major_failures'            => 'No physical product was tested.',
+			'fact_check_status'         => 'not_required',
+			'medical_review_status'     => 'not_required',
+		)
+	)
+);
+if ( $category ) {
+	wp_set_post_terms( $review_id, array( (int) $category->term_id ), 'category' );
+}
+
+$blocked_id = lel_fixture_post( 'review', 'test-blocked-review', '[TEST] Blocked incomplete review', $review_content, $admin_id );
+lel_fixture_meta(
+	$blocked_id,
+	array_merge(
+		lel_fixture_public_meta( $today, $next_review ),
+		array(
+			'testing_required'         => true,
+			'testing_status'           => 'not_started',
+			'tested_product_model'     => 'Example Incomplete Device',
+			'comparison_set'           => 'No completed comparison.',
+			'editorial_approval_status'=> 'testing_incomplete',
+		)
+	)
+);
+
+$correction_id = lel_fixture_post( 'lel_correction', 'test-correction-record', '[TEST] Completed correction', '', $admin_id );
+lel_fixture_meta(
+	$correction_id,
+	array(
+		'corrected_post_id'       => $article_id,
+		'reported_date'           => $today,
+		'reported_by'             => 'Automated synthetic fixture',
+		'issue_category'          => 'clarification',
+		'issue_description'       => 'Test correction lifecycle and public output.',
+		'severity'                => 'minor',
+		'public_impact'           => 'No real-world impact; test data only.',
+		'assigned_editor_user_id' => $admin_id,
+		'correction_status'       => 'complete',
+		'resolution'              => 'Confirmed that the correction component renders.',
+		'corrected_date'          => $today,
+		'public_correction_note'  => 'Synthetic correction notice used to verify the public update history.',
+		'reviewer_required'       => false,
+		'medical_rereviewed'      => false,
+		'conclusion_changed'      => false,
+	)
+);
+
+foreach ( array( $article_id, $medical_id, $review_id ) as $public_id ) {
+	$result = wp_update_post( array( 'ID' => $public_id, 'post_status' => 'publish' ), true );
+	if ( is_wp_error( $result ) || 'publish' !== get_post_status( $public_id ) ) {
+		WP_CLI::error( sprintf( 'Synthetic fixture %d did not pass its publication gates.', $public_id ) );
+	}
+}
+
+wp_update_post( array( 'ID' => $blocked_id, 'post_status' => 'publish' ) );
+if ( 'publish' === get_post_status( $blocked_id ) ) {
+	WP_CLI::error( 'The intentionally incomplete review bypassed publication controls.' );
+}
+
+flush_rewrite_rules( false );
+WP_CLI::success( 'Synthetic local/CI fixtures are ready; the incomplete review remained blocked.' );
+````
+
+## File: scripts/create-test-fixtures.sh
+````bash
+#!/bin/sh
+set -eu
+
+if [ "${WP_ENVIRONMENT_TYPE:-}" = "production" ]; then
+  echo "ERROR: Synthetic fixtures must never run in production." >&2
+  exit 1
+fi
+
+wp eval-file /scripts/create-test-fixtures.php --user="$WP_ADMIN_USER" --allow-root
+````
+
 ## File: scripts/export-test-data.py
 ````python
 #!/usr/bin/env python3
@@ -3026,7 +3611,7 @@ fetch "$SITE_URL/wp-json/longevity/v1/health" "$tmp/health.json"
 python3 -m json.tool "$tmp/health.json" >/dev/null
 grep -q 'Longevity Evidence Lab\|longevity-site-header' "$tmp/home.html" || { echo 'ERROR: Homepage did not contain expected theme output.' >&2; exit 1; }
 grep -q '"status":"ok"\|"status": "ok"' "$tmp/health.json" || { echo 'ERROR: Health response was not healthy.' >&2; exit 1; }
-! grep -Eqi '(Fatal error|Warning:|Notice:)' "$tmp/home.html" || { echo 'ERROR: PHP diagnostics appeared in public output.' >&2; exit 1; }
+! grep -Eqi '(<b>(Fatal error|Warning|Notice)</b>:|PHP (Fatal error|Warning|Notice):|Uncaught [A-Za-z]+:)' "$tmp/home.html" || { echo 'ERROR: PHP diagnostics appeared in public output.' >&2; exit 1; }
 echo 'Smoke test passed.'
 ````
 
@@ -3038,6 +3623,8 @@ from __future__ import annotations
 
 import csv
 import re
+import shutil
+import subprocess
 import sys
 from datetime import date, datetime
 from pathlib import Path
@@ -3274,9 +3861,25 @@ def validate_templates() -> None:
 
 
 def validate_no_tracked_env() -> None:
-    for path in ROOT.glob(".env*"):
-        if path.name not in {".env.example", ".env.ci"}:
-            error(f"{path}: tracked environment files other than .env.example are forbidden")
+    allowed = {".env.example", ".env.ci"}
+    tracked: set[str] = set()
+    if shutil.which("git") and (ROOT / ".git").exists():
+        result = subprocess.run(
+            ["git", "ls-files", ".env*"],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode == 0:
+            tracked.update(line.strip() for line in result.stdout.splitlines() if line.strip())
+    elif (ROOT / "MANIFEST.sha256").exists():
+        for line in (ROOT / "MANIFEST.sha256").read_text(encoding="utf-8").splitlines():
+            if "  " in line:
+                tracked.add(line.split("  ", 1)[1].removeprefix("./"))
+    for name in sorted(item for item in tracked if Path(item).name.startswith(".env")):
+        if Path(name).name not in allowed:
+            error(f"{ROOT / name}: tracked environment files other than .env.example are forbidden")
 
 
 def main() -> int:
@@ -3974,7 +4577,16 @@ In summary, by grounding our strategy in current data and following SEO and cont
 import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
-for (const path of ['/', '/reviews/']) {
+for (const path of [
+  '/',
+  '/test-evidence-guide/',
+  '/reviews/test-valid-review/',
+  '/?s=evidence',
+  '/category/evidence-literacy/',
+  '/reviews/',
+  '/author/lel_test_author/',
+  '/test-route-that-does-not-exist/'
+]) {
   test(`critical accessibility checks pass on ${path}`, async ({ page }) => {
     await page.goto(path);
     const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa']).analyze();
@@ -3992,6 +4604,73 @@ test('homepage exposes skip link, navigation, and search', async ({ page }) => {
   await expect(page.locator('.longevity-skip-link')).toHaveAttribute('href', '#main-content');
   await expect(page.getByRole('navigation', { name: 'Primary navigation' })).toBeVisible();
   await expect(page.getByRole('searchbox')).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveCount(1);
+  await expect(page.getByRole('main')).toBeVisible();
+  await expect(page.getByRole('contentinfo')).toBeVisible();
+});
+
+const routes = [
+  ['article', '/test-evidence-guide/'],
+  ['review', '/reviews/test-valid-review/'],
+  ['search', '/?s=evidence'],
+  ['category', '/category/evidence-literacy/'],
+  ['review archive', '/reviews/'],
+  ['author', '/author/lel_test_author/']
+];
+
+for (const [name, path] of routes) {
+  test(`${name} route has a unique page heading and landmark`, async ({ page }) => {
+    const response = await page.goto(path);
+    expect(response?.status()).toBe(200);
+    await expect(page.getByRole('heading', { level: 1 })).toHaveCount(1);
+    await expect(page.getByRole('main')).toBeVisible();
+  });
+}
+
+test('evidence article renders public trust components and stable heading ids', async ({ page }) => {
+  await page.goto('/test-evidence-guide/');
+  await expect(page.locator('.longevity-trust-summary')).toBeVisible();
+  await expect(page.getByRole('navigation', { name: 'On this page' })).toBeVisible();
+  const headingIds = await page.locator('main h2[id]').evaluateAll((headings) => headings.map((heading) => heading.id));
+  expect(headingIds.length).toBeGreaterThanOrEqual(3);
+  expect(new Set(headingIds).size).toBe(headingIds.length);
+});
+
+test('valid product review exposes a decision, reproducible score, and test method', async ({ page }) => {
+  await page.goto('/reviews/test-valid-review/');
+  await expect(page.locator('.longevity-review-decision')).toBeVisible();
+  await expect(page.locator('.longevity-review-score')).toBeVisible();
+  await expect(page.locator('.longevity-test-method')).toBeVisible();
+});
+
+test('search accepts safe filters and reports its result context', async ({ page }) => {
+  await page.goto('/?s=evidence&content_type=guide&sort=newest');
+  await expect(page.getByRole('heading', { level: 1 })).toContainText('evidence');
+  await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', /noindex/);
+});
+
+test('404 provides a useful recovery route', async ({ page }) => {
+  const response = await page.goto('/test-route-that-does-not-exist/');
+  expect(response?.status()).toBe(404);
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+  await expect(page.getByRole('searchbox', { name: 'Search Longevity Evidence Lab' })).toBeVisible();
+});
+
+test('skip link and primary navigation work from the keyboard', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('heading', { level: 1 }).click();
+  await page.keyboard.press('Tab');
+  await expect(page.locator('.longevity-skip-link')).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('#main-content')).toBeFocused();
+
+  await page.setViewportSize({ width: 360, height: 800 });
+  const menuButton = page.getByRole('button', { name: /menu/i });
+  if (await menuButton.count()) {
+    await menuButton.focus();
+    await page.keyboard.press('Enter');
+    await expect(page.getByRole('navigation', { name: 'Primary navigation' })).toBeVisible();
+  }
 });
 
 test('health endpoint reports ok', async ({ request }) => {
@@ -4000,6 +4679,37 @@ test('health endpoint reports ok', async ({ request }) => {
   const json = await response.json();
   expect(json.status).toBe('ok');
 });
+````
+
+## File: tests/e2e/visual.spec.js
+````javascript
+import { test, expect } from '@playwright/test';
+
+const pages = [
+  ['home', '/'],
+  ['article', '/test-evidence-guide/'],
+  ['review', '/reviews/test-valid-review/'],
+  ['search', '/?s=evidence'],
+  ['archive', '/reviews/']
+];
+
+for (const [name, path] of pages) {
+  test(`${name} captures desktop and mobile visual evidence`, async ({ page }, testInfo) => {
+    for (const viewport of [
+      { name: 'desktop', width: 1440, height: 1000 },
+      { name: 'mobile', width: 360, height: 800 }
+    ]) {
+      await page.setViewportSize(viewport);
+      await page.goto(path);
+      await expect(page.getByRole('main')).toBeVisible();
+      await page.screenshot({
+        animations: 'disabled',
+        fullPage: true,
+        path: testInfo.outputPath(`${name}-${viewport.name}.png`)
+      });
+    }
+  });
+}
 ````
 
 ## File: tests/fixtures/invalid.env
@@ -4362,48 +5072,641 @@ if ( $failures ) {
 echo "Fallback PHP unit tests passed.\n";
 ````
 
+## File: wp-content/mu-plugins/longevity-core/assets/admin-governance.css
+````css
+.lel-editorial-grid {
+	display: grid;
+	gap: 0.75rem;
+}
+
+.lel-governance-section {
+	background: #fff;
+	border: 1px solid #c3c4c7;
+	border-radius: 4px;
+}
+
+.lel-governance-section > summary {
+	cursor: pointer;
+	display: grid;
+	gap: 0.2rem;
+	min-height: 44px;
+	padding: 0.85rem 1rem;
+}
+
+.lel-governance-section > summary span {
+	color: #50575e;
+	font-size: 12px;
+}
+
+.lel-governance-fields {
+	border-top: 1px solid #dcdcde;
+	padding: 0.5rem 1rem 1rem;
+}
+
+.lel-governance-fields > p {
+	max-width: 900px;
+}
+
+.lel-readiness-summary {
+	background: #f6f7f7;
+	border-inline-start: 4px solid #2271b1;
+	padding: 0.25rem 0.75rem;
+}
+
+.lel-gate-blocking {
+	color: #8c1d18;
+}
+
+.lel-gate-warning {
+	color: #704800;
+}
+
+.lel-gate-passed {
+	color: #17633d;
+}
+
+.lel-readiness-link {
+	white-space: nowrap;
+}
+
+.lel-score-editor {
+	border: 1px solid #c3c4c7;
+	margin-block: 1rem;
+	padding: 1rem;
+}
+
+.lel-score-table-wrap {
+	overflow-x: auto;
+}
+
+.lel-score-editor table {
+	border-collapse: collapse;
+	min-width: 620px;
+	width: 100%;
+}
+
+.lel-score-editor :where(th, td) {
+	border-bottom: 1px solid #dcdcde;
+	padding: 0.5rem;
+	text-align: start;
+}
+
+.lel-score-editor input {
+	max-width: 100%;
+	width: 100%;
+}
+
+.lel-score-totals {
+	background: #f6f7f7;
+	padding: 0.75rem;
+}
+
+.lel-score-totals.is-invalid {
+	border-inline-start: 4px solid #d63638;
+}
+
+.lel-score-json {
+	max-height: 18rem;
+	overflow: auto;
+	white-space: pre-wrap;
+}
+
+@media (max-width: 782px) {
+	.lel-governance-fields {
+		padding-inline: 0.75rem;
+	}
+}
+````
+
+## File: wp-content/mu-plugins/longevity-core/assets/admin-governance.js
+````javascript
+(() => {
+  'use strict';
+
+  const editor = document.querySelector('.lel-editorial-grid');
+  if (!editor) return;
+  editor.classList.add('lel-js');
+
+  const checked = (id) => Boolean(document.getElementById(id)?.checked);
+  const value = (id) => String(document.getElementById(id)?.value || '');
+  const updateConditionalSections = () => {
+    const medical = checked('medical_review_required') || checked('material_health_claims') || !['', 'not_required'].includes(value('medical_review_status'));
+    const testing = checked('testing_required') || !['', 'not_required'].includes(value('testing_status'));
+    const commercial = !['', 'none'].includes(value('commercial_relationship'));
+    editor.querySelectorAll('[data-lel-conditional="medical"]').forEach((section) => { section.hidden = !medical; });
+    editor.querySelectorAll('[data-lel-conditional="testing"]').forEach((section) => { section.hidden = !testing; });
+    editor.querySelectorAll('[data-lel-conditional="commercial"]').forEach((section) => { section.hidden = !commercial; });
+  };
+
+  editor.addEventListener('change', updateConditionalSections);
+  updateConditionalSections();
+
+  document.querySelectorAll('.lel-readiness-link').forEach((link) => {
+    link.addEventListener('click', () => {
+      const target = document.querySelector(link.getAttribute('href'));
+      if (!target) return;
+      const section = target.closest('details');
+      if (section) {
+        section.hidden = false;
+        section.open = true;
+      }
+      window.setTimeout(() => target.focus(), 0);
+    });
+  });
+
+  const scoreEditor = document.querySelector('.lel-score-editor');
+  if (!scoreEditor) return;
+  const rows = scoreEditor.querySelector('[data-lel-score-rows]');
+  const weightOutput = scoreEditor.querySelector('[data-lel-weight-total]');
+  const scoreOutput = scoreEditor.querySelector('[data-lel-calculated-score]');
+  const totals = scoreEditor.querySelector('.lel-score-totals');
+  const jsonOutput = scoreEditor.querySelector('.lel-score-json');
+
+  const reindex = () => {
+    rows.querySelectorAll('[data-lel-score-row]').forEach((row, index) => {
+      const inputs = row.querySelectorAll('input');
+      const keys = ['name', 'score', 'weight'];
+      inputs.forEach((input, inputIndex) => {
+        input.name = `review_score_dimensions_rows[${index}][${keys[inputIndex]}]`;
+        input.id = `lel-dimension-${keys[inputIndex]}-${index}`;
+      });
+    });
+  };
+
+  const calculate = () => {
+    let weight = 0;
+    let calculated = 0;
+    const json = [];
+    rows.querySelectorAll('[data-lel-score-row]').forEach((row) => {
+      const inputs = row.querySelectorAll('input');
+      const name = inputs[0].value.trim();
+      const score = Math.min(5, Math.max(0, Number(inputs[1].value || 0)));
+      const rowWeight = Math.min(100, Math.max(0, Number(inputs[2].value || 0)));
+      weight += rowWeight;
+      calculated += score * (rowWeight / 100);
+      if (name) json.push({ name, score, weight: rowWeight });
+    });
+    weightOutput.textContent = weight.toFixed(1).replace('.0', '');
+    scoreOutput.textContent = calculated.toFixed(2);
+    totals.classList.toggle('is-invalid', Math.abs(weight - 100) > 0.01);
+    jsonOutput.textContent = JSON.stringify(json, null, 2);
+  };
+
+  scoreEditor.addEventListener('input', calculate);
+  scoreEditor.addEventListener('click', (event) => {
+    const remove = event.target.closest('[data-lel-remove-dimension]');
+    if (remove) {
+      const row = remove.closest('[data-lel-score-row]');
+      if (row && rows.querySelectorAll('[data-lel-score-row]').length > 1) row.remove();
+      reindex();
+      calculate();
+      return;
+    }
+    if (event.target.closest('[data-lel-add-dimension]')) {
+      const index = rows.querySelectorAll('[data-lel-score-row]').length;
+      const row = document.createElement('tr');
+      row.dataset.lelScoreRow = '';
+      row.innerHTML = `<td><label class="screen-reader-text" for="lel-dimension-name-${index}">Dimension name</label><input id="lel-dimension-name-${index}" type="text"></td><td><label class="screen-reader-text" for="lel-dimension-score-${index}">Dimension score</label><input id="lel-dimension-score-${index}" type="number" min="0" max="5" step="0.1"></td><td><label class="screen-reader-text" for="lel-dimension-weight-${index}">Dimension weight</label><input id="lel-dimension-weight-${index}" type="number" min="0" max="100" step="0.1"></td><td><button type="button" class="button-link-delete" data-lel-remove-dimension>Remove</button></td>`;
+      rows.appendChild(row);
+      reindex();
+      calculate();
+      row.querySelector('input').focus();
+    }
+  });
+
+  reindex();
+  calculate();
+})();
+````
+
 ## File: wp-content/mu-plugins/longevity-core/assets/analytics.js
 ````javascript
 (() => {
   'use strict';
 
   const config = window.longevityAnalyticsConfig || {};
-  const allowed = new Set(config.allowedEvents || []);
+  const schemas = config.eventSchemas || {};
   window.longevityAnalytics = window.longevityAnalytics || [];
+  window.longevityConsent = window.longevityConsent || {
+    analytics: false,
+    advertising: false
+  };
+
+  const cleanValue = (value) => String(value || '').replace(/[\r\n\t]/g, ' ').slice(0, 120);
 
   const push = (name, parameters = {}) => {
-    if (!allowed.has(name)) return;
-    const safe = {
-      event: name,
-      content_id: String(config.contentId || ''),
-      content_group: String(config.contentGroup || ''),
+    const allowedParameters = schemas[name];
+    if (!Array.isArray(allowedParameters)) return;
+
+    const candidates = {
+      content_id: config.contentId,
+      content_group: config.contentGroup,
       ...parameters
     };
+    const safe = { event: name };
+    allowedParameters.forEach((key) => {
+      if (Object.prototype.hasOwnProperty.call(candidates, key)) {
+        safe[key] = cleanValue(candidates[key]);
+      }
+    });
+
     window.longevityAnalytics.push(safe);
-    if (Array.isArray(window.dataLayer)) window.dataLayer.push(safe);
+    const consent = window.longevityConsent || {};
+    const advertisingAllowed = name !== 'affiliate_click' || consent.advertising === true;
+    if (consent.analytics === true && advertisingAllowed && Array.isArray(window.dataLayer)) {
+      window.dataLayer.push(safe);
+    }
     window.dispatchEvent(new CustomEvent('longevity:analytics', { detail: safe }));
   };
 
   document.addEventListener('click', (event) => {
     const target = event.target.closest('[data-lel-event]');
     if (!target) return;
-    const eventName = target.dataset.lelEvent;
-    push(eventName, {
-      placement: String(target.dataset.placement || ''),
-      merchant: String(target.dataset.merchant || ''),
-      destination_domain: target.hostname || ''
+    push(target.dataset.lelEvent, {
+      placement: target.dataset.placement,
+      merchant: target.dataset.merchant,
+      destination_domain: target.hostname
     });
   });
 
   document.addEventListener('toggle', (event) => {
     const target = event.target;
     if (target instanceof HTMLDetailsElement && target.open && target.dataset.lelEvent) {
-      push(target.dataset.lelEvent);
+      push(target.dataset.lelEvent, {
+        product_category: target.dataset.productCategory
+      });
     }
   }, true);
 
   window.longevityTrack = push;
 })();
+````
+
+## File: wp-content/mu-plugins/longevity-core/assets/blocks.js
+````javascript
+(() => {
+  'use strict';
+
+  const { registerBlockType } = window.wp.blocks;
+  const { createElement: el } = window.wp.element;
+  const { Placeholder } = window.wp.components;
+  const { __ } = window.wp.i18n;
+  const blocks = {
+    'article-meta': ['Article metadata', 'Author, publication, update, fact-check, review, and evidence dates.'],
+    'trust-summary': ['Trust summary', 'Approved bottom line, scope, evidence grade, limitations, and disclosure.'],
+    'reviewer-card': ['Reviewer card', 'Verified, authenticated medical reviewer and exact review scope.'],
+    'source-list': ['Source list', 'Safe bibliographic details linked to verified claims.'],
+    'table-of-contents': ['Table of contents', 'Generated for long articles with at least three H2 headings.'],
+    'review-score': ['Review score', 'Reproducible dimensions, total score, confidence, and model version.'],
+    'review-decision': ['Review decision', 'Verdict, fit, tested model, acquisition, dates, and failures.'],
+    'test-method': ['Test method', 'Version-matched approved test record and limitations.'],
+    corrections: ['Corrections', 'Published correction and material update history.'],
+    'related-content': ['Related content', 'Deterministic public related guides and reviews.'],
+    'content-card-meta': ['Content card metadata', 'Content type, update date, evidence, testing, and review state.'],
+    breadcrumbs: ['Breadcrumbs', 'Visible hierarchy shared with breadcrumb schema.'],
+    'search-filters': ['Search filters', 'Progressively enhanced, allowlisted GET filters.'],
+    'author-profile': ['Author profile', 'Public biography and verified professional scope where present.']
+  };
+
+  Object.entries(blocks).forEach(([slug, labels]) => {
+    registerBlockType(`longevity/${slug}`, {
+      apiVersion: 3,
+      title: __(labels[0], 'longevity-core'),
+      description: __(labels[1], 'longevity-core'),
+      category: 'theme',
+      icon: 'shield-alt',
+      supports: { html: false },
+      edit: () => el(Placeholder, {
+        icon: 'shield-alt',
+        label: __(labels[0], 'longevity-core'),
+        instructions: __(labels[1], 'longevity-core')
+      }),
+      save: () => null
+    });
+  });
+})();
+````
+
+## File: wp-content/mu-plugins/longevity-core/blocks/article-meta/block.json
+````json
+{
+  "$schema": "https://schemas.wp.org/trunk/block.json",
+  "apiVersion": 3,
+  "name": "longevity/article-meta",
+  "version": "1.0.0",
+  "title": "Article metadata",
+  "description": "Approved article authorship and review dates",
+  "category": "theme",
+  "icon": "shield-alt",
+  "textdomain": "longevity-core",
+  "usesContext": [
+    "postId",
+    "postType"
+  ],
+  "supports": {
+    "html": false
+  },
+  "editorScript": "longevity-core-blocks"
+}
+````
+
+## File: wp-content/mu-plugins/longevity-core/blocks/author-profile/block.json
+````json
+{
+  "$schema": "https://schemas.wp.org/trunk/block.json",
+  "apiVersion": 3,
+  "name": "longevity/author-profile",
+  "version": "1.0.0",
+  "title": "Author profile",
+  "description": "Public author and verified reviewer scope",
+  "category": "theme",
+  "icon": "shield-alt",
+  "textdomain": "longevity-core",
+  "usesContext": [
+    "postId",
+    "postType"
+  ],
+  "supports": {
+    "html": false
+  },
+  "editorScript": "longevity-core-blocks"
+}
+````
+
+## File: wp-content/mu-plugins/longevity-core/blocks/breadcrumbs/block.json
+````json
+{
+  "$schema": "https://schemas.wp.org/trunk/block.json",
+  "apiVersion": 3,
+  "name": "longevity/breadcrumbs",
+  "version": "1.0.0",
+  "title": "Breadcrumbs",
+  "description": "Visible hierarchy shared with schema",
+  "category": "theme",
+  "icon": "shield-alt",
+  "textdomain": "longevity-core",
+  "usesContext": [
+    "postId",
+    "postType"
+  ],
+  "supports": {
+    "html": false
+  },
+  "editorScript": "longevity-core-blocks"
+}
+````
+
+## File: wp-content/mu-plugins/longevity-core/blocks/content-card-meta/block.json
+````json
+{
+  "$schema": "https://schemas.wp.org/trunk/block.json",
+  "apiVersion": 3,
+  "name": "longevity/content-card-meta",
+  "version": "1.0.0",
+  "title": "Content card metadata",
+  "description": "Public content status metadata",
+  "category": "theme",
+  "icon": "shield-alt",
+  "textdomain": "longevity-core",
+  "usesContext": [
+    "postId",
+    "postType"
+  ],
+  "supports": {
+    "html": false
+  },
+  "editorScript": "longevity-core-blocks"
+}
+````
+
+## File: wp-content/mu-plugins/longevity-core/blocks/corrections/block.json
+````json
+{
+  "$schema": "https://schemas.wp.org/trunk/block.json",
+  "apiVersion": 3,
+  "name": "longevity/corrections",
+  "version": "1.0.0",
+  "title": "Corrections",
+  "description": "Public correction and update history",
+  "category": "theme",
+  "icon": "shield-alt",
+  "textdomain": "longevity-core",
+  "usesContext": [
+    "postId",
+    "postType"
+  ],
+  "supports": {
+    "html": false
+  },
+  "editorScript": "longevity-core-blocks"
+}
+````
+
+## File: wp-content/mu-plugins/longevity-core/blocks/related-content/block.json
+````json
+{
+  "$schema": "https://schemas.wp.org/trunk/block.json",
+  "apiVersion": 3,
+  "name": "longevity/related-content",
+  "version": "1.0.0",
+  "title": "Related content",
+  "description": "Deterministic related public content",
+  "category": "theme",
+  "icon": "shield-alt",
+  "textdomain": "longevity-core",
+  "usesContext": [
+    "postId",
+    "postType"
+  ],
+  "supports": {
+    "html": false
+  },
+  "editorScript": "longevity-core-blocks"
+}
+````
+
+## File: wp-content/mu-plugins/longevity-core/blocks/review-decision/block.json
+````json
+{
+  "$schema": "https://schemas.wp.org/trunk/block.json",
+  "apiVersion": 3,
+  "name": "longevity/review-decision",
+  "version": "1.0.0",
+  "title": "Review decision",
+  "description": "Verdict and buying-decision context",
+  "category": "theme",
+  "icon": "shield-alt",
+  "textdomain": "longevity-core",
+  "usesContext": [
+    "postId",
+    "postType"
+  ],
+  "supports": {
+    "html": false
+  },
+  "editorScript": "longevity-core-blocks"
+}
+````
+
+## File: wp-content/mu-plugins/longevity-core/blocks/review-score/block.json
+````json
+{
+  "$schema": "https://schemas.wp.org/trunk/block.json",
+  "apiVersion": 3,
+  "name": "longevity/review-score",
+  "version": "1.0.0",
+  "title": "Review score",
+  "description": "Reproducible score dimensions and confidence",
+  "category": "theme",
+  "icon": "shield-alt",
+  "textdomain": "longevity-core",
+  "usesContext": [
+    "postId",
+    "postType"
+  ],
+  "supports": {
+    "html": false
+  },
+  "editorScript": "longevity-core-blocks"
+}
+````
+
+## File: wp-content/mu-plugins/longevity-core/blocks/reviewer-card/block.json
+````json
+{
+  "$schema": "https://schemas.wp.org/trunk/block.json",
+  "apiVersion": 3,
+  "name": "longevity/reviewer-card",
+  "version": "1.0.0",
+  "title": "Reviewer card",
+  "description": "Verified scoped medical-review identity",
+  "category": "theme",
+  "icon": "shield-alt",
+  "textdomain": "longevity-core",
+  "usesContext": [
+    "postId",
+    "postType"
+  ],
+  "supports": {
+    "html": false
+  },
+  "editorScript": "longevity-core-blocks"
+}
+````
+
+## File: wp-content/mu-plugins/longevity-core/blocks/search-filters/block.json
+````json
+{
+  "$schema": "https://schemas.wp.org/trunk/block.json",
+  "apiVersion": 3,
+  "name": "longevity/search-filters",
+  "version": "1.0.0",
+  "title": "Search filters",
+  "description": "Allowlisted server-side search filters",
+  "category": "theme",
+  "icon": "shield-alt",
+  "textdomain": "longevity-core",
+  "usesContext": [
+    "postId",
+    "postType"
+  ],
+  "supports": {
+    "html": false
+  },
+  "editorScript": "longevity-core-blocks"
+}
+````
+
+## File: wp-content/mu-plugins/longevity-core/blocks/source-list/block.json
+````json
+{
+  "$schema": "https://schemas.wp.org/trunk/block.json",
+  "apiVersion": 3,
+  "name": "longevity/source-list",
+  "version": "1.0.0",
+  "title": "Source list",
+  "description": "Verified public bibliographic sources",
+  "category": "theme",
+  "icon": "shield-alt",
+  "textdomain": "longevity-core",
+  "usesContext": [
+    "postId",
+    "postType"
+  ],
+  "supports": {
+    "html": false
+  },
+  "editorScript": "longevity-core-blocks"
+}
+````
+
+## File: wp-content/mu-plugins/longevity-core/blocks/table-of-contents/block.json
+````json
+{
+  "$schema": "https://schemas.wp.org/trunk/block.json",
+  "apiVersion": 3,
+  "name": "longevity/table-of-contents",
+  "version": "1.0.0",
+  "title": "Table of contents",
+  "description": "Server-rendered article navigation",
+  "category": "theme",
+  "icon": "shield-alt",
+  "textdomain": "longevity-core",
+  "usesContext": [
+    "postId",
+    "postType"
+  ],
+  "supports": {
+    "html": false
+  },
+  "editorScript": "longevity-core-blocks"
+}
+````
+
+## File: wp-content/mu-plugins/longevity-core/blocks/test-method/block.json
+````json
+{
+  "$schema": "https://schemas.wp.org/trunk/block.json",
+  "apiVersion": 3,
+  "name": "longevity/test-method",
+  "version": "1.0.0",
+  "title": "Test method",
+  "description": "Approved versioned testing details",
+  "category": "theme",
+  "icon": "shield-alt",
+  "textdomain": "longevity-core",
+  "usesContext": [
+    "postId",
+    "postType"
+  ],
+  "supports": {
+    "html": false
+  },
+  "editorScript": "longevity-core-blocks"
+}
+````
+
+## File: wp-content/mu-plugins/longevity-core/blocks/trust-summary/block.json
+````json
+{
+  "$schema": "https://schemas.wp.org/trunk/block.json",
+  "apiVersion": 3,
+  "name": "longevity/trust-summary",
+  "version": "1.0.0",
+  "title": "Trust summary",
+  "description": "Approved evidence, scope, limitations, and disclosure",
+  "category": "theme",
+  "icon": "shield-alt",
+  "textdomain": "longevity-core",
+  "usesContext": [
+    "postId",
+    "postType"
+  ],
+  "supports": {
+    "html": false
+  },
+  "editorScript": "longevity-core-blocks"
+}
 ````
 
 ## File: wp-content/mu-plugins/longevity-core/bootstrap.php
@@ -4430,6 +5733,12 @@ $longevity_core_files = array(
 	'class-corrections.php',
 	'class-publication-gates.php',
 	'class-review-workflow.php',
+	'class-migrations.php',
+	'class-freshness.php',
+	'class-content-discovery.php',
+	'class-public-components.php',
+	'class-blocks.php',
+	'class-admin-assets.php',
 	'class-admin-ui.php',
 	'class-shortcodes.php',
 	'class-schema.php',
@@ -4472,6 +5781,12 @@ final class Bootstrap {
 		Corrections::init();
 		Publication_Gates::init();
 		Review_Workflow::init();
+		Migrations::init();
+		Freshness::init();
+		Content_Discovery::init();
+		Public_Components::init();
+		Blocks::init();
+		Admin_Assets::init();
 		Admin_UI::init();
 		Shortcodes::init();
 		Schema::init();
@@ -4495,6 +5810,41 @@ final class Bootstrap {
 		header( 'Referrer-Policy: strict-origin-when-cross-origin' );
 		header( 'Permissions-Policy: camera=(), microphone=(), geolocation=()' );
 		header( 'X-Frame-Options: SAMEORIGIN' );
+	}
+}
+````
+
+## File: wp-content/mu-plugins/longevity-core/class-admin-assets.php
+````php
+<?php
+/**
+ * Focused governance-editor assets.
+ *
+ * @package LongevityCore
+ */
+
+namespace Longevity\Core;
+
+defined( 'ABSPATH' ) || exit;
+
+/** Loads progressive enhancement only on supported editorial screens. */
+final class Admin_Assets {
+	/** Register the admin enqueue hook. */
+	public static function init(): void {
+		add_action( 'admin_enqueue_scripts', array( self::class, 'enqueue' ) );
+	}
+
+	/** Enqueue small dependency-free assets on post and review editors only. */
+	public static function enqueue( string $hook ): void {
+		if ( ! in_array( $hook, array( 'post.php', 'post-new.php' ), true ) ) {
+			return;
+		}
+		$screen = get_current_screen();
+		if ( ! $screen || ! in_array( $screen->post_type, array( 'post', 'review' ), true ) ) {
+			return;
+		}
+		wp_enqueue_style( 'longevity-admin-governance', LONGEVITY_CORE_URL . 'assets/admin-governance.css', array(), LONGEVITY_CORE_VERSION );
+		wp_enqueue_script( 'longevity-admin-governance', LONGEVITY_CORE_URL . 'assets/admin-governance.js', array(), LONGEVITY_CORE_VERSION, true );
 	}
 }
 ````
@@ -4540,9 +5890,10 @@ final class Admin_UI {
 	/** Render readiness summary. */
 	public static function render_readiness( \WP_Post $post ): void {
 		$result = Publication_Gates::evaluate( $post->ID );
-		printf( '<p><strong>%s%%</strong> %s</p>', esc_html( (string) $result->completion_percentage() ), esc_html__( 'complete across applicable checks', 'longevity-core' ) );
+		printf( '<div class="lel-readiness-summary" role="status"><p><strong>%s%%</strong> %s</p><p>%s &middot; %s &middot; %s</p></div>', esc_html( (string) $result->completion_percentage() ), esc_html__( 'complete across applicable checks', 'longevity-core' ), esc_html( sprintf( _n( '%d blocker', '%d blockers', count( $result->blocking() ), 'longevity-core' ), count( $result->blocking() ) ) ), esc_html( sprintf( _n( '%d warning', '%d warnings', count( $result->warnings() ), 'longevity-core' ), count( $result->warnings() ) ) ), esc_html( sprintf( _n( '%d passed check', '%d passed checks', count( $result->passed() ), 'longevity-core' ), count( $result->passed() ) ) ) );
 		self::render_result_group( __( 'Blocking', 'longevity-core' ), $result->blocking(), 'lel-gate-blocking' );
 		self::render_result_group( __( 'Warnings', 'longevity-core' ), $result->warnings(), 'lel-gate-warning' );
+		self::render_result_group( __( 'Passed', 'longevity-core' ), $result->passed(), 'lel-gate-passed' );
 		if ( ! $result->is_blocked() ) {
 			echo '<p class="lel-gate-passed"><strong>' . esc_html__( 'No blocking failures.', 'longevity-core' ) . '</strong></p>';
 		}
@@ -4557,6 +5908,7 @@ final class Admin_UI {
 	public static function render_governance( \WP_Post $post ): void {
 		wp_nonce_field( 'longevity_save_editorial', 'longevity_editorial_nonce' );
 		echo '<div class="lel-editorial-grid">';
+		echo '<details class="lel-governance-section" open><summary><strong>' . esc_html__( 'Publication overview', 'longevity-core' ) . '</strong><span>' . esc_html__( 'Scope, limitations, ownership, and lifecycle', 'longevity-core' ) . '</span></summary><div class="lel-governance-fields">';
 		self::textarea( $post->ID, 'content_summary', __( 'Direct answer / summary', 'longevity-core' ) );
 		self::textarea( $post->ID, 'content_scope', __( 'Scope', 'longevity-core' ) );
 		self::textarea( $post->ID, 'content_limitations', __( 'Limitations and uncertainty', 'longevity-core' ) );
@@ -4566,15 +5918,18 @@ final class Admin_UI {
 		self::select( $post->ID, 'editorial_approval_status', __( 'Editorial workflow state', 'longevity-core' ), array( 'idea' => 'Idea', 'assigned' => 'Assigned', 'researching' => 'Researching', 'drafting' => 'Drafting', 'editorial_review' => 'Editorial review', 'fact_check' => 'Fact-check', 'medical_review' => 'Medical review', 'testing_incomplete' => 'Testing incomplete', 'commercial_review' => 'Commercial review', 'ready' => 'Ready for publication', 'published' => 'Published', 'update_due' => 'Update due', 'correction_pending' => 'Correction pending', 'archived' => 'Archived' ) );
 		self::checkbox( $post->ID, 'uncertainty_statement_present', __( 'Explicit uncertainty statement is present', 'longevity-core' ) );
 
-		echo '<hr><h3>' . esc_html__( 'Evidence and fact-checking', 'longevity-core' ) . '</h3>';
+		echo '</div></details><details class="lel-governance-section" data-lel-section="evidence"><summary><strong>' . esc_html__( 'Evidence and claims', 'longevity-core' ) . '</strong><span>' . esc_html__( 'Evidence grade, linked claims, and fact-checking', 'longevity-core' ) . '</span></summary><div class="lel-governance-fields">';
 		self::checkbox( $post->ID, 'material_health_claims', __( 'Contains material health claims', 'longevity-core' ) );
 		self::select( $post->ID, 'evidence_grade', __( 'Evidence grade', 'longevity-core' ), array( '' => 'Not assigned', 'A' => 'A — Strong', 'B' => 'B — Moderate', 'C' => 'C — Limited', 'D' => 'D — Mechanistic/anecdotal', 'U' => 'U — Unclear' ) );
 		self::textarea( $post->ID, 'evidence_grade_rationale', __( 'Evidence-grade rationale', 'longevity-core' ) );
 		self::date( $post->ID, 'evidence_cutoff_date', __( 'Evidence cutoff date', 'longevity-core' ) );
 		self::select( $post->ID, 'fact_check_status', __( 'Fact-check status', 'longevity-core' ), array( 'not_started' => 'Not started', 'in_progress' => 'In progress', 'revisions_required' => 'Revisions required', 'complete' => 'Complete', 'not_required' => 'Not required' ) );
 		self::date( $post->ID, 'next_fact_check_date', __( 'Next fact-check date', 'longevity-core' ) );
+		if ( current_user_can( 'manage_claims' ) ) {
+			echo '<p class="description"><a href="' . esc_url( admin_url( 'edit.php?post_type=lel_claim' ) ) . '">' . esc_html__( 'Manage linked claims', 'longevity-core' ) . '</a> &middot; <a href="' . esc_url( admin_url( 'edit.php?post_type=lel_source' ) ) . '">' . esc_html__( 'Manage source records', 'longevity-core' ) . '</a></p>';
+		}
 
-		echo '<hr><h3>' . esc_html__( 'Medical review', 'longevity-core' ) . '</h3>';
+		echo '</div></details><details class="lel-governance-section" data-lel-conditional="medical"><summary><strong>' . esc_html__( 'Medical review', 'longevity-core' ) . '</strong><span>' . esc_html__( 'Assignment, exact scope, dates, revisions, and attestation', 'longevity-core' ) . '</span></summary><div class="lel-governance-fields">';
 		self::checkbox( $post->ID, 'medical_review_required', __( 'Medical review is required', 'longevity-core' ) );
 		self::reviewer_select( $post->ID );
 		self::select( $post->ID, 'medical_review_status', __( 'Medical review status', 'longevity-core' ), array( 'not_required' => 'Not required', 'not_started' => 'Not started', 'assigned' => 'Assigned', 'in_review' => 'In review', 'revisions_required' => 'Revisions required', 'complete' => 'Complete' ) );
@@ -4589,7 +5944,7 @@ final class Admin_UI {
 		self::text( $post->ID, 'medical_review_version', __( 'Reviewed content version', 'longevity-core' ) );
 		self::attestation( $post->ID );
 
-		echo '<hr><h3>' . esc_html__( 'Testing and commercial disclosure', 'longevity-core' ) . '</h3>';
+		echo '</div></details><details class="lel-governance-section" data-lel-conditional="testing"><summary><strong>' . esc_html__( 'Testing', 'longevity-core' ) . '</strong><span>' . esc_html__( 'Protocol, approved record, dates, acquisition, and limitations', 'longevity-core' ) . '</span></summary><div class="lel-governance-fields">';
 		self::checkbox( $post->ID, 'testing_required', __( 'Hands-on testing is required', 'longevity-core' ) );
 		self::select( $post->ID, 'testing_status', __( 'Testing status', 'longevity-core' ), array( 'not_required' => 'Not required', 'planned' => 'Planned', 'in_progress' => 'In progress', 'incomplete' => 'Incomplete', 'complete' => 'Complete', 'approved' => 'Approved' ) );
 		self::date( $post->ID, 'testing_start_date', __( 'Testing start date', 'longevity-core' ) );
@@ -4597,20 +5952,21 @@ final class Admin_UI {
 		self::text( $post->ID, 'testing_duration', __( 'Testing duration', 'longevity-core' ) );
 		self::text( $post->ID, 'testing_protocol_version', __( 'Protocol version', 'longevity-core' ) );
 		self::url( $post->ID, 'testing_methodology_url', __( 'Public methodology URL', 'longevity-core' ) );
-		self::number( $post->ID, 'test_record_id', __( 'Approved test record ID', 'longevity-core' ), 1, 0 );
+		self::test_record_select( $post->ID );
 		self::select( $post->ID, 'product_acquisition_method', __( 'Product acquisition', 'longevity-core' ), array( '' => 'Select', 'purchased' => 'Purchased', 'product_supplied' => 'Product supplied', 'loaned' => 'Loaned', 'service_access' => 'Service access', 'independently_verified_only' => 'Independently verified specifications only' ) );
+		echo '</div></details><details class="lel-governance-section" data-lel-conditional="commercial"><summary><strong>' . esc_html__( 'Commercial disclosure', 'longevity-core' ) . '</strong><span>' . esc_html__( 'Relationship, disclosure approval, and destination registry', 'longevity-core' ) . '</span></summary><div class="lel-governance-fields">';
 		self::select( $post->ID, 'commercial_relationship', __( 'Commercial relationship', 'longevity-core' ), array( 'none' => 'None', 'affiliate' => 'Affiliate', 'product_supplied' => 'Product supplied', 'sponsored' => 'Sponsored' ) );
 		self::select( $post->ID, 'affiliate_disclosure_status', __( 'Affiliate disclosure status', 'longevity-core' ), array( 'not_required' => 'Not required', 'required' => 'Required', 'draft' => 'Draft', 'approved' => 'Approved', 'complete' => 'Complete' ) );
 		self::checkbox( $post->ID, 'affiliate_registry_verified', __( 'Affiliate destinations verified in registry', 'longevity-core' ) );
 
 		if ( 'review' === $post->post_type ) {
-			echo '<hr><h3>' . esc_html__( 'Review details', 'longevity-core' ) . '</h3>';
+			echo '</div></details><details class="lel-governance-section" data-lel-section="review-score"><summary><strong>' . esc_html__( 'Review scoring and decision', 'longevity-core' ) . '</strong><span>' . esc_html__( 'Product identity, fit, failures, dimensions, and confidence', 'longevity-core' ) . '</span></summary><div class="lel-governance-fields">';
 			self::text( $post->ID, 'tested_product_model', __( 'Tested product model', 'longevity-core' ) );
 			self::text( $post->ID, 'tested_firmware_version', __( 'Firmware version', 'longevity-core' ) );
 			self::text( $post->ID, 'tested_app_version', __( 'App version', 'longevity-core' ) );
 			self::textarea( $post->ID, 'comparison_set', __( 'Comparison set', 'longevity-core' ) );
 			self::textarea( $post->ID, 'major_failures', __( 'Major failures', 'longevity-core' ) );
-			self::json_textarea( $post->ID, 'review_score_dimensions', __( 'Score dimensions JSON', 'longevity-core' ) );
+			self::score_dimensions_editor( $post->ID );
 			self::number( $post->ID, 'review_score', __( 'Calculated review score (0–5)', 'longevity-core' ), '0.1', 0, 5 );
 			self::text( $post->ID, 'review_score_version', __( 'Scoring model version', 'longevity-core' ) );
 			self::textarea( $post->ID, 'review_score_override_reason', __( 'Manual score override reason (only when calculated score differs)', 'longevity-core' ) );
@@ -4621,7 +5977,11 @@ final class Admin_UI {
 			self::text( $post->ID, 'price_region', __( 'Price region', 'longevity-core' ) );
 			self::date( $post->ID, 'warranty_checked_date', __( 'Warranty checked date', 'longevity-core' ) );
 		}
-		echo '</div>';
+		echo '</div></details><details class="lel-governance-section"><summary><strong>' . esc_html__( 'Lifecycle and corrections', 'longevity-core' ) . '</strong><span>' . esc_html__( 'Updates and protected correction records', 'longevity-core' ) . '</span></summary><div class="lel-governance-fields"><p>' . esc_html__( 'Material corrections are managed as append-oriented protected records and rendered publicly only after completion.', 'longevity-core' ) . '</p>';
+		if ( current_user_can( 'manage_corrections' ) ) {
+			echo '<p><a href="' . esc_url( admin_url( 'edit.php?post_type=lel_correction' ) ) . '">' . esc_html__( 'Manage correction records', 'longevity-core' ) . '</a></p>';
+		}
+		echo '</div></details></div>';
 	}
 
 	/** Save editor metadata without accepting unauthorized attestations. */
@@ -4633,6 +5993,16 @@ final class Admin_UI {
 		if ( empty( $_POST['longevity_editorial_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['longevity_editorial_nonce'] ) ), 'longevity_save_editorial' ) ) {
 			return;
 		}
+		if ( 'review' === $post->post_type && isset( $_POST['review_score_dimensions_rows'] ) && is_array( $_POST['review_score_dimensions_rows'] ) ) {
+			$dimensions = Review_Methodology::sanitize_dimensions( wp_unslash( $_POST['review_score_dimensions_rows'] ) );
+			update_post_meta( $post_id, 'review_score_dimensions', $dimensions );
+			try {
+				$calculated = Review_Methodology::calculate_score( $dimensions );
+				update_post_meta( $post_id, 'review_score', $calculated['score'] );
+			} catch ( \InvalidArgumentException $exception ) {
+				// Publication readiness remains blocked until weights total 100.
+			}
+		}
 
 		$allowed_fields = array_keys( Meta_Registry::definitions() );
 		$boolean_fields = array_filter(
@@ -4641,6 +6011,9 @@ final class Admin_UI {
 		);
 
 		foreach ( $allowed_fields as $key ) {
+			if ( isset( $_POST['review_score_dimensions_rows'] ) && in_array( $key, array( 'review_score_dimensions', 'review_score' ), true ) ) {
+				continue;
+			}
 			if ( ! in_array( $post->post_type, Meta_Registry::definitions()[ $key ]['post_types'], true ) ) {
 				continue;
 			}
@@ -4784,9 +6157,22 @@ final class Admin_UI {
 		$users = get_users( array( 'capability' => 'complete_medical_review', 'orderby' => 'display_name' ) );
 		echo '<p><label for="medical_reviewer_user_id"><strong>' . esc_html__( 'Medical reviewer', 'longevity-core' ) . '</strong></label><br><select class="widefat" id="medical_reviewer_user_id" name="medical_reviewer_user_id"><option value="0">' . esc_html__( 'Select reviewer', 'longevity-core' ) . '</option>';
 		foreach ( $users as $user ) {
-			echo '<option value="' . esc_attr( (string) $user->ID ) . '" ' . selected( $value, $user->ID, false ) . '>' . esc_html( $user->display_name ) . '</option>';
+			$status = (string) get_user_meta( $user->ID, 'credential_verification_status', true );
+			echo '<option value="' . esc_attr( (string) $user->ID ) . '" ' . selected( $value, $user->ID, false ) . '>' . esc_html( sprintf( '%1$s (ID %2$d; %3$s)', $user->display_name, $user->ID, $status ?: __( 'unverified', 'longevity-core' ) ) ) . '</option>';
 		}
-		echo '</select></p>';
+		echo '</select></p><p class="description">' . esc_html__( 'Only an assigned authenticated reviewer with verified public credentials can complete the attestation.', 'longevity-core' ) . '</p>';
+	}
+
+	/** Render approved test records with human-readable titles and stable IDs. */
+	private static function test_record_select( int $post_id ): void {
+		$value   = (int) get_post_meta( $post_id, 'test_record_id', true );
+		$records = get_posts( array( 'post_type' => 'lel_test_record', 'post_status' => 'any', 'posts_per_page' => 100, 'orderby' => array( 'title' => 'ASC', 'ID' => 'ASC' ) ) );
+		echo '<p><label for="test_record_id"><strong>' . esc_html__( 'Test record', 'longevity-core' ) . '</strong></label><br><select class="widefat" id="test_record_id" name="test_record_id"><option value="0">' . esc_html__( 'Select an approved record', 'longevity-core' ) . '</option>';
+		foreach ( $records as $record ) {
+			$status = (string) get_post_meta( $record->ID, 'approval_status', true );
+			echo '<option value="' . esc_attr( (string) $record->ID ) . '" ' . selected( $value, $record->ID, false ) . '>' . esc_html( sprintf( '%1$s (ID %2$d; %3$s)', get_the_title( $record ), $record->ID, $status ?: __( 'not approved', 'longevity-core' ) ) ) . '</option>';
+		}
+		echo '</select></p><p class="description">' . esc_html__( 'Publication requires an approved record whose protocol version matches this review.', 'longevity-core' ) . '</p>';
 	}
 
 	/** Render result list. */
@@ -4796,14 +6182,54 @@ final class Admin_UI {
 		}
 		echo '<div class="' . esc_attr( $class ) . '"><strong>' . esc_html( $title ) . '</strong><ul>';
 		foreach ( $items as $item ) {
-			echo '<li>' . esc_html( $item['message'] ) . '</li>';
+			$field = self::readiness_field( (string) ( $item['code'] ?? '' ) );
+			echo '<li>' . esc_html( $item['message'] );
+			if ( $field ) {
+				echo ' <a href="#' . esc_attr( $field ) . '" class="lel-readiness-link">' . esc_html__( 'Go to field', 'longevity-core' ) . '</a>';
+			}
+			echo '</li>';
 		}
 		echo '</ul></div>';
 	}
 
+	/** Map gate codes to the nearest actionable field. */
+	private static function readiness_field( string $code ): string {
+		$map = array(
+			'missing_summary'                 => 'content_summary',
+			'missing_limitations'             => 'content_limitations',
+			'claims_unverified'                => 'material_health_claims',
+			'fact_check_incomplete'            => 'fact_check_status',
+			'medical_review_incomplete'        => 'medical_review_status',
+			'test_record_invalid'              => 'test_record_id',
+			'score_not_reproducible'           => 'review_score_dimensions',
+			'commercial_disclosure_incomplete' => 'affiliate_disclosure_status',
+			'missing_review_date'              => 'next_content_review_date',
+		);
+		return $map[ $code ] ?? '';
+	}
+
+	/** Render an accessible repeatable dimension editor backed by the existing meta shape. */
+	private static function score_dimensions_editor( int $post_id ): void {
+		$dimensions = get_post_meta( $post_id, 'review_score_dimensions', true );
+		$dimensions = is_array( $dimensions ) && $dimensions ? $dimensions : array( array( 'name' => '', 'score' => '', 'weight' => '' ) );
+		echo '<fieldset id="review_score_dimensions" class="lel-score-editor"><legend><strong>' . esc_html__( 'Score dimensions', 'longevity-core' ) . '</strong></legend><p class="description">' . esc_html__( 'Weights must total 100%. The calculated score is saved server-side; confidence remains a separate editorial judgment.', 'longevity-core' ) . '</p><div class="lel-score-table-wrap"><table><thead><tr><th scope="col">' . esc_html__( 'Dimension', 'longevity-core' ) . '</th><th scope="col">' . esc_html__( 'Score (0–5)', 'longevity-core' ) . '</th><th scope="col">' . esc_html__( 'Weight %', 'longevity-core' ) . '</th><th scope="col">' . esc_html__( 'Action', 'longevity-core' ) . '</th></tr></thead><tbody data-lel-score-rows>';
+		foreach ( $dimensions as $index => $dimension ) {
+			self::score_dimension_row( (int) $index, is_array( $dimension ) ? $dimension : array() );
+		}
+		echo '</tbody></table></div><p><button type="button" class="button" data-lel-add-dimension>' . esc_html__( 'Add dimension', 'longevity-core' ) . '</button></p><p class="lel-score-totals" aria-live="polite"><strong>' . esc_html__( 'Weight total:', 'longevity-core' ) . '</strong> <span data-lel-weight-total>0</span>% &middot; <strong>' . esc_html__( 'Calculated score:', 'longevity-core' ) . '</strong> <span data-lel-calculated-score>0.00</span>/5</p><details><summary>' . esc_html__( 'Raw JSON debug view', 'longevity-core' ) . '</summary><pre class="lel-score-json">' . esc_html( wp_json_encode( Review_Methodology::sanitize_dimensions( $dimensions ), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) ) . '</pre></details></fieldset>';
+	}
+
+	/** Render one dimension row. */
+	private static function score_dimension_row( int $index, array $dimension ): void {
+		$name   = (string) ( $dimension['name'] ?? '' );
+		$score  = (string) ( $dimension['score'] ?? '' );
+		$weight = (string) ( $dimension['weight'] ?? '' );
+		echo '<tr data-lel-score-row><td><label class="screen-reader-text" for="lel-dimension-name-' . esc_attr( (string) $index ) . '">' . esc_html__( 'Dimension name', 'longevity-core' ) . '</label><input id="lel-dimension-name-' . esc_attr( (string) $index ) . '" type="text" name="review_score_dimensions_rows[' . esc_attr( (string) $index ) . '][name]" value="' . esc_attr( $name ) . '"></td><td><label class="screen-reader-text" for="lel-dimension-score-' . esc_attr( (string) $index ) . '">' . esc_html__( 'Dimension score', 'longevity-core' ) . '</label><input id="lel-dimension-score-' . esc_attr( (string) $index ) . '" type="number" min="0" max="5" step="0.1" name="review_score_dimensions_rows[' . esc_attr( (string) $index ) . '][score]" value="' . esc_attr( $score ) . '"></td><td><label class="screen-reader-text" for="lel-dimension-weight-' . esc_attr( (string) $index ) . '">' . esc_html__( 'Dimension weight', 'longevity-core' ) . '</label><input id="lel-dimension-weight-' . esc_attr( (string) $index ) . '" type="number" min="0" max="100" step="0.1" name="review_score_dimensions_rows[' . esc_attr( (string) $index ) . '][weight]" value="' . esc_attr( $weight ) . '"></td><td><button type="button" class="button-link-delete" data-lel-remove-dimension>' . esc_html__( 'Remove', 'longevity-core' ) . '</button></td></tr>';
+	}
+
 	private static function textarea( int $post_id, string $key, string $label ): void {
 		$value = get_post_meta( $post_id, $key, true );
-		echo '<p><label for="' . esc_attr( $key ) . '"><strong>' . esc_html( $label ) . '</strong></label><br><textarea class="widefat" rows="3" id="' . esc_attr( $key ) . '" name="' . esc_attr( $key ) . '">' . esc_textarea( (string) $value ) . '</textarea></p>';
+		echo '<p><label for="' . esc_attr( $key ) . '"><strong>' . esc_html( $label ) . '</strong></label><br><textarea class="widefat" rows="3" id="' . esc_attr( $key ) . '" name="' . esc_attr( $key ) . '" aria-describedby="' . esc_attr( $key ) . '-help">' . esc_textarea( (string) $value ) . '</textarea>' . self::field_help( $key ) . '</p>';
 	}
 
 	private static function json_textarea( int $post_id, string $key, string $label ): void {
@@ -4838,7 +6264,7 @@ final class Admin_UI {
 
 	private static function input( int $post_id, string $key, string $label, string $type ): void {
 		$value = get_post_meta( $post_id, $key, true );
-		echo '<p><label for="' . esc_attr( $key ) . '"><strong>' . esc_html( $label ) . '</strong></label><br><input class="widefat" type="' . esc_attr( $type ) . '" id="' . esc_attr( $key ) . '" name="' . esc_attr( $key ) . '" value="' . esc_attr( (string) $value ) . '"></p>';
+		echo '<p><label for="' . esc_attr( $key ) . '"><strong>' . esc_html( $label ) . '</strong></label><br><input class="widefat" type="' . esc_attr( $type ) . '" id="' . esc_attr( $key ) . '" name="' . esc_attr( $key ) . '" value="' . esc_attr( (string) $value ) . '" aria-describedby="' . esc_attr( $key ) . '-help">' . self::field_help( $key ) . '</p>';
 	}
 
 	private static function checkbox( int $post_id, string $key, string $label ): void {
@@ -4848,11 +6274,18 @@ final class Admin_UI {
 
 	private static function select( int $post_id, string $key, string $label, array $options ): void {
 		$value = (string) get_post_meta( $post_id, $key, true );
-		echo '<p><label for="' . esc_attr( $key ) . '"><strong>' . esc_html( $label ) . '</strong></label><br><select class="widefat" id="' . esc_attr( $key ) . '" name="' . esc_attr( $key ) . '">';
+		echo '<p><label for="' . esc_attr( $key ) . '"><strong>' . esc_html( $label ) . '</strong></label><br><select class="widefat" id="' . esc_attr( $key ) . '" name="' . esc_attr( $key ) . '" aria-describedby="' . esc_attr( $key ) . '-help">';
 		foreach ( $options as $option => $option_label ) {
 			echo '<option value="' . esc_attr( $option ) . '" ' . selected( $value, $option, false ) . '>' . esc_html( $option_label ) . '</option>';
 		}
-		echo '</select></p>';
+		echo '</select>' . self::field_help( $key ) . '</p>';
+	}
+
+	/** Render registered field help without duplicating governance definitions. */
+	private static function field_help( string $key ): string {
+		$definitions = Meta_Registry::definitions();
+		$description = (string) ( $definitions[ $key ]['description'] ?? '' );
+		return $description ? '<span class="description" id="' . esc_attr( $key ) . '-help">' . esc_html( $description ) . '</span>' : '';
 	}
 
 	/** Reviewer profile field labels. */
@@ -5037,9 +6470,95 @@ final class Analytics {
 		$config = array(
 			'contentId'    => is_singular() ? (string) get_queried_object_id() : '',
 			'contentGroup' => is_singular() ? sanitize_key( (string) get_post_type() ) : 'archive',
-			'allowedEvents'=> array( 'newsletter_signup', 'affiliate_click', 'outbound_citation_click', 'lead_magnet_download', 'review_method_open', 'evidence_summary_open', 'correction_submit', 'comparison_filter_use', 'methodology_download', 'test_data_download' ),
+			'eventSchemas' => self::event_schemas(),
 		);
 		wp_add_inline_script( 'longevity-analytics', 'window.longevityAnalyticsConfig=' . wp_json_encode( $config ) . ';', 'before' );
+	}
+
+	/** Return the only public parameters accepted for each event. */
+	public static function event_schemas(): array {
+		return array(
+			'newsletter_signup'       => array( 'placement', 'content_group' ),
+			'affiliate_click'          => array( 'merchant', 'content_id', 'placement' ),
+			'outbound_citation_click' => array( 'destination_domain', 'content_id' ),
+			'lead_magnet_download'     => array( 'asset_id', 'placement' ),
+			'review_method_open'       => array( 'content_id', 'product_category' ),
+			'evidence_summary_open'    => array( 'content_id' ),
+			'correction_submit'        => array( 'content_id' ),
+			'comparison_filter_use'    => array( 'content_id', 'product_category' ),
+			'methodology_download'     => array( 'content_id', 'placement' ),
+			'test_data_download'       => array( 'content_id', 'placement' ),
+		);
+	}
+}
+````
+
+## File: wp-content/mu-plugins/longevity-core/class-blocks.php
+````php
+<?php
+/**
+ * First-party dynamic trust blocks.
+ *
+ * @package LongevityCore
+ */
+
+namespace Longevity\Core;
+
+defined( 'ABSPATH' ) || exit;
+
+/** Registers editor blocks that share the public component renderer. */
+final class Blocks {
+	/** @var array<string, string> */
+	private const RENDERERS = array(
+		'article-meta'      => 'render_article_meta',
+		'trust-summary'     => 'render_trust_summary',
+		'reviewer-card'     => 'render_reviewer_card',
+		'source-list'       => 'render_source_list',
+		'table-of-contents' => 'render_table_of_contents',
+		'review-score'      => 'render_review_score',
+		'review-decision'   => 'render_review_decision',
+		'test-method'       => 'render_test_method',
+		'corrections'       => 'render_corrections',
+		'related-content'   => 'render_related_content',
+		'content-card-meta' => 'render_content_card_meta',
+		'breadcrumbs'       => 'render_breadcrumbs',
+	);
+
+	/** Register blocks on init. */
+	public static function init(): void {
+		add_action( 'init', array( self::class, 'register' ), 20 );
+	}
+
+	/** Register metadata and server callbacks. */
+	public static function register(): void {
+		wp_register_script(
+			'longevity-core-blocks',
+			LONGEVITY_CORE_URL . 'assets/blocks.js',
+			array( 'wp-blocks', 'wp-components', 'wp-element', 'wp-i18n' ),
+			LONGEVITY_CORE_VERSION,
+			true
+		);
+		foreach ( self::RENDERERS as $slug => $method ) {
+			register_block_type(
+				LONGEVITY_CORE_PATH . 'blocks/' . $slug,
+				array(
+					'render_callback' => static function ( array $attributes, string $content, \WP_Block $block ) use ( $method ): string {
+						unset( $attributes, $content );
+						$post_id = isset( $block->context['postId'] ) ? (int) $block->context['postId'] : (int) get_the_ID();
+						return Public_Components::$method( $post_id );
+					},
+				)
+			);
+		}
+
+		register_block_type(
+			LONGEVITY_CORE_PATH . 'blocks/search-filters',
+			array( 'render_callback' => static fn() => Public_Components::render_search_filters() )
+		);
+		register_block_type(
+			LONGEVITY_CORE_PATH . 'blocks/author-profile',
+			array( 'render_callback' => static fn() => Public_Components::render_author_profile() )
+		);
 	}
 }
 ````
@@ -5158,6 +6677,55 @@ final class Claims {
 		return array_values( array_unique( $citations ) );
 	}
 
+	/**
+	 * Get safe bibliographic fields for verified claims linked to an article.
+	 *
+	 * Private notes, conflicts, email addresses, and source bodies are never returned.
+	 */
+	public static function public_sources_for_post( int $post_id, int $limit = 50 ): array {
+		if ( $post_id <= 0 ) {
+			return array();
+		}
+		$claims = get_posts(
+			array(
+				'post_type'              => 'lel_claim',
+				'post_status'            => 'any',
+				'posts_per_page'         => min( 100, max( 1, $limit ) ),
+				'orderby'                => array( 'ID' => 'ASC' ),
+				'no_found_rows'          => true,
+				'update_post_term_cache' => false,
+				'meta_query'             => array(
+					array( 'key' => 'post_id', 'value' => $post_id, 'compare' => '=', 'type' => 'NUMERIC' ),
+					array( 'key' => 'verification_status', 'value' => 'verified' ),
+				),
+			)
+		);
+		$sources = array();
+		$seen    = array();
+		foreach ( $claims as $claim ) {
+			$title      = trim( (string) get_post_meta( $claim->ID, 'source_title', true ) );
+			$url        = esc_url_raw( (string) get_post_meta( $claim->ID, 'source_url', true ) );
+			$identifier = trim( (string) get_post_meta( $claim->ID, 'source_identifier', true ) );
+			if ( '' === $title || ( '' === $url && '' === $identifier ) ) {
+				continue;
+			}
+			$key = strtolower( $url ?: $identifier );
+			if ( isset( $seen[ $key ] ) ) {
+				continue;
+			}
+			$seen[ $key ] = true;
+			$sources[]    = array(
+				'title'      => $title,
+				'authors'    => trim( (string) get_post_meta( $claim->ID, 'source_authors', true ) ),
+				'publisher'  => trim( (string) get_post_meta( $claim->ID, 'source_type', true ) ),
+				'date'       => trim( (string) get_post_meta( $claim->ID, 'publication_date', true ) ),
+				'url'        => $url,
+				'identifier' => $identifier,
+			);
+		}
+		return $sources;
+	}
+
 	/** Sanitize claim metadata. */
 	private static function sanitize_claim_field( string $field, $value ): string {
 		$value = (string) $value;
@@ -5215,6 +6783,7 @@ final class CLI {
 		\WP_CLI::add_command( 'longevity claims', Claims_Command::class );
 		\WP_CLI::add_command( 'longevity sources', Sources_Command::class );
 		\WP_CLI::add_command( 'longevity readiness', Readiness_Command::class );
+		\WP_CLI::add_command( 'longevity freshness', Freshness_Command::class );
 	}
 }
 
@@ -5516,6 +7085,98 @@ final class Readiness_Command {
 		\WP_CLI::success( 'Publication readiness passed.' );
 	}
 }
+
+/** Bounded freshness audit and operational-status command. */
+final class Freshness_Command {
+	/** Run the freshness audit or display the latest protected status counts. */
+	public function __invoke( array $args, array $assoc_args ): void {
+		unset( $assoc_args );
+		if ( ! current_user_can( 'approve_publication' ) ) {
+			\WP_CLI::error( 'This command requires approve_publication. Run WP-CLI with an authorized --user.' );
+		}
+		$action = sanitize_key( (string) ( $args[0] ?? 'status' ) );
+		if ( 'run' === $action ) {
+			$report = Freshness::run();
+			\WP_CLI::line( wp_json_encode( $report, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+			if ( 'failed' === ( $report['status'] ?? '' ) ) {
+				\WP_CLI::halt( 1 );
+			}
+			\WP_CLI::success( 'Freshness audit completed without publishing or rewriting content.' );
+			return;
+		}
+		if ( 'status' !== $action ) {
+			\WP_CLI::error( 'Use `wp longevity freshness status` or `wp longevity freshness run`.' );
+		}
+		\WP_CLI::line( wp_json_encode( Freshness::status(), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+	}
+}
+````
+
+## File: wp-content/mu-plugins/longevity-core/class-content-discovery.php
+````php
+<?php
+/**
+ * Reader-facing search and archive query policy.
+ *
+ * @package LongevityCore
+ */
+
+namespace Longevity\Core;
+
+defined( 'ABSPATH' ) || exit;
+
+/** Applies bounded, progressively enhanced discovery filters. */
+final class Content_Discovery {
+	/** Register query and indexation filters. */
+	public static function init(): void {
+		add_action( 'pre_get_posts', array( self::class, 'filter_main_query' ) );
+		add_filter( 'wp_robots', array( self::class, 'search_robots' ) );
+	}
+
+	/** Restrict public discovery to supported types and allowlisted GET values. */
+	public static function filter_main_query( \WP_Query $query ): void {
+		if ( is_admin() || ! $query->is_main_query() ) {
+			return;
+		}
+		if ( $query->is_search() ) {
+			$content_type = self::requested_content_type();
+			$query->set( 'post_type', 'guide' === $content_type ? 'post' : ( 'review' === $content_type ? 'review' : array( 'post', 'review' ) ) );
+			$query->set( 'posts_per_page', 10 );
+			$sort = self::requested_sort();
+			if ( 'newest' === $sort ) {
+				$query->set( 'orderby', array( 'date' => 'DESC', 'ID' => 'DESC' ) );
+			} elseif ( 'updated' === $sort ) {
+				$query->set( 'orderby', array( 'modified' => 'DESC', 'ID' => 'DESC' ) );
+			}
+			return;
+		}
+		if ( $query->is_category() || $query->is_tag() || $query->is_author() || $query->is_home() ) {
+			$query->set( 'post_type', array( 'post', 'review' ) );
+			$query->set( 'posts_per_page', 10 );
+		}
+	}
+
+	/** Return an allowlisted content type. */
+	public static function requested_content_type(): string {
+		$value = isset( $_GET['content_type'] ) ? sanitize_key( wp_unslash( $_GET['content_type'] ) ) : 'all';
+		return in_array( $value, array( 'all', 'guide', 'review' ), true ) ? $value : 'all';
+	}
+
+	/** Return an allowlisted sort value. */
+	public static function requested_sort(): string {
+		$value = isset( $_GET['sort'] ) ? sanitize_key( wp_unslash( $_GET['sort'] ) ) : 'relevance';
+		return in_array( $value, array( 'relevance', 'newest', 'updated' ), true ) ? $value : 'relevance';
+	}
+
+	/** Search-result pages are useful to readers but should not be indexed. */
+	public static function search_robots( array $robots ): array {
+		if ( is_search() ) {
+			$robots['noindex'] = true;
+			$robots['follow']  = true;
+		}
+		return $robots;
+	}
+}
 ````
 
 ## File: wp-content/mu-plugins/longevity-core/class-content-types.php
@@ -5712,7 +7373,8 @@ final class Corrections {
 		if ( empty( $records ) ) {
 			return '';
 		}
-		$html = '<section class="longevity-update-history" aria-labelledby="longevity-corrections-title"><h2 id="longevity-corrections-title">' . esc_html__( 'Corrections and material updates', 'longevity-core' ) . '</h2><ol>';
+		$heading_id = wp_unique_id( 'longevity-corrections-' );
+		$html = '<section class="longevity-update-history" aria-labelledby="' . esc_attr( $heading_id ) . '"><h2 id="' . esc_attr( $heading_id ) . '">' . esc_html__( 'Corrections and material updates', 'longevity-core' ) . '</h2><ol>';
 		foreach ( $records as $record ) {
 			$date = get_post_meta( $record->ID, 'corrected_date', true );
 			$note = get_post_meta( $record->ID, 'public_correction_note', true );
@@ -5738,6 +7400,188 @@ final class Corrections {
 			return in_array( $value, array( 'reported', 'investigating', 'in_progress', 'complete', 'rejected' ), true ) ? $value : 'reported';
 		}
 		return Meta_Registry::sanitize_value( $rule, $value );
+	}
+}
+````
+
+## File: wp-content/mu-plugins/longevity-core/class-freshness.php
+````php
+<?php
+/**
+ * Bounded content-freshness automation and operational status.
+ *
+ * @package LongevityCore
+ */
+
+namespace Longevity\Core;
+
+defined( 'ABSPATH' ) || exit;
+
+/** Identifies due records without rewriting, approving, or publishing content. */
+final class Freshness {
+	private const HOOK = 'lel_daily_freshness';
+	private const LOCK = 'lel_freshness_lock';
+
+	/** Register cron and authenticated status hooks. */
+	public static function init(): void {
+		add_action( 'init', array( self::class, 'schedule' ), 30 );
+		add_action( self::HOOK, array( self::class, 'run' ) );
+		add_action( 'admin_menu', array( self::class, 'register_status_page' ) );
+	}
+
+	/** Schedule the daily bounded audit if it is not already scheduled. */
+	public static function schedule(): void {
+		if ( ! wp_next_scheduled( self::HOOK ) ) {
+			wp_schedule_event( time() + HOUR_IN_SECONDS, 'daily', self::HOOK );
+		}
+	}
+
+	/** Run a bounded, locked scan and return a non-sensitive report. */
+	public static function run(): array {
+		if ( get_transient( self::LOCK ) ) {
+			return array( 'status' => 'locked', 'processed' => 0, 'due' => 0 );
+		}
+		set_transient( self::LOCK, '1', 15 * MINUTE_IN_SECONDS );
+		$report = array( 'status' => 'ok', 'processed' => 0, 'due' => 0, 'run_at' => gmdate( DATE_W3C ) );
+		try {
+			$batch = min( 250, max( 10, (int) get_option( 'lel_freshness_batch_size', 100 ) ) );
+			$posts = get_posts(
+				array(
+					'post_type'              => array( 'post', 'review' ),
+					'post_status'            => array( 'publish', 'draft', 'pending', 'future', 'private' ),
+					'posts_per_page'         => $batch,
+					'fields'                 => 'ids',
+					'orderby'                => array( 'modified' => 'ASC', 'ID' => 'ASC' ),
+					'no_found_rows'          => true,
+					'update_post_term_cache' => false,
+				)
+			);
+			$today = gmdate( 'Y-m-d' );
+			foreach ( $posts as $post_id ) {
+				++$report['processed'];
+				$due_fields = array();
+				foreach ( array( 'next_content_review_date', 'next_fact_check_date', 'next_medical_review_date' ) as $field ) {
+					$date = (string) get_post_meta( (int) $post_id, $field, true );
+					if ( '' !== $date && $date < $today ) {
+						$due_fields[] = $field;
+					}
+				}
+				if ( $due_fields ) {
+					++$report['due'];
+					update_post_meta( (int) $post_id, '_lel_freshness_status', 'update_due' );
+					update_post_meta( (int) $post_id, '_lel_freshness_due_fields', array_values( $due_fields ) );
+					Publication_Gates::log_event( (int) $post_id, 'freshness_update_due', array( 'checks' => count( $due_fields ) ) );
+				} else {
+					delete_post_meta( (int) $post_id, '_lel_freshness_status' );
+					delete_post_meta( (int) $post_id, '_lel_freshness_due_fields' );
+				}
+			}
+			update_option( 'lel_last_freshness_report', $report, false );
+			delete_option( 'lel_freshness_last_error' );
+		} catch ( \Throwable $error ) {
+			$report['status'] = 'failed';
+			update_option( 'lel_freshness_last_error', array( 'time' => gmdate( DATE_W3C ) ), false );
+			if ( function_exists( 'error_log' ) ) {
+				error_log( 'Longevity Core freshness job failed.' );
+			}
+		} finally {
+			delete_transient( self::LOCK );
+		}
+		return $report;
+	}
+
+	/** Register a capability-protected operational status page. */
+	public static function register_status_page(): void {
+		add_management_page( __( 'Longevity operational status', 'longevity-core' ), __( 'Longevity status', 'longevity-core' ), 'approve_publication', 'lel-operational-status', array( self::class, 'render_status_page' ) );
+	}
+
+	/** Render bounded operational issue counts without exposing private records. */
+	public static function render_status_page(): void {
+		if ( ! current_user_can( 'approve_publication' ) ) {
+			wp_die( esc_html__( 'You are not allowed to view operational status.', 'longevity-core' ) );
+		}
+		$report = self::status();
+		echo '<div class="wrap"><h1>' . esc_html__( 'Longevity operational status', 'longevity-core' ) . '</h1><p>' . esc_html__( 'Counts are operational signals. Inspect and resolve records through their protected editorial screens.', 'longevity-core' ) . '</p><table class="widefat striped"><tbody>';
+		foreach ( $report as $label => $value ) {
+			echo '<tr><th scope="row">' . esc_html( ucwords( str_replace( '_', ' ', $label ) ) ) . '</th><td>' . esc_html( is_scalar( $value ) ? (string) $value : wp_json_encode( $value ) ) . '</td></tr>';
+		}
+		echo '</tbody></table></div>';
+	}
+
+	/** Return non-sensitive operational counts for admin and CLI. */
+	public static function status(): array {
+		$last = get_option( 'lel_last_freshness_report', array() );
+		return array(
+			'last_freshness_run'        => is_array( $last ) ? ( $last['run_at'] ?? __( 'Never', 'longevity-core' ) ) : __( 'Never', 'longevity-core' ),
+			'overdue_content_reviews'   => self::count_meta( array( 'post', 'review' ), '_lel_freshness_status', 'update_due' ),
+			'overdue_fact_checks'       => self::count_due_field( 'next_fact_check_date' ),
+			'overdue_medical_reviews'   => self::count_due_field( 'next_medical_review_date' ),
+			'pending_corrections'       => self::count_not_meta( 'lel_correction', 'correction_status', 'complete' ),
+			'unapproved_affiliates'     => self::count_not_meta( 'lel_affiliate', 'relationship_status', 'active' ),
+			'invalid_test_records'      => self::count_not_meta( 'lel_test_record', 'approval_status', 'approved' ),
+			'repeated_emergency_overrides' => self::count_repeated_overrides(),
+			'failed_freshness_jobs'     => get_option( 'lel_freshness_last_error', false ) ? 1 : 0,
+			'last_batch_processed'      => is_array( $last ) ? (int) ( $last['processed'] ?? 0 ) : 0,
+		);
+	}
+
+	/** Count records with an exact meta value. */
+	private static function count_meta( $post_type, string $key, string $value ): int {
+		$query = new \WP_Query( array( 'post_type' => $post_type, 'post_status' => 'any', 'fields' => 'ids', 'posts_per_page' => 1, 'no_found_rows' => false, 'meta_key' => $key, 'meta_value' => $value ) );
+		return (int) $query->found_posts;
+	}
+
+	/** Count records whose state is absent or not equal to the approved value. */
+	private static function count_not_meta( string $post_type, string $key, string $value ): int {
+		$query = new \WP_Query(
+			array(
+				'post_type'      => $post_type,
+				'post_status'    => 'any',
+				'fields'         => 'ids',
+				'posts_per_page' => 1,
+				'no_found_rows'  => false,
+				'meta_query'     => array(
+					'relation' => 'OR',
+					array( 'key' => $key, 'compare' => 'NOT EXISTS' ),
+					array( 'key' => $key, 'value' => $value, 'compare' => '!=' ),
+				),
+			)
+		);
+		return (int) $query->found_posts;
+	}
+
+	/** Count overdue items for a specific lifecycle date in a bounded query. */
+	private static function count_due_field( string $field ): int {
+		$query = new \WP_Query(
+			array(
+				'post_type'      => array( 'post', 'review' ),
+				'post_status'    => 'any',
+				'fields'         => 'ids',
+				'posts_per_page' => 1,
+				'no_found_rows'  => false,
+				'meta_query'     => array(
+					array( 'key' => $field, 'value' => gmdate( 'Y-m-d' ), 'compare' => '<', 'type' => 'DATE' ),
+				),
+			)
+		);
+		return (int) $query->found_posts;
+	}
+
+	/** Count posts with two or more recorded emergency publication overrides. */
+	private static function count_repeated_overrides(): int {
+		$posts = get_posts( array( 'post_type' => array( 'post', 'review' ), 'post_status' => 'any', 'fields' => 'ids', 'posts_per_page' => 250, 'meta_key' => '_longevity_audit_log', 'orderby' => 'ID', 'order' => 'DESC' ) );
+		$count = 0;
+		foreach ( $posts as $post_id ) {
+			$events = get_post_meta( (int) $post_id, '_longevity_audit_log', true );
+			if ( ! is_array( $events ) ) {
+				continue;
+			}
+			$overrides = array_filter( $events, static fn( $event ) => is_array( $event ) && 'publication_override_used' === ( $event['event'] ?? '' ) );
+			if ( count( $overrides ) >= 2 ) {
+				++$count;
+			}
+		}
+		return $count;
 	}
 }
 ````
@@ -6116,6 +7960,612 @@ final class Meta_Registry {
 	private static function enum( $value, array $allowed, string $default ): string {
 		$value = sanitize_text_field( (string) $value );
 		return in_array( $value, $allowed, true ) ? $value : $default;
+	}
+}
+````
+
+## File: wp-content/mu-plugins/longevity-core/class-migrations.php
+````php
+<?php
+/**
+ * Idempotent internal data-version migrations.
+ *
+ * @package LongevityCore
+ */
+
+namespace Longevity\Core;
+
+defined( 'ABSPATH' ) || exit;
+
+/** Advances non-destructive metadata and option migrations once per version. */
+final class Migrations {
+	public const CURRENT_VERSION = 1;
+
+	/** Register the version check. */
+	public static function init(): void {
+		add_action( 'init', array( self::class, 'maybe_run' ), 1 );
+	}
+
+	/** Apply only missing versions and record success after each completed step. */
+	public static function maybe_run(): void {
+		$current = (int) get_option( 'lel_data_version', 0 );
+		if ( $current >= self::CURRENT_VERSION ) {
+			return;
+		}
+		for ( $version = $current + 1; $version <= self::CURRENT_VERSION; ++$version ) {
+			try {
+				self::run_version( $version );
+				update_option( 'lel_data_version', $version, false );
+				delete_option( 'lel_data_migration_error' );
+				if ( function_exists( 'error_log' ) ) {
+					error_log( sprintf( 'Longevity Core migration %d completed.', $version ) );
+				}
+			} catch ( \Throwable $error ) {
+				update_option( 'lel_data_migration_error', array( 'version' => $version, 'time' => gmdate( DATE_W3C ) ), false );
+				if ( function_exists( 'error_log' ) ) {
+					error_log( sprintf( 'Longevity Core migration %d failed.', $version ) );
+				}
+				return;
+			}
+		}
+	}
+
+	/** Execute an individual restart-safe migration. */
+	private static function run_version( int $version ): void {
+		if ( 1 === $version ) {
+			add_option( 'lel_last_freshness_report', array(), '', false );
+			add_option( 'lel_freshness_batch_size', 100, '', false );
+		}
+	}
+}
+````
+
+## File: wp-content/mu-plugins/longevity-core/class-public-components.php
+````php
+<?php
+/**
+ * Shared server-rendered public components.
+ *
+ * @package LongevityCore
+ */
+
+namespace Longevity\Core;
+
+defined( 'ABSPATH' ) || exit;
+
+/** Renders approved public state for shortcodes, blocks, and templates. */
+final class Public_Components {
+	/** @var array<string, int> */
+	private static array $instance_counts = array();
+
+	/** Register content filters used by public components. */
+	public static function init(): void {
+		add_filter( 'the_content', array( self::class, 'add_heading_ids' ), 12 );
+	}
+
+	/** Render visible breadcrumbs from the same hierarchy used by schema. */
+	public static function render_breadcrumbs( int $post_id = 0 ): string {
+		$items = self::breadcrumb_items( $post_id );
+		if ( count( $items ) < 2 ) {
+			return '';
+		}
+		$html = '<nav class="longevity-breadcrumbs" aria-label="' . esc_attr__( 'Breadcrumb', 'longevity-core' ) . '"><ol>';
+		$last = count( $items ) - 1;
+		foreach ( $items as $index => $item ) {
+			$html .= '<li>';
+			if ( $index !== $last && ! empty( $item['url'] ) ) {
+				$html .= '<a href="' . esc_url( $item['url'] ) . '">' . esc_html( $item['name'] ) . '</a>';
+			} else {
+				$html .= '<span aria-current="page">' . esc_html( $item['name'] ) . '</span>';
+			}
+			$html .= '</li>';
+		}
+		return $html . '</ol></nav>';
+	}
+
+	/** Get deterministic visible breadcrumb facts. */
+	public static function breadcrumb_items( int $post_id = 0 ): array {
+		$items = array( array( 'name' => get_bloginfo( 'name' ), 'url' => home_url( '/' ) ) );
+		if ( is_search() ) {
+			$items[] = array( 'name' => __( 'Search', 'longevity-core' ), 'url' => '' );
+			return $items;
+		}
+		if ( is_category() ) {
+			$term = get_queried_object();
+			if ( $term instanceof \WP_Term ) {
+				$items[] = array( 'name' => $term->name, 'url' => '' );
+			}
+			return $items;
+		}
+		if ( is_author() ) {
+			$user = get_queried_object();
+			if ( $user instanceof \WP_User ) {
+				$items[] = array( 'name' => $user->display_name, 'url' => '' );
+			}
+			return $items;
+		}
+		if ( is_post_type_archive( 'review' ) ) {
+			$items[] = array( 'name' => __( 'Consumer Lab', 'longevity-core' ), 'url' => '' );
+			return $items;
+		}
+		$post_id = $post_id > 0 ? $post_id : get_queried_object_id();
+		if ( $post_id <= 0 ) {
+			return $items;
+		}
+		if ( 'review' === get_post_type( $post_id ) ) {
+			$items[] = array( 'name' => __( 'Consumer Lab', 'longevity-core' ), 'url' => get_post_type_archive_link( 'review' ) );
+		} else {
+			$categories = get_the_category( $post_id );
+			if ( $categories ) {
+				$items[] = array( 'name' => $categories[0]->name, 'url' => get_category_link( $categories[0] ) );
+			}
+		}
+		$items[] = array( 'name' => get_the_title( $post_id ), 'url' => '' );
+		return $items;
+	}
+
+	/** Render author and editorial dates. */
+	public static function render_article_meta( int $post_id ): string {
+		if ( $post_id <= 0 || ! get_post( $post_id ) ) {
+			return '';
+		}
+		$items     = array();
+		$author_id = (int) get_post_field( 'post_author', $post_id );
+		if ( $author_id ) {
+			$items[] = sprintf( '<span>%s <a href="%s">%s</a></span>', esc_html__( 'By', 'longevity-core' ), esc_url( get_author_posts_url( $author_id ) ), esc_html( get_the_author_meta( 'display_name', $author_id ) ) );
+		}
+		$items[] = '<span>' . esc_html__( 'Published', 'longevity-core' ) . ' <time datetime="' . esc_attr( get_the_date( DATE_W3C, $post_id ) ) . '">' . esc_html( get_the_date( '', $post_id ) ) . '</time></span>';
+		if ( get_the_modified_time( 'U', $post_id ) > get_the_time( 'U', $post_id ) ) {
+			$items[] = '<span>' . esc_html__( 'Updated', 'longevity-core' ) . ' <time datetime="' . esc_attr( get_the_modified_date( DATE_W3C, $post_id ) ) . '">' . esc_html( get_the_modified_date( '', $post_id ) ) . '</time></span>';
+		}
+		$fact_date = (string) get_post_meta( $post_id, 'fact_checked_date', true );
+		$fact_user = (int) get_post_meta( $post_id, 'fact_checked_by', true );
+		if ( $fact_date && $fact_user ) {
+			$items[] = '<span>' . esc_html__( 'Fact-checked by', 'longevity-core' ) . ' <a href="' . esc_url( get_author_posts_url( $fact_user ) ) . '">' . esc_html( get_the_author_meta( 'display_name', $fact_user ) ) . '</a> <time datetime="' . esc_attr( $fact_date ) . '">' . esc_html( $fact_date ) . '</time></span>';
+		}
+		$review_date = (string) get_post_meta( $post_id, 'medical_review_date', true );
+		if ( $review_date && 'complete' === get_post_meta( $post_id, 'medical_review_status', true ) && get_post_meta( $post_id, 'medical_review_attested', true ) ) {
+			$items[] = '<span>' . esc_html__( 'Medically reviewed', 'longevity-core' ) . ' <time datetime="' . esc_attr( $review_date ) . '">' . esc_html( $review_date ) . '</time></span>';
+		}
+		$cutoff = (string) get_post_meta( $post_id, 'evidence_cutoff_date', true );
+		if ( $cutoff ) {
+			$items[] = '<span>' . esc_html__( 'Evidence cutoff', 'longevity-core' ) . ' <time datetime="' . esc_attr( $cutoff ) . '">' . esc_html( $cutoff ) . '</time></span>';
+		}
+		return '<div class="longevity-article-meta">' . implode( '<span aria-hidden="true">&middot;</span>', $items ) . '</div>';
+	}
+
+	/** Render evidence, scope, limitations, and commercial relationship. */
+	public static function render_trust_summary( int $post_id ): string {
+		if ( $post_id <= 0 ) {
+			return '';
+		}
+		$summary      = trim( (string) get_post_meta( $post_id, 'content_summary', true ) );
+		$scope        = trim( (string) get_post_meta( $post_id, 'content_scope', true ) );
+		$limitations  = trim( (string) get_post_meta( $post_id, 'content_limitations', true ) );
+		$grade        = (string) get_post_meta( $post_id, 'evidence_grade', true );
+		$rationale    = trim( (string) get_post_meta( $post_id, 'evidence_grade_rationale', true ) );
+		$relationship = (string) get_post_meta( $post_id, 'commercial_relationship', true );
+		if ( '' === $summary && '' === $scope && '' === $limitations && '' === $grade && in_array( $relationship, array( '', 'none' ), true ) ) {
+			return '';
+		}
+		$id   = self::unique_id( 'trust', $post_id );
+		$html = '<section class="longevity-trust-summary" aria-labelledby="' . esc_attr( $id ) . '"><h2 id="' . esc_attr( $id ) . '">' . esc_html__( 'At a glance', 'longevity-core' ) . '</h2>';
+		if ( $summary ) {
+			$html .= '<div class="longevity-bottom-line"><h3>' . esc_html__( 'Bottom line', 'longevity-core' ) . '</h3><p>' . esc_html( $summary ) . '</p></div>';
+		}
+		if ( $scope ) {
+			$html .= '<p><strong>' . esc_html__( 'Scope:', 'longevity-core' ) . '</strong> ' . esc_html( $scope ) . '</p>';
+		}
+		if ( $grade ) {
+			$grade_labels = array( 'A' => __( 'strong', 'longevity-core' ), 'B' => __( 'moderate', 'longevity-core' ), 'C' => __( 'limited', 'longevity-core' ), 'D' => __( 'mechanistic or anecdotal', 'longevity-core' ), 'U' => __( 'unclear', 'longevity-core' ) );
+			$html .= '<div class="longevity-evidence-grade"><span class="longevity-badge" data-grade="' . esc_attr( $grade ) . '">' . esc_html( sprintf( __( 'Evidence grade %1$s: %2$s', 'longevity-core' ), $grade, $grade_labels[ $grade ] ?? __( 'unclassified', 'longevity-core' ) ) ) . '</span>';
+			if ( $rationale ) {
+				$html .= '<p>' . esc_html( $rationale ) . '</p>';
+			}
+			$html .= '</div>';
+		}
+		if ( $limitations ) {
+			$html .= '<div class="longevity-limitations" role="note"><h3>' . esc_html__( 'Limitations and uncertainty', 'longevity-core' ) . '</h3><p>' . esc_html( $limitations ) . '</p></div>';
+		}
+		if ( ! in_array( $relationship, array( '', 'none' ), true ) ) {
+			$labels = array( 'affiliate' => __( 'This page contains affiliate relationships.', 'longevity-core' ), 'product_supplied' => __( 'A product or access was supplied for evaluation.', 'longevity-core' ), 'sponsored' => __( 'This content has a disclosed sponsorship relationship.', 'longevity-core' ) );
+			$html  .= '<p class="longevity-disclosure"><strong>' . esc_html__( 'Commercial disclosure:', 'longevity-core' ) . '</strong> ' . esc_html( $labels[ $relationship ] ?? $relationship ) . ' ' . esc_html__( 'Commercial relationships do not determine editorial conclusions.', 'longevity-core' ) . '</p>';
+		}
+		return $html . '</section>';
+	}
+
+	/** Render verified scoped reviewer identity. */
+	public static function render_reviewer_card( int $post_id ): string {
+		if ( $post_id <= 0 || 'complete' !== get_post_meta( $post_id, 'medical_review_status', true ) || ! get_post_meta( $post_id, 'medical_review_attested', true ) ) {
+			return '';
+		}
+		$user_id = (int) get_post_meta( $post_id, 'medical_reviewer_user_id', true );
+		if ( $user_id <= 0 || 'verified' !== get_user_meta( $user_id, 'credential_verification_status', true ) ) {
+			return '';
+		}
+		$name        = (string) get_the_author_meta( 'display_name', $user_id );
+		$credentials = trim( (string) get_user_meta( $user_id, 'professional_credentials', true ) );
+		if ( '' === $name || '' === $credentials ) {
+			return '';
+		}
+		$id    = self::unique_id( 'reviewer', $post_id );
+		$scope = self::scope_label( (string) get_post_meta( $post_id, 'medical_review_scope', true ) );
+		$date  = (string) get_post_meta( $post_id, 'medical_review_date', true );
+		$next  = (string) get_post_meta( $post_id, 'next_medical_review_date', true );
+		$html  = '<aside class="longevity-reviewer-card" aria-labelledby="' . esc_attr( $id ) . '"><h2 id="' . esc_attr( $id ) . '">' . esc_html__( 'Medical review', 'longevity-core' ) . '</h2><p><strong><a href="' . esc_url( get_author_posts_url( $user_id ) ) . '">' . esc_html( $name ) . '</a></strong><br>' . esc_html( $credentials ) . '</p><p>' . esc_html( $scope ) . '</p>';
+		if ( $date ) {
+			$html .= '<p><strong>' . esc_html__( 'Reviewed:', 'longevity-core' ) . '</strong> <time datetime="' . esc_attr( $date ) . '">' . esc_html( $date ) . '</time>';
+			if ( $next ) {
+				$html .= '<br><strong>' . esc_html__( 'Next review:', 'longevity-core' ) . '</strong> <time datetime="' . esc_attr( $next ) . '">' . esc_html( $next ) . '</time>';
+			}
+			$html .= '</p>';
+		}
+		return $html . '</aside>';
+	}
+
+	/** Render the review verdict and buying-decision context without blank rows. */
+	public static function render_review_decision( int $post_id ): string {
+		if ( $post_id <= 0 || 'review' !== get_post_type( $post_id ) ) {
+			return '';
+		}
+		$fields = array(
+			__( 'Verdict', 'longevity-core' )             => get_post_meta( $post_id, 'content_summary', true ),
+			__( 'Best for', 'longevity-core' )            => get_post_meta( $post_id, 'best_for', true ),
+			__( 'Not for', 'longevity-core' )             => get_post_meta( $post_id, 'not_for', true ),
+			__( 'Tested model', 'longevity-core' )        => get_post_meta( $post_id, 'tested_product_model', true ),
+			__( 'Firmware / app version', 'longevity-core' ) => trim( (string) get_post_meta( $post_id, 'tested_firmware_version', true ) . ' / ' . (string) get_post_meta( $post_id, 'tested_app_version', true ), ' /' ),
+			__( 'Acquisition', 'longevity-core' )         => get_post_meta( $post_id, 'product_acquisition_method', true ),
+			__( 'Test period', 'longevity-core' )         => trim( (string) get_post_meta( $post_id, 'testing_start_date', true ) . ' – ' . (string) get_post_meta( $post_id, 'testing_end_date', true ), ' –' ),
+			__( 'Testing duration', 'longevity-core' )    => get_post_meta( $post_id, 'testing_duration', true ),
+			__( 'Price context', 'longevity-core' )       => self::checked_context( $post_id, 'price_checked_date', 'price_region' ),
+			__( 'Warranty checked', 'longevity-core' )    => get_post_meta( $post_id, 'warranty_checked_date', true ),
+			__( 'Major failures', 'longevity-core' )      => get_post_meta( $post_id, 'major_failures', true ),
+		);
+		$fields = array_filter( $fields, static fn( $value ) => '' !== trim( (string) $value ) );
+		if ( empty( $fields ) ) {
+			return '';
+		}
+		$id   = self::unique_id( 'decision', $post_id );
+		$html = '<section class="longevity-review-decision" aria-labelledby="' . esc_attr( $id ) . '"><h2 id="' . esc_attr( $id ) . '">' . esc_html__( 'Review decision summary', 'longevity-core' ) . '</h2><dl class="longevity-review-decision-grid">';
+		foreach ( $fields as $label => $value ) {
+			$html .= '<div><dt>' . esc_html( $label ) . '</dt><dd>' . esc_html( (string) $value ) . '</dd></div>';
+		}
+		return $html . '</dl></section>';
+	}
+
+	/** Render a reproducible score explanation. */
+	public static function render_review_score( int $post_id ): string {
+		if ( $post_id <= 0 || 'review' !== get_post_type( $post_id ) ) {
+			return '';
+		}
+		$score      = (float) get_post_meta( $post_id, 'review_score', true );
+		$version    = (string) get_post_meta( $post_id, 'review_score_version', true );
+		$confidence = (string) get_post_meta( $post_id, 'review_score_confidence', true );
+		$dimensions = get_post_meta( $post_id, 'review_score_dimensions', true );
+		if ( $score <= 0 || '' === $version || '' === $confidence || ! is_array( $dimensions ) ) {
+			return '';
+		}
+		try {
+			$calculated = Review_Methodology::calculate_score( $dimensions );
+		} catch ( \InvalidArgumentException $exception ) {
+			return '';
+		}
+		$override = trim( (string) get_post_meta( $post_id, 'review_score_override_reason', true ) );
+		if ( abs( (float) $calculated['score'] - $score ) > 0.01 && '' === $override ) {
+			return '';
+		}
+		$id   = self::unique_id( 'score', $post_id );
+		$html = '<section class="longevity-review-score-card" aria-labelledby="' . esc_attr( $id ) . '"><h2 id="' . esc_attr( $id ) . '">' . esc_html__( 'Review score and confidence', 'longevity-core' ) . '</h2><p class="longevity-review-score">' . esc_html( number_format_i18n( $score, 1 ) ) . '<span class="longevity-score-scale"> / 5</span></p><p><strong>' . esc_html__( 'Confidence:', 'longevity-core' ) . '</strong> ' . esc_html( $confidence ) . '<br><strong>' . esc_html__( 'Scoring model:', 'longevity-core' ) . '</strong> ' . esc_html( $version ) . '</p><div class="longevity-table-wrap"><table><caption class="screen-reader-text">' . esc_html__( 'Weighted review score dimensions', 'longevity-core' ) . '</caption><thead><tr><th scope="col">' . esc_html__( 'Dimension', 'longevity-core' ) . '</th><th scope="col">' . esc_html__( 'Raw score', 'longevity-core' ) . '</th><th scope="col">' . esc_html__( 'Weight', 'longevity-core' ) . '</th></tr></thead><tbody>';
+		foreach ( $calculated['dimensions'] as $dimension ) {
+			$html .= '<tr><th scope="row">' . esc_html( $dimension['name'] ) . '</th><td>' . esc_html( number_format_i18n( (float) $dimension['score'], 1 ) ) . '/5</td><td>' . esc_html( number_format_i18n( (float) $dimension['weight'], 1 ) ) . '%</td></tr>';
+		}
+		$html .= '</tbody></table></div>';
+		if ( $override ) {
+			$html .= '<p><strong>' . esc_html__( 'Documented score adjustment:', 'longevity-core' ) . '</strong> ' . esc_html( $override ) . '</p>';
+		}
+		return $html . '</section>';
+	}
+
+	/** Render a valid, version-matched test method. */
+	public static function render_test_method( int $post_id ): string {
+		if ( $post_id <= 0 || ! get_post_meta( $post_id, 'testing_required', true ) ) {
+			return '';
+		}
+		$status       = (string) get_post_meta( $post_id, 'testing_status', true );
+		$version      = (string) get_post_meta( $post_id, 'testing_protocol_version', true );
+		$record_id    = (int) get_post_meta( $post_id, 'test_record_id', true );
+		$record_valid = Review_Methodology::valid_test_record( $record_id, $version );
+		if ( ! in_array( $status, array( 'complete', 'approved' ), true ) || ! $record_valid ) {
+			return '<aside class="longevity-testing-note" role="note"><strong>' . esc_html__( 'Testing incomplete:', 'longevity-core' ) . '</strong> ' . esc_html__( 'This page must not imply completed hands-on testing until a version-matched, approved test record exists.', 'longevity-core' ) . '</aside>';
+		}
+		$fields = array(
+			__( 'Product', 'longevity-core' )               => get_post_meta( $record_id, 'product_name', true ),
+			__( 'Protocol version', 'longevity-core' )      => $version,
+			__( 'Test dates', 'longevity-core' )            => trim( (string) get_post_meta( $record_id, 'test_start_date', true ) . ' – ' . (string) get_post_meta( $record_id, 'test_end_date', true ), ' –' ),
+			__( 'Testing duration', 'longevity-core' )      => get_post_meta( $post_id, 'testing_duration', true ),
+			__( 'Acquisition', 'longevity-core' )           => get_post_meta( $record_id, 'acquisition_method', true ),
+			__( 'Measurement equipment', 'longevity-core' ) => get_post_meta( $record_id, 'measurement_equipment', true ),
+			__( 'Comparison devices', 'longevity-core' )    => get_post_meta( $record_id, 'comparison_devices', true ),
+			__( 'Environment', 'longevity-core' )           => get_post_meta( $record_id, 'environment', true ),
+			__( 'Protocol deviations', 'longevity-core' )   => get_post_meta( $record_id, 'deviations', true ),
+			__( 'Failures observed', 'longevity-core' )     => get_post_meta( $record_id, 'failures', true ),
+		);
+		$html = '<details class="longevity-test-method" data-lel-event="review_method_open"><summary>' . esc_html__( 'How this product was tested', 'longevity-core' ) . '</summary><dl>';
+		foreach ( $fields as $label => $value ) {
+			if ( '' !== trim( (string) $value ) ) {
+				$html .= '<div><dt>' . esc_html( $label ) . '</dt><dd>' . esc_html( (string) $value ) . '</dd></div>';
+			}
+		}
+		$html .= '</dl>';
+		$method_url = (string) get_post_meta( $post_id, 'testing_methodology_url', true );
+		if ( $method_url ) {
+			$html .= '<p><a href="' . esc_url( $method_url ) . '" data-lel-event="methodology_download" data-placement="review-method">' . esc_html__( 'Read the full methodology', 'longevity-core' ) . '</a></p>';
+		}
+		return $html . '<p>' . esc_html__( 'Consumer testing describes this unit and protocol. It does not establish clinical accuracy or universal outcomes.', 'longevity-core' ) . '</p></details>';
+	}
+
+	/** Render safe, deduplicated public sources linked to verified claims. */
+	public static function render_source_list( int $post_id ): string {
+		$sources = Claims::public_sources_for_post( $post_id, 50 );
+		if ( empty( $sources ) ) {
+			return '';
+		}
+		$id   = self::unique_id( 'sources', $post_id );
+		$html = '<section class="longevity-source-list" aria-labelledby="' . esc_attr( $id ) . '"><h2 id="' . esc_attr( $id ) . '">' . esc_html__( 'Sources', 'longevity-core' ) . '</h2><ol>';
+		foreach ( $sources as $source ) {
+			$html .= '<li><cite>' . esc_html( $source['title'] ) . '</cite>';
+			$details = array_filter( array( $source['authors'], $source['publisher'], $source['date'] ) );
+			if ( $details ) {
+				$html .= '. ' . esc_html( implode( '. ', $details ) );
+			}
+			if ( $source['url'] ) {
+				$html .= '. <a href="' . esc_url( $source['url'] ) . '" rel="external noopener" data-lel-event="outbound_citation_click">' . esc_html__( 'View source', 'longevity-core' ) . '</a>';
+			} elseif ( $source['identifier'] ) {
+				$html .= '. ' . esc_html( $source['identifier'] );
+			}
+			$html .= '</li>';
+		}
+		return $html . '</ol></section>';
+	}
+
+	/** Render a TOC only for long articles with at least three H2 headings. */
+	public static function render_table_of_contents( int $post_id ): string {
+		$post = get_post( $post_id );
+		if ( ! $post || str_word_count( wp_strip_all_tags( $post->post_content ) ) < 600 ) {
+			return '';
+		}
+		$headings = self::extract_headings( $post->post_content );
+		if ( count( array_filter( $headings, static fn( $heading ) => 2 === $heading['level'] ) ) < 3 ) {
+			return '';
+		}
+		$html = '<nav class="longevity-toc" aria-label="' . esc_attr__( 'On this page', 'longevity-core' ) . '"><strong>' . esc_html__( 'On this page', 'longevity-core' ) . '</strong><ol>';
+		foreach ( $headings as $heading ) {
+			$class = 3 === $heading['level'] ? ' class="is-subheading"' : '';
+			$html .= '<li' . $class . '><a href="#' . esc_attr( $heading['id'] ) . '">' . esc_html( $heading['text'] ) . '</a></li>';
+		}
+		return $html . '</ol></nav>';
+	}
+
+	/** Add the same stable IDs used by the TOC while preserving manual IDs. */
+	public static function add_heading_ids( string $content ): string {
+		if ( ! is_singular( array( 'post', 'review' ) ) || false === stripos( $content, '<h2' ) ) {
+			return $content;
+		}
+		$headings = self::extract_headings( $content );
+		$offset   = 0;
+		return (string) preg_replace_callback(
+			'/<h([23])([^>]*)>(.*?)<\/h\1>/is',
+			static function ( array $matches ) use ( $headings, &$offset ): string {
+				$heading = $headings[ $offset ] ?? null;
+				++$offset;
+				if ( ! $heading || preg_match( "/\\sid=(['\"])[^'\"]+\\1/i", $matches[2] ) ) {
+					return $matches[0];
+				}
+				return '<h' . $matches[1] . $matches[2] . ' id="' . esc_attr( $heading['id'] ) . '">' . $matches[3] . '</h' . $matches[1] . '>';
+			},
+			$content
+		);
+	}
+
+	/** Render deterministic related content. */
+	public static function render_related_content( int $post_id, int $limit = 3 ): string {
+		if ( $post_id <= 0 ) {
+			return '';
+		}
+		$categories = wp_get_post_categories( $post_id );
+		$tags       = wp_get_post_tags( $post_id, array( 'fields' => 'ids' ) );
+		$args       = array(
+			'post_type'           => array( 'post', 'review' ),
+			'post_status'         => 'publish',
+			'post__not_in'        => array( $post_id ),
+			'posts_per_page'      => min( 6, max( 1, $limit ) ),
+			'orderby'             => array( 'date' => 'DESC', 'ID' => 'DESC' ),
+			'ignore_sticky_posts' => true,
+			'no_found_rows'       => true,
+		);
+		if ( $categories ) {
+			$args['category__in'] = $categories;
+		} elseif ( $tags ) {
+			$args['tag__in'] = $tags;
+		} else {
+			$args['post_type'] = get_post_type( $post_id );
+		}
+		$posts = get_posts( $args );
+		if ( empty( $posts ) ) {
+			return '';
+		}
+		$id   = self::unique_id( 'related', $post_id );
+		$html = '<section class="longevity-related-content" aria-labelledby="' . esc_attr( $id ) . '"><h2 id="' . esc_attr( $id ) . '">' . esc_html__( 'Continue exploring', 'longevity-core' ) . '</h2><ul>';
+		foreach ( $posts as $related ) {
+			$html .= '<li><a href="' . esc_url( get_permalink( $related ) ) . '">' . esc_html( get_the_title( $related ) ) . '</a> <span class="longevity-small">' . esc_html( 'review' === $related->post_type ? __( 'Consumer Lab review', 'longevity-core' ) : __( 'Evidence guide', 'longevity-core' ) ) . '</span></li>';
+		}
+		return $html . '</ul></section>';
+	}
+
+	/** Render compact metadata for a query-loop card. */
+	public static function render_content_card_meta( int $post_id ): string {
+		if ( $post_id <= 0 ) {
+			return '';
+		}
+		$items   = array();
+		$items[] = '<span><strong>' . esc_html( 'review' === get_post_type( $post_id ) ? __( 'Review', 'longevity-core' ) : __( 'Guide', 'longevity-core' ) ) . '</strong></span>';
+		$items[] = '<time datetime="' . esc_attr( get_the_modified_date( DATE_W3C, $post_id ) ) . '">' . esc_html( sprintf( __( 'Updated %s', 'longevity-core' ), get_the_modified_date( '', $post_id ) ) ) . '</time>';
+		$grade = (string) get_post_meta( $post_id, 'evidence_grade', true );
+		if ( $grade ) {
+			$items[] = '<span>' . esc_html( sprintf( __( 'Evidence %s', 'longevity-core' ), $grade ) ) . '</span>';
+		}
+		if ( 'review' === get_post_type( $post_id ) && in_array( get_post_meta( $post_id, 'testing_status', true ), array( 'complete', 'approved' ), true ) ) {
+			$items[] = '<span>' . esc_html__( 'Tested', 'longevity-core' ) . '</span>';
+		}
+		if ( 'complete' === get_post_meta( $post_id, 'medical_review_status', true ) && get_post_meta( $post_id, 'medical_review_attested', true ) ) {
+			$items[] = '<span>' . esc_html__( 'Medical review recorded', 'longevity-core' ) . '</span>';
+		}
+		return '<div class="longevity-card-meta">' . implode( '', $items ) . '</div>';
+	}
+
+	/** Render an allowlisted GET search/filter form. */
+	public static function render_search_filters(): string {
+		$query        = get_search_query();
+		$content_type = Content_Discovery::requested_content_type();
+		$sort         = Content_Discovery::requested_sort();
+		$count        = isset( $GLOBALS['wp_query'] ) ? (int) $GLOBALS['wp_query']->found_posts : 0;
+		$html         = '<p class="longevity-result-count" aria-live="polite">' . esc_html( sprintf( _n( '%s result', '%s results', $count, 'longevity-core' ), number_format_i18n( $count ) ) ) . '</p><form class="longevity-search-form" role="search" method="get" action="' . esc_url( home_url( '/' ) ) . '">';
+		$html        .= '<label>' . esc_html__( 'Search terms', 'longevity-core' ) . '<input type="search" name="s" value="' . esc_attr( $query ) . '"></label>';
+		$html        .= '<label>' . esc_html__( 'Content type', 'longevity-core' ) . '<select name="content_type">' . self::options( array( 'all' => __( 'All content', 'longevity-core' ), 'guide' => __( 'Evidence guides', 'longevity-core' ), 'review' => __( 'Consumer Lab reviews', 'longevity-core' ) ), $content_type ) . '</select></label>';
+		$html        .= '<label>' . esc_html__( 'Sort', 'longevity-core' ) . '<select name="sort">' . self::options( array( 'relevance' => __( 'Relevance', 'longevity-core' ), 'newest' => __( 'Newest', 'longevity-core' ), 'updated' => __( 'Recently updated', 'longevity-core' ) ), $sort ) . '</select></label>';
+		return $html . '<button type="submit" class="wp-element-button">' . esc_html__( 'Apply filters', 'longevity-core' ) . '</button></form>';
+	}
+
+	/** Render public author identity without private reviewer metadata. */
+	public static function render_author_profile(): string {
+		$user = get_queried_object();
+		if ( ! $user instanceof \WP_User ) {
+			return '';
+		}
+		$name        = $user->display_name;
+		$bio         = (string) get_the_author_meta( 'description', $user->ID );
+		$credentials = 'verified' === get_user_meta( $user->ID, 'credential_verification_status', true ) ? (string) get_user_meta( $user->ID, 'professional_credentials', true ) : '';
+		$scope       = $credentials ? (string) get_user_meta( $user->ID, 'review_scope', true ) : '';
+		$conflict    = (string) get_user_meta( $user->ID, 'conflict_disclosure', true );
+		$html        = '<header class="longevity-author-profile"><h1>' . esc_html( $name ) . '</h1>';
+		if ( $credentials ) {
+			$html .= '<p><strong>' . esc_html__( 'Verified professional credentials:', 'longevity-core' ) . '</strong> ' . esc_html( $credentials ) . '</p>';
+		}
+		if ( $bio ) {
+			$html .= '<p>' . esc_html( $bio ) . '</p>';
+		}
+		if ( $scope ) {
+			$html .= '<p><strong>' . esc_html__( 'Qualified review scope:', 'longevity-core' ) . '</strong> ' . esc_html( $scope ) . '</p>';
+		}
+		if ( $conflict ) {
+			$html .= '<p><strong>' . esc_html__( 'Public conflict disclosure:', 'longevity-core' ) . '</strong> ' . esc_html( $conflict ) . '</p>';
+		}
+		return $html . '</header>';
+	}
+
+	/** Render correction history through the authoritative correction service. */
+	public static function render_corrections( int $post_id ): string {
+		return $post_id > 0 ? Corrections::render( $post_id ) : '';
+	}
+
+	/** Render the educational medical disclaimer. */
+	public static function render_medical_disclaimer(): string {
+		return '<aside class="longevity-medical-disclaimer" role="note"><strong>' . esc_html__( 'Medical disclaimer:', 'longevity-core' ) . '</strong> ' . esc_html__( 'This material is educational and does not replace individualized advice, diagnosis, or treatment from a qualified healthcare professional. Seek professional guidance before changing medication, supplements, diet, or exercise—especially if pregnant, managing a health condition, or preparing for a procedure.', 'longevity-core' ) . '</aside>';
+	}
+
+	/** Render the legacy review box without changing its public contract. */
+	public static function render_legacy_review_box( array $atts ): string {
+		$html = '<aside class="longevity-review-box" aria-label="' . esc_attr__( 'Review summary', 'longevity-core' ) . '">';
+		if ( '' !== (string) ( $atts['score'] ?? '' ) ) {
+			$score = Meta_Registry::sanitize_value( 'score', $atts['score'] );
+			$html .= '<div class="longevity-review-score">' . esc_html( number_format_i18n( $score, 1 ) ) . '/5</div>';
+		}
+		if ( '' !== (string) ( $atts['best_for'] ?? '' ) ) {
+			$html .= '<p><strong>' . esc_html__( 'Best for:', 'longevity-core' ) . '</strong> ' . esc_html( (string) $atts['best_for'] ) . '</p>';
+		}
+		if ( '' !== (string) ( $atts['tested'] ?? '' ) ) {
+			$html .= '<p><strong>' . esc_html__( 'Testing period:', 'longevity-core' ) . '</strong> ' . esc_html( (string) $atts['tested'] ) . '</p>';
+		}
+		return $html . '</aside>';
+	}
+
+	/** Render portable policy links. */
+	public static function render_policy_links(): string {
+		$links = array( 'about' => __( 'About', 'longevity-core' ), 'editorial-policy' => __( 'Editorial Policy', 'longevity-core' ), 'medical-disclaimer' => __( 'Medical Disclaimer', 'longevity-core' ), 'affiliate-disclosure' => __( 'Affiliate Disclosure', 'longevity-core' ), 'corrections' => __( 'Corrections', 'longevity-core' ), 'testing-methodology' => __( 'Testing Methodology', 'longevity-core' ), 'privacy' => __( 'Privacy', 'longevity-core' ), 'terms' => __( 'Terms', 'longevity-core' ), 'contact' => __( 'Contact', 'longevity-core' ) );
+		$html  = '<nav class="longevity-policy-nav" aria-label="' . esc_attr__( 'Publication policies', 'longevity-core' ) . '"><ul>';
+		foreach ( $links as $slug => $label ) {
+			$page = get_page_by_path( $slug );
+			$url  = $page ? get_permalink( $page ) : home_url( '/' . $slug . '/' );
+			$html .= '<li><a href="' . esc_url( $url ) . '">' . esc_html( $label ) . '</a></li>';
+		}
+		return $html . '</ul></nav>';
+	}
+
+	/** Render footer ownership and review context. */
+	public static function render_footer_meta(): string {
+		$reviewed = (string) get_option( 'lel_policy_review_date', '' );
+		$html     = '<p class="longevity-small">&copy; ' . esc_html( gmdate( 'Y' ) ) . ' ' . esc_html( get_bloginfo( 'name' ) ) . '. ' . esc_html__( 'Material corrections remain visible. Commercial relationships do not control conclusions.', 'longevity-core' );
+		if ( $reviewed ) {
+			$html .= ' ' . esc_html__( 'Policies last reviewed:', 'longevity-core' ) . ' <time datetime="' . esc_attr( $reviewed ) . '">' . esc_html( $reviewed ) . '</time>.';
+		}
+		return $html . '</p>';
+	}
+
+	/** Extract stable, deduplicated H2/H3 identifiers. */
+	private static function extract_headings( string $content ): array {
+		preg_match_all( '/<h([23])([^>]*)>(.*?)<\/h\1>/is', $content, $matches, PREG_SET_ORDER );
+		$headings = array();
+		$used     = array();
+		foreach ( $matches as $match ) {
+			$text = trim( wp_strip_all_tags( $match[3] ) );
+			if ( '' === $text ) {
+				continue;
+			}
+			$id = '';
+			if ( preg_match( "/\\sid=(['\"])([^'\"]+)\\1/i", $match[2], $id_match ) ) {
+				$id = sanitize_title( $id_match[2] );
+			}
+			$base = $id ?: sanitize_title( $text );
+			$base = $base ?: 'section';
+			$id   = $base;
+			$i    = 2;
+			while ( isset( $used[ $id ] ) ) {
+				$id = $base . '-' . $i;
+				++$i;
+			}
+			$used[ $id ] = true;
+			$headings[]  = array( 'level' => (int) $match[1], 'id' => $id, 'text' => $text );
+		}
+		return $headings;
+	}
+
+	/** Build select options. */
+	private static function options( array $options, string $selected ): string {
+		$html = '';
+		foreach ( $options as $value => $label ) {
+			$html .= '<option value="' . esc_attr( $value ) . '" ' . selected( $selected, $value, false ) . '>' . esc_html( $label ) . '</option>';
+		}
+		return $html;
+	}
+
+	/** Join price-check date and region without emitting empty punctuation. */
+	private static function checked_context( int $post_id, string $date_key, string $region_key ): string {
+		$date   = trim( (string) get_post_meta( $post_id, $date_key, true ) );
+		$region = trim( (string) get_post_meta( $post_id, $region_key, true ) );
+		return implode( ' · ', array_filter( array( $date, $region ) ) );
+	}
+
+	/** Return a page-unique heading ID. */
+	private static function unique_id( string $component, int $post_id ): string {
+		$key = $component . '-' . $post_id;
+		self::$instance_counts[ $key ] = ( self::$instance_counts[ $key ] ?? 0 ) + 1;
+		return 'lel-' . sanitize_html_class( $key ) . '-' . self::$instance_counts[ $key ];
+	}
+
+	/** Human-readable, deliberately scoped medical-review label. */
+	private static function scope_label( string $scope ): string {
+		$labels = array( 'full_article' => __( 'Medically reviewed for the full article scope recorded by the reviewer.', 'longevity-core' ), 'safety_only' => __( 'Medically reviewed for safety language.', 'longevity-core' ), 'contraindications_only' => __( 'Medically reviewed for contraindication language.', 'longevity-core' ), 'dosage_language_only' => __( 'Medically reviewed for dosage-language accuracy and boundaries.', 'longevity-core' ), 'product_accuracy_only' => __( 'Medically reviewed for product accuracy language and non-diagnostic limitations.', 'longevity-core' ), 'medical_disclaimer_only' => __( 'Medically reviewed only for the medical disclaimer.', 'longevity-core' ), 'claim_ids' => __( 'Medically reviewed only for the recorded claim IDs.', 'longevity-core' ) );
+		return $labels[ $scope ] ?? __( 'Medically reviewed for the scope recorded on this page.', 'longevity-core' );
 	}
 }
 ````
@@ -7324,7 +9774,44 @@ defined( 'ABSPATH' ) || exit;
 final class Schema {
 	/** Register hooks. */
 	public static function init(): void {
+		add_action( 'wp_head', array( self::class, 'output_social_meta' ), 5 );
 		add_action( 'wp_head', array( self::class, 'output' ), 30 );
+	}
+
+	/** Output conservative social metadata when no supported SEO provider owns it. */
+	public static function output_social_meta(): void {
+		if ( self::seo_provider_owns_schema() ) {
+			return;
+		}
+		$post_id     = is_singular() ? get_queried_object_id() : 0;
+		$title       = $post_id ? get_the_title( $post_id ) : wp_get_document_title();
+		$url         = $post_id ? get_permalink( $post_id ) : home_url( '/' );
+		$description = $post_id ? trim( (string) get_the_excerpt( $post_id ) ) : '';
+		if ( '' === $description && $post_id ) {
+			$description = trim( (string) get_post_meta( $post_id, 'content_summary', true ) );
+		}
+		if ( '' === $description ) {
+			$description = (string) get_bloginfo( 'description' );
+		}
+		$type  = is_singular( array( 'post', 'review' ) ) ? 'article' : 'website';
+		$image = $post_id ? wp_get_attachment_image_url( get_post_thumbnail_id( $post_id ), 'full' ) : '';
+		$tags  = array(
+			array( 'property' => 'og:title', 'content' => $title ),
+			array( 'property' => 'og:description', 'content' => $description ),
+			array( 'property' => 'og:url', 'content' => $url ),
+			array( 'property' => 'og:type', 'content' => $type ),
+			array( 'name' => 'twitter:card', 'content' => $image ? 'summary_large_image' : 'summary' ),
+			array( 'name' => 'twitter:title', 'content' => $title ),
+			array( 'name' => 'twitter:description', 'content' => $description ),
+		);
+		if ( $image ) {
+			$tags[] = array( 'property' => 'og:image', 'content' => $image );
+			$tags[] = array( 'name' => 'twitter:image', 'content' => $image );
+		}
+		foreach ( $tags as $tag ) {
+			$attribute = isset( $tag['property'] ) ? 'property="' . esc_attr( $tag['property'] ) . '"' : 'name="' . esc_attr( $tag['name'] ) . '"';
+			echo '<meta ' . $attribute . ' content="' . esc_attr( wp_strip_all_tags( (string) $tag['content'] ) ) . '">' . "\n";
+		}
 	}
 
 	/** Output the JSON-LD graph. */
@@ -7463,8 +9950,24 @@ final class Schema {
 		$model      = trim( (string) get_post_meta( $post_id, 'tested_product_model', true ) );
 		$score      = (float) get_post_meta( $post_id, 'review_score', true );
 		$version    = trim( (string) get_post_meta( $post_id, 'review_score_version', true ) );
+		$confidence = trim( (string) get_post_meta( $post_id, 'review_score_confidence', true ) );
 		$test_state = (string) get_post_meta( $post_id, 'testing_status', true );
-		if ( '' === $model || $score <= 0 || '' === $version || ! in_array( $test_state, array( 'complete', 'approved' ), true ) ) {
+		$record_id  = (int) get_post_meta( $post_id, 'test_record_id', true );
+		$dimensions = get_post_meta( $post_id, 'review_score_dimensions', true );
+		$disclosure = (string) get_post_meta( $post_id, 'affiliate_disclosure_status', true );
+		if ( 'publish' !== get_post_status( $post_id ) || '' === $model || $score <= 0 || '' === $version || '' === $confidence || ! in_array( $test_state, array( 'complete', 'approved' ), true ) || ! Review_Methodology::valid_test_record( $record_id, (string) get_post_meta( $post_id, 'testing_protocol_version', true ) ) ) {
+			return null;
+		}
+		if ( ! in_array( get_post_meta( $post_id, 'commercial_relationship', true ), array( '', 'none' ), true ) && ! in_array( $disclosure, array( 'approved', 'complete' ), true ) ) {
+			return null;
+		}
+		try {
+			$calculated = Review_Methodology::calculate_score( is_array( $dimensions ) ? $dimensions : array() );
+		} catch ( \InvalidArgumentException $exception ) {
+			return null;
+		}
+		$override = trim( (string) get_post_meta( $post_id, 'review_score_override_reason', true ) );
+		if ( abs( (float) $calculated['score'] - $score ) > 0.01 && '' === $override ) {
 			return null;
 		}
 		$product_id = $url . '#product';
@@ -7502,7 +10005,7 @@ final class Schema {
 		}
 		$name = get_the_author_meta( 'display_name', $user_id );
 		$credentials = get_user_meta( $user_id, 'professional_credentials', true );
-		if ( '' === trim( (string) $name ) || '' === trim( (string) $credentials ) ) {
+		if ( 'verified' !== get_user_meta( $user_id, 'credential_verification_status', true ) || '' === trim( (string) $name ) || '' === trim( (string) $credentials ) ) {
 			return null;
 		}
 		return array(
@@ -7521,14 +10024,11 @@ final class Schema {
 
 	/** Build breadcrumbs from visible navigation facts. */
 	private static function breadcrumb_schema( int $post_id, string $id ): array {
-		$items = array(
-			array( '@type' => 'ListItem', 'position' => 1, 'name' => get_bloginfo( 'name' ), 'item' => home_url( '/' ) ),
-		);
-		$categories = get_the_category( $post_id );
-		if ( $categories ) {
-			$items[] = array( '@type' => 'ListItem', 'position' => 2, 'name' => $categories[0]->name, 'item' => get_category_link( $categories[0] ) );
+		$visible = Public_Components::breadcrumb_items( $post_id );
+		$items   = array();
+		foreach ( $visible as $index => $item ) {
+			$items[] = array( '@type' => 'ListItem', 'position' => $index + 1, 'name' => $item['name'], 'item' => $item['url'] ?: get_permalink( $post_id ) );
 		}
-		$items[] = array( '@type' => 'ListItem', 'position' => count( $items ) + 1, 'name' => get_the_title( $post_id ), 'item' => get_permalink( $post_id ) );
 		return array( '@type' => 'BreadcrumbList', '@id' => $id, 'itemListElement' => $items );
 	}
 
@@ -7574,7 +10074,7 @@ final class Schema {
 ````php
 <?php
 /**
- * Public shortcodes and trust components.
+ * Backward-compatible shortcode adapters.
  *
  * @package LongevityCore
  */
@@ -7583,282 +10083,33 @@ namespace Longevity\Core;
 
 defined( 'ABSPATH' ) || exit;
 
-/** Registers backward-compatible and trust-oriented shortcodes. */
+/** Maps legacy shortcodes to shared server-side renderers. */
 final class Shortcodes {
-	/** Register shortcodes. */
+	/** Register existing public shortcode names without changing their contracts. */
 	public static function init(): void {
 		add_shortcode( 'affiliate_link', array( self::class, 'affiliate_link' ) );
-		add_shortcode( 'medical_disclaimer', array( self::class, 'medical_disclaimer' ) );
+		add_shortcode( 'medical_disclaimer', static fn() => Public_Components::render_medical_disclaimer() );
 		add_shortcode( 'review_box', array( self::class, 'review_box' ) );
-		add_shortcode( 'longevity_article_meta', array( self::class, 'article_meta' ) );
-		add_shortcode( 'longevity_trust_summary', array( self::class, 'trust_summary' ) );
-		add_shortcode( 'longevity_reviewer_card', array( self::class, 'reviewer_card' ) );
-		add_shortcode( 'longevity_test_method', array( self::class, 'test_method' ) );
-		add_shortcode( 'longevity_review_score', array( self::class, 'review_score' ) );
-		add_shortcode( 'longevity_corrections', array( self::class, 'corrections' ) );
-		add_shortcode( 'longevity_policy_links', array( self::class, 'policy_links' ) );
-		add_shortcode( 'longevity_footer_meta', array( self::class, 'footer_meta' ) );
+		add_shortcode( 'longevity_article_meta', static fn() => Public_Components::render_article_meta( (int) get_the_ID() ) );
+		add_shortcode( 'longevity_trust_summary', static fn() => Public_Components::render_trust_summary( (int) get_the_ID() ) );
+		add_shortcode( 'longevity_reviewer_card', static fn() => Public_Components::render_reviewer_card( (int) get_the_ID() ) );
+		add_shortcode( 'longevity_test_method', static fn() => Public_Components::render_test_method( (int) get_the_ID() ) );
+		add_shortcode( 'longevity_review_score', static fn() => Public_Components::render_review_score( (int) get_the_ID() ) );
+		add_shortcode( 'longevity_corrections', static fn() => Public_Components::render_corrections( (int) get_the_ID() ) );
+		add_shortcode( 'longevity_policy_links', static fn() => Public_Components::render_policy_links() );
+		add_shortcode( 'longevity_footer_meta', static fn() => Public_Components::render_footer_meta() );
 	}
 
-	/** Render an affiliate link while preserving the original shortcode interface. */
+	/** Preserve the affiliate shortcode interface and registry enforcement. */
 	public static function affiliate_link( array $atts ): string {
-		$atts = shortcode_atts(
-			array(
-				'url'       => '',
-				'label'     => __( 'Check current price', 'longevity-core' ),
-				'placement' => 'article',
-			),
-			$atts,
-			'affiliate_link'
-		);
+		$atts = shortcode_atts( array( 'url' => '', 'label' => __( 'Check current price', 'longevity-core' ), 'placement' => 'article' ), $atts, 'affiliate_link' );
 		return Affiliate_Registry::render_link( (string) $atts['url'], (string) $atts['label'], (string) $atts['placement'] );
 	}
 
-	/** Render the medical disclaimer. */
-	public static function medical_disclaimer(): string {
-		return '<aside class="longevity-medical-disclaimer" role="note"><strong>' . esc_html__( 'Medical disclaimer:', 'longevity-core' ) . '</strong> ' . esc_html__( 'This material is educational and does not replace individualized advice, diagnosis, or treatment from a qualified healthcare professional. Seek professional guidance before changing medication, supplements, diet, or exercise—especially if pregnant, managing a health condition, or preparing for a procedure.', 'longevity-core' ) . '</aside>';
-	}
-
-	/** Render the legacy review box. */
+	/** Preserve the legacy review-box attributes. */
 	public static function review_box( array $atts ): string {
 		$atts = shortcode_atts( array( 'score' => '', 'best_for' => '', 'tested' => '' ), $atts, 'review_box' );
-		$html = '<aside class="longevity-review-box" aria-label="' . esc_attr__( 'Review summary', 'longevity-core' ) . '">';
-		if ( '' !== (string) $atts['score'] ) {
-			$score = Meta_Registry::sanitize_value( 'score', $atts['score'] );
-			$html .= '<div class="longevity-review-score">' . esc_html( number_format_i18n( $score, 1 ) ) . '/5</div>';
-		}
-		if ( '' !== (string) $atts['best_for'] ) {
-			$html .= '<p><strong>' . esc_html__( 'Best for:', 'longevity-core' ) . '</strong> ' . esc_html( (string) $atts['best_for'] ) . '</p>';
-		}
-		if ( '' !== (string) $atts['tested'] ) {
-			$html .= '<p><strong>' . esc_html__( 'Testing period:', 'longevity-core' ) . '</strong> ' . esc_html( (string) $atts['tested'] ) . '</p>';
-		}
-		return $html . '</aside>';
-	}
-
-	/** Render authored, updated, reviewed, and cutoff dates. */
-	public static function article_meta(): string {
-		$post_id = get_the_ID();
-		if ( ! $post_id ) {
-			return '';
-		}
-		$items = array();
-		$author_id = (int) get_post_field( 'post_author', $post_id );
-		if ( $author_id ) {
-			$items[] = sprintf( '<span>%s <a href="%s">%s</a></span>', esc_html__( 'By', 'longevity-core' ), esc_url( get_author_posts_url( $author_id ) ), esc_html( get_the_author_meta( 'display_name', $author_id ) ) );
-		}
-		$items[] = '<span>' . esc_html__( 'Published', 'longevity-core' ) . ' <time datetime="' . esc_attr( get_the_date( DATE_W3C, $post_id ) ) . '">' . esc_html( get_the_date( '', $post_id ) ) . '</time></span>';
-		if ( get_the_modified_time( 'U', $post_id ) > get_the_time( 'U', $post_id ) ) {
-			$items[] = '<span>' . esc_html__( 'Updated', 'longevity-core' ) . ' <time datetime="' . esc_attr( get_the_modified_date( DATE_W3C, $post_id ) ) . '">' . esc_html( get_the_modified_date( '', $post_id ) ) . '</time></span>';
-		}
-		$fact_date = (string) get_post_meta( $post_id, 'fact_checked_date', true );
-		$fact_user = (int) get_post_meta( $post_id, 'fact_checked_by', true );
-		if ( $fact_date && $fact_user ) {
-			$fact_name = get_the_author_meta( 'display_name', $fact_user );
-			$items[] = '<span>' . esc_html__( 'Fact-checked by', 'longevity-core' ) . ' <a href="' . esc_url( get_author_posts_url( $fact_user ) ) . '">' . esc_html( $fact_name ) . '</a> <time datetime="' . esc_attr( $fact_date ) . '">' . esc_html( $fact_date ) . '</time></span>';
-		}
-		$review_date = (string) get_post_meta( $post_id, 'medical_review_date', true );
-		if ( $review_date && 'complete' === get_post_meta( $post_id, 'medical_review_status', true ) ) {
-			$items[] = '<span>' . esc_html__( 'Medically reviewed', 'longevity-core' ) . ' <time datetime="' . esc_attr( $review_date ) . '">' . esc_html( $review_date ) . '</time></span>';
-		}
-		$cutoff = (string) get_post_meta( $post_id, 'evidence_cutoff_date', true );
-		if ( $cutoff ) {
-			$items[] = '<span>' . esc_html__( 'Evidence cutoff', 'longevity-core' ) . ' <time datetime="' . esc_attr( $cutoff ) . '">' . esc_html( $cutoff ) . '</time></span>';
-		}
-		return '<div class="longevity-article-meta">' . implode( '<span aria-hidden="true">·</span>', $items ) . '</div>';
-	}
-
-	/** Render evidence, scope, limitations, and disclosure summary. */
-	public static function trust_summary(): string {
-		$post_id = get_the_ID();
-		if ( ! $post_id ) {
-			return '';
-		}
-		$summary = (string) get_post_meta( $post_id, 'content_summary', true );
-		$scope = (string) get_post_meta( $post_id, 'content_scope', true );
-		$limitations = (string) get_post_meta( $post_id, 'content_limitations', true );
-		$grade = (string) get_post_meta( $post_id, 'evidence_grade', true );
-		$rationale = (string) get_post_meta( $post_id, 'evidence_grade_rationale', true );
-		$relationship = (string) get_post_meta( $post_id, 'commercial_relationship', true );
-		if ( '' === $summary && '' === $scope && '' === $limitations && '' === $grade && in_array( $relationship, array( '', 'none' ), true ) ) {
-			return '';
-		}
-		$html = '<section class="longevity-trust-summary" aria-labelledby="longevity-trust-title"><h2 id="longevity-trust-title">' . esc_html__( 'At a glance', 'longevity-core' ) . '</h2>';
-		if ( $summary ) {
-			$html .= '<div class="longevity-bottom-line"><h3>' . esc_html__( 'Bottom line', 'longevity-core' ) . '</h3><p>' . esc_html( $summary ) . '</p></div>';
-		}
-		if ( $scope ) {
-			$html .= '<p><strong>' . esc_html__( 'Scope:', 'longevity-core' ) . '</strong> ' . esc_html( $scope ) . '</p>';
-		}
-		if ( $grade ) {
-			$html .= '<div class="longevity-evidence-grade"><span class="longevity-badge" data-grade="' . esc_attr( $grade ) . '">' . esc_html( sprintf( __( 'Evidence grade %s', 'longevity-core' ), $grade ) ) . '</span>';
-			if ( $rationale ) {
-				$html .= '<p>' . esc_html( $rationale ) . '</p>';
-			}
-			$html .= '</div>';
-		}
-		if ( $limitations ) {
-			$html .= '<div class="longevity-limitations" role="note"><h3>' . esc_html__( 'Limitations and uncertainty', 'longevity-core' ) . '</h3><p>' . esc_html( $limitations ) . '</p></div>';
-		}
-		if ( ! in_array( $relationship, array( '', 'none' ), true ) ) {
-			$labels = array( 'affiliate' => __( 'This page contains affiliate relationships.', 'longevity-core' ), 'product_supplied' => __( 'A product or access was supplied for evaluation.', 'longevity-core' ), 'sponsored' => __( 'This content has a disclosed sponsorship relationship.', 'longevity-core' ) );
-			$html .= '<p class="longevity-disclosure"><strong>' . esc_html__( 'Commercial disclosure:', 'longevity-core' ) . '</strong> ' . esc_html( $labels[ $relationship ] ?? $relationship ) . ' ' . esc_html__( 'Commercial relationships do not determine editorial conclusions.', 'longevity-core' ) . '</p>';
-		}
-		return $html . '</section>';
-	}
-
-	/** Render scoped reviewer identity. */
-	public static function reviewer_card(): string {
-		$post_id = get_the_ID();
-		if ( ! $post_id || 'complete' !== get_post_meta( $post_id, 'medical_review_status', true ) || ! get_post_meta( $post_id, 'medical_review_attested', true ) ) {
-			return '';
-		}
-		$user_id = (int) get_post_meta( $post_id, 'medical_reviewer_user_id', true );
-		if ( $user_id <= 0 || 'verified' !== get_user_meta( $user_id, 'credential_verification_status', true ) ) {
-			return '';
-		}
-		$name        = get_the_author_meta( 'display_name', $user_id );
-		$credentials = (string) get_user_meta( $user_id, 'professional_credentials', true );
-		$url         = get_author_posts_url( $user_id );
-		if ( '' === $name || '' === $credentials ) {
-			return '';
-		}
-		$scope = (string) get_post_meta( $post_id, 'medical_review_scope', true );
-		$date = (string) get_post_meta( $post_id, 'medical_review_date', true );
-		$next = (string) get_post_meta( $post_id, 'next_medical_review_date', true );
-		$name_html = $url ? '<a href="' . esc_url( $url ) . '">' . esc_html( $name ) . '</a>' : esc_html( $name );
-		$html = '<aside class="longevity-reviewer-card" aria-labelledby="longevity-reviewer-title"><h2 id="longevity-reviewer-title">' . esc_html__( 'Medical review', 'longevity-core' ) . '</h2><p><strong>' . $name_html . '</strong><br>' . esc_html( $credentials ) . '</p><p>' . esc_html( self::scope_label( $scope ) ) . '</p><p><strong>' . esc_html__( 'Reviewed:', 'longevity-core' ) . '</strong> <time datetime="' . esc_attr( $date ) . '">' . esc_html( $date ) . '</time>';
-		if ( $next ) {
-			$html .= '<br><strong>' . esc_html__( 'Next review:', 'longevity-core' ) . '</strong> <time datetime="' . esc_attr( $next ) . '">' . esc_html( $next ) . '</time>';
-		}
-		return $html . '</p></aside>';
-	}
-
-	/** Render test method summary only when testing metadata exists. */
-	public static function test_method(): string {
-		$post_id = get_the_ID();
-		if ( ! $post_id || ! get_post_meta( $post_id, 'testing_required', true ) ) {
-			return '';
-		}
-		$status       = (string) get_post_meta( $post_id, 'testing_status', true );
-		$version      = (string) get_post_meta( $post_id, 'testing_protocol_version', true );
-		$record_id    = (int) get_post_meta( $post_id, 'test_record_id', true );
-		$record_valid = Review_Methodology::valid_test_record( $record_id, $version );
-		if ( ! in_array( $status, array( 'complete', 'approved' ), true ) || ! $record_valid ) {
-			return '<aside class="longevity-testing-note" role="note"><strong>' . esc_html__( 'Testing incomplete:', 'longevity-core' ) . '</strong> ' . esc_html__( 'This page must not imply completed hands-on testing until a version-matched, approved test record exists.', 'longevity-core' ) . '</aside>';
-		}
-
-		$method_url = (string) get_post_meta( $post_id, 'testing_methodology_url', true );
-		$fields = array(
-			__( 'Product', 'longevity-core' )           => get_post_meta( $record_id, 'product_name', true ),
-			__( 'Protocol version', 'longevity-core' ) => $version,
-			__( 'Test dates', 'longevity-core' )       => trim( (string) get_post_meta( $record_id, 'test_start_date', true ) . ' – ' . (string) get_post_meta( $record_id, 'test_end_date', true ), ' –' ),
-			__( 'Testing duration', 'longevity-core' ) => get_post_meta( $post_id, 'testing_duration', true ),
-			__( 'Acquisition', 'longevity-core' )      => get_post_meta( $record_id, 'acquisition_method', true ),
-			__( 'Measurement equipment', 'longevity-core' ) => get_post_meta( $record_id, 'measurement_equipment', true ),
-			__( 'Comparison devices', 'longevity-core' )    => get_post_meta( $record_id, 'comparison_devices', true ),
-			__( 'Environment', 'longevity-core' )           => get_post_meta( $record_id, 'environment', true ),
-			__( 'Failures observed', 'longevity-core' )     => get_post_meta( $record_id, 'failures', true ),
-		);
-		$html = '<details class="longevity-test-method" data-lel-event="review_method_open"><summary>' . esc_html__( 'How this product was tested', 'longevity-core' ) . '</summary><dl>';
-		foreach ( $fields as $label => $value ) {
-			if ( '' !== trim( (string) $value ) ) {
-				$html .= '<div><dt>' . esc_html( $label ) . '</dt><dd>' . esc_html( (string) $value ) . '</dd></div>';
-			}
-		}
-		$html .= '</dl>';
-		if ( $method_url ) {
-			$html .= '<p><a href="' . esc_url( $method_url ) . '" data-lel-event="methodology_download">' . esc_html__( 'Read the full methodology', 'longevity-core' ) . '</a></p>';
-		}
-		return $html . '<p>' . esc_html__( 'Consumer testing describes this unit and protocol. It does not establish clinical accuracy or universal outcomes.', 'longevity-core' ) . '</p></details>';
-	}
-
-	/** Render a reproducible score explanation for review posts. */
-	public static function review_score(): string {
-		$post_id = get_the_ID();
-		if ( ! $post_id || 'review' !== get_post_type( $post_id ) ) {
-			return '';
-		}
-		$score      = (float) get_post_meta( $post_id, 'review_score', true );
-		$version    = (string) get_post_meta( $post_id, 'review_score_version', true );
-		$confidence = (string) get_post_meta( $post_id, 'review_score_confidence', true );
-		$dimensions = get_post_meta( $post_id, 'review_score_dimensions', true );
-		if ( $score <= 0 || '' === $version || '' === $confidence || ! is_array( $dimensions ) ) {
-			return '';
-		}
-		try {
-			$calculated = Review_Methodology::calculate_score( $dimensions );
-		} catch ( \InvalidArgumentException $exception ) {
-			return '';
-		}
-		$override = (string) get_post_meta( $post_id, 'review_score_override_reason', true );
-		if ( abs( (float) $calculated['score'] - $score ) > 0.01 && '' === trim( $override ) ) {
-			return '';
-		}
-
-		$html = '<section class="longevity-review-score-card" aria-labelledby="longevity-score-title"><h2 id="longevity-score-title">' . esc_html__( 'Review score and confidence', 'longevity-core' ) . '</h2><p class="longevity-review-score">' . esc_html( number_format_i18n( $score, 1 ) ) . '/5</p><p><strong>' . esc_html__( 'Confidence:', 'longevity-core' ) . '</strong> ' . esc_html( $confidence ) . '<br><strong>' . esc_html__( 'Scoring model:', 'longevity-core' ) . '</strong> ' . esc_html( $version ) . '</p><div class="wp-block-table"><table><thead><tr><th scope="col">' . esc_html__( 'Dimension', 'longevity-core' ) . '</th><th scope="col">' . esc_html__( 'Raw score', 'longevity-core' ) . '</th><th scope="col">' . esc_html__( 'Weight', 'longevity-core' ) . '</th></tr></thead><tbody>';
-		foreach ( $calculated['dimensions'] as $dimension ) {
-			$html .= '<tr><th scope="row">' . esc_html( $dimension['name'] ) . '</th><td>' . esc_html( number_format_i18n( (float) $dimension['score'], 1 ) ) . '/5</td><td>' . esc_html( number_format_i18n( (float) $dimension['weight'], 1 ) ) . '%</td></tr>';
-		}
-		$html .= '</tbody></table></div>';
-		if ( '' !== trim( $override ) ) {
-			$html .= '<p><strong>' . esc_html__( 'Documented score adjustment:', 'longevity-core' ) . '</strong> ' . esc_html( $override ) . '</p>';
-		}
-		return $html . '</section>';
-	}
-
-	/** Render correction history. */
-	public static function corrections(): string {
-		$post_id = get_the_ID();
-		return $post_id ? Corrections::render( $post_id ) : '';
-	}
-
-	/** Render portable policy navigation from page slugs. */
-	public static function policy_links(): string {
-		$links = array(
-			'about' => __( 'About', 'longevity-core' ),
-			'editorial-policy' => __( 'Editorial Policy', 'longevity-core' ),
-			'medical-disclaimer' => __( 'Medical Disclaimer', 'longevity-core' ),
-			'affiliate-disclosure' => __( 'Affiliate Disclosure', 'longevity-core' ),
-			'corrections' => __( 'Corrections', 'longevity-core' ),
-			'testing-methodology' => __( 'Testing Methodology', 'longevity-core' ),
-			'privacy' => __( 'Privacy', 'longevity-core' ),
-			'terms' => __( 'Terms', 'longevity-core' ),
-			'contact' => __( 'Contact', 'longevity-core' ),
-		);
-		$html = '<nav class="longevity-policy-nav" aria-label="' . esc_attr__( 'Publication policies', 'longevity-core' ) . '"><ul>';
-		foreach ( $links as $slug => $label ) {
-			$page = get_page_by_path( $slug );
-			$url = $page ? get_permalink( $page ) : home_url( '/' . $slug . '/' );
-			$html .= '<li><a href="' . esc_url( $url ) . '">' . esc_html( $label ) . '</a></li>';
-		}
-		return $html . '</ul></nav>';
-	}
-
-	/** Render footer mission and policy review information. */
-	public static function footer_meta(): string {
-		$year = gmdate( 'Y' );
-		$reviewed = (string) get_option( 'lel_policy_review_date', '' );
-		$html = '<p>' . esc_html__( 'Longevity Evidence Lab helps adults evaluate health practices and consumer products using transparent evidence reviews, reproducible testing methods, and clearly stated uncertainty.', 'longevity-core' ) . '</p>';
-		$html .= '<p class="longevity-small">&copy; ' . esc_html( $year ) . ' ' . esc_html( get_bloginfo( 'name' ) ) . '. ' . esc_html__( 'Educational information only; not individualized medical advice.', 'longevity-core' );
-		if ( $reviewed ) {
-			$html .= ' ' . esc_html__( 'Policies last reviewed:', 'longevity-core' ) . ' <time datetime="' . esc_attr( $reviewed ) . '">' . esc_html( $reviewed ) . '</time>.';
-		}
-		return $html . '</p>';
-	}
-
-	/** Human-readable review scope without overstatement. */
-	private static function scope_label( string $scope ): string {
-		$labels = array(
-			'full_article' => __( 'Medically reviewed for the full article scope recorded by the reviewer.', 'longevity-core' ),
-			'safety_only' => __( 'Medically reviewed for safety language.', 'longevity-core' ),
-			'contraindications_only' => __( 'Medically reviewed for contraindication language.', 'longevity-core' ),
-			'dosage_language_only' => __( 'Medically reviewed for dosage-language accuracy and boundaries.', 'longevity-core' ),
-			'product_accuracy_only' => __( 'Medically reviewed for product accuracy language and non-diagnostic limitations.', 'longevity-core' ),
-			'medical_disclaimer_only' => __( 'Medically reviewed only for the medical disclaimer.', 'longevity-core' ),
-			'claim_ids' => __( 'Medically reviewed only for the recorded claim IDs.', 'longevity-core' ),
-		);
-		return $labels[ $scope ] ?? __( 'Medically reviewed for the scope recorded on this page.', 'longevity-core' );
+		return Public_Components::render_legacy_review_box( $atts );
 	}
 }
 ````
@@ -7869,14 +10120,14 @@ final class Shortcodes {
 /**
  * Plugin Name: Longevity Core
  * Description: Editorial governance, evidence traceability, product-testing controls, analytics, and conservative schema.
- * Version: 2.0.0
+ * Version: 3.0.0
  * Requires PHP: 8.1
  * Text Domain: longevity-core
  */
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'LONGEVITY_CORE_VERSION', '2.0.0' );
+define( 'LONGEVITY_CORE_VERSION', '3.0.0' );
 define( 'LONGEVITY_CORE_PATH', __DIR__ . '/longevity-core/' );
 define( 'LONGEVITY_CORE_URL', content_url( 'mu-plugins/longevity-core/' ) );
 
@@ -20354,17 +22605,30 @@ add_action( 'admin_head', 'dolly_css' );
 
 ## File: wp-content/themes/longevity-starter/parts/footer.html
 ````html
-<!-- wp:group {"className":"longevity-site-footer","style":{"spacing":{"padding":{"top":"3rem","bottom":"3rem"}}},"layout":{"type":"constrained"}} -->
-<div class="wp-block-group longevity-site-footer" style="padding-top:3rem;padding-bottom:3rem"><!-- wp:group {"align":"wide","layout":{"type":"constrained"}} --><div class="wp-block-group alignwide"><!-- wp:site-title {"level":2,"isLink":true,"fontSize":"large"} /--><!-- wp:shortcode -->[longevity_footer_meta]<!-- /wp:shortcode --><!-- wp:shortcode -->[longevity_policy_links]<!-- /wp:shortcode --><!-- wp:paragraph {"fontSize":"small"} --><p class="has-small-font-size">Newsletter forms must explain consent, frequency, and how to unsubscribe before collection.</p><!-- /wp:paragraph --></div><!-- /wp:group --></div><!-- /wp:group -->
+<!-- wp:group {"tagName":"footer","className":"longevity-site-footer","layout":{"type":"constrained"}} -->
+<footer class="wp-block-group longevity-site-footer"><!-- wp:html --><div class="longevity-footer-grid alignwide"><div><h2>Longevity Evidence Lab</h2><p>Evidence-led guidance for evaluating health practices and consumer products. We show evidence strength, uncertainty, review scope, testing methods, commercial relationships, and material corrections.</p><p class="longevity-small">Educational information only; not individualized medical advice.</p></div><nav aria-label="Explore"><h3>Explore</h3><ul><li><a href="/start-here/">Start Here</a></li><li><a href="/evidence-guides/">Evidence Guides</a></li><li><a href="/reviews/">Consumer Lab</a></li><li><a href="/?s=">Search</a></li></ul></nav><nav aria-label="About the publication"><h3>About</h3><ul><li><a href="/about/">About the publication</a></li><li><a href="/editorial-policy/">Editorial Policy</a></li><li><a href="/contact/">Contact</a></li></ul></nav><nav aria-label="Editorial standards"><h3>Standards</h3><ul><li><a href="/evidence-methodology/">Evidence methodology</a></li><li><a href="/testing-methodology/">Testing Methodology</a></li><li><a href="/corrections/">Corrections</a></li><li><a href="/affiliate-disclosure/">Affiliate Disclosure</a></li></ul></nav><nav aria-label="Legal"><h3>Legal</h3><ul><li><a href="/medical-disclaimer/">Medical Disclaimer</a></li><li><a href="/privacy/">Privacy</a></li><li><a href="/terms/">Terms</a></li></ul></nav></div><!-- /wp:html --><!-- wp:separator {"backgroundColor":"border-strong"} /--><!-- wp:shortcode -->[longevity_footer_meta]<!-- /wp:shortcode --></footer><!-- /wp:group -->
 ````
 
 ## File: wp-content/themes/longevity-starter/parts/header.html
 ````html
 <!-- wp:html --><a class="longevity-skip-link" href="#main-content">Skip to content</a><!-- /wp:html -->
-<!-- wp:group {"className":"longevity-site-header","style":{"spacing":{"padding":{"top":"1rem","bottom":"1rem"}},"border":{"bottom":{"color":"var:preset|color|border","width":"1px"}}},"layout":{"type":"constrained"}} -->
-<div class="wp-block-group longevity-site-header" style="border-bottom-color:var(--wp--preset--color--border);border-bottom-width:1px;padding-top:1rem;padding-bottom:1rem"><!-- wp:group {"align":"wide","layout":{"type":"flex","flexWrap":"wrap","justifyContent":"space-between","verticalAlignment":"center"}} -->
-<div class="wp-block-group alignwide"><!-- wp:group {"layout":{"type":"flex","flexWrap":"nowrap"}} --><div class="wp-block-group"><!-- wp:site-logo {"width":44,"shouldSyncIcon":true} /--><!-- wp:site-title {"level":0} /--></div><!-- /wp:group --><!-- wp:group {"layout":{"type":"flex","flexWrap":"wrap","justifyContent":"right"}} --><div class="wp-block-group"><!-- wp:navigation {"overlayMenu":"mobile","ariaLabel":"Primary navigation","layout":{"type":"flex","justifyContent":"right"}} --><!-- wp:page-list /--><!-- /wp:navigation --><!-- wp:search {"label":"Search","showLabel":false,"placeholder":"Search evidence guides","buttonText":"Search","buttonUseIcon":true} /--></div><!-- /wp:group --></div>
-<!-- /wp:group --></div><!-- /wp:group -->
+<!-- wp:group {"tagName":"header","className":"longevity-site-header","style":{"spacing":{"padding":{"top":"0.85rem","bottom":"0.85rem"}}},"layout":{"type":"constrained"}} -->
+<header class="wp-block-group longevity-site-header" style="padding-top:0.85rem;padding-bottom:0.85rem"><!-- wp:group {"align":"wide","layout":{"type":"flex","flexWrap":"wrap","justifyContent":"space-between","verticalAlignment":"center"}} -->
+<div class="wp-block-group alignwide"><!-- wp:group {"layout":{"type":"flex","flexWrap":"nowrap"}} --><div class="wp-block-group"><!-- wp:site-logo {"width":42,"shouldSyncIcon":true} /--><!-- wp:site-title {"level":0} /--></div><!-- /wp:group --><!-- wp:group {"layout":{"type":"flex","flexWrap":"wrap","justifyContent":"right"}} --><div class="wp-block-group"><!-- wp:navigation {"overlayMenu":"mobile","ariaLabel":"Primary navigation","className":"longevity-primary-nav","layout":{"type":"flex","justifyContent":"right"}} --><!-- wp:navigation-link {"label":"Start Here","url":"/start-here/","kind":"custom"} /--><!-- wp:navigation-link {"label":"Evidence Guides","url":"/evidence-guides/","kind":"custom"} /--><!-- wp:navigation-link {"label":"Sleep","url":"/category/sleep/","kind":"custom"} /--><!-- wp:navigation-link {"label":"Movement","url":"/category/movement/","kind":"custom"} /--><!-- wp:navigation-link {"label":"Nutrition","url":"/category/nutrition/","kind":"custom"} /--><!-- wp:navigation-link {"label":"Wearables","url":"/category/wearables/","kind":"custom"} /--><!-- wp:navigation-link {"label":"Consumer Lab","url":"/reviews/","kind":"custom"} /--><!-- /wp:navigation --><!-- wp:search {"label":"Search the publication","showLabel":false,"placeholder":"Search evidence","buttonText":"Search","buttonUseIcon":true} /--></div><!-- /wp:group --></div>
+<!-- /wp:group --></header><!-- /wp:group -->
+````
+
+## File: wp-content/themes/longevity-starter/patterns/article-introduction.php
+````php
+<?php
+/**
+ * Title: Article introduction
+ * Slug: longevity-starter/article-introduction
+ * Categories: text
+ * Inserter: true
+ */
+?>
+<!-- wp:paragraph {"className":"longevity-deck"} --><p class="longevity-deck">State the reader outcome, scope, and decision boundary without overstating what the evidence can establish.</p><!-- /wp:paragraph --><!-- wp:longevity/trust-summary /-->
 ````
 
 ## File: wp-content/themes/longevity-starter/patterns/article-trust.php
@@ -20377,72 +22641,222 @@ add_action( 'admin_head', 'dolly_css' );
  * Inserter: true
  */
 ?>
-<!-- wp:shortcode -->[longevity_article_meta]<!-- /wp:shortcode -->
-<!-- wp:shortcode -->[longevity_trust_summary]<!-- /wp:shortcode -->
-<!-- wp:shortcode -->[longevity_reviewer_card]<!-- /wp:shortcode -->
-<!-- wp:shortcode -->[longevity_review_score]<!-- /wp:shortcode --><!-- wp:shortcode -->[longevity_test_method]<!-- /wp:shortcode -->
-<!-- wp:shortcode -->[longevity_corrections]<!-- /wp:shortcode -->
+<!-- wp:longevity/article-meta /-->
+<!-- wp:longevity/trust-summary /-->
+<!-- wp:longevity/reviewer-card /-->
+<!-- wp:longevity/review-score /-->
+<!-- wp:longevity/test-method /-->
+<!-- wp:longevity/corrections /-->
+````
+
+## File: wp-content/themes/longevity-starter/patterns/consumer-lab-intro.php
+````php
+<?php
+/**
+ * Title: Consumer Lab introduction
+ * Slug: longevity-starter/consumer-lab-intro
+ * Categories: featured, text
+ * Inserter: true
+ */
+?>
+<!-- wp:group --><div class="wp-block-group"><!-- wp:paragraph {"className":"longevity-kicker"} --><p class="longevity-kicker">Consumer Lab</p><!-- /wp:paragraph --><!-- wp:heading --><h2 class="wp-block-heading">Reviews with inspectable testing</h2><!-- /wp:heading --><!-- wp:paragraph --><p>Reviews appear only after required test, score, disclosure, and publication checks pass.</p><!-- /wp:paragraph --></div><!-- /wp:group -->
+````
+
+## File: wp-content/themes/longevity-starter/patterns/corrections-cta.php
+````php
+<?php
+/**
+ * Title: Corrections call to action
+ * Slug: longevity-starter/corrections-cta
+ * Categories: call-to-action
+ * Inserter: true
+ */
+?>
+<!-- wp:group --><div class="wp-block-group"><!-- wp:heading --><h2 class="wp-block-heading">Corrections remain visible</h2><!-- /wp:heading --><!-- wp:paragraph --><p>Report a possible factual error or material product change through the documented corrections process.</p><!-- /wp:paragraph --><!-- wp:paragraph --><p><a href="/corrections/">Review the corrections process</a></p><!-- /wp:paragraph --></div><!-- /wp:group -->
+````
+
+## File: wp-content/themes/longevity-starter/patterns/evidence-guide-grid.php
+````php
+<?php
+/**
+ * Title: Evidence guide card grid
+ * Slug: longevity-starter/evidence-guide-grid
+ * Categories: posts, query
+ * Inserter: true
+ */
+?>
+<!-- wp:query {"query":{"perPage":3,"postType":"post","order":"desc","orderBy":"date","inherit":false}} --><div class="wp-block-query"><!-- wp:post-template {"className":"longevity-card-grid","layout":{"type":"grid","columnCount":3}} --><!-- wp:group {"className":"longevity-card-body"} --><div class="wp-block-group longevity-card-body"><!-- wp:post-title {"isLink":true} /--><!-- wp:longevity/content-card-meta /--><!-- wp:post-excerpt {"moreText":""} /--></div><!-- /wp:group --><!-- /wp:post-template --></div><!-- /wp:query -->
+````
+
+## File: wp-content/themes/longevity-starter/patterns/featured-guide.php
+````php
+<?php
+/**
+ * Title: Featured guide
+ * Slug: longevity-starter/featured-guide
+ * Categories: featured, text
+ * Inserter: true
+ */
+?>
+<!-- wp:group {"backgroundColor":"brand-subtle","style":{"spacing":{"padding":{"top":"2rem","right":"2rem","bottom":"2rem","left":"2rem"}}}} --><div class="wp-block-group has-brand-subtle-background-color has-background" style="padding:2rem"><!-- wp:paragraph {"className":"longevity-kicker"} --><p class="longevity-kicker">Start Here</p><!-- /wp:paragraph --><!-- wp:heading --><h2 class="wp-block-heading">A practical guide to reading health evidence</h2><!-- /wp:heading --><!-- wp:paragraph --><p><a href="/start-here/">Read the foundational guide</a></p><!-- /wp:paragraph --></div><!-- /wp:group -->
+````
+
+## File: wp-content/themes/longevity-starter/patterns/homepage-hero.php
+````php
+<?php
+/**
+ * Title: Homepage hero
+ * Slug: longevity-starter/homepage-hero
+ * Categories: featured, banner
+ * Inserter: true
+ */
+?>
+<!-- wp:group {"className":"longevity-hero","layout":{"type":"constrained"}} --><div class="wp-block-group longevity-hero"><!-- wp:paragraph {"className":"longevity-eyebrow"} --><p class="longevity-eyebrow">Evidence before certainty</p><!-- /wp:paragraph --><!-- wp:heading {"level":1} --><h1 class="wp-block-heading">Make clearer decisions about health claims and consumer products.</h1><!-- /wp:heading --><!-- wp:paragraph {"className":"longevity-hero-copy"} --><p class="longevity-hero-copy">Show evidence strength, uncertainty, review scope, testing methods, and commercial context.</p><!-- /wp:paragraph --></div><!-- /wp:group -->
+````
+
+## File: wp-content/themes/longevity-starter/patterns/methodology-cta.php
+````php
+<?php
+/**
+ * Title: Methodology call to action
+ * Slug: longevity-starter/methodology-cta
+ * Categories: call-to-action
+ * Inserter: true
+ */
+?>
+<!-- wp:group {"backgroundColor":"brand-subtle","style":{"spacing":{"padding":{"top":"2rem","right":"2rem","bottom":"2rem","left":"2rem"}}}} --><div class="wp-block-group has-brand-subtle-background-color has-background" style="padding:2rem"><!-- wp:heading --><h2 class="wp-block-heading">Inspect the methodology</h2><!-- /wp:heading --><!-- wp:paragraph --><p><a href="/evidence-methodology/">How evidence is graded</a> and <a href="/testing-methodology/">how products are tested</a>.</p><!-- /wp:paragraph --></div><!-- /wp:group -->
+````
+
+## File: wp-content/themes/longevity-starter/patterns/newsletter-cta.php
+````php
+<?php
+/**
+ * Title: Newsletter configuration placeholder
+ * Slug: longevity-starter/newsletter-cta
+ * Categories: call-to-action
+ * Inserter: true
+ */
+?>
+<!-- wp:group {"className":"longevity-empty-state"} --><div class="wp-block-group longevity-empty-state"><!-- wp:heading {"level":3} --><h3 class="wp-block-heading">Newsletter not configured</h3><!-- /wp:heading --><!-- wp:paragraph --><p>Add a signup form only after a functional handler, accurate consent copy, accessible status feedback, and privacy review are complete.</p><!-- /wp:paragraph --></div><!-- /wp:group -->
+````
+
+## File: wp-content/themes/longevity-starter/patterns/publication-identity.php
+````php
+<?php
+/**
+ * Title: Publication identity
+ * Slug: longevity-starter/publication-identity
+ * Categories: about
+ * Inserter: true
+ */
+?>
+<!-- wp:group --><div class="wp-block-group"><!-- wp:heading --><h2 class="wp-block-heading">About Longevity Evidence Lab</h2><!-- /wp:heading --><!-- wp:paragraph --><p>An evidence-led publication that makes uncertainty, medical-review scope, product testing, commercial relationships, and corrections inspectable.</p><!-- /wp:paragraph --></div><!-- /wp:group -->
+````
+
+## File: wp-content/themes/longevity-starter/patterns/review-verdict.php
+````php
+<?php
+/**
+ * Title: Review verdict
+ * Slug: longevity-starter/review-verdict
+ * Categories: text
+ * Inserter: true
+ */
+?>
+<!-- wp:longevity/review-decision /--><!-- wp:longevity/review-score /--><!-- wp:longevity/test-method /-->
+````
+
+## File: wp-content/themes/longevity-starter/patterns/sources-section.php
+````php
+<?php
+/**
+ * Title: Sources section
+ * Slug: longevity-starter/sources-section
+ * Categories: text
+ * Inserter: true
+ */
+?>
+<!-- wp:longevity/source-list /--><!-- wp:longevity/corrections /-->
+````
+
+## File: wp-content/themes/longevity-starter/patterns/topic-navigation.php
+````php
+<?php
+/**
+ * Title: Topic navigation
+ * Slug: longevity-starter/topic-navigation
+ * Categories: featured, posts
+ * Inserter: true
+ */
+?>
+<!-- wp:html --><div class="longevity-topic-grid"><article class="longevity-topic-card"><h3>Evidence Literacy</h3><p>Learn how to interpret certainty and uncertainty.</p><a href="/category/evidence-literacy/">Explore evidence literacy</a></article><article class="longevity-topic-card"><h3>Sleep</h3><p>Read evidence-led sleep guidance.</p><a href="/category/sleep/">Explore sleep</a></article><article class="longevity-topic-card"><h3>Consumer Lab</h3><p>Inspect completed product testing.</p><a href="/reviews/">Explore reviews</a></article></div><!-- /wp:html -->
+````
+
+## File: wp-content/themes/longevity-starter/patterns/trust-principles.php
+````php
+<?php
+/**
+ * Title: Publication trust principles
+ * Slug: longevity-starter/trust-principles
+ * Categories: featured, text
+ * Inserter: true
+ */
+?>
+<!-- wp:html --><div class="longevity-trust-grid"><article class="longevity-principle"><h3>Evidence strength is shown</h3><p>Grades include a rationale.</p></article><article class="longevity-principle"><h3>Limitations stay visible</h3><p>Uncertainty appears beside conclusions.</p></article><article class="longevity-principle"><h3>Review is scoped</h3><p>Medical review states what was reviewed.</p></article><article class="longevity-principle"><h3>Testing is documented</h3><p>Approved records support tested presentation.</p></article></div><!-- /wp:html -->
 ````
 
 ## File: wp-content/themes/longevity-starter/templates/404.html
 ````html
-<!-- wp:template-part {"slug":"header"} /--><!-- wp:group {"tagName":"main","anchor":"main-content","style":{"spacing":{"padding":{"top":"5rem","bottom":"5rem"}}},"layout":{"type":"constrained"}} --><main id="main-content" class="wp-block-group" style="padding-top:5rem;padding-bottom:5rem"><!-- wp:heading {"level":1,"fontSize":"x-large"} --><h1 class="wp-block-heading has-x-large-font-size">Page not found</h1><!-- /wp:heading --><!-- wp:paragraph --><p>The address may have changed during an evidence update or correction. Search the publication or return to Start Here.</p><!-- /wp:paragraph --><!-- wp:search {"label":"Search Longevity Evidence Lab","showLabel":true,"buttonText":"Search"} /--><!-- wp:home-link {"label":"Return to Start Here"} /--></main><!-- /wp:group --><!-- wp:template-part {"slug":"footer"} /-->
+<!-- wp:template-part {"slug":"header"} /--><!-- wp:group {"tagName":"main","anchor":"main-content","style":{"spacing":{"padding":{"top":"5rem","bottom":"5rem"}}},"layout":{"type":"constrained"}} --><main id="main-content" class="wp-block-group" style="padding-top:5rem;padding-bottom:5rem"><!-- wp:heading {"level":1,"fontSize":"x-large"} --><h1 class="wp-block-heading has-x-large-font-size">Page not found</h1><!-- /wp:heading --><!-- wp:paragraph --><p>The address may have changed during an evidence update or correction. Search the publication or return to Start Here.</p><!-- /wp:paragraph --><!-- wp:search {"label":"Search Longevity Evidence Lab","showLabel":true,"buttonText":"Search"} /--><!-- wp:buttons --><div class="wp-block-buttons"><!-- wp:button --><div class="wp-block-button"><a class="wp-block-button__link wp-element-button" href="/start-here/">Return to Start Here</a></div><!-- /wp:button --></div><!-- /wp:buttons --></main><!-- /wp:group --><!-- wp:template-part {"slug":"footer"} /-->
 ````
 
 ## File: wp-content/themes/longevity-starter/templates/archive-review.html
 ````html
 <!-- wp:template-part {"slug":"header"} /-->
-<!-- wp:group {"tagName":"main","anchor":"main-content","style":{"spacing":{"padding":{"top":"3rem","bottom":"4rem"}}},"layout":{"type":"constrained"}} -->
-<main id="main-content" class="wp-block-group" style="padding-top:3rem;padding-bottom:4rem"><!-- wp:heading {"level":1,"fontSize":"x-large"} --><h1 class="wp-block-heading has-x-large-font-size">Consumer Lab reviews</h1><!-- /wp:heading --><!-- wp:paragraph --><p>Transparent product reviews based on disclosed acquisition, versioned protocols, real test records, scoring criteria, and limitations.</p><!-- /wp:paragraph --><!-- wp:query {"query":{"perPage":10,"postType":"review","order":"desc","orderBy":"date","inherit":true},"align":"wide"} --><div class="wp-block-query alignwide"><!-- wp:post-template {"layout":{"type":"grid","columnCount":2}} --><!-- wp:group {"className":"longevity-card","layout":{"type":"constrained"}} --><div class="wp-block-group longevity-card"><!-- wp:paragraph {"className":"longevity-kicker"} --><p class="longevity-kicker">Consumer Lab</p><!-- /wp:paragraph --><!-- wp:post-title {"isLink":true,"fontSize":"large"} /--><!-- wp:post-excerpt {"moreText":"Read transparent review"} /--></div><!-- /wp:group --><!-- /wp:post-template --><!-- wp:query-no-results --><!-- wp:paragraph --><p>No reviews have completed the required publication gates.</p><!-- /wp:paragraph --><!-- /wp:query-no-results --><!-- wp:query-pagination {"layout":{"type":"flex","justifyContent":"space-between"}} --><!-- wp:query-pagination-previous /--><!-- wp:query-pagination-numbers /--><!-- wp:query-pagination-next /--><!-- /wp:query-pagination --></div><!-- /wp:query --></main><!-- /wp:group -->
+<!-- wp:group {"tagName":"main","anchor":"main-content","className":"longevity-section","layout":{"type":"constrained"}} --><main id="main-content" class="wp-block-group longevity-section"><!-- wp:longevity/breadcrumbs /--><!-- wp:paragraph {"className":"longevity-kicker"} --><p class="longevity-kicker">Consumer Lab</p><!-- /wp:paragraph --><!-- wp:heading {"level":1,"fontSize":"x-large"} --><h1 class="wp-block-heading has-x-large-font-size">Product reviews with inspectable testing</h1><!-- /wp:heading --><!-- wp:paragraph {"className":"longevity-section-intro"} --><p class="longevity-section-intro">Published reviews disclose acquisition, product version, test dates, protocol, observed failures, score dimensions, confidence, limitations, and commercial relationships.</p><!-- /wp:paragraph --><!-- wp:query {"query":{"perPage":10,"postType":"review","order":"desc","orderBy":"date","inherit":true},"align":"wide"} --><div class="wp-block-query alignwide"><!-- wp:post-template {"className":"longevity-card-grid","layout":{"type":"grid","columnCount":2}} --><!-- wp:group {"className":"longevity-card","layout":{"type":"default"}} --><div class="wp-block-group longevity-card"><!-- wp:post-featured-image {"isLink":true,"sizeSlug":"longevity-card"} /--><!-- wp:group {"className":"longevity-card-body","layout":{"type":"default"}} --><div class="wp-block-group longevity-card-body"><!-- wp:paragraph {"className":"longevity-kicker"} --><p class="longevity-kicker">Consumer Lab review</p><!-- /wp:paragraph --><!-- wp:post-title {"isLink":true,"fontSize":"large"} /--><!-- wp:longevity/content-card-meta /--><!-- wp:post-excerpt {"excerptLength":24,"moreText":""} /--><!-- wp:read-more {"content":"Read transparent review","className":"longevity-card-link"} /--></div><!-- /wp:group --></div><!-- /wp:group --><!-- /wp:post-template --><!-- wp:query-no-results --><!-- wp:html --><div class="longevity-empty-state"><h2>No reviews have completed the required gates</h2><p>We do not publish tested-review presentation without a real approved test record, reproducible score, explicit limitations, and completed disclosure.</p><p><a href="/testing-methodology/">Inspect the testing methodology</a></p></div><!-- /wp:html --><!-- /wp:query-no-results --><!-- wp:query-pagination {"layout":{"type":"flex","justifyContent":"space-between"}} --><!-- wp:query-pagination-previous {"label":"Previous reviews"} /--><!-- wp:query-pagination-numbers /--><!-- wp:query-pagination-next {"label":"Next reviews"} /--><!-- /wp:query-pagination --></div><!-- /wp:query --></main><!-- /wp:group -->
 <!-- wp:template-part {"slug":"footer"} /-->
 ````
 
 ## File: wp-content/themes/longevity-starter/templates/archive.html
 ````html
 <!-- wp:template-part {"slug":"header"} /-->
-<!-- wp:group {"tagName":"main","anchor":"main-content","style":{"spacing":{"padding":{"top":"3rem","bottom":"4rem"}}},"layout":{"type":"constrained"}} -->
-<main id="main-content" class="wp-block-group" style="padding-top:3rem;padding-bottom:4rem"><!-- wp:query-title {"type":"archive","showPrefix":false} /--><!-- wp:term-description /--><!-- wp:query {"query":{"perPage":10,"order":"desc","orderBy":"date","inherit":true},"align":"wide"} -->
-<div class="wp-block-query alignwide"><!-- wp:post-template {"layout":{"type":"grid","columnCount":2}} --><!-- wp:group {"className":"longevity-card","layout":{"type":"constrained"}} -->
-<div class="wp-block-group longevity-card"><!-- wp:post-terms {"term":"category","fontSize":"small"} /--><!-- wp:post-title {"isLink":true,"fontSize":"large"} /--><!-- wp:post-excerpt {"moreText":"Read article"} /--></div>
-<!-- /wp:group --><!-- /wp:post-template --><!-- wp:query-no-results --><!-- wp:paragraph --><p>No published evidence guides match this archive yet.</p><!-- /wp:paragraph --><!-- /wp:query-no-results --><!-- wp:query-pagination {"layout":{"type":"flex","justifyContent":"space-between"}} --><!-- wp:query-pagination-previous /--><!-- wp:query-pagination-numbers /--><!-- wp:query-pagination-next /--><!-- /wp:query-pagination --></div><!-- /wp:query --></main>
-<!-- /wp:group --><!-- wp:template-part {"slug":"footer"} /-->
+<!-- wp:group {"tagName":"main","anchor":"main-content","className":"longevity-section","layout":{"type":"constrained"}} --><main id="main-content" class="wp-block-group longevity-section"><!-- wp:longevity/breadcrumbs /--><!-- wp:query-title {"type":"archive","showPrefix":false,"fontSize":"x-large"} /--><!-- wp:term-description {"className":"longevity-section-intro"} /--><!-- wp:query {"query":{"perPage":10,"order":"desc","orderBy":"date","inherit":true},"align":"wide"} --><div class="wp-block-query alignwide"><!-- wp:post-template {"className":"longevity-card-grid","layout":{"type":"grid","columnCount":2}} --><!-- wp:group {"className":"longevity-card","layout":{"type":"default"}} --><div class="wp-block-group longevity-card"><!-- wp:post-featured-image {"isLink":true,"sizeSlug":"longevity-card"} /--><!-- wp:group {"className":"longevity-card-body","layout":{"type":"default"}} --><div class="wp-block-group longevity-card-body"><!-- wp:post-terms {"term":"category","fontSize":"small"} /--><!-- wp:post-title {"isLink":true,"fontSize":"large"} /--><!-- wp:longevity/content-card-meta /--><!-- wp:post-excerpt {"excerptLength":24,"moreText":""} /--><!-- wp:read-more {"content":"Read guide","className":"longevity-card-link"} /--></div><!-- /wp:group --></div><!-- /wp:group --><!-- /wp:post-template --><!-- wp:query-no-results --><!-- wp:html --><div class="longevity-empty-state"><h2>No published content here yet</h2><p>Content remains unpublished until its applicable evidence, review, and disclosure checks pass.</p><p><a href="/start-here/">Explore Start Here</a></p></div><!-- /wp:html --><!-- /wp:query-no-results --><!-- wp:query-pagination {"layout":{"type":"flex","justifyContent":"space-between"}} --><!-- wp:query-pagination-previous {"label":"Previous page"} /--><!-- wp:query-pagination-numbers /--><!-- wp:query-pagination-next {"label":"Next page"} /--><!-- /wp:query-pagination --></div><!-- /wp:query --></main><!-- /wp:group -->
+<!-- wp:template-part {"slug":"footer"} /-->
 ````
 
 ## File: wp-content/themes/longevity-starter/templates/author.html
 ````html
 <!-- wp:template-part {"slug":"header"} /-->
-<!-- wp:group {"tagName":"main","anchor":"main-content","style":{"spacing":{"padding":{"top":"3rem","bottom":"4rem"}}},"layout":{"type":"constrained"}} -->
-<main id="main-content" class="wp-block-group" style="padding-top:3rem;padding-bottom:4rem"><!-- wp:query-title {"type":"archive","showPrefix":false} /--><!-- wp:term-description /--><!-- wp:query {"query":{"perPage":10,"order":"desc","orderBy":"date","inherit":true},"align":"wide"} -->
-<div class="wp-block-query alignwide"><!-- wp:post-template {"layout":{"type":"grid","columnCount":2}} --><!-- wp:group {"className":"longevity-card","layout":{"type":"constrained"}} -->
-<div class="wp-block-group longevity-card"><!-- wp:post-terms {"term":"category","fontSize":"small"} /--><!-- wp:post-title {"isLink":true,"fontSize":"large"} /--><!-- wp:post-excerpt {"moreText":"Read article"} /--></div>
-<!-- /wp:group --><!-- /wp:post-template --><!-- wp:query-no-results --><!-- wp:paragraph --><p>No published evidence guides match this archive yet.</p><!-- /wp:paragraph --><!-- /wp:query-no-results --><!-- wp:query-pagination {"layout":{"type":"flex","justifyContent":"space-between"}} --><!-- wp:query-pagination-previous /--><!-- wp:query-pagination-numbers /--><!-- wp:query-pagination-next /--><!-- /wp:query-pagination --></div><!-- /wp:query --></main>
-<!-- /wp:group --><!-- wp:template-part {"slug":"footer"} /-->
+<!-- wp:group {"tagName":"main","anchor":"main-content","className":"longevity-section","layout":{"type":"constrained"}} --><main id="main-content" class="wp-block-group longevity-section"><!-- wp:longevity/breadcrumbs /--><!-- wp:longevity/author-profile /--><!-- wp:heading --><h2 class="wp-block-heading">Recent contributions</h2><!-- /wp:heading --><!-- wp:query {"query":{"perPage":10,"order":"desc","orderBy":"date","inherit":true},"align":"wide"} --><div class="wp-block-query alignwide"><!-- wp:post-template {"className":"longevity-card-grid","layout":{"type":"grid","columnCount":2}} --><!-- wp:group {"className":"longevity-card","layout":{"type":"default"}} --><div class="wp-block-group longevity-card"><!-- wp:post-featured-image {"isLink":true,"sizeSlug":"longevity-card"} /--><!-- wp:group {"className":"longevity-card-body","layout":{"type":"default"}} --><div class="wp-block-group longevity-card-body"><!-- wp:post-terms {"term":"category","fontSize":"small"} /--><!-- wp:post-title {"isLink":true,"fontSize":"large"} /--><!-- wp:longevity/content-card-meta /--><!-- wp:post-excerpt {"excerptLength":24,"moreText":""} /--><!-- wp:read-more {"content":"Read contribution","className":"longevity-card-link"} /--></div><!-- /wp:group --></div><!-- /wp:group --><!-- /wp:post-template --><!-- wp:query-no-results --><!-- wp:paragraph --><p>No public contributions are available for this profile.</p><!-- /wp:query-no-results --><!-- wp:query-pagination {"layout":{"type":"flex","justifyContent":"space-between"}} --><!-- wp:query-pagination-previous {"label":"Previous page"} /--><!-- wp:query-pagination-numbers /--><!-- wp:query-pagination-next {"label":"Next page"} /--><!-- /wp:query-pagination --></div><!-- /wp:query --></main><!-- /wp:group -->
+<!-- wp:template-part {"slug":"footer"} /-->
 ````
 
 ## File: wp-content/themes/longevity-starter/templates/category.html
 ````html
 <!-- wp:template-part {"slug":"header"} /-->
-<!-- wp:group {"tagName":"main","anchor":"main-content","style":{"spacing":{"padding":{"top":"3rem","bottom":"4rem"}}},"layout":{"type":"constrained"}} -->
-<main id="main-content" class="wp-block-group" style="padding-top:3rem;padding-bottom:4rem"><!-- wp:query-title {"type":"archive","showPrefix":false} /--><!-- wp:term-description /--><!-- wp:query {"query":{"perPage":10,"order":"desc","orderBy":"date","inherit":true},"align":"wide"} -->
-<div class="wp-block-query alignwide"><!-- wp:post-template {"layout":{"type":"grid","columnCount":2}} --><!-- wp:group {"className":"longevity-card","layout":{"type":"constrained"}} -->
-<div class="wp-block-group longevity-card"><!-- wp:post-terms {"term":"category","fontSize":"small"} /--><!-- wp:post-title {"isLink":true,"fontSize":"large"} /--><!-- wp:post-excerpt {"moreText":"Read article"} /--></div>
-<!-- /wp:group --><!-- /wp:post-template --><!-- wp:query-no-results --><!-- wp:paragraph --><p>No published evidence guides match this archive yet.</p><!-- /wp:paragraph --><!-- /wp:query-no-results --><!-- wp:query-pagination {"layout":{"type":"flex","justifyContent":"space-between"}} --><!-- wp:query-pagination-previous /--><!-- wp:query-pagination-numbers /--><!-- wp:query-pagination-next /--><!-- /wp:query-pagination --></div><!-- /wp:query --></main>
-<!-- /wp:group --><!-- wp:template-part {"slug":"footer"} /-->
+<!-- wp:group {"tagName":"main","anchor":"main-content","className":"longevity-section","layout":{"type":"constrained"}} --><main id="main-content" class="wp-block-group longevity-section"><!-- wp:longevity/breadcrumbs /--><!-- wp:query-title {"type":"archive","showPrefix":false,"fontSize":"x-large"} /--><!-- wp:term-description {"className":"longevity-section-intro"} /--><!-- wp:query {"query":{"perPage":10,"order":"desc","orderBy":"date","inherit":true},"align":"wide"} --><div class="wp-block-query alignwide"><!-- wp:post-template {"className":"longevity-card-grid","layout":{"type":"grid","columnCount":2}} --><!-- wp:group {"className":"longevity-card","layout":{"type":"default"}} --><div class="wp-block-group longevity-card"><!-- wp:post-featured-image {"isLink":true,"sizeSlug":"longevity-card"} /--><!-- wp:group {"className":"longevity-card-body","layout":{"type":"default"}} --><div class="wp-block-group longevity-card-body"><!-- wp:post-title {"isLink":true,"fontSize":"large"} /--><!-- wp:longevity/content-card-meta /--><!-- wp:post-excerpt {"excerptLength":24,"moreText":""} /--><!-- wp:read-more {"content":"Read guide","className":"longevity-card-link"} /--></div><!-- /wp:group --></div><!-- /wp:group --><!-- /wp:post-template --><!-- wp:query-no-results --><!-- wp:html --><div class="longevity-empty-state"><h2>No published guides in this topic</h2><p>Try another topic or review the evidence methodology while this section is being prepared.</p></div><!-- /wp:html --><!-- /wp:query-no-results --><!-- wp:query-pagination {"layout":{"type":"flex","justifyContent":"space-between"}} --><!-- wp:query-pagination-previous {"label":"Previous page"} /--><!-- wp:query-pagination-numbers /--><!-- wp:query-pagination-next {"label":"Next page"} /--><!-- /wp:query-pagination --></div><!-- /wp:query --></main><!-- /wp:group -->
+<!-- wp:template-part {"slug":"footer"} /-->
 ````
 
 ## File: wp-content/themes/longevity-starter/templates/front-page.html
 ````html
 <!-- wp:template-part {"slug":"header"} /-->
-<!-- wp:group {"tagName":"main","anchor":"main-content","layout":{"type":"constrained"}} --><main id="main-content" class="wp-block-group"><!-- wp:group {"align":"full","style":{"spacing":{"padding":{"top":"5rem","bottom":"5rem"}},"color":{"background":"var:preset|color|soft"}},"layout":{"type":"constrained"}} -->
-<div class="wp-block-group alignfull has-soft-background-color has-background" style="padding-top:5rem;padding-bottom:5rem"><!-- wp:post-content {"layout":{"type":"constrained"}} /--></div><!-- /wp:group -->
-<!-- wp:group {"align":"wide","style":{"spacing":{"padding":{"top":"3.5rem","bottom":"2rem"}}},"layout":{"type":"constrained"}} --><div class="wp-block-group alignwide" style="padding-top:3.5rem;padding-bottom:2rem"><!-- wp:heading --><h2 class="wp-block-heading">Latest evidence guides</h2><!-- /wp:heading --><!-- wp:query {"query":{"perPage":6,"postType":"post","order":"desc","orderBy":"date","inherit":false}} --><div class="wp-block-query"><!-- wp:post-template {"layout":{"type":"grid","columnCount":3}} --><!-- wp:group {"className":"longevity-card","layout":{"type":"constrained"}} --><div class="wp-block-group longevity-card"><!-- wp:post-terms {"term":"category","fontSize":"small"} /--><!-- wp:post-title {"isLink":true,"fontSize":"large"} /--><!-- wp:post-excerpt {"excerptLength":22,"moreText":"Read evidence guide"} /--></div><!-- /wp:group --><!-- /wp:post-template --></div><!-- /wp:query --></div><!-- /wp:group -->
-<!-- wp:group {"align":"wide","style":{"spacing":{"padding":{"top":"2rem","bottom":"4rem"}}},"layout":{"type":"constrained"}} --><div class="wp-block-group alignwide" style="padding-top:2rem;padding-bottom:4rem"><!-- wp:heading --><h2 class="wp-block-heading">Consumer Lab reviews</h2><!-- /wp:heading --><!-- wp:paragraph --><p>Reviews appear here only after required testing, review, and disclosure gates are completed.</p><!-- /wp:paragraph --><!-- wp:query {"query":{"perPage":3,"postType":"review","order":"desc","orderBy":"date","inherit":false}} --><div class="wp-block-query"><!-- wp:post-template {"layout":{"type":"grid","columnCount":3}} --><!-- wp:group {"className":"longevity-card","layout":{"type":"constrained"}} --><div class="wp-block-group longevity-card"><!-- wp:paragraph {"className":"longevity-kicker"} --><p class="longevity-kicker">Tested review</p><!-- /wp:paragraph --><!-- wp:post-title {"isLink":true,"fontSize":"large"} /--><!-- wp:post-excerpt {"excerptLength":22,"moreText":"Read review"} /--></div><!-- /wp:group --><!-- /wp:post-template --></div><!-- /wp:query --></div><!-- /wp:group --></main><!-- /wp:group -->
+<!-- wp:group {"tagName":"main","anchor":"main-content","layout":{"type":"constrained"}} -->
+<main id="main-content" class="wp-block-group"><!-- wp:group {"align":"full","className":"longevity-hero","layout":{"type":"constrained"}} --><div class="wp-block-group alignfull longevity-hero"><!-- wp:group {"align":"wide","layout":{"type":"constrained","contentSize":"900px","justifyContent":"left"}} --><div class="wp-block-group alignwide"><!-- wp:paragraph {"className":"longevity-eyebrow"} --><p class="longevity-eyebrow">Evidence before certainty</p><!-- /wp:paragraph --><!-- wp:heading {"level":1} --><h1 class="wp-block-heading">Make clearer decisions about health claims and consumer products.</h1><!-- /wp:heading --><!-- wp:paragraph {"className":"longevity-hero-copy"} --><p class="longevity-hero-copy">We evaluate the strength of evidence, state what remains uncertain, document medical-review scope, and show how products were tested—without replacing individualized medical advice.</p><!-- /wp:paragraph --><!-- wp:buttons --><div class="wp-block-buttons"><!-- wp:button --><div class="wp-block-button"><a class="wp-block-button__link wp-element-button" href="/start-here/">Start with the evidence guide</a></div><!-- /wp:button --><!-- wp:button {"className":"is-style-outline"} --><div class="wp-block-button is-style-outline"><a class="wp-block-button__link wp-element-button" href="/evidence-methodology/">How we evaluate evidence</a></div><!-- /wp:button --></div><!-- /wp:buttons --></div><!-- /wp:group --></div><!-- /wp:group -->
+<!-- wp:group {"align":"full","className":"longevity-section","backgroundColor":"paper","layout":{"type":"constrained"}} --><div class="wp-block-group alignfull longevity-section has-paper-background-color has-background"><!-- wp:group {"align":"wide","layout":{"type":"constrained"}} --><div class="wp-block-group alignwide"><!-- wp:heading --><h2 class="wp-block-heading longevity-section-heading">Trust should be inspectable</h2><!-- /wp:heading --><!-- wp:paragraph {"className":"longevity-section-intro"} --><p class="longevity-section-intro">Our trust signals reflect recorded editorial state. They are not decorative badges or substitutes for sources and limitations.</p><!-- /wp:paragraph --><!-- wp:html --><div class="longevity-trust-grid"><article class="longevity-principle"><h3>Evidence strength is shown</h3><p>Grades include a plain-language rationale and an evidence cutoff date when recorded.</p></article><article class="longevity-principle"><h3>Uncertainty stays visible</h3><p>Scope and limitations are presented alongside conclusions, not hidden at the bottom.</p></article><article class="longevity-principle"><h3>Review is scoped</h3><p>Medical review appears only after assigned, authenticated completion and states what was reviewed.</p></article><article class="longevity-principle"><h3>Testing is documented</h3><p>Tested-review presentation requires an approved, version-matched record and reproducible score.</p></article></div><!-- /wp:html --></div><!-- /wp:group --></div><!-- /wp:group -->
+<!-- wp:group {"align":"full","className":"longevity-section","backgroundColor":"surface","layout":{"type":"constrained"}} --><div class="wp-block-group alignfull longevity-section has-surface-background-color has-background"><!-- wp:group {"align":"wide","layout":{"type":"constrained"}} --><div class="wp-block-group alignwide"><!-- wp:heading --><h2 class="wp-block-heading longevity-section-heading">Explore by topic</h2><!-- /wp:heading --><!-- wp:html --><div class="longevity-topic-grid"><article class="longevity-topic-card"><h3>Evidence Literacy</h3><p>Learn how study design, certainty, and uncertainty change what a claim can support.</p><a href="/category/evidence-literacy/">Explore evidence literacy</a></article><article class="longevity-topic-card"><h3>Sleep &amp; Circadian Health</h3><p>Understand sleep guidance, measurement limits, and practical decision boundaries.</p><a href="/category/sleep/">Explore sleep</a></article><article class="longevity-topic-card"><h3>Movement &amp; Physical Capacity</h3><p>Evaluate activity guidance in the context of ability, safety, and evidence quality.</p><a href="/category/movement/">Explore movement</a></article><article class="longevity-topic-card"><h3>Nutrition &amp; Healthy Aging</h3><p>Separate pattern-level evidence from overconfident claims about individual foods.</p><a href="/category/nutrition/">Explore nutrition</a></article><article class="longevity-topic-card"><h3>Wearables &amp; Measurement</h3><p>Interpret consumer metrics without confusing estimates with clinical measurements.</p><a href="/category/wearables/">Explore wearables</a></article><article class="longevity-topic-card"><h3>Consumer Lab</h3><p>Read product reviews only after required testing, scoring, and disclosure gates pass.</p><a href="/reviews/">Explore Consumer Lab</a></article></div><!-- /wp:html --></div><!-- /wp:group --></div><!-- /wp:group -->
+<!-- wp:group {"align":"wide","className":"longevity-section","layout":{"type":"constrained"}} --><div class="wp-block-group alignwide longevity-section"><!-- wp:columns {"verticalAlignment":"center"} --><div class="wp-block-columns are-vertically-aligned-center"><!-- wp:column {"verticalAlignment":"center"} --><div class="wp-block-column is-vertically-aligned-center"><!-- wp:paragraph {"className":"longevity-eyebrow"} --><p class="longevity-eyebrow">Start Here</p><!-- /wp:paragraph --><!-- wp:heading --><h2 class="wp-block-heading">A practical guide to reading health evidence</h2><!-- /wp:heading --><!-- wp:paragraph --><p>Begin with the framework we use to separate useful evidence, uncertainty, plausibility, and unsupported certainty.</p><!-- /wp:paragraph --><!-- wp:paragraph --><p><a href="/start-here/"><strong>Read the foundational evidence guide</strong></a></p><!-- /wp:paragraph --></div><!-- /wp:column --><!-- wp:column {"verticalAlignment":"center","backgroundColor":"brand-subtle"} --><div class="wp-block-column is-vertically-aligned-center has-brand-subtle-background-color has-background" style="padding:2rem"><!-- wp:heading {"level":3} --><h3 class="wp-block-heading">Before you act on a claim</h3><!-- /wp:heading --><!-- wp:list --><ul class="wp-block-list"><li>What outcome was actually measured?</li><li>How certain is the evidence?</li><li>Who might the result not apply to?</li><li>What are the relevant risks and alternatives?</li></ul><!-- /wp:list --></div><!-- /wp:column --></div><!-- /wp:columns --></div><!-- /wp:group -->
+<!-- wp:group {"align":"full","className":"longevity-section","backgroundColor":"surface","layout":{"type":"constrained"}} --><div class="wp-block-group alignfull longevity-section has-surface-background-color has-background"><!-- wp:group {"align":"wide","layout":{"type":"constrained"}} --><div class="wp-block-group alignwide"><!-- wp:heading --><h2 class="wp-block-heading">Latest evidence guides</h2><!-- /wp:heading --><!-- wp:query {"query":{"perPage":6,"postType":"post","order":"desc","orderBy":"date","inherit":false}} --><div class="wp-block-query"><!-- wp:post-template {"className":"longevity-card-grid","layout":{"type":"grid","columnCount":3}} --><!-- wp:group {"className":"longevity-card","layout":{"type":"default"}} --><div class="wp-block-group longevity-card"><!-- wp:post-featured-image {"isLink":true,"sizeSlug":"longevity-card"} /--><!-- wp:group {"className":"longevity-card-body","layout":{"type":"default"}} --><div class="wp-block-group longevity-card-body"><!-- wp:post-terms {"term":"category","fontSize":"small"} /--><!-- wp:post-title {"isLink":true,"fontSize":"large"} /--><!-- wp:longevity/content-card-meta /--><!-- wp:post-excerpt {"excerptLength":24,"moreText":""} /--><!-- wp:read-more {"content":"Read evidence guide","className":"longevity-card-link"} /--></div><!-- /wp:group --></div><!-- /wp:group --><!-- /wp:post-template --><!-- wp:query-no-results --><!-- wp:html --><div class="longevity-empty-state"><h3>Evidence guides are being prepared</h3><p>Nothing is published until the applicable evidence, review, and editorial checks are complete. Start with our methodology in the meantime.</p><p><a href="/evidence-methodology/">Read the evidence methodology</a></p></div><!-- /wp:html --><!-- /wp:query-no-results --></div><!-- /wp:query --></div><!-- /wp:group --></div><!-- /wp:group -->
+<!-- wp:group {"align":"wide","className":"longevity-section","layout":{"type":"constrained"}} --><div class="wp-block-group alignwide longevity-section"><!-- wp:heading --><h2 class="wp-block-heading">Consumer Lab</h2><!-- /wp:heading --><!-- wp:paragraph {"className":"longevity-section-intro"} --><p class="longevity-section-intro">Buying guidance appears only when a review has completed its testing, scoring, disclosure, and publication gates.</p><!-- /wp:paragraph --><!-- wp:query {"query":{"perPage":3,"postType":"review","order":"desc","orderBy":"date","inherit":false}} --><div class="wp-block-query"><!-- wp:post-template {"className":"longevity-card-grid","layout":{"type":"grid","columnCount":3}} --><!-- wp:group {"className":"longevity-card","layout":{"type":"default"}} --><div class="wp-block-group longevity-card"><!-- wp:post-featured-image {"isLink":true,"sizeSlug":"longevity-card"} /--><!-- wp:group {"className":"longevity-card-body","layout":{"type":"default"}} --><div class="wp-block-group longevity-card-body"><!-- wp:paragraph {"className":"longevity-kicker"} --><p class="longevity-kicker">Consumer Lab review</p><!-- /wp:paragraph --><!-- wp:post-title {"isLink":true,"fontSize":"large"} /--><!-- wp:longevity/content-card-meta /--><!-- wp:post-excerpt {"excerptLength":22,"moreText":""} /--><!-- wp:read-more {"content":"Read transparent review","className":"longevity-card-link"} /--></div><!-- /wp:group --></div><!-- /wp:group --><!-- /wp:post-template --><!-- wp:query-no-results --><!-- wp:html --><div class="longevity-empty-state"><h3>No completed product reviews yet</h3><p>We will not imply hands-on testing until a real approved test record exists. You can inspect the protocol and independence rules now.</p><p><a href="/testing-methodology/">How Consumer Lab testing works</a></p></div><!-- /wp:html --><!-- /wp:query-no-results --></div><!-- /wp:query --></div><!-- /wp:group -->
+<!-- wp:group {"align":"full","className":"longevity-section","backgroundColor":"brand-subtle","layout":{"type":"constrained"}} --><div class="wp-block-group alignfull longevity-section has-brand-subtle-background-color has-background"><!-- wp:group {"align":"wide","layout":{"type":"constrained"}} --><div class="wp-block-group alignwide"><!-- wp:heading --><h2 class="wp-block-heading">Inspect how the publication works</h2><!-- /wp:heading --><!-- wp:buttons --><div class="wp-block-buttons"><!-- wp:button --><div class="wp-block-button"><a class="wp-block-button__link wp-element-button" href="/editorial-policy/">Editorial Policy</a></div><!-- /wp:button --><!-- wp:button {"className":"is-style-outline"} --><div class="wp-block-button is-style-outline"><a class="wp-block-button__link wp-element-button" href="/evidence-methodology/">Evidence grading</a></div><!-- /wp:button --><!-- wp:button {"className":"is-style-outline"} --><div class="wp-block-button is-style-outline"><a class="wp-block-button__link wp-element-button" href="/testing-methodology/">Testing methodology</a></div><!-- /wp:button --><!-- wp:button {"className":"is-style-outline"} --><div class="wp-block-button is-style-outline"><a class="wp-block-button__link wp-element-button" href="/corrections/">Corrections</a></div><!-- /wp:button --></div><!-- /wp:buttons --><!-- wp:paragraph {"fontSize":"small"} --><p class="has-small-font-size">Newsletter signup is omitted until a functional, privacy-reviewed subscription handler is configured.</p><!-- /wp:paragraph --></div><!-- /wp:group --></div><!-- /wp:group --></main><!-- /wp:group -->
 <!-- wp:template-part {"slug":"footer"} /-->
 ````
 
 ## File: wp-content/themes/longevity-starter/templates/index.html
 ````html
-<!-- wp:template-part {"slug":"header"} /--><!-- wp:group {"tagName":"main","anchor":"main-content","style":{"spacing":{"padding":{"top":"3rem","bottom":"4rem"}}},"layout":{"type":"constrained"}} --><main id="main-content" class="wp-block-group" style="padding-top:3rem;padding-bottom:4rem"><!-- wp:query {"query":{"perPage":10,"order":"desc","orderBy":"date","inherit":true},"align":"wide"} --><div class="wp-block-query alignwide"><!-- wp:post-template {"layout":{"type":"grid","columnCount":2}} --><!-- wp:group {"className":"longevity-card","layout":{"type":"constrained"}} --><div class="wp-block-group longevity-card"><!-- wp:post-title {"isLink":true,"fontSize":"large"} /--><!-- wp:post-excerpt {"moreText":"Read article"} /--></div><!-- /wp:group --><!-- /wp:post-template --><!-- wp:query-pagination {"layout":{"type":"flex","justifyContent":"space-between"}} --><!-- wp:query-pagination-previous /--><!-- wp:query-pagination-numbers /--><!-- wp:query-pagination-next /--><!-- /wp:query-pagination --></div><!-- /wp:query --></main><!-- /wp:group --><!-- wp:template-part {"slug":"footer"} /-->
+<!-- wp:template-part {"slug":"header"} /-->
+<!-- wp:group {"tagName":"main","anchor":"main-content","className":"longevity-section","layout":{"type":"constrained"}} --><main id="main-content" class="wp-block-group longevity-section"><!-- wp:heading {"level":1,"fontSize":"x-large"} --><h1 class="wp-block-heading has-x-large-font-size">Evidence guides and reviews</h1><!-- /wp:heading --><!-- wp:query {"query":{"perPage":10,"order":"desc","orderBy":"date","inherit":true},"align":"wide"} --><div class="wp-block-query alignwide"><!-- wp:post-template {"className":"longevity-card-grid","layout":{"type":"grid","columnCount":2}} --><!-- wp:group {"className":"longevity-card","layout":{"type":"default"}} --><div class="wp-block-group longevity-card"><!-- wp:post-featured-image {"isLink":true,"sizeSlug":"longevity-card"} /--><!-- wp:group {"className":"longevity-card-body","layout":{"type":"default"}} --><div class="wp-block-group longevity-card-body"><!-- wp:post-terms {"term":"category","fontSize":"small"} /--><!-- wp:post-title {"isLink":true,"fontSize":"large"} /--><!-- wp:longevity/content-card-meta /--><!-- wp:post-excerpt {"excerptLength":24,"moreText":""} /--><!-- wp:read-more {"content":"Read more","className":"longevity-card-link"} /--></div><!-- /wp:group --></div><!-- /wp:group --><!-- /wp:post-template --><!-- wp:query-no-results --><!-- wp:paragraph --><p>No published content is available yet.</p><!-- /wp:query-no-results --><!-- wp:query-pagination {"layout":{"type":"flex","justifyContent":"space-between"}} --><!-- wp:query-pagination-previous {"label":"Previous page"} /--><!-- wp:query-pagination-numbers /--><!-- wp:query-pagination-next {"label":"Next page"} /--><!-- /wp:query-pagination --></div><!-- /wp:query --></main><!-- /wp:group -->
+<!-- wp:template-part {"slug":"footer"} /-->
 ````
 
 ## File: wp-content/themes/longevity-starter/templates/page.html
@@ -20452,22 +22866,24 @@ add_action( 'admin_head', 'dolly_css' );
 
 ## File: wp-content/themes/longevity-starter/templates/search.html
 ````html
-<!-- wp:template-part {"slug":"header"} /--><!-- wp:group {"tagName":"main","anchor":"main-content","style":{"spacing":{"padding":{"top":"3rem","bottom":"4rem"}}},"layout":{"type":"constrained"}} --><main id="main-content" class="wp-block-group" style="padding-top:3rem;padding-bottom:4rem"><!-- wp:query-title {"type":"search","showPrefix":true} /--><!-- wp:search {"label":"Search again","showLabel":true,"buttonText":"Search"} /--><!-- wp:query {"query":{"perPage":10,"order":"desc","orderBy":"relevance","inherit":true},"align":"wide"} --><div class="wp-block-query alignwide"><!-- wp:post-template --><!-- wp:group {"className":"longevity-card","layout":{"type":"constrained"}} --><div class="wp-block-group longevity-card"><!-- wp:post-title {"isLink":true,"fontSize":"large"} /--><!-- wp:post-excerpt {"moreText":"Read result"} /--></div><!-- /wp:group --><!-- /wp:post-template --><!-- wp:query-no-results --><!-- wp:paragraph --><p>No results matched. Try a broader topic such as sleep, evidence, movement, nutrition, or wearables.</p><!-- /wp:paragraph --><!-- /wp:query-no-results --><!-- wp:query-pagination --><!-- wp:query-pagination-previous /--><!-- wp:query-pagination-numbers /--><!-- wp:query-pagination-next /--><!-- /wp:query-pagination --></div><!-- /wp:query --></main><!-- /wp:group --><!-- wp:template-part {"slug":"footer"} /-->
+<!-- wp:template-part {"slug":"header"} /-->
+<!-- wp:group {"tagName":"main","anchor":"main-content","className":"longevity-section","layout":{"type":"constrained"}} --><main id="main-content" class="wp-block-group longevity-section"><!-- wp:longevity/breadcrumbs /--><!-- wp:query-title {"type":"search","showPrefix":true,"fontSize":"x-large"} /--><!-- wp:longevity/search-filters /--><!-- wp:query {"query":{"perPage":10,"order":"desc","orderBy":"relevance","inherit":true},"align":"wide"} --><div class="wp-block-query alignwide"><!-- wp:post-template {"className":"longevity-card-grid","layout":{"type":"grid","columnCount":2}} --><!-- wp:group {"className":"longevity-card","layout":{"type":"default"}} --><div class="wp-block-group longevity-card"><!-- wp:post-featured-image {"isLink":true,"sizeSlug":"longevity-card"} /--><!-- wp:group {"className":"longevity-card-body","layout":{"type":"default"}} --><div class="wp-block-group longevity-card-body"><!-- wp:post-terms {"term":"category","fontSize":"small"} /--><!-- wp:post-title {"isLink":true,"fontSize":"large"} /--><!-- wp:longevity/content-card-meta /--><!-- wp:post-excerpt {"excerptLength":24,"moreText":""} /--><!-- wp:read-more {"content":"Read result","className":"longevity-card-link"} /--></div><!-- /wp:group --></div><!-- /wp:group --><!-- /wp:post-template --><!-- wp:query-no-results --><!-- wp:html --><div class="longevity-empty-state"><h2>No matching evidence guides or reviews</h2><p>Try a broader term, remove a filter, or explore sleep, movement, nutrition, wearables, and evidence literacy.</p><p><a href="/start-here/">Go to Start Here</a></p></div><!-- /wp:html --><!-- /wp:query-no-results --><!-- wp:query-pagination {"layout":{"type":"flex","justifyContent":"space-between"}} --><!-- wp:query-pagination-previous {"label":"Previous results"} /--><!-- wp:query-pagination-numbers /--><!-- wp:query-pagination-next {"label":"Next results"} /--><!-- /wp:query-pagination --></div><!-- /wp:query --></main><!-- /wp:group -->
+<!-- wp:template-part {"slug":"footer"} /-->
 ````
 
 ## File: wp-content/themes/longevity-starter/templates/single-review.html
 ````html
 <!-- wp:template-part {"slug":"header"} /-->
-<!-- wp:group {"tagName":"main","anchor":"main-content","className":"longevity-article-shell","style":{"spacing":{"padding":{"top":"3.5rem","bottom":"4rem"}}},"layout":{"type":"constrained"}} -->
-<main id="main-content" class="wp-block-group longevity-article-shell" style="padding-top:3.5rem;padding-bottom:4rem"><!-- wp:paragraph {"className":"longevity-kicker"} --><p class="longevity-kicker">Consumer Lab review</p><!-- /wp:paragraph --><!-- wp:post-title {"level":1,"fontSize":"x-large"} /--><!-- wp:shortcode -->[longevity_article_meta]<!-- /wp:shortcode --><!-- wp:shortcode -->[longevity_trust_summary]<!-- /wp:shortcode --><!-- wp:shortcode -->[longevity_reviewer_card]<!-- /wp:shortcode --><!-- wp:post-featured-image {"align":"wide"} /--><!-- wp:shortcode -->[longevity_review_score]<!-- /wp:shortcode --><!-- wp:shortcode -->[longevity_test_method]<!-- /wp:shortcode --><!-- wp:post-content {"layout":{"type":"constrained"}} /--><!-- wp:shortcode -->[longevity_corrections]<!-- /wp:shortcode --><!-- wp:shortcode -->[medical_disclaimer]<!-- /wp:shortcode --></main><!-- /wp:group -->
+<!-- wp:group {"tagName":"main","anchor":"main-content","className":"longevity-article-shell","style":{"spacing":{"padding":{"top":"3rem","bottom":"4.5rem"}}},"layout":{"type":"constrained"}} -->
+<main id="main-content" class="wp-block-group longevity-article-shell" style="padding-top:3rem;padding-bottom:4.5rem"><!-- wp:longevity/breadcrumbs /--><!-- wp:group {"className":"longevity-article-header","layout":{"type":"constrained"}} --><div class="wp-block-group longevity-article-header"><!-- wp:paragraph {"className":"longevity-kicker"} --><p class="longevity-kicker">Consumer Lab review</p><!-- /wp:paragraph --><!-- wp:post-title {"level":1,"fontSize":"x-large"} /--><!-- wp:post-excerpt {"className":"longevity-deck","moreText":""} /--><!-- wp:longevity/article-meta /--></div><!-- /wp:group --><!-- wp:longevity/trust-summary /--><!-- wp:longevity/reviewer-card /--><!-- wp:post-featured-image {"align":"wide","sizeSlug":"longevity-hero"} /--><!-- wp:longevity/review-decision /--><!-- wp:longevity/review-score /--><!-- wp:longevity/test-method /--><!-- wp:longevity/table-of-contents /--><!-- wp:post-content {"layout":{"type":"constrained"}} /--><!-- wp:longevity/source-list /--><!-- wp:longevity/corrections /--><!-- wp:shortcode -->[medical_disclaimer]<!-- /wp:shortcode --><!-- wp:longevity/related-content /--><!-- wp:paragraph {"fontSize":"small"} --><p class="has-small-font-size">Review conclusions apply to the recorded product version, unit, dates, and protocol. <a href="/corrections/">Report a possible error or material product change</a>.</p><!-- /wp:paragraph --></main><!-- /wp:group -->
 <!-- wp:template-part {"slug":"footer"} /-->
 ````
 
 ## File: wp-content/themes/longevity-starter/templates/single.html
 ````html
 <!-- wp:template-part {"slug":"header"} /-->
-<!-- wp:group {"tagName":"main","anchor":"main-content","className":"longevity-article-shell","style":{"spacing":{"padding":{"top":"3.5rem","bottom":"4rem"}}},"layout":{"type":"constrained"}} -->
-<main id="main-content" class="wp-block-group longevity-article-shell" style="padding-top:3.5rem;padding-bottom:4rem"><!-- wp:post-terms {"term":"category","fontSize":"small"} /--><!-- wp:post-title {"level":1,"fontSize":"x-large"} /--><!-- wp:shortcode -->[longevity_article_meta]<!-- /wp:shortcode --><!-- wp:shortcode -->[longevity_trust_summary]<!-- /wp:shortcode --><!-- wp:shortcode -->[longevity_reviewer_card]<!-- /wp:shortcode --><!-- wp:post-featured-image {"align":"wide"} /--><!-- wp:post-content {"layout":{"type":"constrained"}} /--><!-- wp:shortcode -->[longevity_test_method]<!-- /wp:shortcode --><!-- wp:shortcode -->[longevity_corrections]<!-- /wp:shortcode --><!-- wp:shortcode -->[medical_disclaimer]<!-- /wp:shortcode --><!-- wp:separator /--><!-- wp:post-navigation-link {"type":"previous","label":"Previous article"} /--><!-- wp:post-navigation-link {"label":"Next article"} /--></main><!-- /wp:group -->
+<!-- wp:group {"tagName":"main","anchor":"main-content","className":"longevity-article-shell","style":{"spacing":{"padding":{"top":"3rem","bottom":"4.5rem"}}},"layout":{"type":"constrained"}} -->
+<main id="main-content" class="wp-block-group longevity-article-shell" style="padding-top:3rem;padding-bottom:4.5rem"><!-- wp:longevity/breadcrumbs /--><!-- wp:group {"className":"longevity-article-header","layout":{"type":"constrained"}} --><div class="wp-block-group longevity-article-header"><!-- wp:post-terms {"term":"category","fontSize":"small"} /--><!-- wp:post-title {"level":1,"fontSize":"x-large"} /--><!-- wp:post-excerpt {"className":"longevity-deck","moreText":""} /--><!-- wp:longevity/article-meta /--></div><!-- /wp:group --><!-- wp:longevity/trust-summary /--><!-- wp:longevity/reviewer-card /--><!-- wp:post-featured-image {"align":"wide","sizeSlug":"longevity-hero"} /--><!-- wp:longevity/table-of-contents /--><!-- wp:post-content {"layout":{"type":"constrained"}} /--><!-- wp:longevity/source-list /--><!-- wp:longevity/test-method /--><!-- wp:longevity/corrections /--><!-- wp:shortcode -->[medical_disclaimer]<!-- /wp:shortcode --><!-- wp:longevity/related-content /--><!-- wp:separator /--><!-- wp:group {"layout":{"type":"flex","flexWrap":"wrap","justifyContent":"space-between"}} --><div class="wp-block-group"><!-- wp:post-navigation-link {"type":"previous","label":"Previous","showTitle":true} /--><!-- wp:post-navigation-link {"label":"Next","showTitle":true} /--></div><!-- /wp:group --><!-- wp:paragraph {"fontSize":"small"} --><p class="has-small-font-size">See something that may be wrong or out of date? <a href="/corrections/">Review our corrections process and report it</a>.</p><!-- /wp:paragraph --></main><!-- /wp:group -->
 <!-- wp:template-part {"slug":"footer"} /-->
 ````
 
@@ -20492,6 +22908,8 @@ add_action(
 add_action(
 	'after_setup_theme',
 	static function (): void {
+		remove_action( 'wp_enqueue_scripts', 'wp_enqueue_block_template_skip_link' );
+		remove_action( 'wp_footer', 'the_block_template_skip_link' );
 		add_theme_support( 'wp-block-styles' );
 		add_theme_support( 'editor-styles' );
 		add_editor_style( 'style.css' );
@@ -20499,20 +22917,38 @@ add_action(
 		add_theme_support( 'title-tag' );
 		add_theme_support( 'custom-logo' );
 		add_theme_support( 'html5', array( 'search-form', 'gallery', 'caption', 'style', 'script' ) );
+		add_image_size( 'longevity-card', 720, 450, true );
+		add_image_size( 'longevity-hero', 1440, 900, false );
 	}
 );
 
-/** Include public review content in reader-facing main queries. */
-add_action(
-	'pre_get_posts',
-	static function ( WP_Query $query ): void {
-		if ( is_admin() || ! $query->is_main_query() ) {
-			return;
+/** Describe responsive card and article-image display widths to WordPress. */
+add_filter(
+	'wp_calculate_image_sizes',
+	static function ( string $sizes, array $size ): string {
+		if ( $size[0] <= 720 ) {
+			return '(max-width: 700px) 100vw, (max-width: 1000px) 50vw, 33vw';
 		}
-		if ( $query->is_search() || $query->is_category() || $query->is_tag() || $query->is_author() || $query->is_home() ) {
-			$query->set( 'post_type', array( 'post', 'review' ) );
+		return $sizes;
+	},
+	10,
+	2
+);
+
+/** Keep excerpts concise; templates provide explicit link labels. */
+add_filter( 'excerpt_more', static fn() => '&hellip;' );
+
+/** Make skip-link targets programmatically focusable without changing tab order. */
+add_filter(
+	'render_block_core/group',
+	static function ( string $content, array $block ): string {
+		if ( 'main' !== ( $block['attrs']['tagName'] ?? '' ) || 'main-content' !== ( $block['attrs']['anchor'] ?? '' ) ) {
+			return $content;
 		}
-	}
+		return (string) preg_replace( '/<main\b/', '<main tabindex="-1"', $content, 1 );
+	},
+	10,
+	2
 );
 
 /** Add semantic body classes for trust-oriented layouts. */
@@ -20537,18 +22973,19 @@ Theme Name: Longevity Starter
 Theme URI: https://invalid.local/longevity-starter
 Author: Longevity Evidence Lab
 Description: Accessible block theme for an evidence-led consumer health and product-testing publication.
-Version: 2.0.0
+Version: 3.0.0
 Requires at least: 6.7
 Requires PHP: 8.1
 Text Domain: longevity-starter
 */
 
-/* Base and accessibility */
+/* 1. Reset and base */
 :root {
 	color-scheme: light;
 }
 
 html {
+	scroll-padding-top: 7rem;
 	scroll-behavior: smooth;
 }
 
@@ -20556,34 +22993,46 @@ body {
 	text-wrap: pretty;
 }
 
+* {
+	box-sizing: border-box;
+}
+
+img {
+	height: auto;
+	max-width: 100%;
+}
+
 a {
 	text-decoration-thickness: 0.09em;
-	text-underline-offset: 0.18em;
+	text-underline-offset: 0.2em;
 }
 
 a:hover {
+	color: var(--wp--preset--color--brand-hover);
 	text-decoration-thickness: 0.14em;
 }
 
-input,
-select,
-textarea,
-button {
-	font: inherit;
+:where(p, li, dd) {
+	overflow-wrap: anywhere;
 }
 
-a:focus-visible,
-button:focus-visible,
-input:focus-visible,
-select:focus-visible,
-textarea:focus-visible,
-summary:focus-visible {
+button,
+input,
+select,
+textarea {
+	font: inherit;
+	min-height: 2.75rem;
+}
+
+/* 2. Accessibility */
+:where(a, button, input, select, textarea, summary):focus-visible {
 	outline: 3px solid var(--wp--preset--color--focus);
 	outline-offset: 3px;
 }
 
 .longevity-skip-link {
 	background: var(--wp--preset--color--ink);
+	border-radius: var(--wp--custom--radius--small);
 	color: var(--wp--preset--color--paper);
 	font-weight: 700;
 	left: 1rem;
@@ -20597,64 +23046,287 @@ summary:focus-visible {
 	top: 1rem;
 }
 
+.screen-reader-text:focus {
+	clip: auto !important;
+	height: auto !important;
+	width: auto !important;
+}
+
+/* 3. Layout */
 .wp-site-blocks {
 	display: flex;
-	min-height: 100vh;
 	flex-direction: column;
+	min-height: 100vh;
 }
 
 main {
 	flex: 1;
 }
 
-img {
-	height: auto;
-	max-width: 100%;
+.longevity-section {
+	padding-block: clamp(3rem, 7vw, 6.5rem);
 }
 
-/* Header and navigation */
+.longevity-section + .longevity-section {
+	border-top: 1px solid var(--wp--preset--color--border);
+}
+
+.longevity-section-heading {
+	max-width: var(--wp--custom--measure--compact);
+}
+
+.longevity-section-intro {
+	color: var(--wp--preset--color--muted);
+	font-size: var(--wp--preset--font-size--medium);
+	max-width: var(--wp--custom--measure--compact);
+}
+
+/* 4. Header and navigation */
 .longevity-site-header {
-	background: var(--wp--preset--color--paper);
+	background: color-mix(in srgb, var(--wp--preset--color--paper) 96%, transparent);
+	border-bottom: 1px solid var(--wp--preset--color--border);
 	position: relative;
 	z-index: 20;
 }
 
-.longevity-site-header .wp-block-navigation-item__content {
-	font-weight: 650;
+.longevity-site-header .wp-block-site-title {
+	font-family: var(--wp--preset--font-family--serif);
+	font-size: 1.25rem;
+	font-weight: 700;
+	line-height: 1.1;
+}
+
+.longevity-site-header .wp-block-site-title a {
+	color: var(--wp--preset--color--ink);
+	text-decoration: none;
+}
+
+.longevity-primary-nav .wp-block-navigation-item__content {
+	color: var(--wp--preset--color--ink);
+	font-size: 0.92rem;
+	font-weight: 680;
+	padding-block: 0.6rem;
+}
+
+.longevity-primary-nav .current-menu-item > .wp-block-navigation-item__content,
+.longevity-primary-nav .wp-block-navigation-item__content[aria-current="page"] {
+	box-shadow: inset 0 -3px var(--wp--preset--color--brand);
 }
 
 .longevity-site-header .wp-block-search__inside-wrapper {
-	min-width: min(16rem, 80vw);
+	min-width: min(15rem, 80vw);
 }
 
-/* Content cards and grids */
-.longevity-card {
-	background: var(--wp--preset--color--paper);
-	border: 1px solid var(--wp--preset--color--border);
-	border-radius: var(--wp--custom--radius--card);
-	box-shadow: var(--wp--custom--shadow--subtle);
-	height: 100%;
-	padding: var(--wp--preset--spacing--40);
+.wp-block-navigation__responsive-container.is-menu-open {
+	padding: 1.5rem;
 }
 
-.longevity-card :where(h2, h3) {
-	margin-block-start: 0.35rem;
+.wp-block-navigation__responsive-container-close,
+.wp-block-navigation__responsive-container-open {
+	min-height: 2.75rem;
+	min-width: 2.75rem;
 }
 
+/* 5. Hero */
+.longevity-hero {
+	background:
+		linear-gradient(115deg, rgb(223 242 233 / 78%), rgb(247 250 248 / 94%)),
+		radial-gradient(circle at 85% 20%, rgb(20 97 71 / 16%), transparent 32%);
+	border-bottom: 1px solid var(--wp--preset--color--border);
+	padding-block: clamp(4rem, 9vw, 8rem);
+}
+
+.longevity-hero h1 {
+	font-size: var(--wp--preset--font-size--display);
+	letter-spacing: -0.035em;
+	max-width: 15ch;
+}
+
+.longevity-hero .longevity-hero-copy {
+	color: var(--wp--preset--color--muted);
+	font-size: var(--wp--preset--font-size--medium);
+	max-width: 58ch;
+}
+
+.longevity-eyebrow,
 .longevity-kicker {
+	color: var(--wp--preset--color--brand);
 	font-size: var(--wp--preset--font-size--small);
-	font-weight: 750;
-	letter-spacing: 0.08em;
+	font-weight: 780;
+	letter-spacing: 0.09em;
 	text-transform: uppercase;
 }
 
-/* Article trust system */
+.wp-block-button.is-style-outline .wp-block-button__link {
+	background: transparent;
+	border: 2px solid var(--wp--preset--color--brand);
+	color: var(--wp--preset--color--brand);
+}
+
+.wp-element-button:hover,
+.wp-block-button__link:hover {
+	background: var(--wp--preset--color--brand-hover);
+	color: var(--wp--preset--color--paper);
+}
+
+/* 6. Cards and content grids */
+.longevity-card-grid,
+.longevity-topic-grid,
+.longevity-trust-grid,
+.longevity-footer-grid {
+	display: grid;
+	gap: clamp(1rem, 2vw, 1.5rem);
+}
+
+.longevity-card-grid,
+.longevity-topic-grid {
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.longevity-trust-grid {
+	grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.longevity-footer-grid {
+	grid-template-columns: 1.5fr repeat(4, minmax(8rem, 1fr));
+}
+
+.longevity-card,
+.longevity-topic-card,
+.longevity-principle {
+	background: var(--wp--preset--color--paper);
+	border: 1px solid var(--wp--preset--color--border);
+	border-radius: var(--wp--custom--radius--card);
+	height: 100%;
+	overflow: hidden;
+}
+
+.longevity-card {
+	box-shadow: var(--wp--custom--shadow--subtle);
+	display: flex;
+	flex-direction: column;
+}
+
+.longevity-card-body,
+.longevity-topic-card,
+.longevity-principle {
+	padding: clamp(1.1rem, 2vw, 1.5rem);
+}
+
+.longevity-card :where(h2, h3),
+.longevity-topic-card h3,
+.longevity-principle h3 {
+	margin-block-start: 0.35rem;
+}
+
+.longevity-card .wp-block-post-featured-image {
+	aspect-ratio: 16 / 10;
+	background: var(--wp--preset--color--surface-subtle);
+	margin: 0;
+	overflow: hidden;
+}
+
+.longevity-card .wp-block-post-featured-image img {
+	height: 100%;
+	object-fit: cover;
+	width: 100%;
+}
+
+.longevity-card-meta {
+	color: var(--wp--preset--color--muted);
+	display: flex;
+	flex-wrap: wrap;
+	font-size: var(--wp--preset--font-size--small);
+	gap: 0.45rem 0.75rem;
+	margin-block: 0.75rem;
+}
+
+.longevity-card-meta strong {
+	color: var(--wp--preset--color--ink);
+}
+
+.longevity-card-link {
+	font-weight: 700;
+	margin-block-start: auto;
+}
+
+.longevity-topic-card a,
+.longevity-principle a {
+	font-weight: 700;
+}
+
+.longevity-empty-state {
+	background: var(--wp--preset--color--surface);
+	border: 1px dashed var(--wp--preset--color--border-strong);
+	border-radius: var(--wp--custom--radius--card);
+	max-width: 65ch;
+	padding: 1.5rem;
+}
+
+/* 7. Article typography */
 .longevity-article-shell {
 	max-width: var(--wp--style--global--content-size);
 }
 
+.longevity-article-header {
+	margin-block-end: var(--wp--preset--spacing--50);
+}
+
+.longevity-article-header h1 {
+	font-size: var(--wp--preset--font-size--x-large);
+	letter-spacing: -0.025em;
+	margin-block: 0.5rem 1rem;
+}
+
+.longevity-deck,
+.longevity-article-header .wp-block-post-excerpt__excerpt {
+	color: var(--wp--preset--color--muted);
+	font-size: var(--wp--preset--font-size--medium);
+	line-height: 1.55;
+}
+
+.longevity-article-shell .entry-content,
+.longevity-article-shell .wp-block-post-content {
+	max-width: var(--wp--custom--measure--article);
+}
+
+.longevity-article-shell .wp-block-post-content > :where(h2, h3) {
+	scroll-margin-top: 6rem;
+}
+
+.longevity-article-shell .wp-block-post-content > h2 {
+	margin-block-start: 2.75em;
+}
+
+.longevity-article-shell .wp-block-post-content > h3 {
+	margin-block-start: 2em;
+}
+
+.longevity-article-shell .wp-block-post-content :where(ul, ol) {
+	padding-inline-start: 1.4em;
+}
+
+.longevity-breadcrumbs {
+	font-size: var(--wp--preset--font-size--small);
+	margin-block-end: 1rem;
+}
+
+.longevity-breadcrumbs ol {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.35rem;
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+
+.longevity-breadcrumbs li + li::before {
+	color: var(--wp--preset--color--muted);
+	content: "/";
+	margin-inline-end: 0.35rem;
+}
+
 .longevity-article-meta {
-	align-items: center;
 	color: var(--wp--preset--color--muted);
 	display: flex;
 	flex-wrap: wrap;
@@ -20663,26 +23335,31 @@ img {
 	margin-block: 1rem 1.5rem;
 }
 
+/* 8. Trust components */
 .longevity-trust-summary,
 .longevity-reviewer-card,
 .longevity-review-box,
 .longevity-review-score-card,
+.longevity-review-decision,
 .longevity-test-method,
 .longevity-update-history,
-.longevity-testing-note {
+.longevity-testing-note,
+.longevity-source-list,
+.longevity-related-content,
+.longevity-toc {
 	border: 1px solid var(--wp--preset--color--border);
 	border-radius: var(--wp--custom--radius--card);
 	margin-block: var(--wp--preset--spacing--50);
-	padding: var(--wp--preset--spacing--40);
+	padding: clamp(1.1rem, 2.5vw, 1.75rem);
 }
 
-.longevity-trust-summary {
-	background: var(--wp--preset--color--soft);
+.longevity-trust-summary,
+.longevity-toc,
+.longevity-related-content {
+	background: var(--wp--preset--color--surface);
 }
 
-.longevity-trust-summary > h2,
-.longevity-reviewer-card > h2,
-.longevity-update-history > h2 {
+:where(.longevity-trust-summary, .longevity-reviewer-card, .longevity-update-history, .longevity-source-list, .longevity-related-content, .longevity-review-decision) > h2 {
 	font-size: var(--wp--preset--font-size--large);
 	margin-block-start: 0;
 }
@@ -20699,26 +23376,24 @@ img {
 }
 
 .longevity-badge {
-	background: var(--wp--preset--color--accent-soft);
-	border: 1px solid var(--wp--preset--color--accent);
-	border-radius: 999px;
-	display: inline-block;
+	align-items: center;
+	background: var(--wp--preset--color--brand-subtle);
+	border: 1px solid var(--wp--preset--color--brand);
+	border-radius: var(--wp--custom--radius--pill);
+	display: inline-flex;
 	font-size: var(--wp--preset--font-size--small);
 	font-weight: 750;
-	padding: 0.25rem 0.7rem;
-}
-
-.longevity-evidence-grade .longevity-badge::before {
-	content: "Evidence: ";
+	gap: 0.35rem;
+	padding: 0.3rem 0.75rem;
 }
 
 .longevity-limitations,
 .longevity-disclosure,
 .longevity-medical-disclaimer,
 .longevity-testing-note {
-	background: var(--wp--preset--color--warning-soft);
+	background: var(--wp--preset--color--warning-subtle);
 	border-inline-start: 0.3rem solid var(--wp--preset--color--warning);
-	padding: 0.9rem 1rem;
+	padding: 0.95rem 1rem;
 }
 
 .longevity-medical-disclaimer {
@@ -20726,26 +23401,62 @@ img {
 	margin-block: var(--wp--preset--spacing--40);
 }
 
+.longevity-toc ol,
+.longevity-source-list ol {
+	padding-inline-start: 1.35rem;
+}
+
+.longevity-toc li + li,
+.longevity-source-list li + li {
+	margin-block-start: 0.5rem;
+}
+
+/* 9. Review components */
+.longevity-review-decision-grid {
+	display: grid;
+	gap: 0.85rem 1.5rem;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.longevity-review-decision-grid > div {
+	border-top: 1px solid var(--wp--preset--color--border);
+	padding-block-start: 0.8rem;
+}
+
+.longevity-review-decision dt,
+.longevity-test-method dt {
+	font-weight: 750;
+}
+
+.longevity-review-decision dd,
+.longevity-test-method dd {
+	margin: 0.25rem 0 0;
+}
+
 .longevity-review-score {
-	font-size: clamp(2rem, 7vw, 3.2rem);
-	font-weight: 800;
+	font-size: clamp(2rem, 7vw, 3.5rem);
+	font-weight: 820;
 	line-height: 1;
+}
+
+.longevity-score-scale {
+	color: var(--wp--preset--color--muted);
+	font-size: var(--wp--preset--font-size--small);
 }
 
 .longevity-test-method summary {
 	cursor: pointer;
+	font-size: 1.1rem;
 	font-weight: 750;
+	min-height: 2.75rem;
+	padding-block: 0.6rem;
 }
 
 .longevity-test-method dl > div {
 	display: grid;
 	gap: 0.3rem;
-	grid-template-columns: minmax(8rem, 0.4fr) 1fr;
-	padding-block: 0.45rem;
-}
-
-.longevity-test-method dt {
-	font-weight: 700;
+	grid-template-columns: minmax(9rem, 0.4fr) 1fr;
+	padding-block: 0.5rem;
 }
 
 .longevity-update-history ol {
@@ -20758,8 +23469,59 @@ img {
 	padding-top: 1rem;
 }
 
-/* Tables and forms */
-.wp-block-table {
+/* 10. Search and filters */
+.longevity-search-form {
+	background: var(--wp--preset--color--surface);
+	border: 1px solid var(--wp--preset--color--border);
+	border-radius: var(--wp--custom--radius--card);
+	display: grid;
+	gap: 1rem;
+	grid-template-columns: minmax(12rem, 2fr) repeat(2, minmax(10rem, 1fr)) auto;
+	margin-block: 1.5rem 2.5rem;
+	padding: 1rem;
+}
+
+.longevity-search-form label {
+	display: grid;
+	font-size: var(--wp--preset--font-size--small);
+	font-weight: 700;
+	gap: 0.3rem;
+}
+
+.longevity-search-form :where(input, select) {
+	background: var(--wp--preset--color--paper);
+	border: 1px solid var(--wp--preset--color--border-strong);
+	border-radius: var(--wp--custom--radius--small);
+	padding: 0.55rem 0.7rem;
+}
+
+.longevity-result-count {
+	color: var(--wp--preset--color--muted);
+}
+
+.wp-block-query-pagination {
+	margin-block-start: var(--wp--preset--spacing--50);
+}
+
+.wp-block-query-pagination a,
+.wp-block-query-pagination .page-numbers {
+	align-items: center;
+	display: inline-flex;
+	min-height: 2.75rem;
+	padding: 0.4rem 0.65rem;
+}
+
+/* 11. Forms */
+:where(.wp-block-search, .wp-block-post-comments-form) input,
+:where(.wp-block-search, .wp-block-post-comments-form) textarea {
+	border: 1px solid var(--wp--preset--color--border-strong);
+	border-radius: var(--wp--custom--radius--small);
+	padding: 0.65rem 0.8rem;
+}
+
+/* 12. Tables */
+.wp-block-table,
+.longevity-table-wrap {
 	overflow-x: auto;
 }
 
@@ -20772,55 +23534,100 @@ table {
 th,
 td {
 	border: 1px solid var(--wp--preset--color--border);
-	padding: 0.65rem;
+	padding: 0.7rem;
 	text-align: start;
 	vertical-align: top;
 }
 
 th {
-	background: var(--wp--preset--color--soft);
+	background: var(--wp--preset--color--surface-subtle);
 }
 
-/* Footer */
+/* 13. Author and policy pages */
+.longevity-author-profile {
+	background: var(--wp--preset--color--surface);
+	border-block: 1px solid var(--wp--preset--color--border);
+	padding-block: var(--wp--preset--spacing--50);
+}
+
+.longevity-author-profile .wp-block-avatar img {
+	border-radius: 50%;
+}
+
+/* 14. Footer */
 .longevity-site-footer {
 	background: var(--wp--preset--color--ink);
 	color: var(--wp--preset--color--paper);
+	padding-block: clamp(3rem, 6vw, 5rem);
 }
 
 .longevity-site-footer a {
 	color: inherit;
 }
 
+.longevity-site-footer h2,
+.longevity-site-footer h3 {
+	color: inherit;
+}
+
+.longevity-site-footer h3 {
+	font-family: var(--wp--preset--font-family--system);
+	font-size: 0.95rem;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+}
+
+.longevity-site-footer ul,
 .longevity-policy-nav ul {
-	display: flex;
-	flex-wrap: wrap;
-	gap: 0.55rem 1rem;
+	display: grid;
+	gap: 0.45rem;
 	list-style: none;
 	margin: 0;
 	padding: 0;
+}
+
+.longevity-site-footer .wp-block-site-title {
+	font-family: var(--wp--preset--font-family--serif);
 }
 
 .longevity-small {
 	font-size: var(--wp--preset--font-size--small);
 }
 
-/* Editor helper styles */
-.lel-editorial-grid {
-	column-gap: 2rem;
+/* 15. Responsive behavior */
+@media (width <= 1000px) {
+	.longevity-card-grid,
+	.longevity-topic-grid,
+	.longevity-trust-grid {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+
+	.longevity-footer-grid {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+
+	.longevity-footer-grid > :first-child {
+		grid-column: 1 / -1;
+	}
+
+	.longevity-search-form {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
 }
 
-.lel-gate-blocking {
-	color: var(--wp--preset--color--danger);
-}
-
-.lel-gate-warning {
-	color: var(--wp--preset--color--warning-text);
-}
-
-/* Responsive behavior */
 @media (width <= 700px) {
+	.longevity-card-grid,
+	.longevity-topic-grid,
+	.longevity-trust-grid,
+	.longevity-footer-grid,
+	.longevity-review-decision-grid,
+	.longevity-search-form,
 	.longevity-test-method dl > div {
 		grid-template-columns: 1fr;
+	}
+
+	.longevity-footer-grid > :first-child {
+		grid-column: auto;
 	}
 
 	.wp-block-query .wp-block-post-template.is-layout-grid {
@@ -20830,8 +23637,23 @@ th {
 	.longevity-article-meta > [aria-hidden="true"] {
 		display: none;
 	}
+
+	.longevity-hero {
+		padding-block: 3.5rem;
+	}
 }
 
+@media (width <= 420px) {
+	.longevity-site-header .wp-block-search {
+		width: 100%;
+	}
+
+	.longevity-site-header .wp-block-search__inside-wrapper {
+		min-width: 0;
+	}
+}
+
+/* 16. Reduced motion and forced colors */
 @media (prefers-reduced-motion: reduce) {
 	html {
 		scroll-behavior: auto;
@@ -20847,11 +23669,22 @@ th {
 	}
 }
 
+@media (forced-colors: active) {
+	.longevity-badge,
+	.longevity-card,
+	.longevity-trust-summary,
+	.longevity-disclosure {
+		border: 1px solid CanvasText;
+	}
+}
+
+/* 17. Print */
 @media print {
 	.longevity-site-header,
 	.longevity-site-footer,
 	.longevity-affiliate-cta,
-	.wp-block-post-navigation-link {
+	.wp-block-post-navigation-link,
+	.longevity-toc {
 		display: none !important;
 	}
 
@@ -20865,6 +23698,13 @@ th {
 		content: " (" attr(href) ")";
 		font-size: 0.8em;
 	}
+
+	.longevity-trust-summary,
+	.longevity-source-list,
+	.longevity-medical-disclaimer,
+	.longevity-disclosure {
+		break-inside: avoid;
+	}
 }
 ````
 
@@ -20876,53 +23716,71 @@ th {
   "settings": {
     "appearanceTools": true,
     "layout": {
-      "contentSize": "760px",
-      "wideSize": "1180px"
+      "contentSize": "720px",
+      "wideSize": "1200px"
     },
     "color": {
       "defaultPalette": false,
       "palette": [
-        { "slug": "ink", "name": "Ink", "color": "#172027" },
-        { "slug": "paper", "name": "Paper", "color": "#ffffff" },
-        { "slug": "soft", "name": "Soft", "color": "#f2f6f4" },
-        { "slug": "accent", "name": "Accent", "color": "#205b48" },
-        { "slug": "accent-soft", "name": "Accent Soft", "color": "#e3f1eb" },
-        { "slug": "border", "name": "Border", "color": "#cbd8d3" },
+        { "slug": "ink", "name": "Ink", "color": "#17211d" },
         { "slug": "muted", "name": "Muted", "color": "#52615b" },
+        { "slug": "paper", "name": "Paper", "color": "#ffffff" },
+        { "slug": "surface", "name": "Surface", "color": "#f7faf8" },
+        { "slug": "surface-subtle", "name": "Surface Subtle", "color": "#edf4f0" },
+        { "slug": "border", "name": "Border", "color": "#c8d6d0" },
+        { "slug": "border-strong", "name": "Border Strong", "color": "#82958d" },
+        { "slug": "brand", "name": "Brand", "color": "#146147" },
+        { "slug": "brand-hover", "name": "Brand Hover", "color": "#0c4935" },
+        { "slug": "brand-subtle", "name": "Brand Subtle", "color": "#dff2e9" },
         { "slug": "focus", "name": "Focus", "color": "#005fcc" },
-        { "slug": "warning", "name": "Warning", "color": "#8a5a00" },
-        { "slug": "warning-soft", "name": "Warning Soft", "color": "#fff7df" },
-        { "slug": "warning-text", "name": "Warning Text", "color": "#704800" },
-        { "slug": "danger", "name": "Danger", "color": "#8c1d18" }
+        { "slug": "success", "name": "Success", "color": "#17633d" },
+        { "slug": "success-subtle", "name": "Success Subtle", "color": "#e1f4e9" },
+        { "slug": "warning", "name": "Warning", "color": "#7a4d00" },
+        { "slug": "warning-subtle", "name": "Warning Subtle", "color": "#fff4d6" },
+        { "slug": "danger", "name": "Danger", "color": "#8c1d18" },
+        { "slug": "danger-subtle", "name": "Danger Subtle", "color": "#fde9e7" },
+        { "slug": "info", "name": "Info", "color": "#174f78" },
+        { "slug": "info-subtle", "name": "Info Subtle", "color": "#e5f1f8" },
+        { "slug": "soft", "name": "Legacy Soft", "color": "#edf4f0" },
+        { "slug": "accent", "name": "Legacy Accent", "color": "#146147" },
+        { "slug": "accent-soft", "name": "Legacy Accent Soft", "color": "#dff2e9" },
+        { "slug": "warning-soft", "name": "Legacy Warning Soft", "color": "#fff4d6" },
+        { "slug": "warning-text", "name": "Legacy Warning Text", "color": "#633f00" }
       ]
     },
     "typography": {
       "fluid": true,
       "fontFamilies": [
-        { "slug": "system", "name": "System Sans", "fontFamily": "-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif" },
-        { "slug": "serif", "name": "Editorial Serif", "fontFamily": "Georgia,\"Times New Roman\",serif" }
+        { "slug": "system", "name": "System Sans", "fontFamily": "-apple-system,BlinkMacSystemFont,\"Segoe UI\",Roboto,Helvetica,Arial,sans-serif" },
+        { "slug": "serif", "name": "Editorial Serif", "fontFamily": "Georgia,\"Times New Roman\",serif" },
+        { "slug": "mono", "name": "System Mono", "fontFamily": "ui-monospace,SFMono-Regular,Consolas,\"Liberation Mono\",monospace" }
       ],
       "fontSizes": [
-        { "slug": "small", "name": "Small", "size": "0.9rem" },
-        { "slug": "medium", "name": "Medium", "size": "1.1rem" },
-        { "slug": "large", "name": "Large", "size": "clamp(1.45rem, 3vw, 2.15rem)" },
-        { "slug": "x-large", "name": "Extra Large", "size": "clamp(2.1rem, 6vw, 4.3rem)" }
+        { "slug": "small", "name": "Metadata", "size": "0.875rem" },
+        { "slug": "body", "name": "Body", "size": "clamp(1.0625rem, 1rem + 0.2vw, 1.1875rem)" },
+        { "slug": "medium", "name": "Lead", "size": "clamp(1.15rem, 1.05rem + 0.45vw, 1.4rem)" },
+        { "slug": "large", "name": "Section Heading", "size": "clamp(1.5rem, 1.2rem + 1.25vw, 2.3rem)" },
+        { "slug": "x-large", "name": "Article Title", "size": "clamp(2.1rem, 1.6rem + 2.4vw, 4.25rem)" },
+        { "slug": "display", "name": "Display", "size": "clamp(2.6rem, 1.8rem + 3.7vw, 5.6rem)" }
       ]
     },
     "spacing": {
       "units": ["px", "rem", "vw", "%"],
       "spacingSizes": [
+        { "slug": "10", "name": "3XS", "size": "0.25rem" },
         { "slug": "20", "name": "2XS", "size": "0.5rem" },
         { "slug": "30", "name": "XS", "size": "0.75rem" },
         { "slug": "40", "name": "S", "size": "1.25rem" },
         { "slug": "50", "name": "M", "size": "2rem" },
         { "slug": "60", "name": "L", "size": "3rem" },
-        { "slug": "70", "name": "XL", "size": "4.5rem" }
+        { "slug": "70", "name": "XL", "size": "4.5rem" },
+        { "slug": "80", "name": "2XL", "size": "6.5rem" }
       ]
     },
     "custom": {
-      "radius": { "card": "0.8rem" },
-      "shadow": { "subtle": "0 0.15rem 0.7rem rgba(23, 32, 39, 0.08)" }
+      "radius": { "small": "0.4rem", "card": "0.85rem", "pill": "999px" },
+      "shadow": { "subtle": "0 0.3rem 1.2rem rgba(23, 33, 29, 0.07)" },
+      "measure": { "article": "70ch", "compact": "54ch" }
     }
   },
   "styles": {
@@ -20932,30 +23790,35 @@ th {
     },
     "typography": {
       "fontFamily": "var(--wp--preset--font-family--system)",
-      "fontSize": "1.05rem",
-      "lineHeight": "1.7"
+      "fontSize": "var(--wp--preset--font-size--body)",
+      "lineHeight": "1.72"
     },
     "elements": {
       "heading": {
         "typography": {
           "fontFamily": "var(--wp--preset--font-family--serif)",
+          "fontWeight": "700",
           "lineHeight": "1.12"
         }
       },
       "link": {
-        "color": { "text": "var(--wp--preset--color--accent)" }
+        "color": { "text": "var(--wp--preset--color--brand)" }
       },
       "button": {
+        "border": { "radius": "0.45rem" },
         "color": {
-          "background": "var(--wp--preset--color--accent)",
+          "background": "var(--wp--preset--color--brand)",
           "text": "var(--wp--preset--color--paper)"
-        }
+        },
+        "typography": { "fontWeight": "700" }
       }
     },
     "blocks": {
-      "core/button": { "border": { "radius": "999px" } },
+      "core/button": { "border": { "radius": "0.45rem" } },
       "core/post-title": { "typography": { "fontFamily": "var(--wp--preset--font-family--serif)" } },
-      "core/pullquote": { "border": { "color": "var(--wp--preset--color--accent)" } }
+      "core/post-excerpt": { "typography": { "lineHeight": "1.6" } },
+      "core/pullquote": { "border": { "color": "var(--wp--preset--color--brand)" } },
+      "core/code": { "typography": { "fontFamily": "var(--wp--preset--font-family--mono)", "fontSize": "0.9rem" } }
     },
     "spacing": { "blockGap": "1.35rem" }
   }
@@ -47624,6 +50487,12 @@ DISALLOW_FILE_MODS=false
 INSTALL_OPTIONAL_PLUGINS=0
 ````
 
+## File: .gitattributes
+````
+# Auto detect text files and perform LF normalization
+* text=auto
+````
+
 ## File: .gitignore
 ````
 .env
@@ -47637,11 +50506,19 @@ node_modules/
 coverage/
 playwright-report/
 test-results/
+reports/
 build/
 .DS_Store
 *.log
 wp-content/uploads/*
 !wp-content/uploads/.gitkeep
+````
+
+## File: .npmrc
+````
+registry=https://registry.npmjs.org/
+omit-lockfile-registry-resolved=true
+fund=false
 ````
 
 ## File: .stylelintrc.json
@@ -47650,7 +50527,8 @@ wp-content/uploads/*
   "extends": ["stylelint-config-standard"],
   "rules": {
     "selector-class-pattern": null,
-    "custom-property-pattern": null
+    "custom-property-pattern": null,
+    "no-descending-specificity": null
   }
 }
 ````
@@ -47695,9 +50573,9 @@ services:
       WORDPRESS_DB_NAME: ${WORDPRESS_DB_NAME}
       WORDPRESS_DB_USER: ${WORDPRESS_DB_USER}
       WORDPRESS_DB_PASSWORD: ${WORDPRESS_DB_PASSWORD}
+      WORDPRESS_DEBUG: ${WP_DEBUG:-false}
       WORDPRESS_CONFIG_EXTRA: |
         define( 'WP_ENVIRONMENT_TYPE', '${WP_ENVIRONMENT_TYPE:-local}' );
-        define( 'WP_DEBUG', ${WP_DEBUG:-false} );
         define( 'WP_DEBUG_LOG', ${WP_DEBUG_LOG:-false} );
         define( 'WP_DEBUG_DISPLAY', ${WP_DEBUG_DISPLAY:-false} );
         define( 'FORCE_SSL_ADMIN', ${FORCE_SSL_ADMIN:-false} );
@@ -47788,6 +50666,7 @@ volumes:
   "require-dev": {
     "dealerdirect/phpcodesniffer-composer-installer": "^1.0",
     "phpcompatibility/php-compatibility": "^9.3",
+    "phpcompatibility/phpcompatibility-wp": "^2.1",
     "phpstan/phpstan": "^2.0",
     "phpunit/phpunit": "^10.5",
     "szepeviktor/phpstan-wordpress": "^2.0",
@@ -47841,6 +50720,43 @@ export default [
   },
   { ignores: ['node_modules/**', 'vendor/**'] }
 ];
+````
+
+## File: lighthouserc.cjs
+````javascript
+module.exports = {
+  ci: {
+    collect: {
+      numberOfRuns: 1,
+      settings: {
+        chromeFlags: '--no-sandbox --disable-dev-shm-usage',
+        preset: 'desktop'
+      },
+      url: [
+        'http://localhost:8080/',
+        'http://localhost:8080/test-evidence-guide/',
+        'http://localhost:8080/reviews/test-valid-review/',
+        'http://localhost:8080/?s=evidence',
+        'http://localhost:8080/reviews/'
+      ]
+    },
+    assert: {
+      assertions: {
+        'categories:performance': ['error', { minScore: 0.9 }],
+        'categories:accessibility': ['error', { minScore: 0.95 }],
+        'categories:best-practices': ['error', { minScore: 0.95 }],
+        'categories:seo': ['error', { minScore: 0.95 }],
+        'largest-contentful-paint': ['error', { maxNumericValue: 2500 }],
+        'cumulative-layout-shift': ['error', { maxNumericValue: 0.1 }],
+        'total-blocking-time': ['error', { maxNumericValue: 200 }]
+      }
+    },
+    upload: {
+      target: 'filesystem',
+      outputDir: './reports/lighthouse'
+    }
+  }
+};
 ````
 
 ## File: Makefile
@@ -48059,18 +50975,26 @@ e84da72860600d0b34dabb97fdbf1647a87c3155cd3d1564b0f3506432b56d8c  ./wp-content/t
   "private": true,
   "scripts": {
     "lint": "npm run lint:css && npm run lint:js",
-    "lint:css": "stylelint 'wp-content/themes/longevity-starter/**/*.css'",
-    "lint:js": "eslint 'wp-content/mu-plugins/longevity-core/assets/**/*.js' 'tests/e2e/**/*.js'",
-    "test:e2e": "playwright test",
-    "test:a11y": "playwright test tests/e2e/accessibility.spec.js"
+    "lint:css": "stylelint wp-content/themes/longevity-starter/**/*.css",
+    "lint:js": "eslint wp-content/mu-plugins/longevity-core/assets/**/*.js tests/e2e/**/*.js",
+    "test:e2e": "playwright test tests/e2e/core.spec.js",
+    "test:a11y": "playwright test tests/e2e/accessibility.spec.js",
+    "test:visual": "playwright test tests/e2e/visual.spec.js",
+    "test:lighthouse": "lhci autorun --config=lighthouserc.cjs"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.10.0",
     "@eslint/js": "^9.0.0",
+    "@lhci/cli": "^0.15.1",
     "@playwright/test": "^1.50.0",
     "eslint": "^9.0.0",
     "stylelint": "^16.0.0",
     "stylelint-config-standard": "^38.0.0"
+  },
+  "overrides": {
+    "inquirer": "^9.3.8",
+    "tmp": "^0.2.6",
+    "uuid": "^11.1.1"
   },
   "type": "module"
 }
@@ -48124,11 +51048,15 @@ import { defineConfig } from '@playwright/test';
 
 export default defineConfig({
   testDir: './tests/e2e',
+  outputDir: './reports/playwright-artifacts',
+  reporter: [['list'], ['html', { outputFolder: './reports/playwright', open: 'never' }]],
+  retries: process.env.CI ? 1 : 0,
   use: {
     baseURL: process.env.WP_SITE_URL || 'http://localhost:8080',
-    trace: 'retain-on-failure'
-  },
-  webServer: process.env.CI ? undefined : undefined
+    trace: 'retain-on-failure',
+    screenshot: 'only-on-failure',
+    video: 'retain-on-failure'
+  }
 });
 ````
 

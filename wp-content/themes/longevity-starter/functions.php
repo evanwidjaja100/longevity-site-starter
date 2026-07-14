@@ -17,6 +17,8 @@ add_action(
 add_action(
 	'after_setup_theme',
 	static function (): void {
+		remove_action( 'wp_enqueue_scripts', 'wp_enqueue_block_template_skip_link' );
+		remove_action( 'wp_footer', 'the_block_template_skip_link' );
 		add_theme_support( 'wp-block-styles' );
 		add_theme_support( 'editor-styles' );
 		add_editor_style( 'style.css' );
@@ -24,20 +26,38 @@ add_action(
 		add_theme_support( 'title-tag' );
 		add_theme_support( 'custom-logo' );
 		add_theme_support( 'html5', array( 'search-form', 'gallery', 'caption', 'style', 'script' ) );
+		add_image_size( 'longevity-card', 720, 450, true );
+		add_image_size( 'longevity-hero', 1440, 900, false );
 	}
 );
 
-/** Include public review content in reader-facing main queries. */
-add_action(
-	'pre_get_posts',
-	static function ( WP_Query $query ): void {
-		if ( is_admin() || ! $query->is_main_query() ) {
-			return;
+/** Describe responsive card and article-image display widths to WordPress. */
+add_filter(
+	'wp_calculate_image_sizes',
+	static function ( string $sizes, array $size ): string {
+		if ( $size[0] <= 720 ) {
+			return '(max-width: 700px) 100vw, (max-width: 1000px) 50vw, 33vw';
 		}
-		if ( $query->is_search() || $query->is_category() || $query->is_tag() || $query->is_author() || $query->is_home() ) {
-			$query->set( 'post_type', array( 'post', 'review' ) );
+		return $sizes;
+	},
+	10,
+	2
+);
+
+/** Keep excerpts concise; templates provide explicit link labels. */
+add_filter( 'excerpt_more', static fn() => '&hellip;' );
+
+/** Make skip-link targets programmatically focusable without changing tab order. */
+add_filter(
+	'render_block_core/group',
+	static function ( string $content, array $block ): string {
+		if ( 'main' !== ( $block['attrs']['tagName'] ?? '' ) || 'main-content' !== ( $block['attrs']['anchor'] ?? '' ) ) {
+			return $content;
 		}
-	}
+		return (string) preg_replace( '/<main\b/', '<main tabindex="-1"', $content, 1 );
+	},
+	10,
+	2
 );
 
 /** Add semantic body classes for trust-oriented layouts. */

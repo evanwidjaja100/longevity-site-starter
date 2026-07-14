@@ -19,6 +19,7 @@ final class CLI {
 		\WP_CLI::add_command( 'longevity claims', Claims_Command::class );
 		\WP_CLI::add_command( 'longevity sources', Sources_Command::class );
 		\WP_CLI::add_command( 'longevity readiness', Readiness_Command::class );
+		\WP_CLI::add_command( 'longevity freshness', Freshness_Command::class );
 	}
 }
 
@@ -318,5 +319,30 @@ final class Readiness_Command {
 			\WP_CLI::halt( 1 );
 		}
 		\WP_CLI::success( 'Publication readiness passed.' );
+	}
+}
+
+/** Bounded freshness audit and operational-status command. */
+final class Freshness_Command {
+	/** Run the freshness audit or display the latest protected status counts. */
+	public function __invoke( array $args, array $assoc_args ): void {
+		unset( $assoc_args );
+		if ( ! current_user_can( 'approve_publication' ) ) {
+			\WP_CLI::error( 'This command requires approve_publication. Run WP-CLI with an authorized --user.' );
+		}
+		$action = sanitize_key( (string) ( $args[0] ?? 'status' ) );
+		if ( 'run' === $action ) {
+			$report = Freshness::run();
+			\WP_CLI::line( wp_json_encode( $report, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+			if ( 'failed' === ( $report['status'] ?? '' ) ) {
+				\WP_CLI::halt( 1 );
+			}
+			\WP_CLI::success( 'Freshness audit completed without publishing or rewriting content.' );
+			return;
+		}
+		if ( 'status' !== $action ) {
+			\WP_CLI::error( 'Use `wp longevity freshness status` or `wp longevity freshness run`.' );
+		}
+		\WP_CLI::line( wp_json_encode( Freshness::status(), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
 	}
 }

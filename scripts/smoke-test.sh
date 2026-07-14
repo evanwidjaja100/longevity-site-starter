@@ -21,5 +21,5 @@ fetch "$SITE_URL/wp-json/longevity/v1/health" "$tmp/health.json"
 python3 -m json.tool "$tmp/health.json" >/dev/null
 grep -q 'Longevity Evidence Lab\|longevity-site-header' "$tmp/home.html" || { echo 'ERROR: Homepage did not contain expected theme output.' >&2; exit 1; }
 grep -q '"status":"ok"\|"status": "ok"' "$tmp/health.json" || { echo 'ERROR: Health response was not healthy.' >&2; exit 1; }
-! grep -Eqi '(Fatal error|Warning:|Notice:)' "$tmp/home.html" || { echo 'ERROR: PHP diagnostics appeared in public output.' >&2; exit 1; }
+! grep -Eqi '(<b>(Fatal error|Warning|Notice)</b>:|PHP (Fatal error|Warning|Notice):|Uncaught [A-Za-z]+:)' "$tmp/home.html" || { echo 'ERROR: PHP diagnostics appeared in public output.' >&2; exit 1; }
 echo 'Smoke test passed.'

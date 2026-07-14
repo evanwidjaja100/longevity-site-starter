@@ -3,18 +3,19 @@ Theme Name: Longevity Starter
 Theme URI: https://invalid.local/longevity-starter
 Author: Longevity Evidence Lab
 Description: Accessible block theme for an evidence-led consumer health and product-testing publication.
-Version: 2.0.0
+Version: 3.0.0
 Requires at least: 6.7
 Requires PHP: 8.1
 Text Domain: longevity-starter
 */
 
-/* Base and accessibility */
+/* 1. Reset and base */
 :root {
 	color-scheme: light;
 }
 
 html {
+	scroll-padding-top: 7rem;
 	scroll-behavior: smooth;
 }
 
@@ -22,34 +23,46 @@ body {
 	text-wrap: pretty;
 }
 
+* {
+	box-sizing: border-box;
+}
+
+img {
+	height: auto;
+	max-width: 100%;
+}
+
 a {
 	text-decoration-thickness: 0.09em;
-	text-underline-offset: 0.18em;
+	text-underline-offset: 0.2em;
 }
 
 a:hover {
+	color: var(--wp--preset--color--brand-hover);
 	text-decoration-thickness: 0.14em;
 }
 
-input,
-select,
-textarea,
-button {
-	font: inherit;
+:where(p, li, dd) {
+	overflow-wrap: anywhere;
 }
 
-a:focus-visible,
-button:focus-visible,
-input:focus-visible,
-select:focus-visible,
-textarea:focus-visible,
-summary:focus-visible {
+button,
+input,
+select,
+textarea {
+	font: inherit;
+	min-height: 2.75rem;
+}
+
+/* 2. Accessibility */
+:where(a, button, input, select, textarea, summary):focus-visible {
 	outline: 3px solid var(--wp--preset--color--focus);
 	outline-offset: 3px;
 }
 
 .longevity-skip-link {
 	background: var(--wp--preset--color--ink);
+	border-radius: var(--wp--custom--radius--small);
 	color: var(--wp--preset--color--paper);
 	font-weight: 700;
 	left: 1rem;
@@ -63,64 +76,287 @@ summary:focus-visible {
 	top: 1rem;
 }
 
+.screen-reader-text:focus {
+	clip: auto !important;
+	height: auto !important;
+	width: auto !important;
+}
+
+/* 3. Layout */
 .wp-site-blocks {
 	display: flex;
-	min-height: 100vh;
 	flex-direction: column;
+	min-height: 100vh;
 }
 
 main {
 	flex: 1;
 }
 
-img {
-	height: auto;
-	max-width: 100%;
+.longevity-section {
+	padding-block: clamp(3rem, 7vw, 6.5rem);
 }
 
-/* Header and navigation */
+.longevity-section + .longevity-section {
+	border-top: 1px solid var(--wp--preset--color--border);
+}
+
+.longevity-section-heading {
+	max-width: var(--wp--custom--measure--compact);
+}
+
+.longevity-section-intro {
+	color: var(--wp--preset--color--muted);
+	font-size: var(--wp--preset--font-size--medium);
+	max-width: var(--wp--custom--measure--compact);
+}
+
+/* 4. Header and navigation */
 .longevity-site-header {
-	background: var(--wp--preset--color--paper);
+	background: color-mix(in srgb, var(--wp--preset--color--paper) 96%, transparent);
+	border-bottom: 1px solid var(--wp--preset--color--border);
 	position: relative;
 	z-index: 20;
 }
 
-.longevity-site-header .wp-block-navigation-item__content {
-	font-weight: 650;
+.longevity-site-header .wp-block-site-title {
+	font-family: var(--wp--preset--font-family--serif);
+	font-size: 1.25rem;
+	font-weight: 700;
+	line-height: 1.1;
+}
+
+.longevity-site-header .wp-block-site-title a {
+	color: var(--wp--preset--color--ink);
+	text-decoration: none;
+}
+
+.longevity-primary-nav .wp-block-navigation-item__content {
+	color: var(--wp--preset--color--ink);
+	font-size: 0.92rem;
+	font-weight: 680;
+	padding-block: 0.6rem;
+}
+
+.longevity-primary-nav .current-menu-item > .wp-block-navigation-item__content,
+.longevity-primary-nav .wp-block-navigation-item__content[aria-current="page"] {
+	box-shadow: inset 0 -3px var(--wp--preset--color--brand);
 }
 
 .longevity-site-header .wp-block-search__inside-wrapper {
-	min-width: min(16rem, 80vw);
+	min-width: min(15rem, 80vw);
 }
 
-/* Content cards and grids */
-.longevity-card {
-	background: var(--wp--preset--color--paper);
-	border: 1px solid var(--wp--preset--color--border);
-	border-radius: var(--wp--custom--radius--card);
-	box-shadow: var(--wp--custom--shadow--subtle);
-	height: 100%;
-	padding: var(--wp--preset--spacing--40);
+.wp-block-navigation__responsive-container.is-menu-open {
+	padding: 1.5rem;
 }
 
-.longevity-card :where(h2, h3) {
-	margin-block-start: 0.35rem;
+.wp-block-navigation__responsive-container-close,
+.wp-block-navigation__responsive-container-open {
+	min-height: 2.75rem;
+	min-width: 2.75rem;
 }
 
+/* 5. Hero */
+.longevity-hero {
+	background:
+		linear-gradient(115deg, rgb(223 242 233 / 78%), rgb(247 250 248 / 94%)),
+		radial-gradient(circle at 85% 20%, rgb(20 97 71 / 16%), transparent 32%);
+	border-bottom: 1px solid var(--wp--preset--color--border);
+	padding-block: clamp(4rem, 9vw, 8rem);
+}
+
+.longevity-hero h1 {
+	font-size: var(--wp--preset--font-size--display);
+	letter-spacing: -0.035em;
+	max-width: 15ch;
+}
+
+.longevity-hero .longevity-hero-copy {
+	color: var(--wp--preset--color--muted);
+	font-size: var(--wp--preset--font-size--medium);
+	max-width: 58ch;
+}
+
+.longevity-eyebrow,
 .longevity-kicker {
+	color: var(--wp--preset--color--brand);
 	font-size: var(--wp--preset--font-size--small);
-	font-weight: 750;
-	letter-spacing: 0.08em;
+	font-weight: 780;
+	letter-spacing: 0.09em;
 	text-transform: uppercase;
 }
 
-/* Article trust system */
+.wp-block-button.is-style-outline .wp-block-button__link {
+	background: transparent;
+	border: 2px solid var(--wp--preset--color--brand);
+	color: var(--wp--preset--color--brand);
+}
+
+.wp-element-button:hover,
+.wp-block-button__link:hover {
+	background: var(--wp--preset--color--brand-hover);
+	color: var(--wp--preset--color--paper);
+}
+
+/* 6. Cards and content grids */
+.longevity-card-grid,
+.longevity-topic-grid,
+.longevity-trust-grid,
+.longevity-footer-grid {
+	display: grid;
+	gap: clamp(1rem, 2vw, 1.5rem);
+}
+
+.longevity-card-grid,
+.longevity-topic-grid {
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.longevity-trust-grid {
+	grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.longevity-footer-grid {
+	grid-template-columns: 1.5fr repeat(4, minmax(8rem, 1fr));
+}
+
+.longevity-card,
+.longevity-topic-card,
+.longevity-principle {
+	background: var(--wp--preset--color--paper);
+	border: 1px solid var(--wp--preset--color--border);
+	border-radius: var(--wp--custom--radius--card);
+	height: 100%;
+	overflow: hidden;
+}
+
+.longevity-card {
+	box-shadow: var(--wp--custom--shadow--subtle);
+	display: flex;
+	flex-direction: column;
+}
+
+.longevity-card-body,
+.longevity-topic-card,
+.longevity-principle {
+	padding: clamp(1.1rem, 2vw, 1.5rem);
+}
+
+.longevity-card :where(h2, h3),
+.longevity-topic-card h3,
+.longevity-principle h3 {
+	margin-block-start: 0.35rem;
+}
+
+.longevity-card .wp-block-post-featured-image {
+	aspect-ratio: 16 / 10;
+	background: var(--wp--preset--color--surface-subtle);
+	margin: 0;
+	overflow: hidden;
+}
+
+.longevity-card .wp-block-post-featured-image img {
+	height: 100%;
+	object-fit: cover;
+	width: 100%;
+}
+
+.longevity-card-meta {
+	color: var(--wp--preset--color--muted);
+	display: flex;
+	flex-wrap: wrap;
+	font-size: var(--wp--preset--font-size--small);
+	gap: 0.45rem 0.75rem;
+	margin-block: 0.75rem;
+}
+
+.longevity-card-meta strong {
+	color: var(--wp--preset--color--ink);
+}
+
+.longevity-card-link {
+	font-weight: 700;
+	margin-block-start: auto;
+}
+
+.longevity-topic-card a,
+.longevity-principle a {
+	font-weight: 700;
+}
+
+.longevity-empty-state {
+	background: var(--wp--preset--color--surface);
+	border: 1px dashed var(--wp--preset--color--border-strong);
+	border-radius: var(--wp--custom--radius--card);
+	max-width: 65ch;
+	padding: 1.5rem;
+}
+
+/* 7. Article typography */
 .longevity-article-shell {
 	max-width: var(--wp--style--global--content-size);
 }
 
+.longevity-article-header {
+	margin-block-end: var(--wp--preset--spacing--50);
+}
+
+.longevity-article-header h1 {
+	font-size: var(--wp--preset--font-size--x-large);
+	letter-spacing: -0.025em;
+	margin-block: 0.5rem 1rem;
+}
+
+.longevity-deck,
+.longevity-article-header .wp-block-post-excerpt__excerpt {
+	color: var(--wp--preset--color--muted);
+	font-size: var(--wp--preset--font-size--medium);
+	line-height: 1.55;
+}
+
+.longevity-article-shell .entry-content,
+.longevity-article-shell .wp-block-post-content {
+	max-width: var(--wp--custom--measure--article);
+}
+
+.longevity-article-shell .wp-block-post-content > :where(h2, h3) {
+	scroll-margin-top: 6rem;
+}
+
+.longevity-article-shell .wp-block-post-content > h2 {
+	margin-block-start: 2.75em;
+}
+
+.longevity-article-shell .wp-block-post-content > h3 {
+	margin-block-start: 2em;
+}
+
+.longevity-article-shell .wp-block-post-content :where(ul, ol) {
+	padding-inline-start: 1.4em;
+}
+
+.longevity-breadcrumbs {
+	font-size: var(--wp--preset--font-size--small);
+	margin-block-end: 1rem;
+}
+
+.longevity-breadcrumbs ol {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.35rem;
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+
+.longevity-breadcrumbs li + li::before {
+	color: var(--wp--preset--color--muted);
+	content: "/";
+	margin-inline-end: 0.35rem;
+}
+
 .longevity-article-meta {
-	align-items: center;
 	color: var(--wp--preset--color--muted);
 	display: flex;
 	flex-wrap: wrap;
@@ -129,26 +365,31 @@ img {
 	margin-block: 1rem 1.5rem;
 }
 
+/* 8. Trust components */
 .longevity-trust-summary,
 .longevity-reviewer-card,
 .longevity-review-box,
 .longevity-review-score-card,
+.longevity-review-decision,
 .longevity-test-method,
 .longevity-update-history,
-.longevity-testing-note {
+.longevity-testing-note,
+.longevity-source-list,
+.longevity-related-content,
+.longevity-toc {
 	border: 1px solid var(--wp--preset--color--border);
 	border-radius: var(--wp--custom--radius--card);
 	margin-block: var(--wp--preset--spacing--50);
-	padding: var(--wp--preset--spacing--40);
+	padding: clamp(1.1rem, 2.5vw, 1.75rem);
 }
 
-.longevity-trust-summary {
-	background: var(--wp--preset--color--soft);
+.longevity-trust-summary,
+.longevity-toc,
+.longevity-related-content {
+	background: var(--wp--preset--color--surface);
 }
 
-.longevity-trust-summary > h2,
-.longevity-reviewer-card > h2,
-.longevity-update-history > h2 {
+:where(.longevity-trust-summary, .longevity-reviewer-card, .longevity-update-history, .longevity-source-list, .longevity-related-content, .longevity-review-decision) > h2 {
 	font-size: var(--wp--preset--font-size--large);
 	margin-block-start: 0;
 }
@@ -165,26 +406,24 @@ img {
 }
 
 .longevity-badge {
-	background: var(--wp--preset--color--accent-soft);
-	border: 1px solid var(--wp--preset--color--accent);
-	border-radius: 999px;
-	display: inline-block;
+	align-items: center;
+	background: var(--wp--preset--color--brand-subtle);
+	border: 1px solid var(--wp--preset--color--brand);
+	border-radius: var(--wp--custom--radius--pill);
+	display: inline-flex;
 	font-size: var(--wp--preset--font-size--small);
 	font-weight: 750;
-	padding: 0.25rem 0.7rem;
-}
-
-.longevity-evidence-grade .longevity-badge::before {
-	content: "Evidence: ";
+	gap: 0.35rem;
+	padding: 0.3rem 0.75rem;
 }
 
 .longevity-limitations,
 .longevity-disclosure,
 .longevity-medical-disclaimer,
 .longevity-testing-note {
-	background: var(--wp--preset--color--warning-soft);
+	background: var(--wp--preset--color--warning-subtle);
 	border-inline-start: 0.3rem solid var(--wp--preset--color--warning);
-	padding: 0.9rem 1rem;
+	padding: 0.95rem 1rem;
 }
 
 .longevity-medical-disclaimer {
@@ -192,26 +431,62 @@ img {
 	margin-block: var(--wp--preset--spacing--40);
 }
 
+.longevity-toc ol,
+.longevity-source-list ol {
+	padding-inline-start: 1.35rem;
+}
+
+.longevity-toc li + li,
+.longevity-source-list li + li {
+	margin-block-start: 0.5rem;
+}
+
+/* 9. Review components */
+.longevity-review-decision-grid {
+	display: grid;
+	gap: 0.85rem 1.5rem;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.longevity-review-decision-grid > div {
+	border-top: 1px solid var(--wp--preset--color--border);
+	padding-block-start: 0.8rem;
+}
+
+.longevity-review-decision dt,
+.longevity-test-method dt {
+	font-weight: 750;
+}
+
+.longevity-review-decision dd,
+.longevity-test-method dd {
+	margin: 0.25rem 0 0;
+}
+
 .longevity-review-score {
-	font-size: clamp(2rem, 7vw, 3.2rem);
-	font-weight: 800;
+	font-size: clamp(2rem, 7vw, 3.5rem);
+	font-weight: 820;
 	line-height: 1;
+}
+
+.longevity-score-scale {
+	color: var(--wp--preset--color--muted);
+	font-size: var(--wp--preset--font-size--small);
 }
 
 .longevity-test-method summary {
 	cursor: pointer;
+	font-size: 1.1rem;
 	font-weight: 750;
+	min-height: 2.75rem;
+	padding-block: 0.6rem;
 }
 
 .longevity-test-method dl > div {
 	display: grid;
 	gap: 0.3rem;
-	grid-template-columns: minmax(8rem, 0.4fr) 1fr;
-	padding-block: 0.45rem;
-}
-
-.longevity-test-method dt {
-	font-weight: 700;
+	grid-template-columns: minmax(9rem, 0.4fr) 1fr;
+	padding-block: 0.5rem;
 }
 
 .longevity-update-history ol {
@@ -224,8 +499,59 @@ img {
 	padding-top: 1rem;
 }
 
-/* Tables and forms */
-.wp-block-table {
+/* 10. Search and filters */
+.longevity-search-form {
+	background: var(--wp--preset--color--surface);
+	border: 1px solid var(--wp--preset--color--border);
+	border-radius: var(--wp--custom--radius--card);
+	display: grid;
+	gap: 1rem;
+	grid-template-columns: minmax(12rem, 2fr) repeat(2, minmax(10rem, 1fr)) auto;
+	margin-block: 1.5rem 2.5rem;
+	padding: 1rem;
+}
+
+.longevity-search-form label {
+	display: grid;
+	font-size: var(--wp--preset--font-size--small);
+	font-weight: 700;
+	gap: 0.3rem;
+}
+
+.longevity-search-form :where(input, select) {
+	background: var(--wp--preset--color--paper);
+	border: 1px solid var(--wp--preset--color--border-strong);
+	border-radius: var(--wp--custom--radius--small);
+	padding: 0.55rem 0.7rem;
+}
+
+.longevity-result-count {
+	color: var(--wp--preset--color--muted);
+}
+
+.wp-block-query-pagination {
+	margin-block-start: var(--wp--preset--spacing--50);
+}
+
+.wp-block-query-pagination a,
+.wp-block-query-pagination .page-numbers {
+	align-items: center;
+	display: inline-flex;
+	min-height: 2.75rem;
+	padding: 0.4rem 0.65rem;
+}
+
+/* 11. Forms */
+:where(.wp-block-search, .wp-block-post-comments-form) input,
+:where(.wp-block-search, .wp-block-post-comments-form) textarea {
+	border: 1px solid var(--wp--preset--color--border-strong);
+	border-radius: var(--wp--custom--radius--small);
+	padding: 0.65rem 0.8rem;
+}
+
+/* 12. Tables */
+.wp-block-table,
+.longevity-table-wrap {
 	overflow-x: auto;
 }
 
@@ -238,55 +564,100 @@ table {
 th,
 td {
 	border: 1px solid var(--wp--preset--color--border);
-	padding: 0.65rem;
+	padding: 0.7rem;
 	text-align: start;
 	vertical-align: top;
 }
 
 th {
-	background: var(--wp--preset--color--soft);
+	background: var(--wp--preset--color--surface-subtle);
 }
 
-/* Footer */
+/* 13. Author and policy pages */
+.longevity-author-profile {
+	background: var(--wp--preset--color--surface);
+	border-block: 1px solid var(--wp--preset--color--border);
+	padding-block: var(--wp--preset--spacing--50);
+}
+
+.longevity-author-profile .wp-block-avatar img {
+	border-radius: 50%;
+}
+
+/* 14. Footer */
 .longevity-site-footer {
 	background: var(--wp--preset--color--ink);
 	color: var(--wp--preset--color--paper);
+	padding-block: clamp(3rem, 6vw, 5rem);
 }
 
 .longevity-site-footer a {
 	color: inherit;
 }
 
+.longevity-site-footer h2,
+.longevity-site-footer h3 {
+	color: inherit;
+}
+
+.longevity-site-footer h3 {
+	font-family: var(--wp--preset--font-family--system);
+	font-size: 0.95rem;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+}
+
+.longevity-site-footer ul,
 .longevity-policy-nav ul {
-	display: flex;
-	flex-wrap: wrap;
-	gap: 0.55rem 1rem;
+	display: grid;
+	gap: 0.45rem;
 	list-style: none;
 	margin: 0;
 	padding: 0;
+}
+
+.longevity-site-footer .wp-block-site-title {
+	font-family: var(--wp--preset--font-family--serif);
 }
 
 .longevity-small {
 	font-size: var(--wp--preset--font-size--small);
 }
 
-/* Editor helper styles */
-.lel-editorial-grid {
-	column-gap: 2rem;
+/* 15. Responsive behavior */
+@media (width <= 1000px) {
+	.longevity-card-grid,
+	.longevity-topic-grid,
+	.longevity-trust-grid {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+
+	.longevity-footer-grid {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+
+	.longevity-footer-grid > :first-child {
+		grid-column: 1 / -1;
+	}
+
+	.longevity-search-form {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
 }
 
-.lel-gate-blocking {
-	color: var(--wp--preset--color--danger);
-}
-
-.lel-gate-warning {
-	color: var(--wp--preset--color--warning-text);
-}
-
-/* Responsive behavior */
 @media (width <= 700px) {
+	.longevity-card-grid,
+	.longevity-topic-grid,
+	.longevity-trust-grid,
+	.longevity-footer-grid,
+	.longevity-review-decision-grid,
+	.longevity-search-form,
 	.longevity-test-method dl > div {
 		grid-template-columns: 1fr;
+	}
+
+	.longevity-footer-grid > :first-child {
+		grid-column: auto;
 	}
 
 	.wp-block-query .wp-block-post-template.is-layout-grid {
@@ -296,8 +667,23 @@ th {
 	.longevity-article-meta > [aria-hidden="true"] {
 		display: none;
 	}
+
+	.longevity-hero {
+		padding-block: 3.5rem;
+	}
 }
 
+@media (width <= 420px) {
+	.longevity-site-header .wp-block-search {
+		width: 100%;
+	}
+
+	.longevity-site-header .wp-block-search__inside-wrapper {
+		min-width: 0;
+	}
+}
+
+/* 16. Reduced motion and forced colors */
 @media (prefers-reduced-motion: reduce) {
 	html {
 		scroll-behavior: auto;
@@ -313,11 +699,22 @@ th {
 	}
 }
 
+@media (forced-colors: active) {
+	.longevity-badge,
+	.longevity-card,
+	.longevity-trust-summary,
+	.longevity-disclosure {
+		border: 1px solid CanvasText;
+	}
+}
+
+/* 17. Print */
 @media print {
 	.longevity-site-header,
 	.longevity-site-footer,
 	.longevity-affiliate-cta,
-	.wp-block-post-navigation-link {
+	.wp-block-post-navigation-link,
+	.longevity-toc {
 		display: none !important;
 	}
 
@@ -330,5 +727,12 @@ th {
 	a::after {
 		content: " (" attr(href) ")";
 		font-size: 0.8em;
+	}
+
+	.longevity-trust-summary,
+	.longevity-source-list,
+	.longevity-medical-disclaimer,
+	.longevity-disclosure {
+		break-inside: avoid;
 	}
 }
