@@ -20,6 +20,12 @@ $longevity_core_files = array(
 	'class-corrections.php',
 	'class-publication-gates.php',
 	'class-review-workflow.php',
+	'class-migrations.php',
+	'class-freshness.php',
+	'class-content-discovery.php',
+	'class-public-components.php',
+	'class-blocks.php',
+	'class-admin-assets.php',
 	'class-admin-ui.php',
 	'class-shortcodes.php',
 	'class-schema.php',
@@ -62,6 +68,12 @@ final class Bootstrap {
 		Corrections::init();
 		Publication_Gates::init();
 		Review_Workflow::init();
+		Migrations::init();
+		Freshness::init();
+		Content_Discovery::init();
+		Public_Components::init();
+		Blocks::init();
+		Admin_Assets::init();
 		Admin_UI::init();
 		Shortcodes::init();
 		Schema::init();

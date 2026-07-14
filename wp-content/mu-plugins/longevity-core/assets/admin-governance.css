@@ -1,0 +1,102 @@
+.lel-editorial-grid {
+	display: grid;
+	gap: 0.75rem;
+}
+
+.lel-governance-section {
+	background: #fff;
+	border: 1px solid #c3c4c7;
+	border-radius: 4px;
+}
+
+.lel-governance-section > summary {
+	cursor: pointer;
+	display: grid;
+	gap: 0.2rem;
+	min-height: 44px;
+	padding: 0.85rem 1rem;
+}
+
+.lel-governance-section > summary span {
+	color: #50575e;
+	font-size: 12px;
+}
+
+.lel-governance-fields {
+	border-top: 1px solid #dcdcde;
+	padding: 0.5rem 1rem 1rem;
+}
+
+.lel-governance-fields > p {
+	max-width: 900px;
+}
+
+.lel-readiness-summary {
+	background: #f6f7f7;
+	border-inline-start: 4px solid #2271b1;
+	padding: 0.25rem 0.75rem;
+}
+
+.lel-gate-blocking {
+	color: #8c1d18;
+}
+
+.lel-gate-warning {
+	color: #704800;
+}
+
+.lel-gate-passed {
+	color: #17633d;
+}
+
+.lel-readiness-link {
+	white-space: nowrap;
+}
+
+.lel-score-editor {
+	border: 1px solid #c3c4c7;
+	margin-block: 1rem;
+	padding: 1rem;
+}
+
+.lel-score-table-wrap {
+	overflow-x: auto;
+}
+
+.lel-score-editor table {
+	border-collapse: collapse;
+	min-width: 620px;
+	width: 100%;
+}
+
+.lel-score-editor :where(th, td) {
+	border-bottom: 1px solid #dcdcde;
+	padding: 0.5rem;
+	text-align: start;
+}
+
+.lel-score-editor input {
+	max-width: 100%;
+	width: 100%;
+}
+
+.lel-score-totals {
+	background: #f6f7f7;
+	padding: 0.75rem;
+}
+
+.lel-score-totals.is-invalid {
+	border-inline-start: 4px solid #d63638;
+}
+
+.lel-score-json {
+	max-height: 18rem;
+	overflow: auto;
+	white-space: pre-wrap;
+}
+
+@media (max-width: 782px) {
+	.lel-governance-fields {
+		padding-inline: 0.75rem;
+	}
+}

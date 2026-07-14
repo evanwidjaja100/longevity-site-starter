@@ -25,8 +25,24 @@ final class Analytics {
 		$config = array(
 			'contentId'    => is_singular() ? (string) get_queried_object_id() : '',
 			'contentGroup' => is_singular() ? sanitize_key( (string) get_post_type() ) : 'archive',
-			'allowedEvents'=> array( 'newsletter_signup', 'affiliate_click', 'outbound_citation_click', 'lead_magnet_download', 'review_method_open', 'evidence_summary_open', 'correction_submit', 'comparison_filter_use', 'methodology_download', 'test_data_download' ),
+			'eventSchemas' => self::event_schemas(),
 		);
 		wp_add_inline_script( 'longevity-analytics', 'window.longevityAnalyticsConfig=' . wp_json_encode( $config ) . ';', 'before' );
+	}
+
+	/** Return the only public parameters accepted for each event. */
+	public static function event_schemas(): array {
+		return array(
+			'newsletter_signup'       => array( 'placement', 'content_group' ),
+			'affiliate_click'          => array( 'merchant', 'content_id', 'placement' ),
+			'outbound_citation_click' => array( 'destination_domain', 'content_id' ),
+			'lead_magnet_download'     => array( 'asset_id', 'placement' ),
+			'review_method_open'       => array( 'content_id', 'product_category' ),
+			'evidence_summary_open'    => array( 'content_id' ),
+			'correction_submit'        => array( 'content_id' ),
+			'comparison_filter_use'    => array( 'content_id', 'product_category' ),
+			'methodology_download'     => array( 'content_id', 'placement' ),
+			'test_data_download'       => array( 'content_id', 'placement' ),
+		);
 	}
 }

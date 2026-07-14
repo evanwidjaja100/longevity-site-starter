@@ -13,7 +13,44 @@ defined( 'ABSPATH' ) || exit;
 final class Schema {
 	/** Register hooks. */
 	public static function init(): void {
+		add_action( 'wp_head', array( self::class, 'output_social_meta' ), 5 );
 		add_action( 'wp_head', array( self::class, 'output' ), 30 );
+	}
+
+	/** Output conservative social metadata when no supported SEO provider owns it. */
+	public static function output_social_meta(): void {
+		if ( self::seo_provider_owns_schema() ) {
+			return;
+		}
+		$post_id     = is_singular() ? get_queried_object_id() : 0;
+		$title       = $post_id ? get_the_title( $post_id ) : wp_get_document_title();
+		$url         = $post_id ? get_permalink( $post_id ) : home_url( '/' );
+		$description = $post_id ? trim( (string) get_the_excerpt( $post_id ) ) : '';
+		if ( '' === $description && $post_id ) {
+			$description = trim( (string) get_post_meta( $post_id, 'content_summary', true ) );
+		}
+		if ( '' === $description ) {
+			$description = (string) get_bloginfo( 'description' );
+		}
+		$type  = is_singular( array( 'post', 'review' ) ) ? 'article' : 'website';
+		$image = $post_id ? wp_get_attachment_image_url( get_post_thumbnail_id( $post_id ), 'full' ) : '';
+		$tags  = array(
+			array( 'property' => 'og:title', 'content' => $title ),
+			array( 'property' => 'og:description', 'content' => $description ),
+			array( 'property' => 'og:url', 'content' => $url ),
+			array( 'property' => 'og:type', 'content' => $type ),
+			array( 'name' => 'twitter:card', 'content' => $image ? 'summary_large_image' : 'summary' ),
+			array( 'name' => 'twitter:title', 'content' => $title ),
+			array( 'name' => 'twitter:description', 'content' => $description ),
+		);
+		if ( $image ) {
+			$tags[] = array( 'property' => 'og:image', 'content' => $image );
+			$tags[] = array( 'name' => 'twitter:image', 'content' => $image );
+		}
+		foreach ( $tags as $tag ) {
+			$attribute = isset( $tag['property'] ) ? 'property="' . esc_attr( $tag['property'] ) . '"' : 'name="' . esc_attr( $tag['name'] ) . '"';
+			echo '<meta ' . $attribute . ' content="' . esc_attr( wp_strip_all_tags( (string) $tag['content'] ) ) . '">' . "\n";
+		}
 	}
 
 	/** Output the JSON-LD graph. */
@@ -152,8 +189,24 @@ final class Schema {
 		$model      = trim( (string) get_post_meta( $post_id, 'tested_product_model', true ) );
 		$score      = (float) get_post_meta( $post_id, 'review_score', true );
 		$version    = trim( (string) get_post_meta( $post_id, 'review_score_version', true ) );
+		$confidence = trim( (string) get_post_meta( $post_id, 'review_score_confidence', true ) );
 		$test_state = (string) get_post_meta( $post_id, 'testing_status', true );
-		if ( '' === $model || $score <= 0 || '' === $version || ! in_array( $test_state, array( 'complete', 'approved' ), true ) ) {
+		$record_id  = (int) get_post_meta( $post_id, 'test_record_id', true );
+		$dimensions = get_post_meta( $post_id, 'review_score_dimensions', true );
+		$disclosure = (string) get_post_meta( $post_id, 'affiliate_disclosure_status', true );
+		if ( 'publish' !== get_post_status( $post_id ) || '' === $model || $score <= 0 || '' === $version || '' === $confidence || ! in_array( $test_state, array( 'complete', 'approved' ), true ) || ! Review_Methodology::valid_test_record( $record_id, (string) get_post_meta( $post_id, 'testing_protocol_version', true ) ) ) {
+			return null;
+		}
+		if ( ! in_array( get_post_meta( $post_id, 'commercial_relationship', true ), array( '', 'none' ), true ) && ! in_array( $disclosure, array( 'approved', 'complete' ), true ) ) {
+			return null;
+		}
+		try {
+			$calculated = Review_Methodology::calculate_score( is_array( $dimensions ) ? $dimensions : array() );
+		} catch ( \InvalidArgumentException $exception ) {
+			return null;
+		}
+		$override = trim( (string) get_post_meta( $post_id, 'review_score_override_reason', true ) );
+		if ( abs( (float) $calculated['score'] - $score ) > 0.01 && '' === $override ) {
 			return null;
 		}
 		$product_id = $url . '#product';
@@ -191,7 +244,7 @@ final class Schema {
 		}
 		$name = get_the_author_meta( 'display_name', $user_id );
 		$credentials = get_user_meta( $user_id, 'professional_credentials', true );
-		if ( '' === trim( (string) $name ) || '' === trim( (string) $credentials ) ) {
+		if ( 'verified' !== get_user_meta( $user_id, 'credential_verification_status', true ) || '' === trim( (string) $name ) || '' === trim( (string) $credentials ) ) {
 			return null;
 		}
 		return array(
@@ -210,14 +263,11 @@ final class Schema {
 
 	/** Build breadcrumbs from visible navigation facts. */
 	private static function breadcrumb_schema( int $post_id, string $id ): array {
-		$items = array(
-			array( '@type' => 'ListItem', 'position' => 1, 'name' => get_bloginfo( 'name' ), 'item' => home_url( '/' ) ),
-		);
-		$categories = get_the_category( $post_id );
-		if ( $categories ) {
-			$items[] = array( '@type' => 'ListItem', 'position' => 2, 'name' => $categories[0]->name, 'item' => get_category_link( $categories[0] ) );
+		$visible = Public_Components::breadcrumb_items( $post_id );
+		$items   = array();
+		foreach ( $visible as $index => $item ) {
+			$items[] = array( '@type' => 'ListItem', 'position' => $index + 1, 'name' => $item['name'], 'item' => $item['url'] ?: get_permalink( $post_id ) );
 		}
-		$items[] = array( '@type' => 'ListItem', 'position' => count( $items ) + 1, 'name' => get_the_title( $post_id ), 'item' => get_permalink( $post_id ) );
 		return array( '@type' => 'BreadcrumbList', '@id' => $id, 'itemListElement' => $items );
 	}
 

@@ -37,9 +37,10 @@ final class Admin_UI {
 	/** Render readiness summary. */
 	public static function render_readiness( \WP_Post $post ): void {
 		$result = Publication_Gates::evaluate( $post->ID );
-		printf( '<p><strong>%s%%</strong> %s</p>', esc_html( (string) $result->completion_percentage() ), esc_html__( 'complete across applicable checks', 'longevity-core' ) );
+		printf( '<div class="lel-readiness-summary" role="status"><p><strong>%s%%</strong> %s</p><p>%s &middot; %s &middot; %s</p></div>', esc_html( (string) $result->completion_percentage() ), esc_html__( 'complete across applicable checks', 'longevity-core' ), esc_html( sprintf( _n( '%d blocker', '%d blockers', count( $result->blocking() ), 'longevity-core' ), count( $result->blocking() ) ) ), esc_html( sprintf( _n( '%d warning', '%d warnings', count( $result->warnings() ), 'longevity-core' ), count( $result->warnings() ) ) ), esc_html( sprintf( _n( '%d passed check', '%d passed checks', count( $result->passed() ), 'longevity-core' ), count( $result->passed() ) ) ) );
 		self::render_result_group( __( 'Blocking', 'longevity-core' ), $result->blocking(), 'lel-gate-blocking' );
 		self::render_result_group( __( 'Warnings', 'longevity-core' ), $result->warnings(), 'lel-gate-warning' );
+		self::render_result_group( __( 'Passed', 'longevity-core' ), $result->passed(), 'lel-gate-passed' );
 		if ( ! $result->is_blocked() ) {
 			echo '<p class="lel-gate-passed"><strong>' . esc_html__( 'No blocking failures.', 'longevity-core' ) . '</strong></p>';
 		}
@@ -54,6 +55,7 @@ final class Admin_UI {
 	public static function render_governance( \WP_Post $post ): void {
 		wp_nonce_field( 'longevity_save_editorial', 'longevity_editorial_nonce' );
 		echo '<div class="lel-editorial-grid">';
+		echo '<details class="lel-governance-section" open><summary><strong>' . esc_html__( 'Publication overview', 'longevity-core' ) . '</strong><span>' . esc_html__( 'Scope, limitations, ownership, and lifecycle', 'longevity-core' ) . '</span></summary><div class="lel-governance-fields">';
 		self::textarea( $post->ID, 'content_summary', __( 'Direct answer / summary', 'longevity-core' ) );
 		self::textarea( $post->ID, 'content_scope', __( 'Scope', 'longevity-core' ) );
 		self::textarea( $post->ID, 'content_limitations', __( 'Limitations and uncertainty', 'longevity-core' ) );
@@ -63,15 +65,18 @@ final class Admin_UI {
 		self::select( $post->ID, 'editorial_approval_status', __( 'Editorial workflow state', 'longevity-core' ), array( 'idea' => 'Idea', 'assigned' => 'Assigned', 'researching' => 'Researching', 'drafting' => 'Drafting', 'editorial_review' => 'Editorial review', 'fact_check' => 'Fact-check', 'medical_review' => 'Medical review', 'testing_incomplete' => 'Testing incomplete', 'commercial_review' => 'Commercial review', 'ready' => 'Ready for publication', 'published' => 'Published', 'update_due' => 'Update due', 'correction_pending' => 'Correction pending', 'archived' => 'Archived' ) );
 		self::checkbox( $post->ID, 'uncertainty_statement_present', __( 'Explicit uncertainty statement is present', 'longevity-core' ) );
 
-		echo '<hr><h3>' . esc_html__( 'Evidence and fact-checking', 'longevity-core' ) . '</h3>';
+		echo '</div></details><details class="lel-governance-section" data-lel-section="evidence"><summary><strong>' . esc_html__( 'Evidence and claims', 'longevity-core' ) . '</strong><span>' . esc_html__( 'Evidence grade, linked claims, and fact-checking', 'longevity-core' ) . '</span></summary><div class="lel-governance-fields">';
 		self::checkbox( $post->ID, 'material_health_claims', __( 'Contains material health claims', 'longevity-core' ) );
 		self::select( $post->ID, 'evidence_grade', __( 'Evidence grade', 'longevity-core' ), array( '' => 'Not assigned', 'A' => 'A — Strong', 'B' => 'B — Moderate', 'C' => 'C — Limited', 'D' => 'D — Mechanistic/anecdotal', 'U' => 'U — Unclear' ) );
 		self::textarea( $post->ID, 'evidence_grade_rationale', __( 'Evidence-grade rationale', 'longevity-core' ) );
 		self::date( $post->ID, 'evidence_cutoff_date', __( 'Evidence cutoff date', 'longevity-core' ) );
 		self::select( $post->ID, 'fact_check_status', __( 'Fact-check status', 'longevity-core' ), array( 'not_started' => 'Not started', 'in_progress' => 'In progress', 'revisions_required' => 'Revisions required', 'complete' => 'Complete', 'not_required' => 'Not required' ) );
 		self::date( $post->ID, 'next_fact_check_date', __( 'Next fact-check date', 'longevity-core' ) );
+		if ( current_user_can( 'manage_claims' ) ) {
+			echo '<p class="description"><a href="' . esc_url( admin_url( 'edit.php?post_type=lel_claim' ) ) . '">' . esc_html__( 'Manage linked claims', 'longevity-core' ) . '</a> &middot; <a href="' . esc_url( admin_url( 'edit.php?post_type=lel_source' ) ) . '">' . esc_html__( 'Manage source records', 'longevity-core' ) . '</a></p>';
+		}
 
-		echo '<hr><h3>' . esc_html__( 'Medical review', 'longevity-core' ) . '</h3>';
+		echo '</div></details><details class="lel-governance-section" data-lel-conditional="medical"><summary><strong>' . esc_html__( 'Medical review', 'longevity-core' ) . '</strong><span>' . esc_html__( 'Assignment, exact scope, dates, revisions, and attestation', 'longevity-core' ) . '</span></summary><div class="lel-governance-fields">';
 		self::checkbox( $post->ID, 'medical_review_required', __( 'Medical review is required', 'longevity-core' ) );
 		self::reviewer_select( $post->ID );
 		self::select( $post->ID, 'medical_review_status', __( 'Medical review status', 'longevity-core' ), array( 'not_required' => 'Not required', 'not_started' => 'Not started', 'assigned' => 'Assigned', 'in_review' => 'In review', 'revisions_required' => 'Revisions required', 'complete' => 'Complete' ) );
@@ -86,7 +91,7 @@ final class Admin_UI {
 		self::text( $post->ID, 'medical_review_version', __( 'Reviewed content version', 'longevity-core' ) );
 		self::attestation( $post->ID );
 
-		echo '<hr><h3>' . esc_html__( 'Testing and commercial disclosure', 'longevity-core' ) . '</h3>';
+		echo '</div></details><details class="lel-governance-section" data-lel-conditional="testing"><summary><strong>' . esc_html__( 'Testing', 'longevity-core' ) . '</strong><span>' . esc_html__( 'Protocol, approved record, dates, acquisition, and limitations', 'longevity-core' ) . '</span></summary><div class="lel-governance-fields">';
 		self::checkbox( $post->ID, 'testing_required', __( 'Hands-on testing is required', 'longevity-core' ) );
 		self::select( $post->ID, 'testing_status', __( 'Testing status', 'longevity-core' ), array( 'not_required' => 'Not required', 'planned' => 'Planned', 'in_progress' => 'In progress', 'incomplete' => 'Incomplete', 'complete' => 'Complete', 'approved' => 'Approved' ) );
 		self::date( $post->ID, 'testing_start_date', __( 'Testing start date', 'longevity-core' ) );
@@ -94,20 +99,21 @@ final class Admin_UI {
 		self::text( $post->ID, 'testing_duration', __( 'Testing duration', 'longevity-core' ) );
 		self::text( $post->ID, 'testing_protocol_version', __( 'Protocol version', 'longevity-core' ) );
 		self::url( $post->ID, 'testing_methodology_url', __( 'Public methodology URL', 'longevity-core' ) );
-		self::number( $post->ID, 'test_record_id', __( 'Approved test record ID', 'longevity-core' ), 1, 0 );
+		self::test_record_select( $post->ID );
 		self::select( $post->ID, 'product_acquisition_method', __( 'Product acquisition', 'longevity-core' ), array( '' => 'Select', 'purchased' => 'Purchased', 'product_supplied' => 'Product supplied', 'loaned' => 'Loaned', 'service_access' => 'Service access', 'independently_verified_only' => 'Independently verified specifications only' ) );
+		echo '</div></details><details class="lel-governance-section" data-lel-conditional="commercial"><summary><strong>' . esc_html__( 'Commercial disclosure', 'longevity-core' ) . '</strong><span>' . esc_html__( 'Relationship, disclosure approval, and destination registry', 'longevity-core' ) . '</span></summary><div class="lel-governance-fields">';
 		self::select( $post->ID, 'commercial_relationship', __( 'Commercial relationship', 'longevity-core' ), array( 'none' => 'None', 'affiliate' => 'Affiliate', 'product_supplied' => 'Product supplied', 'sponsored' => 'Sponsored' ) );
 		self::select( $post->ID, 'affiliate_disclosure_status', __( 'Affiliate disclosure status', 'longevity-core' ), array( 'not_required' => 'Not required', 'required' => 'Required', 'draft' => 'Draft', 'approved' => 'Approved', 'complete' => 'Complete' ) );
 		self::checkbox( $post->ID, 'affiliate_registry_verified', __( 'Affiliate destinations verified in registry', 'longevity-core' ) );
 
 		if ( 'review' === $post->post_type ) {
-			echo '<hr><h3>' . esc_html__( 'Review details', 'longevity-core' ) . '</h3>';
+			echo '</div></details><details class="lel-governance-section" data-lel-section="review-score"><summary><strong>' . esc_html__( 'Review scoring and decision', 'longevity-core' ) . '</strong><span>' . esc_html__( 'Product identity, fit, failures, dimensions, and confidence', 'longevity-core' ) . '</span></summary><div class="lel-governance-fields">';
 			self::text( $post->ID, 'tested_product_model', __( 'Tested product model', 'longevity-core' ) );
 			self::text( $post->ID, 'tested_firmware_version', __( 'Firmware version', 'longevity-core' ) );
 			self::text( $post->ID, 'tested_app_version', __( 'App version', 'longevity-core' ) );
 			self::textarea( $post->ID, 'comparison_set', __( 'Comparison set', 'longevity-core' ) );
 			self::textarea( $post->ID, 'major_failures', __( 'Major failures', 'longevity-core' ) );
-			self::json_textarea( $post->ID, 'review_score_dimensions', __( 'Score dimensions JSON', 'longevity-core' ) );
+			self::score_dimensions_editor( $post->ID );
 			self::number( $post->ID, 'review_score', __( 'Calculated review score (0–5)', 'longevity-core' ), '0.1', 0, 5 );
 			self::text( $post->ID, 'review_score_version', __( 'Scoring model version', 'longevity-core' ) );
 			self::textarea( $post->ID, 'review_score_override_reason', __( 'Manual score override reason (only when calculated score differs)', 'longevity-core' ) );
@@ -118,7 +124,11 @@ final class Admin_UI {
 			self::text( $post->ID, 'price_region', __( 'Price region', 'longevity-core' ) );
 			self::date( $post->ID, 'warranty_checked_date', __( 'Warranty checked date', 'longevity-core' ) );
 		}
-		echo '</div>';
+		echo '</div></details><details class="lel-governance-section"><summary><strong>' . esc_html__( 'Lifecycle and corrections', 'longevity-core' ) . '</strong><span>' . esc_html__( 'Updates and protected correction records', 'longevity-core' ) . '</span></summary><div class="lel-governance-fields"><p>' . esc_html__( 'Material corrections are managed as append-oriented protected records and rendered publicly only after completion.', 'longevity-core' ) . '</p>';
+		if ( current_user_can( 'manage_corrections' ) ) {
+			echo '<p><a href="' . esc_url( admin_url( 'edit.php?post_type=lel_correction' ) ) . '">' . esc_html__( 'Manage correction records', 'longevity-core' ) . '</a></p>';
+		}
+		echo '</div></details></div>';
 	}
 
 	/** Save editor metadata without accepting unauthorized attestations. */
@@ -130,6 +140,16 @@ final class Admin_UI {
 		if ( empty( $_POST['longevity_editorial_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['longevity_editorial_nonce'] ) ), 'longevity_save_editorial' ) ) {
 			return;
 		}
+		if ( 'review' === $post->post_type && isset( $_POST['review_score_dimensions_rows'] ) && is_array( $_POST['review_score_dimensions_rows'] ) ) {
+			$dimensions = Review_Methodology::sanitize_dimensions( wp_unslash( $_POST['review_score_dimensions_rows'] ) );
+			update_post_meta( $post_id, 'review_score_dimensions', $dimensions );
+			try {
+				$calculated = Review_Methodology::calculate_score( $dimensions );
+				update_post_meta( $post_id, 'review_score', $calculated['score'] );
+			} catch ( \InvalidArgumentException $exception ) {
+				// Publication readiness remains blocked until weights total 100.
+			}
+		}
 
 		$allowed_fields = array_keys( Meta_Registry::definitions() );
 		$boolean_fields = array_filter(
@@ -138,6 +158,9 @@ final class Admin_UI {
 		);
 
 		foreach ( $allowed_fields as $key ) {
+			if ( isset( $_POST['review_score_dimensions_rows'] ) && in_array( $key, array( 'review_score_dimensions', 'review_score' ), true ) ) {
+				continue;
+			}
 			if ( ! in_array( $post->post_type, Meta_Registry::definitions()[ $key ]['post_types'], true ) ) {
 				continue;
 			}
@@ -281,9 +304,22 @@ final class Admin_UI {
 		$users = get_users( array( 'capability' => 'complete_medical_review', 'orderby' => 'display_name' ) );
 		echo '<p><label for="medical_reviewer_user_id"><strong>' . esc_html__( 'Medical reviewer', 'longevity-core' ) . '</strong></label><br><select class="widefat" id="medical_reviewer_user_id" name="medical_reviewer_user_id"><option value="0">' . esc_html__( 'Select reviewer', 'longevity-core' ) . '</option>';
 		foreach ( $users as $user ) {
-			echo '<option value="' . esc_attr( (string) $user->ID ) . '" ' . selected( $value, $user->ID, false ) . '>' . esc_html( $user->display_name ) . '</option>';
+			$status = (string) get_user_meta( $user->ID, 'credential_verification_status', true );
+			echo '<option value="' . esc_attr( (string) $user->ID ) . '" ' . selected( $value, $user->ID, false ) . '>' . esc_html( sprintf( '%1$s (ID %2$d; %3$s)', $user->display_name, $user->ID, $status ?: __( 'unverified', 'longevity-core' ) ) ) . '</option>';
 		}
-		echo '</select></p>';
+		echo '</select></p><p class="description">' . esc_html__( 'Only an assigned authenticated reviewer with verified public credentials can complete the attestation.', 'longevity-core' ) . '</p>';
+	}
+
+	/** Render approved test records with human-readable titles and stable IDs. */
+	private static function test_record_select( int $post_id ): void {
+		$value   = (int) get_post_meta( $post_id, 'test_record_id', true );
+		$records = get_posts( array( 'post_type' => 'lel_test_record', 'post_status' => 'any', 'posts_per_page' => 100, 'orderby' => array( 'title' => 'ASC', 'ID' => 'ASC' ) ) );
+		echo '<p><label for="test_record_id"><strong>' . esc_html__( 'Test record', 'longevity-core' ) . '</strong></label><br><select class="widefat" id="test_record_id" name="test_record_id"><option value="0">' . esc_html__( 'Select an approved record', 'longevity-core' ) . '</option>';
+		foreach ( $records as $record ) {
+			$status = (string) get_post_meta( $record->ID, 'approval_status', true );
+			echo '<option value="' . esc_attr( (string) $record->ID ) . '" ' . selected( $value, $record->ID, false ) . '>' . esc_html( sprintf( '%1$s (ID %2$d; %3$s)', get_the_title( $record ), $record->ID, $status ?: __( 'not approved', 'longevity-core' ) ) ) . '</option>';
+		}
+		echo '</select></p><p class="description">' . esc_html__( 'Publication requires an approved record whose protocol version matches this review.', 'longevity-core' ) . '</p>';
 	}
 
 	/** Render result list. */
@@ -293,14 +329,54 @@ final class Admin_UI {
 		}
 		echo '<div class="' . esc_attr( $class ) . '"><strong>' . esc_html( $title ) . '</strong><ul>';
 		foreach ( $items as $item ) {
-			echo '<li>' . esc_html( $item['message'] ) . '</li>';
+			$field = self::readiness_field( (string) ( $item['code'] ?? '' ) );
+			echo '<li>' . esc_html( $item['message'] );
+			if ( $field ) {
+				echo ' <a href="#' . esc_attr( $field ) . '" class="lel-readiness-link">' . esc_html__( 'Go to field', 'longevity-core' ) . '</a>';
+			}
+			echo '</li>';
 		}
 		echo '</ul></div>';
 	}
 
+	/** Map gate codes to the nearest actionable field. */
+	private static function readiness_field( string $code ): string {
+		$map = array(
+			'missing_summary'                 => 'content_summary',
+			'missing_limitations'             => 'content_limitations',
+			'claims_unverified'                => 'material_health_claims',
+			'fact_check_incomplete'            => 'fact_check_status',
+			'medical_review_incomplete'        => 'medical_review_status',
+			'test_record_invalid'              => 'test_record_id',
+			'score_not_reproducible'           => 'review_score_dimensions',
+			'commercial_disclosure_incomplete' => 'affiliate_disclosure_status',
+			'missing_review_date'              => 'next_content_review_date',
+		);
+		return $map[ $code ] ?? '';
+	}
+
+	/** Render an accessible repeatable dimension editor backed by the existing meta shape. */
+	private static function score_dimensions_editor( int $post_id ): void {
+		$dimensions = get_post_meta( $post_id, 'review_score_dimensions', true );
+		$dimensions = is_array( $dimensions ) && $dimensions ? $dimensions : array( array( 'name' => '', 'score' => '', 'weight' => '' ) );
+		echo '<fieldset id="review_score_dimensions" class="lel-score-editor"><legend><strong>' . esc_html__( 'Score dimensions', 'longevity-core' ) . '</strong></legend><p class="description">' . esc_html__( 'Weights must total 100%. The calculated score is saved server-side; confidence remains a separate editorial judgment.', 'longevity-core' ) . '</p><div class="lel-score-table-wrap"><table><thead><tr><th scope="col">' . esc_html__( 'Dimension', 'longevity-core' ) . '</th><th scope="col">' . esc_html__( 'Score (0–5)', 'longevity-core' ) . '</th><th scope="col">' . esc_html__( 'Weight %', 'longevity-core' ) . '</th><th scope="col">' . esc_html__( 'Action', 'longevity-core' ) . '</th></tr></thead><tbody data-lel-score-rows>';
+		foreach ( $dimensions as $index => $dimension ) {
+			self::score_dimension_row( (int) $index, is_array( $dimension ) ? $dimension : array() );
+		}
+		echo '</tbody></table></div><p><button type="button" class="button" data-lel-add-dimension>' . esc_html__( 'Add dimension', 'longevity-core' ) . '</button></p><p class="lel-score-totals" aria-live="polite"><strong>' . esc_html__( 'Weight total:', 'longevity-core' ) . '</strong> <span data-lel-weight-total>0</span>% &middot; <strong>' . esc_html__( 'Calculated score:', 'longevity-core' ) . '</strong> <span data-lel-calculated-score>0.00</span>/5</p><details><summary>' . esc_html__( 'Raw JSON debug view', 'longevity-core' ) . '</summary><pre class="lel-score-json">' . esc_html( wp_json_encode( Review_Methodology::sanitize_dimensions( $dimensions ), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) ) . '</pre></details></fieldset>';
+	}
+
+	/** Render one dimension row. */
+	private static function score_dimension_row( int $index, array $dimension ): void {
+		$name   = (string) ( $dimension['name'] ?? '' );
+		$score  = (string) ( $dimension['score'] ?? '' );
+		$weight = (string) ( $dimension['weight'] ?? '' );
+		echo '<tr data-lel-score-row><td><label class="screen-reader-text" for="lel-dimension-name-' . esc_attr( (string) $index ) . '">' . esc_html__( 'Dimension name', 'longevity-core' ) . '</label><input id="lel-dimension-name-' . esc_attr( (string) $index ) . '" type="text" name="review_score_dimensions_rows[' . esc_attr( (string) $index ) . '][name]" value="' . esc_attr( $name ) . '"></td><td><label class="screen-reader-text" for="lel-dimension-score-' . esc_attr( (string) $index ) . '">' . esc_html__( 'Dimension score', 'longevity-core' ) . '</label><input id="lel-dimension-score-' . esc_attr( (string) $index ) . '" type="number" min="0" max="5" step="0.1" name="review_score_dimensions_rows[' . esc_attr( (string) $index ) . '][score]" value="' . esc_attr( $score ) . '"></td><td><label class="screen-reader-text" for="lel-dimension-weight-' . esc_attr( (string) $index ) . '">' . esc_html__( 'Dimension weight', 'longevity-core' ) . '</label><input id="lel-dimension-weight-' . esc_attr( (string) $index ) . '" type="number" min="0" max="100" step="0.1" name="review_score_dimensions_rows[' . esc_attr( (string) $index ) . '][weight]" value="' . esc_attr( $weight ) . '"></td><td><button type="button" class="button-link-delete" data-lel-remove-dimension>' . esc_html__( 'Remove', 'longevity-core' ) . '</button></td></tr>';
+	}
+
 	private static function textarea( int $post_id, string $key, string $label ): void {
 		$value = get_post_meta( $post_id, $key, true );
-		echo '<p><label for="' . esc_attr( $key ) . '"><strong>' . esc_html( $label ) . '</strong></label><br><textarea class="widefat" rows="3" id="' . esc_attr( $key ) . '" name="' . esc_attr( $key ) . '">' . esc_textarea( (string) $value ) . '</textarea></p>';
+		echo '<p><label for="' . esc_attr( $key ) . '"><strong>' . esc_html( $label ) . '</strong></label><br><textarea class="widefat" rows="3" id="' . esc_attr( $key ) . '" name="' . esc_attr( $key ) . '" aria-describedby="' . esc_attr( $key ) . '-help">' . esc_textarea( (string) $value ) . '</textarea>' . self::field_help( $key ) . '</p>';
 	}
 
 	private static function json_textarea( int $post_id, string $key, string $label ): void {
@@ -335,7 +411,7 @@ final class Admin_UI {
 
 	private static function input( int $post_id, string $key, string $label, string $type ): void {
 		$value = get_post_meta( $post_id, $key, true );
-		echo '<p><label for="' . esc_attr( $key ) . '"><strong>' . esc_html( $label ) . '</strong></label><br><input class="widefat" type="' . esc_attr( $type ) . '" id="' . esc_attr( $key ) . '" name="' . esc_attr( $key ) . '" value="' . esc_attr( (string) $value ) . '"></p>';
+		echo '<p><label for="' . esc_attr( $key ) . '"><strong>' . esc_html( $label ) . '</strong></label><br><input class="widefat" type="' . esc_attr( $type ) . '" id="' . esc_attr( $key ) . '" name="' . esc_attr( $key ) . '" value="' . esc_attr( (string) $value ) . '" aria-describedby="' . esc_attr( $key ) . '-help">' . self::field_help( $key ) . '</p>';
 	}
 
 	private static function checkbox( int $post_id, string $key, string $label ): void {
@@ -345,11 +421,18 @@ final class Admin_UI {
 
 	private static function select( int $post_id, string $key, string $label, array $options ): void {
 		$value = (string) get_post_meta( $post_id, $key, true );
-		echo '<p><label for="' . esc_attr( $key ) . '"><strong>' . esc_html( $label ) . '</strong></label><br><select class="widefat" id="' . esc_attr( $key ) . '" name="' . esc_attr( $key ) . '">';
+		echo '<p><label for="' . esc_attr( $key ) . '"><strong>' . esc_html( $label ) . '</strong></label><br><select class="widefat" id="' . esc_attr( $key ) . '" name="' . esc_attr( $key ) . '" aria-describedby="' . esc_attr( $key ) . '-help">';
 		foreach ( $options as $option => $option_label ) {
 			echo '<option value="' . esc_attr( $option ) . '" ' . selected( $value, $option, false ) . '>' . esc_html( $option_label ) . '</option>';
 		}
-		echo '</select></p>';
+		echo '</select>' . self::field_help( $key ) . '</p>';
+	}
+
+	/** Render registered field help without duplicating governance definitions. */
+	private static function field_help( string $key ): string {
+		$definitions = Meta_Registry::definitions();
+		$description = (string) ( $definitions[ $key ]['description'] ?? '' );
+		return $description ? '<span class="description" id="' . esc_attr( $key ) . '-help">' . esc_html( $description ) . '</span>' : '';
 	}
 
 	/** Reviewer profile field labels. */

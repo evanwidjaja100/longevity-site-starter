@@ -1,0 +1,19 @@
+{
+  "$schema": "https://schemas.wp.org/trunk/block.json",
+  "apiVersion": 3,
+  "name": "longevity/article-meta",
+  "version": "1.0.0",
+  "title": "Article metadata",
+  "description": "Approved article authorship and review dates",
+  "category": "theme",
+  "icon": "shield-alt",
+  "textdomain": "longevity-core",
+  "usesContext": [
+    "postId",
+    "postType"
+  ],
+  "supports": {
+    "html": false
+  },
+  "editorScript": "longevity-core-blocks"
+}

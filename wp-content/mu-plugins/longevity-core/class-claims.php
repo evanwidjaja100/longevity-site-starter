@@ -110,6 +110,55 @@ final class Claims {
 		return array_values( array_unique( $citations ) );
 	}
 
+	/**
+	 * Get safe bibliographic fields for verified claims linked to an article.
+	 *
+	 * Private notes, conflicts, email addresses, and source bodies are never returned.
+	 */
+	public static function public_sources_for_post( int $post_id, int $limit = 50 ): array {
+		if ( $post_id <= 0 ) {
+			return array();
+		}
+		$claims = get_posts(
+			array(
+				'post_type'              => 'lel_claim',
+				'post_status'            => 'any',
+				'posts_per_page'         => min( 100, max( 1, $limit ) ),
+				'orderby'                => array( 'ID' => 'ASC' ),
+				'no_found_rows'          => true,
+				'update_post_term_cache' => false,
+				'meta_query'             => array(
+					array( 'key' => 'post_id', 'value' => $post_id, 'compare' => '=', 'type' => 'NUMERIC' ),
+					array( 'key' => 'verification_status', 'value' => 'verified' ),
+				),
+			)
+		);
+		$sources = array();
+		$seen    = array();
+		foreach ( $claims as $claim ) {
+			$title      = trim( (string) get_post_meta( $claim->ID, 'source_title', true ) );
+			$url        = esc_url_raw( (string) get_post_meta( $claim->ID, 'source_url', true ) );
+			$identifier = trim( (string) get_post_meta( $claim->ID, 'source_identifier', true ) );
+			if ( '' === $title || ( '' === $url && '' === $identifier ) ) {
+				continue;
+			}
+			$key = strtolower( $url ?: $identifier );
+			if ( isset( $seen[ $key ] ) ) {
+				continue;
+			}
+			$seen[ $key ] = true;
+			$sources[]    = array(
+				'title'      => $title,
+				'authors'    => trim( (string) get_post_meta( $claim->ID, 'source_authors', true ) ),
+				'publisher'  => trim( (string) get_post_meta( $claim->ID, 'source_type', true ) ),
+				'date'       => trim( (string) get_post_meta( $claim->ID, 'publication_date', true ) ),
+				'url'        => $url,
+				'identifier' => $identifier,
+			);
+		}
+		return $sources;
+	}
+
 	/** Sanitize claim metadata. */
 	private static function sanitize_claim_field( string $field, $value ): string {
 		$value = (string) $value;

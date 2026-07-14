@@ -1,0 +1,19 @@
+{
+  "$schema": "https://schemas.wp.org/trunk/block.json",
+  "apiVersion": 3,
+  "name": "longevity/table-of-contents",
+  "version": "1.0.0",
+  "title": "Table of contents",
+  "description": "Server-rendered article navigation",
+  "category": "theme",
+  "icon": "shield-alt",
+  "textdomain": "longevity-core",
+  "usesContext": [
+    "postId",
+    "postType"
+  ],
+  "supports": {
+    "html": false
+  },
+  "editorScript": "longevity-core-blocks"
+}

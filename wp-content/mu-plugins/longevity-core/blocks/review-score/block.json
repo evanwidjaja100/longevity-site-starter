@@ -1,0 +1,19 @@
+{
+  "$schema": "https://schemas.wp.org/trunk/block.json",
+  "apiVersion": 3,
+  "name": "longevity/review-score",
+  "version": "1.0.0",
+  "title": "Review score",
+  "description": "Reproducible score dimensions and confidence",
+  "category": "theme",
+  "icon": "shield-alt",
+  "textdomain": "longevity-core",
+  "usesContext": [
+    "postId",
+    "postType"
+  ],
+  "supports": {
+    "html": false
+  },
+  "editorScript": "longevity-core-blocks"
+}
