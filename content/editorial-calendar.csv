@@ -1,0 +1,61 @@
+order,publish_date,cluster,intent,title,target_keyword,target_length,template,medical_review,hands_on_testing,primary_internal_link_order,status,notes
+1,2026-07-21,Guides,Informational,What Is Biohacking? An Evidence-Aware Beginner’s Guide,what is biohacking,1800,Pillar guide,Yes,No,—,Brief queued,Define scope; avoid promising lifespan extension.
+2,2026-07-23,Supplements,Informational,"NAD+ Precursors Explained: NMN, NR, Evidence, and Uncertainty",NAD supplements,2200,Evidence guide,Yes,No,1,Brief queued,Regulatory and evidence status must be verified at publication.
+3,2026-07-28,Wearables,Review,"Oura Ring 4 Review: Sleep Trends, Recovery Signals, and Limitations",Oura Ring 4 review,2400,Hands-on review,Yes,Yes,1,Brief queued,"Verify current firmware, pricing, and membership terms."
+4,2026-07-30,Nutrition,Informational,Foods That Support Brain Health Across Adulthood,foods for brain health,1800,Evidence guide,Yes,No,1,Brief queued,Avoid brain-boosting outcome guarantees.
+5,2026-08-04,Supplements,Commercial,Nootropic Stacks: What the Evidence Supports—and What It Does Not,best nootropics,2600,Comparison guide,Yes,No,1,Brief queued,No prescriptive stacks or dosage plans.
+6,2026-08-06,Wearables,Review,"WHOOP Review: Recovery Coaching, Sleep Tracking, and Subscription Value",WHOOP review,2400,Hands-on review,Yes,Yes,3,Brief queued,Verify current hardware generation and plan terms.
+7,2026-08-11,Nutrition,Informational,"Intermittent Fasting and Healthy Aging: Benefits, Risks, and Who Should Avoid It",intermittent fasting longevity,2200,Evidence guide,Yes,No,1,Brief queued,Include contraindications and eating-disorder cautions.
+8,2026-08-13,Recovery,Commercial,Best Home Saunas: Infrared vs Traditional Models,best home sauna,2400,Tested comparison,Yes,Yes,1,Brief queued,Safety and electrical notes required.
+9,2026-08-18,Sleep,Informational,How to Improve Sleep Naturally Before Buying Another Device,improve sleep naturally,2200,Action guide,Yes,No,1,Brief queued,Prioritize guideline-consistent practices.
+10,2026-08-20,Wearables,Commercial,Best Fitness Trackers for Different Goals and Budgets,best fitness tracker,2500,Tested comparison,No,Yes,3,Brief queued,Current model verification required.
+11,2026-08-25,Wearables,Review,Apple Watch Sleep Tracking Review: Useful Trends and Blind Spots,Apple Watch sleep tracking review,2200,Hands-on review,No,Yes,3,Brief queued,Verify current watchOS and supported models.
+12,2026-08-27,Recovery,Informational,"Cold Plunge Benefits, Risks, and a Safer Setup",cold plunge benefits,2200,Safety guide,Yes,No,1,Brief queued,No unsupported immunity or fat-loss claims.
+13,2026-09-01,Recovery,Commercial,"Red Light Therapy Devices: How to Compare Wavelength, Dose, and Claims",red light therapy device,2600,Buyer guide,Yes,Yes,1,Brief queued,Require measurements or disclose no lab validation.
+14,2026-09-03,Guides,Informational,A Practical Morning Routine for Energy Without Wellness Theater,healthy morning routine,1700,Action guide,Yes,No,1,Brief queued,Avoid universal prescriptions.
+15,2026-09-08,Supplements,Commercial,"Healthy-Aging Supplements: Evidence, Safety, and Marketing Red Flags",anti-aging supplements,2800,Evidence comparison,Yes,No,2,Brief queued,Do not present anti-aging as a proven outcome.
+16,2026-09-10,Recovery,Informational,Science-Informed Stress Management Techniques,stress management techniques,1900,Action guide,Yes,No,1,Brief queued,Include escalation guidance for severe symptoms.
+17,2026-09-15,Wearables,Review,"Fitbit Charge Review: Value, Accuracy, and Upgrade Considerations",Fitbit Charge review,2200,Hands-on review,No,Yes,10,Brief queued,Verify current model and platform support.
+18,2026-09-17,Recovery,Commercial,Best Meditation Apps for Beginners: A Transparent Comparison,best meditation apps,2000,Tested comparison,No,Yes,16,Brief queued,Disclose test period and pricing date.
+19,2026-09-22,Nutrition,Informational,"Meal Planning for Healthy Aging: Protein, Fiber, and Practicality",healthy aging meal plan,2200,Action guide,Yes,No,4,Brief queued,No individualized calorie prescription.
+20,2026-09-24,Sleep,Commercial,"Blue-Light-Blocking Glasses: Evidence, Fit, and Buying Criteria",blue light blocking glasses,2200,Buyer guide,Yes,Yes,9,Brief queued,Distinguish light reduction from marketing.
+21,2026-09-29,Sleep,Informational,How Accurate Are Consumer Sleep Trackers?,sleep tracker accuracy,2200,Evidence guide,Yes,No,9,Brief queued,Explain limits versus polysomnography.
+22,2026-10-01,Recovery,Informational,HRV Explained: What It Can—and Cannot—Tell You,heart rate variability explained,2100,Evidence guide,Yes,No,1,Brief queued,Avoid diagnostic interpretation.
+23,2026-10-06,Recovery,Informational,"VO2 Max and Healthy Aging: Measurement, Meaning, and Training",VO2 max longevity,2200,Evidence guide,Yes,No,1,Brief queued,Exercise safety review required.
+24,2026-10-08,Supplements,Informational,"Creatine for Older Adults: Strength, Cognition, and Safety Evidence",creatine older adults,2400,Evidence guide,Yes,No,15,Brief queued,Include kidney and medication cautions.
+25,2026-10-13,Supplements,Informational,"Magnesium for Sleep: Forms, Evidence, and Safety",magnesium for sleep,2300,Evidence guide,Yes,No,9,Brief queued,No dosage without reviewer approval.
+26,2026-10-15,Supplements,Commercial,"NMN vs NR: Evidence, Regulation, and Buying Risks",NMN vs NR,2600,Evidence comparison,Yes,No,2,Brief queued,Verify regulator status by market.
+27,2026-10-20,Wearables,Informational,Continuous Glucose Monitors for People Without Diabetes: What We Know,CGM for non diabetics,2500,Evidence guide,Yes,No,1,Brief queued,High review priority; avoid diagnosis.
+28,2026-10-22,Wearables,Commercial,"Best Smart Rings: Sleep, Recovery, Comfort, and Data Access",best smart ring,2500,Tested comparison,No,Yes,3,Brief queued,Test current models consistently.
+29,2026-10-27,Wearables,Commercial,Oura vs WHOOP: Which Feedback Model Fits You?,Oura vs WHOOP,2400,Tested comparison,No,Yes,3,Brief queued,Compare current plans and exports.
+30,2026-10-29,Sleep,Commercial,"Best Sleep Trackers: Rings, Watches, Bands, and Bedside Sensors",best sleep tracker,2800,Tested comparison,Yes,Yes,21,Brief queued,Use transparent scoring and caveats.
+31,2026-11-03,Recovery,Informational,"Sauna Safety: Heat Exposure, Hydration, and Contraindications",sauna safety,2200,Safety guide,Yes,No,8,Brief queued,Include cardiovascular and pregnancy cautions.
+32,2026-11-05,Recovery,Informational,"Cold Plunge Safety: Temperature, Duration, and Red Flags",cold plunge safety,2100,Safety guide,Yes,No,12,Brief queued,No protocol for high-risk readers.
+33,2026-11-10,Recovery,Informational,Red Light Therapy Wavelengths and Dose: A Reader’s Guide,red light therapy wavelength,2400,Evidence guide,Yes,No,13,Brief queued,Separate output from clinical evidence.
+34,2026-11-12,Nutrition,Informational,Protein Needs in Later Adulthood: Evidence and Practical Meals,protein older adults,2300,Evidence guide,Yes,No,19,Brief queued,Account for kidney disease cautions.
+35,2026-11-17,Recovery,Informational,Resistance Training for Healthy Aging: A Beginner Framework,resistance training longevity,2400,Action guide,Yes,No,23,Brief queued,Include clearance and progression caveats.
+36,2026-11-19,Recovery,Informational,"Zone 2 Training: Definition, Measurement, and Limitations",zone 2 training,2200,Evidence guide,Yes,No,23,Brief queued,Avoid universal heart-rate zones.
+37,2026-11-24,Recovery,Informational,A 10-Minute Mobility Routine for Desk-Bound Adults,mobility routine,1600,How-to guide,Yes,Yes,35,Brief queued,Movement review and alternatives required.
+38,2026-11-26,Sleep,Informational,"Circadian Rhythm Basics: Timing Light, Meals, and Sleep",circadian rhythm guide,2200,Pillar guide,Yes,No,9,Brief queued,Do not oversimplify shift work.
+39,2026-12-01,Sleep,Informational,Morning Light Exposure: What It Does and How to Use It Safely,morning light exposure,1900,Action guide,Yes,No,38,Brief queued,Eye-condition cautions required.
+40,2026-12-03,Sleep,Informational,"Caffeine Timing and Sleep: Half-Life, Sensitivity, and Trade-Offs",caffeine timing sleep,1900,Evidence guide,Yes,No,9,Brief queued,Avoid one-size-fits-all cutoffs.
+41,2026-12-08,Sleep,Informational,Alcohol and Sleep: Why Sedation Is Not Better Sleep,alcohol and sleep,1900,Evidence guide,Yes,No,9,Brief queued,Include support note without moralizing.
+42,2026-12-10,Recovery,Informational,"Breathing Exercises for Stress: Methods, Evidence, and Safety",breathing exercises stress,1900,Action guide,Yes,Yes,16,Brief queued,Avoid treating anxiety-disorder claims.
+43,2026-12-15,Supplements,Informational,"Adaptogens Explained: Evidence, Interactions, and Marketing",adaptogens evidence,2400,Evidence guide,Yes,No,15,Brief queued,Review interactions.
+44,2026-12-17,Supplements,Informational,"Ashwagandha: Potential Benefits, Risks, and Who Should Avoid It",ashwagandha benefits risks,2400,Evidence guide,Yes,No,43,Brief queued,"Liver, thyroid, and pregnancy cautions."
+45,2026-12-22,Supplements,Informational,Lion’s Mane Mushroom: Human Evidence vs Hype,lions mane evidence,2200,Evidence guide,Yes,No,43,Brief queued,Separate human and preclinical evidence.
+46,2026-12-24,Supplements,Informational,How to Read a Supplement Label Without Being Misled,how to read supplement label,1900,Action guide,Yes,No,15,Brief queued,Verify jurisdiction-specific rules.
+47,2026-12-29,Supplements,Informational,Third-Party Supplement Testing: What Seals Do—and Do Not—Mean,third party supplement testing,2100,Buyer guide,Yes,No,46,Brief queued,Verify certifier scope.
+48,2026-12-31,Wearables,Informational,"Wearable Privacy: Health Data, Cloud Accounts, and Export Options",wearable privacy,2200,Privacy guide,No,No,3,Brief queued,Check current policies; avoid legal conclusions.
+49,2027-01-05,Wearables,Informational,How to Interpret a Readiness Score Without Overreacting,readiness score meaning,1900,Action guide,Yes,No,22,Brief queued,Not diagnostic; emphasize trends.
+50,2027-01-07,Sleep,Informational,Sleep Scores Explained: Useful Trend or False Precision?,sleep score accuracy,2000,Evidence guide,Yes,No,21,Brief queued,Explain proprietary algorithms.
+51,2027-01-12,Wearables,Commercial,Best Home Blood Pressure Monitors: Validation First,best blood pressure monitor,2500,Buyer guide,Yes,Yes,27,Brief queued,Use independently validated devices.
+52,2027-01-14,Guides,Commercial,Best Indoor Air Quality Monitors for Bedrooms and Offices,best air quality monitor,2300,Tested comparison,No,Yes,9,Brief queued,Define sensor limitations.
+53,2027-01-19,Guides,Commercial,Desk Health Gadgets Worth Considering—and What to Skip,desk health gadgets,2200,Tested comparison,Yes,Yes,14,Brief queued,Avoid medical-device claims.
+54,2027-01-21,Sleep,Commercial,A Practical Travel Sleep Kit for Time-Zone Changes,travel sleep kit,2100,Buyer guide,Yes,Yes,9,Brief queued,Medication content requires review.
+55,2027-01-26,Guides,Commercial,Biohacking Under $100: High-Value Basics Before Gadgets,biohacking under 100,2200,Budget guide,Yes,Yes,1,Brief queued,Lead with low-cost habits.
+56,2027-01-28,Guides,Informational,Anti-Aging Myths: What Current Evidence Does Not Support,anti aging myths,2400,Myth review,Yes,No,1,Brief queued,Use claim-by-claim evidence.
+57,2027-02-02,Guides,Informational,"Longevity Biomarkers: Clinical Use, Consumer Tests, and Uncertainty",longevity biomarkers,2600,Evidence guide,Yes,No,1,Brief queued,No self-diagnosis.
+58,2027-02-04,Guides,Informational,How to Read a Clinical Study Without Getting Fooled,how to read clinical study,2400,Research literacy guide,Yes,No,1,Brief queued,Use accurate examples.
+59,2027-02-09,Sleep,Informational,"A 30-Day Sleep Reset: Measurement, Habits, and Review Points",30 day sleep reset,2500,Program guide,Yes,No,9,Brief queued,Not a treatment plan.
+60,2027-02-11,Guides,Commercial,"The Year in Longevity Tech: Evidence, Products, and Retractions",longevity technology 2026,2800,Annual roundup,Yes,Yes,1,Brief queued,Fully re-research before publication.

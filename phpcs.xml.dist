@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<ruleset name="Longevity Evidence Lab">
+  <description>WordPress coding standards for first-party PHP.</description>
+  <file>wp-content/mu-plugins</file>
+  <file>wp-content/themes/longevity-starter</file>
+  <exclude-pattern>*/vendor/*</exclude-pattern>
+  <arg name="extensions" value="php" />
+  <arg value="sp" />
+  <rule ref="WordPress" />
+  <rule ref="PHPCompatibilityWP">
+    <properties><property name="testVersion" value="8.1-" /></properties>
+  </rule>
+</ruleset>

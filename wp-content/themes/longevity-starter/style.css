@@ -1,0 +1,334 @@
+/*
+Theme Name: Longevity Starter
+Theme URI: https://invalid.local/longevity-starter
+Author: Longevity Evidence Lab
+Description: Accessible block theme for an evidence-led consumer health and product-testing publication.
+Version: 2.0.0
+Requires at least: 6.7
+Requires PHP: 8.1
+Text Domain: longevity-starter
+*/
+
+/* Base and accessibility */
+:root {
+	color-scheme: light;
+}
+
+html {
+	scroll-behavior: smooth;
+}
+
+body {
+	text-wrap: pretty;
+}
+
+a {
+	text-decoration-thickness: 0.09em;
+	text-underline-offset: 0.18em;
+}
+
+a:hover {
+	text-decoration-thickness: 0.14em;
+}
+
+input,
+select,
+textarea,
+button {
+	font: inherit;
+}
+
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+summary:focus-visible {
+	outline: 3px solid var(--wp--preset--color--focus);
+	outline-offset: 3px;
+}
+
+.longevity-skip-link {
+	background: var(--wp--preset--color--ink);
+	color: var(--wp--preset--color--paper);
+	font-weight: 700;
+	left: 1rem;
+	padding: 0.75rem 1rem;
+	position: fixed;
+	top: -8rem;
+	z-index: 100000;
+}
+
+.longevity-skip-link:focus {
+	top: 1rem;
+}
+
+.wp-site-blocks {
+	display: flex;
+	min-height: 100vh;
+	flex-direction: column;
+}
+
+main {
+	flex: 1;
+}
+
+img {
+	height: auto;
+	max-width: 100%;
+}
+
+/* Header and navigation */
+.longevity-site-header {
+	background: var(--wp--preset--color--paper);
+	position: relative;
+	z-index: 20;
+}
+
+.longevity-site-header .wp-block-navigation-item__content {
+	font-weight: 650;
+}
+
+.longevity-site-header .wp-block-search__inside-wrapper {
+	min-width: min(16rem, 80vw);
+}
+
+/* Content cards and grids */
+.longevity-card {
+	background: var(--wp--preset--color--paper);
+	border: 1px solid var(--wp--preset--color--border);
+	border-radius: var(--wp--custom--radius--card);
+	box-shadow: var(--wp--custom--shadow--subtle);
+	height: 100%;
+	padding: var(--wp--preset--spacing--40);
+}
+
+.longevity-card :where(h2, h3) {
+	margin-block-start: 0.35rem;
+}
+
+.longevity-kicker {
+	font-size: var(--wp--preset--font-size--small);
+	font-weight: 750;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+}
+
+/* Article trust system */
+.longevity-article-shell {
+	max-width: var(--wp--style--global--content-size);
+}
+
+.longevity-article-meta {
+	align-items: center;
+	color: var(--wp--preset--color--muted);
+	display: flex;
+	flex-wrap: wrap;
+	font-size: var(--wp--preset--font-size--small);
+	gap: 0.4rem 0.7rem;
+	margin-block: 1rem 1.5rem;
+}
+
+.longevity-trust-summary,
+.longevity-reviewer-card,
+.longevity-review-box,
+.longevity-review-score-card,
+.longevity-test-method,
+.longevity-update-history,
+.longevity-testing-note {
+	border: 1px solid var(--wp--preset--color--border);
+	border-radius: var(--wp--custom--radius--card);
+	margin-block: var(--wp--preset--spacing--50);
+	padding: var(--wp--preset--spacing--40);
+}
+
+.longevity-trust-summary {
+	background: var(--wp--preset--color--soft);
+}
+
+.longevity-trust-summary > h2,
+.longevity-reviewer-card > h2,
+.longevity-update-history > h2 {
+	font-size: var(--wp--preset--font-size--large);
+	margin-block-start: 0;
+}
+
+.longevity-bottom-line {
+	border-bottom: 1px solid var(--wp--preset--color--border);
+	margin-bottom: 1rem;
+	padding-bottom: 0.5rem;
+}
+
+.longevity-bottom-line h3,
+.longevity-limitations h3 {
+	font-size: var(--wp--preset--font-size--medium);
+}
+
+.longevity-badge {
+	background: var(--wp--preset--color--accent-soft);
+	border: 1px solid var(--wp--preset--color--accent);
+	border-radius: 999px;
+	display: inline-block;
+	font-size: var(--wp--preset--font-size--small);
+	font-weight: 750;
+	padding: 0.25rem 0.7rem;
+}
+
+.longevity-evidence-grade .longevity-badge::before {
+	content: "Evidence: ";
+}
+
+.longevity-limitations,
+.longevity-disclosure,
+.longevity-medical-disclaimer,
+.longevity-testing-note {
+	background: var(--wp--preset--color--warning-soft);
+	border-inline-start: 0.3rem solid var(--wp--preset--color--warning);
+	padding: 0.9rem 1rem;
+}
+
+.longevity-medical-disclaimer {
+	font-size: var(--wp--preset--font-size--small);
+	margin-block: var(--wp--preset--spacing--40);
+}
+
+.longevity-review-score {
+	font-size: clamp(2rem, 7vw, 3.2rem);
+	font-weight: 800;
+	line-height: 1;
+}
+
+.longevity-test-method summary {
+	cursor: pointer;
+	font-weight: 750;
+}
+
+.longevity-test-method dl > div {
+	display: grid;
+	gap: 0.3rem;
+	grid-template-columns: minmax(8rem, 0.4fr) 1fr;
+	padding-block: 0.45rem;
+}
+
+.longevity-test-method dt {
+	font-weight: 700;
+}
+
+.longevity-update-history ol {
+	padding-inline-start: 1.25rem;
+}
+
+.longevity-update-history li + li {
+	border-top: 1px solid var(--wp--preset--color--border);
+	margin-top: 1rem;
+	padding-top: 1rem;
+}
+
+/* Tables and forms */
+.wp-block-table {
+	overflow-x: auto;
+}
+
+table {
+	border-collapse: collapse;
+	font-variant-numeric: tabular-nums;
+	width: 100%;
+}
+
+th,
+td {
+	border: 1px solid var(--wp--preset--color--border);
+	padding: 0.65rem;
+	text-align: start;
+	vertical-align: top;
+}
+
+th {
+	background: var(--wp--preset--color--soft);
+}
+
+/* Footer */
+.longevity-site-footer {
+	background: var(--wp--preset--color--ink);
+	color: var(--wp--preset--color--paper);
+}
+
+.longevity-site-footer a {
+	color: inherit;
+}
+
+.longevity-policy-nav ul {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.55rem 1rem;
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+
+.longevity-small {
+	font-size: var(--wp--preset--font-size--small);
+}
+
+/* Editor helper styles */
+.lel-editorial-grid {
+	column-gap: 2rem;
+}
+
+.lel-gate-blocking {
+	color: var(--wp--preset--color--danger);
+}
+
+.lel-gate-warning {
+	color: var(--wp--preset--color--warning-text);
+}
+
+/* Responsive behavior */
+@media (width <= 700px) {
+	.longevity-test-method dl > div {
+		grid-template-columns: 1fr;
+	}
+
+	.wp-block-query .wp-block-post-template.is-layout-grid {
+		grid-template-columns: 1fr;
+	}
+
+	.longevity-article-meta > [aria-hidden="true"] {
+		display: none;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	html {
+		scroll-behavior: auto;
+	}
+
+	*,
+	*::before,
+	*::after {
+		animation-duration: 0.01ms !important;
+		animation-iteration-count: 1 !important;
+		scroll-behavior: auto !important;
+		transition-duration: 0.01ms !important;
+	}
+}
+
+@media print {
+	.longevity-site-header,
+	.longevity-site-footer,
+	.longevity-affiliate-cta,
+	.wp-block-post-navigation-link {
+		display: none !important;
+	}
+
+	body {
+		background: white;
+		color: black;
+		font-size: 11pt;
+	}
+
+	a::after {
+		content: " (" attr(href) ")";
+		font-size: 0.8em;
+	}
+}

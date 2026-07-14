@@ -1,0 +1,119 @@
+name: longevity-site
+
+services:
+  db:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${WORDPRESS_DB_NAME}
+      MYSQL_USER: ${WORDPRESS_DB_USER}
+      MYSQL_PASSWORD: ${WORDPRESS_DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${WORDPRESS_DB_ROOT_PASSWORD}
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    volumes:
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "MYSQL_PWD=$$MYSQL_ROOT_PASSWORD mysqladmin ping -h 127.0.0.1 -u root --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    security_opt:
+      - no-new-privileges:true
+
+  wordpress:
+    image: wordpress:7.0.1-php8.3-apache
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "${WORDPRESS_PORT:-8080}:80"
+    environment:
+      WORDPRESS_DB_HOST: db:3306
+      WORDPRESS_DB_NAME: ${WORDPRESS_DB_NAME}
+      WORDPRESS_DB_USER: ${WORDPRESS_DB_USER}
+      WORDPRESS_DB_PASSWORD: ${WORDPRESS_DB_PASSWORD}
+      WORDPRESS_CONFIG_EXTRA: |
+        define( 'WP_ENVIRONMENT_TYPE', '${WP_ENVIRONMENT_TYPE:-local}' );
+        define( 'WP_DEBUG', ${WP_DEBUG:-false} );
+        define( 'WP_DEBUG_LOG', ${WP_DEBUG_LOG:-false} );
+        define( 'WP_DEBUG_DISPLAY', ${WP_DEBUG_DISPLAY:-false} );
+        define( 'FORCE_SSL_ADMIN', ${FORCE_SSL_ADMIN:-false} );
+        define( 'DISALLOW_FILE_MODS', ${DISALLOW_FILE_MODS:-false} );
+        define( 'DISALLOW_FILE_EDIT', true );
+        define( 'WP_AUTO_UPDATE_CORE', 'minor' );
+        define( 'WP_MEMORY_LIMIT', '256M' );
+        define( 'WP_MAX_MEMORY_LIMIT', '512M' );
+        define( 'AUTOSAVE_INTERVAL', 120 );
+        define( 'WP_POST_REVISIONS', 30 );
+        define( 'EMPTY_TRASH_DAYS', 14 );
+    volumes:
+      - wordpress_data:/var/www/html
+      - ./wp-content:/var/www/html/wp-content
+      - ./docker/uploads.ini:/usr/local/etc/php/conf.d/uploads.ini:ro
+    healthcheck:
+      test: ["CMD-SHELL", "php -r '$$s=@fsockopen(\"127.0.0.1\",80,$$e,$$m,2); exit($$s?0:1);'"]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+      start_period: 45s
+    security_opt:
+      - no-new-privileges:true
+
+  wpcli:
+    image: wordpress:cli-php8.3
+    depends_on:
+      db:
+        condition: service_healthy
+      wordpress:
+        condition: service_healthy
+    working_dir: /var/www/html
+    environment:
+      WORDPRESS_DB_HOST: db:3306
+      WORDPRESS_DB_NAME: ${WORDPRESS_DB_NAME}
+      WORDPRESS_DB_USER: ${WORDPRESS_DB_USER}
+      WORDPRESS_DB_PASSWORD: ${WORDPRESS_DB_PASSWORD}
+      WP_SITE_URL: ${WP_SITE_URL}
+      WP_SITE_TITLE: ${WP_SITE_TITLE}
+      WP_ADMIN_USER: ${WP_ADMIN_USER}
+      WP_ADMIN_PASSWORD: ${WP_ADMIN_PASSWORD}
+      WP_ADMIN_EMAIL: ${WP_ADMIN_EMAIL}
+      WP_ENVIRONMENT_TYPE: ${WP_ENVIRONMENT_TYPE:-local}
+      WP_TIMEZONE: ${WP_TIMEZONE:-UTC}
+      WP_LOCALE: ${WP_LOCALE:-en_US}
+      INSTALL_OPTIONAL_PLUGINS: ${INSTALL_OPTIONAL_PLUGINS:-0}
+    volumes:
+      - wordpress_data:/var/www/html
+      - ./wp-content:/var/www/html/wp-content
+      - ./scripts:/scripts:ro
+      - ./content:/project-content:ro
+      - ./policies:/project-policies:ro
+    security_opt:
+      - no-new-privileges:true
+
+  wpcron:
+    image: wordpress:cli-php8.3
+    profiles: ["cron"]
+    depends_on:
+      wordpress:
+        condition: service_healthy
+    working_dir: /var/www/html
+    entrypoint: ["sh", "-c"]
+    command: ["while true; do wp cron event run --due-now --allow-root || true; sleep 300; done"]
+    environment:
+      WORDPRESS_DB_HOST: db:3306
+      WORDPRESS_DB_NAME: ${WORDPRESS_DB_NAME}
+      WORDPRESS_DB_USER: ${WORDPRESS_DB_USER}
+      WORDPRESS_DB_PASSWORD: ${WORDPRESS_DB_PASSWORD}
+    volumes:
+      - wordpress_data:/var/www/html
+      - ./wp-content:/var/www/html/wp-content
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  db_data:
+  wordpress_data:

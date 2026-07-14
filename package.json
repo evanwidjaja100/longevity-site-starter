@@ -1,0 +1,20 @@
+{
+  "name": "longevity-evidence-lab",
+  "private": true,
+  "scripts": {
+    "lint": "npm run lint:css && npm run lint:js",
+    "lint:css": "stylelint 'wp-content/themes/longevity-starter/**/*.css'",
+    "lint:js": "eslint 'wp-content/mu-plugins/longevity-core/assets/**/*.js' 'tests/e2e/**/*.js'",
+    "test:e2e": "playwright test",
+    "test:a11y": "playwright test tests/e2e/accessibility.spec.js"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.10.0",
+    "@eslint/js": "^9.0.0",
+    "@playwright/test": "^1.50.0",
+    "eslint": "^9.0.0",
+    "stylelint": "^16.0.0",
+    "stylelint-config-standard": "^38.0.0"
+  },
+  "type": "module"
+}

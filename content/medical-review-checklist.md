@@ -1,0 +1,12 @@
+# Medical Review Checklist
+- [ ] Education is distinguished from medical advice.
+- [ ] Population, intervention, comparator, and outcomes are accurate.
+- [ ] Absolute effects are used where possible.
+- [ ] Human outcomes are not inferred from animal or cell studies.
+- [ ] Benefits, harms, contraindications, uncertainty, and limitations are balanced.
+- [ ] Dosage information is non-prescriptive and authoritative.
+- [ ] Drug, supplement, pregnancy, surgery, and chronic-condition cautions are addressed.
+- [ ] Disease-treatment or prevention wording is supportable.
+- [ ] Material claims are traceable to the fact-check log.
+- [ ] Title and summary do not overstate evidence.
+- [ ] Reviewer credentials, date, scope, and re-review date are recorded.

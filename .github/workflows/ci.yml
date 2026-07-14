@@ -1,0 +1,41 @@
+name: CI
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          coverage: none
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: sudo apt-get update && sudo apt-get install -y shellcheck
+      - run: composer validate --strict
+      - run: composer install --no-interaction --prefer-dist
+      - run: npm ci
+      - run: make validate
+      - run: composer lint
+      - run: composer test
+      - run: npm run lint
+      - run: docker compose config --quiet
+  wordpress-smoke:
+    runs-on: ubuntu-latest
+    needs: validate
+    steps:
+      - uses: actions/checkout@v4
+      - run: cp .env.ci .env
+      - run: docker compose up -d db wordpress
+      - run: docker compose run --rm --entrypoint sh wpcli /scripts/bootstrap.sh
+      - run: ./scripts/smoke-test.sh
+      - run: docker compose down -v
