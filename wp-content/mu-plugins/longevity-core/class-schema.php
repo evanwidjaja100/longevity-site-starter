@@ -97,6 +97,28 @@ final class Schema {
 			$post_id = get_queried_object_id();
 			$graph   = array_merge( $graph, self::singular_graph( $post_id, $org_id, $website_id ) );
 		}
+		if ( is_post_type_archive( 'review' ) ) {
+			$items = array();
+			foreach ( Rankings::directory() as $index => $group ) {
+				$items[] = array( '@type' => 'ListItem', 'position' => $index + 1, 'name' => $group['term']->name, 'url' => get_category_link( $group['term']->term_id ) );
+			}
+			$collection = array( '@type' => 'CollectionPage', '@id' => get_post_type_archive_link( 'review' ) . '#collection', 'url' => get_post_type_archive_link( 'review' ), 'name' => __( 'Consumer Lab rankings', 'longevity-core' ), 'isPartOf' => array( '@id' => $website_id ) );
+			if ( $items ) {
+				$collection['mainEntity'] = array( '@type' => 'ItemList', 'itemListElement' => $items );
+			}
+			$graph[] = $collection;
+		}
+		if ( is_category() ) {
+			$term = get_queried_object();
+			$ranked = $term instanceof \WP_Term ? Rankings::reviews( (int) $term->term_id ) : array();
+			if ( $ranked ) {
+				$items = array();
+				foreach ( $ranked as $index => $review ) {
+					$items[] = array( '@type' => 'ListItem', 'position' => $index + 1, 'name' => get_the_title( $review ), 'url' => get_permalink( $review ) );
+				}
+				$graph[] = array( '@type' => 'CollectionPage', '@id' => get_category_link( $term->term_id ) . '#ranking', 'url' => get_category_link( $term->term_id ), 'name' => $term->name . ' ' . __( 'Consumer Lab ranking', 'longevity-core' ), 'mainEntity' => array( '@type' => 'ItemList', 'itemListElement' => $items ), 'isPartOf' => array( '@id' => $website_id ) );
+			}
+		}
 		return $graph;
 	}
 
@@ -194,7 +216,7 @@ final class Schema {
 		$record_id  = (int) get_post_meta( $post_id, 'test_record_id', true );
 		$dimensions = get_post_meta( $post_id, 'review_score_dimensions', true );
 		$disclosure = (string) get_post_meta( $post_id, 'affiliate_disclosure_status', true );
-		if ( 'publish' !== get_post_status( $post_id ) || '' === $model || $score <= 0 || '' === $version || '' === $confidence || ! in_array( $test_state, array( 'complete', 'approved' ), true ) || ! Review_Methodology::valid_test_record( $record_id, (string) get_post_meta( $post_id, 'testing_protocol_version', true ) ) ) {
+		if ( ! Rankings::is_eligible( $post_id ) || '' === $model || $score <= 0 || '' === $version || '' === $confidence || ! in_array( $test_state, array( 'complete', 'approved' ), true ) || ! Review_Methodology::valid_test_record( $record_id, (string) get_post_meta( $post_id, 'testing_protocol_version', true ) ) ) {
 			return null;
 		}
 		if ( ! in_array( get_post_meta( $post_id, 'commercial_relationship', true ), array( '', 'none' ), true ) && ! in_array( $disclosure, array( 'approved', 'complete' ), true ) ) {

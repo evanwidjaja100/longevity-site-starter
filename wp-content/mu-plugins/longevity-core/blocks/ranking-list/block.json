@@ -1,0 +1,13 @@
+{
+  "$schema": "https://schemas.wp.org/trunk/block.json",
+  "apiVersion": 3,
+  "name": "longevity/ranking-list",
+  "version": "1.0.0",
+  "title": "Ranking list",
+  "description": "Eligible, filterable Consumer Lab product rankings",
+  "category": "theme",
+  "icon": "editor-ol",
+  "textdomain": "longevity-core",
+  "supports": { "html": false },
+  "editorScript": "longevity-core-blocks"
+}

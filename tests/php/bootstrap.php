@@ -40,8 +40,21 @@ if ( ! function_exists( 'wp_strip_all_tags' ) ) {
 		return strip_tags( (string) $value );
 	}
 }
+if ( ! function_exists( 'get_post_meta' ) ) {
+	function get_post_meta( int $post_id, string $key, bool $single = false ) {
+		unset( $single );
+		return $GLOBALS['lel_test_meta'][ $post_id ][ $key ] ?? '';
+	}
+}
+if ( ! function_exists( 'get_the_title' ) ) {
+	function get_the_title( $post ): string {
+		$post_id = is_object( $post ) ? (int) $post->ID : (int) $post;
+		return (string) ( $GLOBALS['lel_test_titles'][ $post_id ] ?? '' );
+	}
+}
 
 require_once LONGEVITY_CORE_PATH . 'class-gate-result.php';
 require_once LONGEVITY_CORE_PATH . 'class-review-methodology.php';
 require_once LONGEVITY_CORE_PATH . 'class-meta-registry.php';
 require_once LONGEVITY_CORE_PATH . 'class-publication-gates.php';
+require_once LONGEVITY_CORE_PATH . 'class-rankings.php';

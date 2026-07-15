@@ -27,7 +27,7 @@ final class Review_Methodology {
 			self::register_private_meta( 'lel_protocol', $key, $rule );
 		}
 		$record_fields = array(
-			'product_name' => 'text', 'unit_identifier' => 'text', 'acquisition_method' => 'acquisition', 'tester_user_ids' => 'csv_ids', 'test_start_date' => 'date', 'test_end_date' => 'date', 'protocol_id' => 'text', 'protocol_version' => 'version', 'raw_observations' => 'textarea', 'measurement_equipment' => 'textarea', 'failures' => 'textarea', 'deviations' => 'textarea', 'comparison_devices' => 'textarea', 'environment' => 'textarea', 'evidence_references' => 'textarea', 'conflicts' => 'textarea', 'approval_status' => 'text', 'approved_by' => 'absint', 'approval_date' => 'date',
+			'product_name' => 'text', 'unit_identifier' => 'text', 'acquisition_method' => 'acquisition', 'tester_user_ids' => 'csv_ids', 'test_start_date' => 'date', 'test_end_date' => 'date', 'protocol_id' => 'text', 'protocol_version' => 'version', 'raw_observations' => 'textarea', 'public_test_results' => 'public_results', 'measurement_equipment' => 'textarea', 'failures' => 'textarea', 'deviations' => 'textarea', 'comparison_devices' => 'textarea', 'environment' => 'textarea', 'evidence_references' => 'textarea', 'conflicts' => 'textarea', 'approval_status' => 'text', 'approved_by' => 'absint', 'approval_date' => 'date',
 		);
 		foreach ( $record_fields as $key => $rule ) {
 			self::register_private_meta( 'lel_test_record', $key, $rule );
@@ -56,6 +56,42 @@ final class Review_Methodology {
 			}
 			$sanitized[] = array( 'name' => $name, 'score' => $score, 'weight' => $weight );
 		}
+		return $sanitized;
+	}
+
+	/** Sanitize a bounded public projection of approved test-record observations. */
+	public static function sanitize_public_results( $value ): array {
+		if ( is_string( $value ) ) {
+			$decoded = json_decode( $value, true );
+			$value   = is_array( $decoded ) ? $decoded : array();
+		}
+		if ( ! is_array( $value ) ) {
+			return array();
+		}
+		$allowed_statuses = array( 'meets', 'partially_meets', 'does_not_meet', 'informational', 'not_applicable' );
+		$sanitized        = array();
+		foreach ( array_slice( $value, 0, 30 ) as $index => $row ) {
+			if ( ! is_array( $row ) ) {
+				continue;
+			}
+			$label    = substr( sanitize_text_field( (string) ( $row['label'] ?? '' ) ), 0, 100 );
+			$observed = substr( sanitize_text_field( (string) ( $row['observed_value'] ?? '' ) ), 0, 120 );
+			$status   = sanitize_key( (string) ( $row['status'] ?? 'informational' ) );
+			if ( '' === $label || '' === $observed || ! in_array( $status, $allowed_statuses, true ) ) {
+				continue;
+			}
+			$sanitized[] = array(
+				'label'           => $label,
+				'observed_value'  => $observed,
+				'unit'            => substr( sanitize_text_field( (string) ( $row['unit'] ?? '' ) ), 0, 40 ),
+				'reference_label' => substr( sanitize_text_field( (string) ( $row['reference_label'] ?? '' ) ), 0, 100 ),
+				'reference_value' => substr( sanitize_text_field( (string) ( $row['reference_value'] ?? '' ) ), 0, 120 ),
+				'status'          => $status,
+				'note'            => substr( sanitize_textarea_field( (string) ( $row['note'] ?? '' ) ), 0, 500 ),
+				'display_order'   => min( 999, max( 0, absint( $row['display_order'] ?? ( $index + 1 ) * 10 ) ) ),
+			);
+		}
+		usort( $sanitized, static fn( $left, $right ) => $left['display_order'] <=> $right['display_order'] );
 		return $sanitized;
 	}
 
@@ -166,16 +202,36 @@ final class Review_Methodology {
 					),
 				),
 			);
+		} elseif ( 'public_results' === $rule ) {
+			$show_in_rest = array(
+				'schema' => array(
+					'type'  => 'array',
+					'items' => array(
+						'type'                 => 'object',
+						'additionalProperties' => false,
+						'properties'           => array(
+							'label'           => array( 'type' => 'string' ),
+							'observed_value'  => array( 'type' => 'string' ),
+							'unit'            => array( 'type' => 'string' ),
+							'reference_label' => array( 'type' => 'string' ),
+							'reference_value' => array( 'type' => 'string' ),
+							'status'          => array( 'type' => 'string', 'enum' => array( 'meets', 'partially_meets', 'does_not_meet', 'informational', 'not_applicable' ) ),
+							'note'            => array( 'type' => 'string' ),
+							'display_order'   => array( 'type' => 'integer', 'minimum' => 0, 'maximum' => 999 ),
+						),
+					),
+				),
+			);
 		}
 
 		register_post_meta(
 			$post_type,
 			$key,
 			array(
-				'type'              => 'absint' === $rule ? 'integer' : ( 'dimensions' === $rule ? 'array' : 'string' ),
+				'type'              => 'absint' === $rule ? 'integer' : ( in_array( $rule, array( 'dimensions', 'public_results' ), true ) ? 'array' : 'string' ),
 				'single'            => true,
 				'show_in_rest'      => $show_in_rest,
-				'sanitize_callback' => static fn( $value ) => Meta_Registry::sanitize_value( $rule, $value ),
+				'sanitize_callback' => static fn( $value ) => 'public_results' === $rule ? self::sanitize_public_results( $value ) : Meta_Registry::sanitize_value( $rule, $value ),
 				'auth_callback'     => static fn() => current_user_can( 'manage_test_protocols' ),
 			)
 		);

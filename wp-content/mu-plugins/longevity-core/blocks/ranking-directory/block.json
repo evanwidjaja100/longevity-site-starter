@@ -1,0 +1,13 @@
+{
+  "$schema": "https://schemas.wp.org/trunk/block.json",
+  "apiVersion": 3,
+  "name": "longevity/ranking-directory",
+  "version": "1.0.0",
+  "title": "Ranking directory",
+  "description": "Eligible Consumer Lab ranking categories",
+  "category": "theme",
+  "icon": "chart-bar",
+  "textdomain": "longevity-core",
+  "supports": { "html": false },
+  "editorScript": "longevity-core-blocks"
+}

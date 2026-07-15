@@ -73,7 +73,7 @@ final class Public_Components {
 		} else {
 			$categories = get_the_category( $post_id );
 			if ( $categories ) {
-				$items[] = array( 'name' => $categories[0]->name, 'url' => get_category_link( $categories[0] ) );
+				$items[] = array( 'name' => $categories[0]->name, 'url' => get_category_link( $categories[0]->term_id ) );
 			}
 		}
 		$items[] = array( 'name' => get_the_title( $post_id ), 'url' => '' );
@@ -177,6 +177,124 @@ final class Public_Components {
 			$html .= '</p>';
 		}
 		return $html . '</aside>';
+	}
+
+	/** Render only categories containing at least one fully eligible ranked report. */
+	public static function render_ranking_directory(): string {
+		$groups = Rankings::directory();
+		if ( empty( $groups ) ) {
+			return '<section class="longevity-ranking-empty longevity-empty-state" aria-labelledby="lel-ranking-empty"><p class="longevity-kicker">Rankings are evidence, not inventory</p><h2 id="lel-ranking-empty">No test-based rankings are ready yet</h2><p>Categories appear here only after products complete an approved, protocol-matched test and the score, confidence, disclosure, and editorial record all pass review.</p><p><a href="' . esc_url( home_url( '/testing-methodology/' ) ) . '">' . esc_html__( 'See how testing works', 'longevity-core' ) . '</a></p></section>';
+		}
+		$html = '<section class="longevity-ranking-directory" aria-labelledby="lel-ranking-directory-title"><div class="longevity-section-header"><div><p class="longevity-kicker">Consumer Lab rankings</p><h2 id="lel-ranking-directory-title">Compare protocol-complete product reports</h2></div><p>Only eligible, published reports contribute to these category counts and scores.</p></div><div class="longevity-ranking-category-grid">';
+		foreach ( $groups as $group ) {
+			$term = $group['term'];
+			$html .= '<article class="longevity-ranking-category"><div class="longevity-category-mark" aria-hidden="true">' . esc_html( strtoupper( mb_substr( $term->name, 0, 1 ) ) ) . '</div><div><p class="longevity-kicker">' . esc_html( sprintf( _n( '%d eligible report', '%d eligible reports', $group['count'], 'longevity-core' ), $group['count'] ) ) . '</p><h3><a href="' . esc_url( get_category_link( $term->term_id ) ) . '">' . esc_html( $term->name ) . '</a></h3><dl class="longevity-category-facts"><div><dt>' . esc_html__( 'Top score', 'longevity-core' ) . '</dt><dd>' . esc_html( number_format_i18n( $group['highest_score'], 1 ) ) . '/5</dd></div><div><dt>' . esc_html__( 'Updated', 'longevity-core' ) . '</dt><dd><time datetime="' . esc_attr( $group['latest'] ) . '">' . esc_html( $group['latest'] ) . '</time></dd></div></dl></div></article>';
+		}
+		return $html . '</div></section>';
+	}
+
+	/** Render one category's eligible reviews with safe GET controls and stable order. */
+	public static function render_ranking_list(): string {
+		$term = get_queried_object();
+		if ( ! $term instanceof \WP_Term || 'category' !== $term->taxonomy ) {
+			return '';
+		}
+		$all     = Rankings::reviews( (int) $term->term_id, 'score', array(), 100 );
+		$reviews = Rankings::reviews( (int) $term->term_id );
+		if ( empty( $all ) ) {
+			return '';
+		}
+		$sort       = Rankings::requested_sort();
+		$filters    = Rankings::requested_filters();
+		$confidence = array_values( array_unique( array_map( static fn( $post ) => (string) get_post_meta( $post->ID, 'review_score_confidence', true ), $all ) ) );
+		$subscriptions = array_values( array_unique( array_map( static fn( $post ) => (bool) get_post_meta( $post->ID, 'subscription_required', true ), $all ) ) );
+		$html = '<section class="longevity-ranking-list" aria-labelledby="lel-ranking-list-title"><div class="longevity-section-header"><div><p class="longevity-kicker">Consumer Lab ranking</p><h2 id="lel-ranking-list-title">' . esc_html( $term->name ) . ' product reports</h2></div><p>' . esc_html( sprintf( _n( '%d eligible tested product', '%d eligible tested products', count( $all ), 'longevity-core' ), count( $all ) ) ) . '</p></div>';
+		$html .= '<form class="longevity-ranking-filters" method="get" action="' . esc_url( get_category_link( $term->term_id ) ) . '"><label>' . esc_html__( 'Sort rankings', 'longevity-core' ) . '<select name="ranking_sort">' . self::options( array( 'score' => __( 'Overall score', 'longevity-core' ), 'confidence' => __( 'Confidence', 'longevity-core' ), 'updated' => __( 'Recently updated', 'longevity-core' ), 'title' => __( 'Product name', 'longevity-core' ) ), $sort ) . '</select></label>';
+		if ( count( $confidence ) > 1 ) {
+			$options = array( '' => __( 'All confidence levels', 'longevity-core' ) );
+			foreach ( $confidence as $value ) {
+				$options[ $value ] = $value;
+			}
+			$html .= '<label>' . esc_html__( 'Confidence', 'longevity-core' ) . '<select name="confidence">' . self::options( $options, $filters['confidence'] ?? '' ) . '</select></label>';
+		}
+		if ( count( $subscriptions ) > 1 ) {
+			$html .= '<label>' . esc_html__( 'Subscription', 'longevity-core' ) . '<select name="subscription">' . self::options( array( '' => __( 'Any subscription status', 'longevity-core' ), 'not_required' => __( 'No subscription required', 'longevity-core' ), 'required' => __( 'Subscription required', 'longevity-core' ) ), $filters['subscription'] ?? '' ) . '</select></label>';
+		}
+		$html .= '<button class="wp-element-button" type="submit" data-lel-event="ranking_filter">' . esc_html__( 'Apply', 'longevity-core' ) . '</button></form>';
+		if ( empty( $reviews ) ) {
+			return $html . '<div class="longevity-empty-state"><h3>' . esc_html__( 'No reports match these filters', 'longevity-core' ) . '</h3><p><a href="' . esc_url( get_category_link( $term->term_id ) ) . '">' . esc_html__( 'Clear ranking filters', 'longevity-core' ) . '</a></p></div></section>';
+		}
+		$html .= '<div class="longevity-ranking-table-wrap"><table class="longevity-ranking-table"><caption class="screen-reader-text">' . esc_html( sprintf( __( '%s Consumer Lab ranking', 'longevity-core' ), $term->name ) ) . '</caption><thead><tr><th scope="col">' . esc_html__( 'Rank', 'longevity-core' ) . '</th><th scope="col">' . esc_html__( 'Product and model', 'longevity-core' ) . '</th><th scope="col">' . esc_html__( 'Overall score', 'longevity-core' ) . '</th><th scope="col">' . esc_html__( 'Confidence', 'longevity-core' ) . '</th><th scope="col">' . esc_html__( 'Decision context', 'longevity-core' ) . '</th><th scope="col">' . esc_html__( 'Report', 'longevity-core' ) . '</th></tr></thead><tbody>';
+		foreach ( $reviews as $index => $review ) {
+			$score = (float) get_post_meta( $review->ID, 'review_score', true );
+			$confidence_label = (string) get_post_meta( $review->ID, 'review_score_confidence', true );
+			$model = (string) get_post_meta( $review->ID, 'tested_product_model', true );
+			$brand = (string) get_post_meta( $review->ID, 'product_brand', true );
+			$best  = (string) get_post_meta( $review->ID, 'best_for', true );
+			$date  = (string) get_post_meta( $review->ID, 'last_material_update', true );
+			$html .= '<tr><td data-label="' . esc_attr__( 'Rank', 'longevity-core' ) . '"><span class="longevity-rank-number">' . esc_html( (string) ( $index + 1 ) ) . '</span></td><th scope="row" data-label="' . esc_attr__( 'Product', 'longevity-core' ) . '"><a href="' . esc_url( get_permalink( $review ) ) . '">' . esc_html( get_the_title( $review ) ) . '</a><span>' . esc_html( implode( ' · ', array_filter( array( $brand, $model ) ) ) ) . '</span></th><td data-label="' . esc_attr__( 'Overall score', 'longevity-core' ) . '"><strong class="longevity-score-value">' . esc_html( number_format_i18n( $score, 1 ) ) . '</strong><span>/5</span></td><td data-label="' . esc_attr__( 'Confidence', 'longevity-core' ) . '"><span class="longevity-confidence-badge" data-confidence="' . esc_attr( sanitize_title( $confidence_label ) ) . '">' . esc_html( $confidence_label ) . '</span><span class="longevity-status-badge is-complete">' . esc_html__( 'Testing complete', 'longevity-core' ) . '</span></td><td data-label="' . esc_attr__( 'Decision context', 'longevity-core' ) . '">' . ( $best ? '<strong>' . esc_html__( 'Best for:', 'longevity-core' ) . '</strong> ' . esc_html( $best ) : '' ) . '<span>' . esc_html__( 'Updated', 'longevity-core' ) . ' <time datetime="' . esc_attr( $date ) . '">' . esc_html( $date ) . '</time></span></td><td data-label="' . esc_attr__( 'Report', 'longevity-core' ) . '"><a class="longevity-report-link" data-lel-event="ranking_report_open" href="' . esc_url( get_permalink( $review ) ) . '">' . esc_html__( 'View report', 'longevity-core' ) . '</a></td></tr>';
+		}
+		return $html . '</tbody></table></div><p class="longevity-ranking-note"><strong>' . esc_html__( 'How order is determined:', 'longevity-core' ) . '</strong> ' . esc_html__( 'Overall score, then confidence, most recent material update, and product title. Commercial relationships never change the score or order.', 'longevity-core' ) . '</p></section>';
+	}
+
+	/** Render the decision-dense header for a product report. */
+	public static function render_product_report_summary( int $post_id ): string {
+		if ( $post_id <= 0 || 'review' !== get_post_type( $post_id ) ) {
+			return '';
+		}
+		$version   = (string) get_post_meta( $post_id, 'testing_protocol_version', true );
+		$record_id = (int) get_post_meta( $post_id, 'test_record_id', true );
+		$complete  = in_array( get_post_meta( $post_id, 'testing_status', true ), array( 'complete', 'approved' ), true ) && Review_Methodology::valid_test_record( $record_id, $version );
+		$fields = array(
+			__( 'Verdict', 'longevity-core' )                => get_post_meta( $post_id, 'content_summary', true ),
+			__( 'Best for', 'longevity-core' )               => get_post_meta( $post_id, 'best_for', true ),
+			__( 'Not for', 'longevity-core' )                => get_post_meta( $post_id, 'not_for', true ),
+			__( 'Acquisition', 'longevity-core' )            => get_post_meta( $post_id, 'product_acquisition_method', true ),
+			__( 'Test dates', 'longevity-core' )             => trim( (string) get_post_meta( $post_id, 'testing_start_date', true ) . ' – ' . (string) get_post_meta( $post_id, 'testing_end_date', true ), ' –' ),
+			__( 'Comparison set', 'longevity-core' )         => get_post_meta( $post_id, 'comparison_set', true ),
+			__( 'Commercial relationship', 'longevity-core' ) => get_post_meta( $post_id, 'commercial_relationship', true ),
+		);
+		$score      = (float) get_post_meta( $post_id, 'review_score', true );
+		$confidence = (string) get_post_meta( $post_id, 'review_score_confidence', true );
+		$model      = (string) get_post_meta( $post_id, 'tested_product_model', true );
+		$html = '<section class="longevity-product-summary" aria-labelledby="lel-product-summary"><div class="longevity-product-identity"><p class="longevity-kicker">' . esc_html__( 'Tested product', 'longevity-core' ) . '</p><h2 id="lel-product-summary">' . esc_html( $model ?: get_the_title( $post_id ) ) . '</h2><span class="longevity-status-badge ' . ( $complete ? 'is-complete' : 'is-incomplete' ) . '">' . esc_html( $complete ? __( 'Testing complete', 'longevity-core' ) : __( 'Testing in progress', 'longevity-core' ) ) . '</span></div>';
+		if ( $complete && Rankings::is_eligible( $post_id ) ) {
+			$html .= '<div class="longevity-score-panel"><span>' . esc_html__( 'Overall score', 'longevity-core' ) . '</span><strong>' . esc_html( number_format_i18n( $score, 1 ) ) . '</strong><span>/5</span><span class="longevity-confidence-badge">' . esc_html( $confidence ) . '</span></div>';
+		}
+		$html .= '<dl class="longevity-product-facts">';
+		foreach ( $fields as $label => $value ) {
+			if ( '' !== trim( (string) $value ) ) {
+				$html .= '<div><dt>' . esc_html( $label ) . '</dt><dd>' . esc_html( (string) $value ) . '</dd></div>';
+			}
+		}
+		$categories = get_the_category( $post_id );
+		if ( $categories ) {
+			$html .= '<div><dt>' . esc_html__( 'Ranking category', 'longevity-core' ) . '</dt><dd><a href="' . esc_url( get_category_link( $categories[0]->term_id ) ) . '">' . esc_html( $categories[0]->name ) . '</a></dd></div>';
+		}
+		return $html . '</dl></section>';
+	}
+
+	/** Render approved public-result rows without private record identifiers or raw notes. */
+	public static function render_test_results( int $post_id ): string {
+		if ( $post_id <= 0 || 'review' !== get_post_type( $post_id ) ) {
+			return '';
+		}
+		$version   = (string) get_post_meta( $post_id, 'testing_protocol_version', true );
+		$record_id = (int) get_post_meta( $post_id, 'test_record_id', true );
+		if ( ! Review_Methodology::valid_test_record( $record_id, $version ) ) {
+			return '';
+		}
+		$rows = Review_Methodology::sanitize_public_results( get_post_meta( $record_id, 'public_test_results', true ) );
+		if ( empty( $rows ) ) {
+			return '';
+		}
+		$labels = array( 'meets' => __( 'Meets reference', 'longevity-core' ), 'partially_meets' => __( 'Partially meets', 'longevity-core' ), 'does_not_meet' => __( 'Does not meet', 'longevity-core' ), 'informational' => __( 'Informational', 'longevity-core' ), 'not_applicable' => __( 'Not applicable', 'longevity-core' ) );
+		$html = '<section class="longevity-test-results" aria-labelledby="lel-test-results"><div class="longevity-section-header"><div><p class="longevity-kicker">Recorded observations</p><h2 id="lel-test-results">Structured test results</h2></div><p>These bounded public rows come from the approved test record. Private notes and identifiers are not exposed.</p></div><div class="longevity-table-wrap"><table><thead><tr><th scope="col">' . esc_html__( 'Metric', 'longevity-core' ) . '</th><th scope="col">' . esc_html__( 'Observed', 'longevity-core' ) . '</th><th scope="col">' . esc_html__( 'Reference', 'longevity-core' ) . '</th><th scope="col">' . esc_html__( 'Result', 'longevity-core' ) . '</th><th scope="col">' . esc_html__( 'Interpretation', 'longevity-core' ) . '</th></tr></thead><tbody>';
+		foreach ( $rows as $row ) {
+			$reference = implode( ': ', array_filter( array( $row['reference_label'], $row['reference_value'] ) ) );
+			$html .= '<tr><th scope="row">' . esc_html( $row['label'] ) . '</th><td>' . esc_html( trim( $row['observed_value'] . ' ' . $row['unit'] ) ) . '</td><td>' . esc_html( $reference ?: '—' ) . '</td><td><span class="longevity-result-status" data-status="' . esc_attr( $row['status'] ) . '">' . esc_html( $labels[ $row['status'] ] ) . '</span></td><td>' . esc_html( $row['note'] ?: '—' ) . '</td></tr>';
+		}
+		return $html . '</tbody></table></div></section>';
 	}
 
 	/** Render the review verdict and buying-decision context without blank rows. */
@@ -390,7 +508,7 @@ final class Public_Components {
 		if ( $grade ) {
 			$items[] = '<span>' . esc_html( sprintf( __( 'Evidence %s', 'longevity-core' ), $grade ) ) . '</span>';
 		}
-		if ( 'review' === get_post_type( $post_id ) && in_array( get_post_meta( $post_id, 'testing_status', true ), array( 'complete', 'approved' ), true ) ) {
+		if ( 'review' === get_post_type( $post_id ) && in_array( get_post_meta( $post_id, 'testing_status', true ), array( 'complete', 'approved' ), true ) && Review_Methodology::valid_test_record( (int) get_post_meta( $post_id, 'test_record_id', true ), (string) get_post_meta( $post_id, 'testing_protocol_version', true ) ) ) {
 			$items[] = '<span>' . esc_html__( 'Tested', 'longevity-core' ) . '</span>';
 		}
 		if ( 'complete' === get_post_meta( $post_id, 'medical_review_status', true ) && get_post_meta( $post_id, 'medical_review_attested', true ) ) {

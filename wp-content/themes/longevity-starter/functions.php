@@ -11,6 +11,8 @@ add_action(
 	'wp_enqueue_scripts',
 	static function (): void {
 		wp_enqueue_style( 'longevity-starter', get_stylesheet_uri(), array(), wp_get_theme()->get( 'Version' ) );
+		wp_enqueue_style( 'longevity-consumer-lab', get_theme_file_uri( 'assets/css/consumer-lab.css' ), array( 'longevity-starter' ), wp_get_theme()->get( 'Version' ) );
+		wp_enqueue_script( 'longevity-site-ui', get_theme_file_uri( 'assets/js/site-ui.js' ), array(), wp_get_theme()->get( 'Version' ), true );
 	}
 );
 
@@ -21,7 +23,7 @@ add_action(
 		remove_action( 'wp_footer', 'the_block_template_skip_link' );
 		add_theme_support( 'wp-block-styles' );
 		add_theme_support( 'editor-styles' );
-		add_editor_style( 'style.css' );
+		add_editor_style( array( 'style.css', 'assets/css/consumer-lab.css' ) );
 		add_theme_support( 'responsive-embeds' );
 		add_theme_support( 'title-tag' );
 		add_theme_support( 'custom-logo' );

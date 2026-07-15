@@ -17,6 +17,7 @@ $longevity_core_files = array(
 	'class-claims.php',
 	'class-affiliate-registry.php',
 	'class-review-methodology.php',
+	'class-rankings.php',
 	'class-corrections.php',
 	'class-publication-gates.php',
 	'class-review-workflow.php',
@@ -65,6 +66,7 @@ final class Bootstrap {
 		Claims::init();
 		Affiliate_Registry::init();
 		Review_Methodology::init();
+		Rankings::init();
 		Corrections::init();
 		Publication_Gates::init();
 		Review_Workflow::init();

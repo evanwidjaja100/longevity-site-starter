@@ -5,6 +5,7 @@ require __DIR__ . '/bootstrap.php';
 use Longevity\Core\Meta_Registry;
 use Longevity\Core\Publication_Gates;
 use Longevity\Core\Review_Methodology;
+use Longevity\Core\Rankings;
 
 $failures = array();
 $assert = static function ( bool $condition, string $message ) use ( &$failures ): void {
@@ -23,6 +24,13 @@ $assert( 3.4 === $score['score'], 'Weighted score must equal 3.4.' );
 $assert( 2 === count( $score['dimensions'] ), 'Calculated score must retain raw dimensions.' );
 $assert( 'U' === Meta_Registry::sanitize_value( 'evidence_grade', 'U' ), 'Evidence grade U must be accepted.' );
 $assert( '' === Meta_Registry::sanitize_value( 'date', 'July 14' ), 'Non-ISO date must be rejected.' );
+$public_results = Review_Methodology::sanitize_public_results( array( array( 'label' => '<b>Battery</b>', 'observed_value' => '6.2', 'status' => 'meets', 'private' => 'drop' ) ) );
+$assert( 1 === count( $public_results ) && 'Battery' === $public_results[0]['label'] && ! isset( $public_results[0]['private'] ), 'Public result rows must be sanitized and unexpected fields removed.' );
+
+$GLOBALS['lel_test_meta'] = array( 1 => array( 'review_score' => 4, 'review_score_confidence' => 'Low confidence', 'last_material_update' => '2026-07-01' ), 2 => array( 'review_score' => 4, 'review_score_confidence' => 'High confidence', 'last_material_update' => '2026-07-01' ) );
+$GLOBALS['lel_test_titles'] = array( 1 => 'Beta', 2 => 'Alpha' );
+$ranked = Rankings::sort( array( (object) array( 'ID' => 1 ), (object) array( 'ID' => 2 ) ) );
+$assert( 2 === $ranked[0]->ID, 'Confidence must provide the deterministic score tiebreaker.' );
 
 $context = array(
 	'post_type' => 'post',

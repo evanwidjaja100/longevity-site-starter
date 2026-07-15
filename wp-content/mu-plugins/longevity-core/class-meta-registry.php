@@ -137,6 +137,10 @@ final class Meta_Registry {
 			'data_export_available'            => self::field( 'boolean', false, 'boolean', $review, true, true, 'Whether the product supports data export.' ),
 			'subscription_required'            => self::field( 'boolean', false, 'boolean', $review, true, true, 'Whether a subscription is required.' ),
 			'warranty_checked_date'            => self::field( 'string', '', 'date', $review, true, true, 'Date warranty terms were checked.' ),
+			'product_brand'                    => self::field( 'string', '', 'text', $review, true, true, 'Product brand exactly as displayed by the manufacturer.' ),
+			'product_variant'                  => self::field( 'string', '', 'text', $review, true, true, 'Tested color, size, capacity, or other material variant.' ),
+			'product_price_amount'             => self::field( 'number', 0.0, 'price', $review, true, true, 'Observed non-negative price amount; never a best-price claim.' ),
+			'product_price_currency'           => self::field( 'string', '', 'currency', $review, true, true, 'ISO 4217 currency code for the observed price.' ),
 			// Backward-compatible aliases retained for existing content.
 			'medical_reviewer'                 => self::field( 'string', '', 'text', $editorial, true, true, 'Deprecated fallback reviewer name.' ),
 			'last_fact_checked'                 => self::field( 'string', '', 'date', $editorial, true, true, 'Deprecated fact-check date.' ),
@@ -193,6 +197,11 @@ final class Meta_Registry {
 				return absint( $value );
 			case 'score':
 				return min( 5.0, max( 0.0, (float) $value ) );
+			case 'price':
+				return min( 1000000.0, max( 0.0, round( (float) $value, 2 ) ) );
+			case 'currency':
+				$value = strtoupper( sanitize_text_field( (string) $value ) );
+				return preg_match( '/^[A-Z]{3}$/', $value ) ? $value : '';
 			case 'date':
 				$value = sanitize_text_field( (string) $value );
 				return preg_match( '/^\d{4}-\d{2}-\d{2}$/', $value ) ? $value : '';

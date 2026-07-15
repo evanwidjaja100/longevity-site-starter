@@ -16,6 +16,7 @@ final class Admin_UI {
 		add_action( 'add_meta_boxes', array( self::class, 'add_meta_boxes' ) );
 		add_action( 'save_post_post', array( self::class, 'save_editorial_meta' ), 20, 3 );
 		add_action( 'save_post_review', array( self::class, 'save_editorial_meta' ), 20, 3 );
+		add_action( 'save_post_lel_test_record', array( self::class, 'save_public_test_results' ), 20, 3 );
 		add_action( 'show_user_profile', array( self::class, 'render_reviewer_profile' ) );
 		add_action( 'edit_user_profile', array( self::class, 'render_reviewer_profile' ) );
 		add_action( 'personal_options_update', array( self::class, 'save_reviewer_profile' ) );
@@ -32,6 +33,7 @@ final class Admin_UI {
 			add_meta_box( 'lel-readiness', __( 'Publication readiness', 'longevity-core' ), array( self::class, 'render_readiness' ), $post_type, 'side', 'high' );
 			add_meta_box( 'lel-governance', __( 'Evidence, review, testing, and disclosure', 'longevity-core' ), array( self::class, 'render_governance' ), $post_type, 'normal', 'high' );
 		}
+		add_meta_box( 'lel-public-test-results', __( 'Approved public test results', 'longevity-core' ), array( self::class, 'render_public_test_results_editor' ), 'lel_test_record', 'normal', 'high' );
 	}
 
 	/** Render readiness summary. */
@@ -109,6 +111,8 @@ final class Admin_UI {
 		if ( 'review' === $post->post_type ) {
 			echo '</div></details><details class="lel-governance-section" data-lel-section="review-score"><summary><strong>' . esc_html__( 'Review scoring and decision', 'longevity-core' ) . '</strong><span>' . esc_html__( 'Product identity, fit, failures, dimensions, and confidence', 'longevity-core' ) . '</span></summary><div class="lel-governance-fields">';
 			self::text( $post->ID, 'tested_product_model', __( 'Tested product model', 'longevity-core' ) );
+			self::text( $post->ID, 'product_brand', __( 'Product brand', 'longevity-core' ) );
+			self::text( $post->ID, 'product_variant', __( 'Tested variant', 'longevity-core' ) );
 			self::text( $post->ID, 'tested_firmware_version', __( 'Firmware version', 'longevity-core' ) );
 			self::text( $post->ID, 'tested_app_version', __( 'App version', 'longevity-core' ) );
 			self::textarea( $post->ID, 'comparison_set', __( 'Comparison set', 'longevity-core' ) );
@@ -121,6 +125,8 @@ final class Admin_UI {
 			self::text( $post->ID, 'best_for', __( 'Best for', 'longevity-core' ) );
 			self::text( $post->ID, 'not_for', __( 'Not for', 'longevity-core' ) );
 			self::date( $post->ID, 'price_checked_date', __( 'Price checked date', 'longevity-core' ) );
+			self::number( $post->ID, 'product_price_amount', __( 'Observed price amount', 'longevity-core' ), '0.01', 0, 1000000 );
+			self::text( $post->ID, 'product_price_currency', __( 'Price currency (ISO 4217)', 'longevity-core' ) );
 			self::text( $post->ID, 'price_region', __( 'Price region', 'longevity-core' ) );
 			self::date( $post->ID, 'warranty_checked_date', __( 'Warranty checked date', 'longevity-core' ) );
 		}
@@ -193,6 +199,34 @@ final class Admin_UI {
 
 		self::save_fact_check_completion( $post_id );
 		self::save_medical_attestation( $post_id );
+	}
+
+	/** Render a structured editor so operational staff never need to hand-write JSON. */
+	public static function render_public_test_results_editor( \WP_Post $post ): void {
+		wp_nonce_field( 'longevity_save_public_results', 'longevity_public_results_nonce' );
+		$rows = Review_Methodology::sanitize_public_results( get_post_meta( $post->ID, 'public_test_results', true ) );
+		if ( empty( $rows ) ) {
+			$rows[] = array( 'label' => '', 'observed_value' => '', 'unit' => '', 'reference_label' => '', 'reference_value' => '', 'status' => 'informational', 'note' => '', 'display_order' => 10 );
+		}
+		echo '<p>' . esc_html__( 'Only approved, non-sensitive observations belong here. Raw notes, tester identities, account data, serial numbers, and private evidence locations must remain in the protected record.', 'longevity-core' ) . '</p>';
+		echo '<div class="lel-results-editor"><div class="table-scroll"><table class="widefat striped"><thead><tr><th>' . esc_html__( 'Metric', 'longevity-core' ) . '</th><th>' . esc_html__( 'Observed', 'longevity-core' ) . '</th><th>' . esc_html__( 'Unit', 'longevity-core' ) . '</th><th>' . esc_html__( 'Reference label', 'longevity-core' ) . '</th><th>' . esc_html__( 'Reference value', 'longevity-core' ) . '</th><th>' . esc_html__( 'Status', 'longevity-core' ) . '</th><th>' . esc_html__( 'Interpretation note', 'longevity-core' ) . '</th><th>' . esc_html__( 'Order', 'longevity-core' ) . '</th><th>' . esc_html__( 'Actions', 'longevity-core' ) . '</th></tr></thead><tbody data-lel-result-rows>';
+		foreach ( $rows as $index => $row ) {
+			self::public_result_row( $row, $index );
+		}
+		echo '</tbody></table></div><p><button type="button" class="button" data-lel-add-result>' . esc_html__( 'Add result row', 'longevity-core' ) . '</button></p></div>';
+	}
+
+	/** Save structured public rows with nonce and least-privilege capability checks. */
+	public static function save_public_test_results( int $post_id, \WP_Post $post, bool $update ): void {
+		unset( $post, $update );
+		if ( wp_is_post_revision( $post_id ) || wp_is_post_autosave( $post_id ) || ! current_user_can( 'manage_test_protocols' ) ) {
+			return;
+		}
+		if ( empty( $_POST['longevity_public_results_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['longevity_public_results_nonce'] ) ), 'longevity_save_public_results' ) ) {
+			return;
+		}
+		$rows = isset( $_POST['public_test_results_rows'] ) && is_array( $_POST['public_test_results_rows'] ) ? wp_unslash( $_POST['public_test_results_rows'] ) : array();
+		update_post_meta( $post_id, 'public_test_results', Review_Methodology::sanitize_public_results( $rows ) );
 	}
 
 	/** Render reviewer profile fields. */
@@ -377,6 +411,20 @@ final class Admin_UI {
 	private static function textarea( int $post_id, string $key, string $label ): void {
 		$value = get_post_meta( $post_id, $key, true );
 		echo '<p><label for="' . esc_attr( $key ) . '"><strong>' . esc_html( $label ) . '</strong></label><br><textarea class="widefat" rows="3" id="' . esc_attr( $key ) . '" name="' . esc_attr( $key ) . '" aria-describedby="' . esc_attr( $key ) . '-help">' . esc_textarea( (string) $value ) . '</textarea>' . self::field_help( $key ) . '</p>';
+	}
+
+	/** Render one structured public test-result row. */
+	private static function public_result_row( array $row, int $index ): void {
+		$fields = array( 'label', 'observed_value', 'unit', 'reference_label', 'reference_value', 'note', 'display_order' );
+		echo '<tr data-lel-result-row>';
+		foreach ( array_slice( $fields, 0, 5 ) as $field ) {
+			echo '<td><label class="screen-reader-text" for="lel-result-' . esc_attr( $field . '-' . $index ) . '">' . esc_html( str_replace( '_', ' ', ucfirst( $field ) ) ) . '</label><input id="lel-result-' . esc_attr( $field . '-' . $index ) . '" type="text" name="public_test_results_rows[' . esc_attr( (string) $index ) . '][' . esc_attr( $field ) . ']" value="' . esc_attr( (string) ( $row[ $field ] ?? '' ) ) . '"></td>';
+		}
+		echo '<td><label class="screen-reader-text" for="lel-result-status-' . esc_attr( (string) $index ) . '">' . esc_html__( 'Status', 'longevity-core' ) . '</label><select id="lel-result-status-' . esc_attr( (string) $index ) . '" name="public_test_results_rows[' . esc_attr( (string) $index ) . '][status]">';
+		foreach ( array( 'meets' => 'Meets reference', 'partially_meets' => 'Partially meets', 'does_not_meet' => 'Does not meet', 'informational' => 'Informational', 'not_applicable' => 'Not applicable' ) as $value => $label ) {
+			echo '<option value="' . esc_attr( $value ) . '" ' . selected( $row['status'] ?? 'informational', $value, false ) . '>' . esc_html( $label ) . '</option>';
+		}
+		echo '</select></td><td><label class="screen-reader-text" for="lel-result-note-' . esc_attr( (string) $index ) . '">' . esc_html__( 'Interpretation note', 'longevity-core' ) . '</label><textarea id="lel-result-note-' . esc_attr( (string) $index ) . '" name="public_test_results_rows[' . esc_attr( (string) $index ) . '][note]" rows="2">' . esc_textarea( (string) ( $row['note'] ?? '' ) ) . '</textarea></td><td><label class="screen-reader-text" for="lel-result-order-' . esc_attr( (string) $index ) . '">' . esc_html__( 'Display order', 'longevity-core' ) . '</label><input id="lel-result-order-' . esc_attr( (string) $index ) . '" type="number" min="0" max="999" name="public_test_results_rows[' . esc_attr( (string) $index ) . '][display_order]" value="' . esc_attr( (string) ( $row['display_order'] ?? ( $index + 1 ) * 10 ) ) . '"></td><td><button type="button" class="button-link" data-lel-result-up aria-label="' . esc_attr__( 'Move row up', 'longevity-core' ) . '">↑</button> <button type="button" class="button-link" data-lel-result-down aria-label="' . esc_attr__( 'Move row down', 'longevity-core' ) . '">↓</button> <button type="button" class="button-link-delete" data-lel-remove-result>' . esc_html__( 'Remove', 'longevity-core' ) . '</button></td></tr>';
 	}
 
 	private static function json_textarea( int $post_id, string $key, string $label ): void {

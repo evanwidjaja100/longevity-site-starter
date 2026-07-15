@@ -25,4 +25,22 @@ final class ReviewMethodologyTest extends TestCase {
 		self::assertSame( 5.0, $dimensions[0]['score'] );
 		self::assertSame( 100.0, $dimensions[0]['weight'] );
 	}
+
+	public function test_sanitizes_bounded_public_results(): void {
+		$rows = Review_Methodology::sanitize_public_results(
+			array(
+				array( 'label' => '<b>Battery</b>', 'observed_value' => '6.2', 'unit' => 'days', 'status' => 'meets', 'note' => '<script>alert(1)</script>Documented.', 'display_order' => 20, 'private_note' => 'must disappear' ),
+				array( 'label' => 'Broken', 'observed_value' => 'x', 'status' => 'invented' ),
+			)
+		);
+		self::assertCount( 1, $rows );
+		self::assertSame( 'Battery', $rows[0]['label'] );
+		self::assertSame( 'alert(1)Documented.', $rows[0]['note'] );
+		self::assertArrayNotHasKey( 'private_note', $rows[0] );
+	}
+
+	public function test_public_results_are_limited_to_thirty_rows(): void {
+		$input = array_fill( 0, 40, array( 'label' => 'Metric', 'observed_value' => 'Value', 'status' => 'informational' ) );
+		self::assertCount( 30, Review_Methodology::sanitize_public_results( $input ) );
+	}
 }

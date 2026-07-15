@@ -100,3 +100,16 @@
 		padding-inline: 0.75rem;
 	}
 }
+.lel-results-editor .table-scroll {
+	overflow-x: auto;
+}
+
+.lel-results-editor :is(input, select, textarea) {
+	min-width: 8rem;
+	width: 100%;
+}
+
+.lel-results-editor td:last-child {
+	min-width: 8rem;
+	white-space: nowrap;
+}
