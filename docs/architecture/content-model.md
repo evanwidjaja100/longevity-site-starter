@@ -18,4 +18,8 @@ Medical reviewers are WordPress users with optional public professional fields. 
 Operational publication state lives in WordPress. Repository CSV and Markdown files define assignments, protocols, governance, and exchange formats; they do not silently overwrite WordPress records. CSV import is explicit, capability-controlled, validated, and supports dry runs.
 
 ## Lifecycle
+
+## Public ranking projection
+
+Reviews use the existing built-in `category` taxonomy. A category becomes a public ranking category only when it contains at least one eligible review. `public_test_results` belongs to `lel_test_record`, not the public review, and is limited to 30 sanitized rows. Review product metadata may include brand, variant, non-negative observed price amount, ISO currency, existing region, and checked date. These fields do not enable value sorting by themselves.
 Records retain stable IDs. Superseded claims point to replacements. Protocols are versioned rather than edited retroactively. Corrections are append-oriented, and material workflow events are stored in a bounded audit log.

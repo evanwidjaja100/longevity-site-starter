@@ -43,6 +43,11 @@ final class Analytics {
 			'comparison_filter_use'    => array( 'content_id', 'product_category' ),
 			'methodology_download'     => array( 'content_id', 'placement' ),
 			'test_data_download'       => array( 'content_id', 'placement' ),
+			'ranking_sort'            => array( 'category', 'sort' ),
+			'ranking_filter'          => array( 'category', 'filter_name' ),
+			'ranking_report_open'     => array( 'content_id', 'category', 'placement' ),
+			'outbound_click'          => array( 'content_id', 'placement' ),
+			'search_open'             => array( 'placement' ),
 		);
 	}
 }

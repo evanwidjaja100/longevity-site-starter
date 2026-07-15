@@ -22,4 +22,8 @@ Only authenticated users with explicit capabilities may complete review states, 
 6. Public templates and conservative JSON-LD expose only substantiated, non-empty data.
 
 ## Portability
+
+## Consumer Lab ranking flow
+
+`Rankings` sits between WordPress records and every public ordered representation. Dynamic blocks delegate to `Public_Components`, which asks `Rankings` for eligible reviews and category aggregates. Structured observations flow from a private approved `lel_test_record` through the bounded public-result sanitizer; raw operational fields never cross that boundary. The block theme renders the result server-side and uses JavaScript only for search-dialog enhancement.
 Critical data is stored through WordPress APIs in posts, users, and post metadata. The theme can be replaced without losing governance records. The MU plugin can be copied to managed WordPress hosts that permit MU plugins. Host-specific caching, WAF, SMTP, backups, and observability remain external adapters.

@@ -1,5 +1,7 @@
 # Conservative Schema Model
 
+Consumer Lab directory and eligible category rankings may emit `CollectionPage` with a visible, genuine `ItemList`. Product `Review` schema now delegates eligibility to the authoritative ranking service and remains absent if testing, score, confidence, protocol, freshness, correction, or disclosure state is invalid. No aggregate rating, certification, user rating, unsupported offer, or hidden ranking item is emitted.
+
 The schema service emits one `@graph` containing only entities supported by visible page content and stored metadata:
 
 - `Organization` and `WebSite` on the site.

@@ -86,10 +86,33 @@
           "score": {
             "type": "number",
             "minimum": 0,
-            "maximum": 10
+            "maximum": 5
           }
         },
         "additionalProperties": false
+      }
+    },
+    "product_brand": { "type": "string", "maxLength": 120 },
+    "product_variant": { "type": "string", "maxLength": 120 },
+    "product_price_amount": { "type": "number", "minimum": 0, "maximum": 1000000 },
+    "product_price_currency": { "type": "string", "pattern": "^[A-Z]{3}$" },
+    "public_test_results": {
+      "type": "array",
+      "maxItems": 30,
+      "items": {
+        "type": "object",
+        "required": ["label", "observed_value", "status", "display_order"],
+        "additionalProperties": false,
+        "properties": {
+          "label": { "type": "string", "minLength": 1, "maxLength": 100 },
+          "observed_value": { "type": "string", "minLength": 1, "maxLength": 120 },
+          "unit": { "type": "string", "maxLength": 40 },
+          "reference_label": { "type": "string", "maxLength": 100 },
+          "reference_value": { "type": "string", "maxLength": 120 },
+          "status": { "enum": ["meets", "partially_meets", "does_not_meet", "informational", "not_applicable"] },
+          "note": { "type": "string", "maxLength": 500 },
+          "display_order": { "type": "integer", "minimum": 0, "maximum": 999 }
+        }
       }
     }
   },

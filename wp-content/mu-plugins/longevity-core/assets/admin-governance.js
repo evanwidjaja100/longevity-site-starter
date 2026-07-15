@@ -1,6 +1,43 @@
 (() => {
   'use strict';
 
+  const resultsEditor = document.querySelector('.lel-results-editor');
+  if (resultsEditor) {
+    const resultRows = resultsEditor.querySelector('[data-lel-result-rows]');
+    const resultFields = ['label', 'observed_value', 'unit', 'reference_label', 'reference_value', 'status', 'note', 'display_order'];
+    const reindexResults = () => {
+      resultRows.querySelectorAll('[data-lel-result-row]').forEach((row, index) => {
+        row.querySelectorAll('input, select, textarea').forEach((input, fieldIndex) => {
+          const field = resultFields[fieldIndex];
+          input.name = `public_test_results_rows[${index}][${field}]`;
+          input.id = `lel-result-${field}-${index}`;
+        });
+      });
+    };
+    resultsEditor.addEventListener('click', (event) => {
+      const row = event.target.closest('[data-lel-result-row]');
+      if (event.target.closest('[data-lel-add-result]')) {
+        const index = resultRows.children.length;
+        const next = document.createElement('tr');
+        next.dataset.lelResultRow = '';
+        next.innerHTML = `<td><input type="text" aria-label="Metric"></td><td><input type="text" aria-label="Observed value"></td><td><input type="text" aria-label="Unit"></td><td><input type="text" aria-label="Reference label"></td><td><input type="text" aria-label="Reference value"></td><td><select aria-label="Status"><option value="meets">Meets reference</option><option value="partially_meets">Partially meets</option><option value="does_not_meet">Does not meet</option><option value="informational" selected>Informational</option><option value="not_applicable">Not applicable</option></select></td><td><textarea rows="2" aria-label="Interpretation note"></textarea></td><td><input type="number" min="0" max="999" value="${(index + 1) * 10}" aria-label="Display order"></td><td><button type="button" class="button-link" data-lel-result-up aria-label="Move row up">↑</button> <button type="button" class="button-link" data-lel-result-down aria-label="Move row down">↓</button> <button type="button" class="button-link-delete" data-lel-remove-result>Remove</button></td>`;
+        resultRows.appendChild(next);
+        reindexResults();
+        next.querySelector('input').focus();
+      } else if (row && event.target.closest('[data-lel-remove-result]')) {
+        row.remove();
+        reindexResults();
+      } else if (row && event.target.closest('[data-lel-result-up]') && row.previousElementSibling) {
+        resultRows.insertBefore(row, row.previousElementSibling);
+        reindexResults();
+      } else if (row && event.target.closest('[data-lel-result-down]') && row.nextElementSibling) {
+        resultRows.insertBefore(row.nextElementSibling, row);
+        reindexResults();
+      }
+    });
+    reindexResults();
+  }
+
   const editor = document.querySelector('.lel-editorial-grid');
   if (!editor) return;
   editor.classList.add('lel-js');

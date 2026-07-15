@@ -18,6 +18,10 @@
     'related-content': ['Related content', 'Deterministic public related guides and reviews.'],
     'content-card-meta': ['Content card metadata', 'Content type, update date, evidence, testing, and review state.'],
     breadcrumbs: ['Breadcrumbs', 'Visible hierarchy shared with breadcrumb schema.'],
+    'ranking-directory': ['Ranking directory', 'Eligible ranking categories, counts, scores, and update dates.'],
+    'ranking-list': ['Ranking list', 'Accessible server-rendered ranking controls and ordered product reports.'],
+    'product-report-summary': ['Product report summary', 'Tested model, decision context, status, confidence, and commercial relationship.'],
+    'test-results': ['Structured test results', 'Approved bounded observations from the linked private test record.'],
     'search-filters': ['Search filters', 'Progressively enhanced, allowlisted GET filters.'],
     'author-profile': ['Author profile', 'Public biography and verified professional scope where present.']
   };

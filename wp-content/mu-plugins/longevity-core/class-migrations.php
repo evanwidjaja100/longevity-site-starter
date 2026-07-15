@@ -11,7 +11,7 @@ defined( 'ABSPATH' ) || exit;
 
 /** Advances non-destructive metadata and option migrations once per version. */
 final class Migrations {
-	public const CURRENT_VERSION = 1;
+	public const CURRENT_VERSION = 2;
 
 	/** Register the version check. */
 	public static function init(): void {
@@ -47,6 +47,10 @@ final class Migrations {
 		if ( 1 === $version ) {
 			add_option( 'lel_last_freshness_report', array(), '', false );
 			add_option( 'lel_freshness_batch_size', 100, '', false );
+		}
+		if ( 2 === $version ) {
+			add_option( 'lel_rankings_cache_version', '1', '', false );
+			add_option( 'lel_public_results_schema_version', '1.0.0', '', false );
 		}
 	}
 }

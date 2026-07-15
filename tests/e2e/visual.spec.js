@@ -5,13 +5,15 @@ const pages = [
   ['article', '/test-evidence-guide/'],
   ['review', '/reviews/test-valid-review/'],
   ['search', '/?s=evidence'],
-  ['archive', '/reviews/']
+  ['archive', '/reviews/'],
+  ['ranking', '/category/evidence-literacy/']
 ];
 
 for (const [name, path] of pages) {
   test(`${name} captures desktop and mobile visual evidence`, async ({ page }, testInfo) => {
     for (const viewport of [
       { name: 'desktop', width: 1440, height: 1000 },
+      { name: 'tablet', width: 768, height: 1024 },
       { name: 'mobile', width: 360, height: 800 }
     ]) {
       await page.setViewportSize(viewport);

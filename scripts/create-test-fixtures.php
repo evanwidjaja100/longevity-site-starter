@@ -248,6 +248,10 @@ lel_fixture_meta(
 		'comparison_devices' => 'Example Comparator TEST-2.',
 		'environment'        => 'Local Docker environment.',
 		'evidence_references'=> 'https://example.invalid/test-method',
+		'public_test_results'=> array(
+			array( 'label' => 'Battery duration', 'observed_value' => '6.2', 'unit' => 'days', 'reference_label' => 'Synthetic reference', 'reference_value' => '7 days', 'status' => 'partially_meets', 'note' => 'Synthetic observation for interface testing only.', 'display_order' => 10 ),
+			array( 'label' => 'Data export', 'observed_value' => 'Available', 'unit' => '', 'reference_label' => '', 'reference_value' => '', 'status' => 'informational', 'note' => 'No real account or export was used.', 'display_order' => 20 ),
+		),
 		'conflicts'          => 'Synthetic test data only.',
 		'approval_status'    => 'approved',
 		'approved_by'        => $admin_id,
@@ -282,6 +286,12 @@ lel_fixture_meta(
 			'best_for'                  => 'Testing the complete review interface.',
 			'not_for'                   => 'Any real purchase or health decision.',
 			'tested_product_model'      => 'Example Device TEST-1',
+			'product_brand'             => '[TEST] Example Labs',
+			'product_variant'           => 'Synthetic blue',
+			'product_price_amount'      => 199.00,
+			'product_price_currency'    => 'USD',
+			'price_checked_date'        => $today,
+			'price_region'              => 'Synthetic US market',
 			'comparison_set'            => 'Example Comparator TEST-2',
 			'major_failures'            => 'No physical product was tested.',
 			'fact_check_status'         => 'not_required',
@@ -291,6 +301,84 @@ lel_fixture_meta(
 );
 if ( $category ) {
 	wp_set_post_terms( $review_id, array( (int) $category->term_id ), 'category' );
+}
+
+$empty_category = get_term_by( 'slug', 'test-empty-ranking', 'category' );
+if ( ! $empty_category ) {
+	$created        = wp_insert_term( '[TEST] Empty ranking', 'category', array( 'slug' => 'test-empty-ranking' ) );
+	$empty_category = is_wp_error( $created ) ? null : get_term( (int) $created['term_id'], 'category' );
+}
+
+$merchant_id = lel_fixture_post( 'lel_affiliate', 'test-approved-merchant', '[TEST] Approved merchant', '', $admin_id );
+lel_fixture_meta(
+	$merchant_id,
+	array(
+		'merchant_id'                => 'TEST-MERCHANT',
+		'merchant_name'              => '[TEST] Example Merchant',
+		'merchant_domain'            => 'merchant.example.invalid',
+		'program_name'               => '[TEST] Synthetic affiliate program',
+		'relationship_status'        => 'active',
+		'effective_date'             => '2025-01-01',
+		'disclosure_language'        => 'Synthetic affiliate relationship for local and CI testing only.',
+		'editorial_independence_note'=> 'The synthetic relationship cannot alter score or order.',
+		'owner_user_id'              => $admin_id,
+		'last_verified_date'         => $today,
+	)
+);
+
+/** Create another approved synthetic test record for ranking coverage. */
+function lel_fixture_test_record( string $slug, string $product, int $admin_id, string $today, array $results ): int {
+	$record = lel_fixture_post( 'lel_test_record', $slug, '[TEST] ' . $product . ' test record', '', $admin_id );
+	lel_fixture_meta(
+		$record,
+		array(
+			'product_name' => $product, 'unit_identifier' => strtoupper( $slug ), 'acquisition_method' => 'purchased', 'tester_user_ids' => (string) $admin_id,
+			'test_start_date' => '2025-02-01', 'test_end_date' => '2025-02-03', 'protocol_id' => 'TEST-WEARABLE', 'protocol_version' => '1.0',
+			'raw_observations' => 'Synthetic observations for interface verification only.', 'public_test_results' => $results, 'measurement_equipment' => 'No physical equipment; software fixture.',
+			'failures' => 'Synthetic record only.', 'deviations' => 'Physical testing not applicable.', 'comparison_devices' => 'Example Comparator TEST-2.', 'environment' => 'Local Docker environment.',
+			'evidence_references' => 'https://example.invalid/test-method', 'conflicts' => 'Synthetic test data only.', 'approval_status' => 'approved', 'approved_by' => $admin_id, 'approval_date' => $today,
+		)
+	);
+	return $record;
+}
+
+$record_two = lel_fixture_test_record(
+	'test-device-two-record',
+	'Example Device TEST-2',
+	$admin_id,
+	$today,
+	array( array( 'label' => 'Sync reliability', 'observed_value' => '9', 'unit' => 'of 10 sessions', 'reference_label' => 'Synthetic target', 'reference_value' => '9 of 10', 'status' => 'meets', 'note' => 'Synthetic result.', 'display_order' => 10 ) )
+);
+$record_three = lel_fixture_test_record(
+	'test-device-three-record',
+	'Example Device TEST-3',
+	$admin_id,
+	$today,
+	array( array( 'label' => 'Export format', 'observed_value' => 'CSV', 'unit' => '', 'reference_label' => '', 'reference_value' => '', 'status' => 'informational', 'note' => 'Synthetic result.', 'display_order' => 10 ) )
+);
+
+$shared_review_meta = array_merge(
+	lel_fixture_public_meta( $today, $next_review ),
+	array(
+		'testing_required' => true, 'testing_status' => 'complete', 'testing_start_date' => '2025-02-01', 'testing_end_date' => '2025-02-03', 'testing_duration' => 'Three synthetic sessions',
+		'testing_methodology_url' => 'https://example.invalid/test-method', 'testing_protocol_version' => '1.0', 'product_acquisition_method' => 'purchased',
+		'review_score_version' => '1.0', 'best_for' => 'Automated ranking-interface verification.', 'not_for' => 'Any real purchase or health decision.',
+		'comparison_set' => 'Example Comparator TEST-2', 'major_failures' => 'No physical product was tested.', 'fact_check_status' => 'not_required', 'medical_review_status' => 'not_required',
+		'product_brand' => '[TEST] Example Labs', 'price_checked_date' => $today, 'price_region' => 'Synthetic US market', 'product_price_currency' => 'USD',
+	)
+);
+
+$review_two = lel_fixture_post( 'review', 'test-alpha-review', '[TEST] Alpha product report', $review_content . '\n[affiliate_link url="https://merchant.example.invalid/product" label="View synthetic merchant"]', $author->ID );
+$dimensions_two = array( array( 'name' => 'Interface clarity', 'score' => 4.6, 'weight' => 50.0 ), array( 'name' => 'Metadata completeness', 'score' => 4.2, 'weight' => 50.0 ) );
+lel_fixture_meta( $review_two, array_merge( $shared_review_meta, array( 'test_record_id' => $record_two, 'review_score' => 4.4, 'review_score_dimensions' => $dimensions_two, 'review_score_confidence' => 'High confidence', 'tested_product_model' => 'Example Device TEST-2', 'product_variant' => 'Synthetic small', 'product_price_amount' => 249.00, 'commercial_relationship' => 'affiliate', 'affiliate_disclosure_required' => true, 'affiliate_disclosure_status' => 'complete', 'affiliate_registry_verified' => true ) ) );
+
+$review_three = lel_fixture_post( 'review', 'test-zeta-review', '[TEST] Zeta product report', $review_content, $author->ID );
+$dimensions_three = array( array( 'name' => 'Interface clarity', 'score' => 4.2, 'weight' => 50.0 ), array( 'name' => 'Metadata completeness', 'score' => 4.0, 'weight' => 50.0 ) );
+lel_fixture_meta( $review_three, array_merge( $shared_review_meta, array( 'test_record_id' => $record_three, 'review_score' => 4.1, 'review_score_dimensions' => $dimensions_three, 'review_score_confidence' => 'Preliminary', 'tested_product_model' => 'Example Device TEST-3', 'product_variant' => 'Synthetic large', 'product_price_amount' => 149.00 ) ) );
+
+if ( $category ) {
+	wp_set_post_terms( $review_two, array( (int) $category->term_id ), 'category' );
+	wp_set_post_terms( $review_three, array( (int) $category->term_id ), 'category' );
 }
 
 $blocked_id = lel_fixture_post( 'review', 'test-blocked-review', '[TEST] Blocked incomplete review', $review_content, $admin_id );
@@ -330,7 +418,7 @@ lel_fixture_meta(
 	)
 );
 
-foreach ( array( $article_id, $medical_id, $review_id ) as $public_id ) {
+foreach ( array( $article_id, $medical_id, $review_id, $review_two, $review_three ) as $public_id ) {
 	$result = wp_update_post( array( 'ID' => $public_id, 'post_status' => 'publish' ), true );
 	if ( is_wp_error( $result ) || 'publish' !== get_post_status( $public_id ) ) {
 		WP_CLI::error( sprintf( 'Synthetic fixture %d did not pass its publication gates.', $public_id ) );

@@ -22,7 +22,7 @@ final class Admin_Assets {
 			return;
 		}
 		$screen = get_current_screen();
-		if ( ! $screen || ! in_array( $screen->post_type, array( 'post', 'review' ), true ) ) {
+		if ( ! $screen || ! in_array( $screen->post_type, array( 'post', 'review', 'lel_test_record' ), true ) ) {
 			return;
 		}
 		wp_enqueue_style( 'longevity-admin-governance', LONGEVITY_CORE_URL . 'assets/admin-governance.css', array(), LONGEVITY_CORE_VERSION );

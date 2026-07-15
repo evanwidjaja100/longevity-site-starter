@@ -8,6 +8,10 @@ This repository preserves WordPress as the CMS, a custom block theme as the pres
 
 ## What is included
 
+- A server-rendered Consumer Lab directory at `/reviews/`, deterministic category rankings on existing category archives, and governed product-report summaries.
+- Structured approved public test observations stored on private test records, with a row-based admin editor and strict public boundary.
+- A progressive-enhancement header search dialog; primary search, ranking, sorting, and filtering remain functional without JavaScript.
+
 - Modular `longevity-core` MU plugin with explicit editorial metadata, roles and capabilities, publication gates, audit events, private claim/source/protocol/test/correction/affiliate registries, medical-review attestation, versioned scoring, conservative schema, privacy-aware analytics, REST health/readiness endpoints, and WP-CLI import/export commands.
 - Accessible `longevity-starter` block theme with post and review discovery, trust summaries, reviewer scope, limitations, disclosures, testing methods, correction history, responsive tables, keyboard focus, reduced-motion behavior, and print styles.
 - Trust-first launch calendar, internal-link map, editorial templates, evidence and AI governance, and category-specific testing protocols.
