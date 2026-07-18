@@ -68,11 +68,11 @@ Branch: `improvement/launch-foundation-v2`
 - P1.5 ✅: Add `_longevity_noindex` meta to draft pages; `wp_robots` filter in Bootstrap enforces noindex for drafts and placeholder pages
 - P1.6 ✅: Added `wp_head` action for canonical URLs on category archives via Routes class; 19/19 E2E pass
 
-### Phase 2 — Production-Grade Bootstrap
-- P2.1 ⬜: `wp longevity bootstrap categories` — CLI command for canonical categories
-- P2.2 ⬜: `wp longevity bootstrap content` — CLI command for placeholder content
-- P2.3 ⬜: `wp longevity bootstrap all` — orchestrator command
-- P2.4 ⬜: E2E smoke tests for bootstrap commands
+### Phase 2 — Production-Grade Bootstrap ✅
+- P2.1 ✅: `wp longevity bootstrap categories` — 7 canonical categories created idempotently
+- P2.2 ✅: `wp longevity bootstrap content` — 7 placeholder items (6 posts + 1 review) created as drafts with `_longevity_noindex`
+- P2.3 ✅: `wp longevity bootstrap all` — orchestrates pages, categories, content in sequence
+- P2.4 ✅: 6 E2E smoke tests for bootstrap commands (dry-run, idempotency, all sections)
 
 ### Tip for next agent
 - All PHP CLI commands run via `docker compose run --rm wpcli wp ...` (not `docker exec`)

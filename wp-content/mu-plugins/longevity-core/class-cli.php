@@ -351,7 +351,7 @@ final class Readiness_Command {
 	}
 }
 
-/** Page bootstrap command — creates canonical pages idempotently. */
+/** Bootstrap command — creates canonical pages, categories, and placeholder content idempotently. */
 final class Bootstrap_Command {
 
 	/** @var array<string, array> Canonical page definitions. */
@@ -428,6 +428,38 @@ final class Bootstrap_Command {
 		),
 	);
 
+	/** @var array<string, array> Canonical category definitions matching Routes. */
+	private const CANONICAL_CATEGORIES = array(
+		'evidence'     => array(
+			'slug' => 'evidence-literacy',
+			'name' => 'Evidence Literacy',
+		),
+		'sleep'        => array(
+			'slug' => 'sleep-and-circadian-health',
+			'name' => 'Sleep and Circadian Health',
+		),
+		'movement'     => array(
+			'slug' => 'movement-and-physical-capacity',
+			'name' => 'Movement and Physical Capacity',
+		),
+		'nutrition'    => array(
+			'slug' => 'nutrition-and-healthy-aging',
+			'name' => 'Nutrition and Healthy Aging',
+		),
+		'wearables'    => array(
+			'slug' => 'wearables-and-consumer-measurement',
+			'name' => 'Wearables and Consumer Measurement',
+		),
+		'supplements'  => array(
+			'slug' => 'supplements-and-high-uncertainty-interventions',
+			'name' => 'Supplements and High-Uncertainty Interventions',
+		),
+		'consumer_lab' => array(
+			'slug' => 'consumer-lab',
+			'name' => 'Consumer Lab',
+		),
+	);
+
 	/**
 	 * Create canonical pages idempotently.
 	 *
@@ -448,7 +480,6 @@ final class Bootstrap_Command {
 		foreach ( self::CANONICAL_PAGES as $key => $def ) {
 			$slug = $def['slug'];
 
-			// Check if page already exists by slug.
 			$existing_page = get_page_by_path( $slug, OBJECT, 'page' );
 
 			if ( $existing_page instanceof \WP_Post ) {
@@ -457,7 +488,6 @@ final class Bootstrap_Command {
 				continue;
 			}
 
-			// Check if another page already claims this route key via page_on_front.
 			if ( 'home' === $key ) {
 				$front_page_id = (int) get_option( 'page_on_front' );
 				if ( $front_page_id > 0 ) {
@@ -501,12 +531,10 @@ final class Bootstrap_Command {
 			\WP_CLI::line( "Created {$def['title']} (/{$slug}/) as {$def['status']} (ID {$post_id})" );
 			++$created;
 
-			// Mark placeholder pages as noindex.
 			if ( 'draft' === $def['status'] ) {
 				update_post_meta( $post_id, '_longevity_noindex', '1' );
 			}
 
-			// Set home page as front page.
 			if ( 'home' === $key ) {
 				update_option( 'page_on_front', (int) $post_id );
 				update_option( 'show_on_front', 'page' );
@@ -514,7 +542,6 @@ final class Bootstrap_Command {
 			}
 		}
 
-		// Ensure Start Here is NOT the front page.
 		$front_page_id = (int) get_option( 'page_on_front' );
 		if ( $front_page_id > 0 ) {
 			$front_page = get_post( $front_page_id );
@@ -531,6 +558,193 @@ final class Bootstrap_Command {
 		if ( $errors ) {
 			\WP_CLI::halt( 1 );
 		}
+	}
+
+	/**
+	 * Create canonical categories idempotently.
+	 *
+	 * ## OPTIONS
+	 * [--dry-run]     Preview changes without modifying the database.
+	 *
+	 * ## EXAMPLES
+	 *     wp longevity bootstrap categories
+	 *     wp longevity bootstrap categories --dry-run
+	 */
+	public function categories( array $args, array $assoc_args ): void {
+		unset( $args );
+		$dry_run  = isset( $assoc_args['dry-run'] );
+		$created  = 0;
+		$existing = 0;
+		$errors   = array();
+
+		foreach ( self::CANONICAL_CATEGORIES as $key => $def ) {
+			$slug      = $def['slug'];
+			$term      = term_exists( $slug, 'category' );
+			$term_id   = 0;
+
+			if ( $term ) {
+				if ( is_array( $term ) ) {
+					$term_id = (int) $term['term_id'];
+				} else {
+					$term_id = (int) $term;
+				}
+				\WP_CLI::line( "{$def['name']} (/{$slug}/): already exists (ID {$term_id})" );
+				++$existing;
+				continue;
+			}
+
+			if ( $dry_run ) {
+				\WP_CLI::line( "[DRY RUN] Would create category {$def['name']} (/{$slug}/)" );
+				++$created;
+				continue;
+			}
+
+			$result = wp_insert_term( $def['name'], 'category', array( 'slug' => $slug ) );
+			if ( is_wp_error( $result ) ) {
+				$errors[] = "Failed to create category {$def['name']}: " . $result->get_error_message();
+				\WP_CLI::warning( "Failed to create category {$def['name']}: " . $result->get_error_message() );
+				continue;
+			}
+
+			$term_id = (int) $result['term_id'];
+			\WP_CLI::line( "Created category {$def['name']} (/{$slug}/) as ID {$term_id}" );
+			++$created;
+		}
+
+		\WP_CLI::success( sprintf( 'Bootstrap complete: %d created, %d existing, %d error(s).', $created, $existing, count( $errors ) ) );
+		if ( $errors ) {
+			\WP_CLI::halt( 1 );
+		}
+	}
+
+	/**
+	 * Create placeholder content (draft posts/reviews) for each canonical category.
+	 *
+	 * ## OPTIONS
+	 * [--dry-run]     Preview changes without modifying the database.
+	 *
+	 * ## EXAMPLES
+	 *     wp longevity bootstrap content
+	 *     wp longevity bootstrap content --dry-run
+	 */
+	public function content( array $args, array $assoc_args ): void {
+		unset( $args );
+		$dry_run  = isset( $assoc_args['dry-run'] );
+		$created  = 0;
+		$existing = 0;
+		$errors   = array();
+
+		$post_blueprints = array(
+			'evidence'     => array(
+				'post_type'    => 'post',
+				'post_title'   => 'Evidence Literacy — Understanding Evidence Levels',
+				'post_name'    => 'evidence-literacy-guide',
+				'post_content' => '<!-- wp:paragraph --><p>This placeholder evidence guide explains how to evaluate the strength of health claims using standard evidence frameworks.</p><!-- /wp:paragraph -->',
+			),
+			'sleep'        => array(
+				'post_type'    => 'post',
+				'post_title'   => 'Sleep and Circadian Health — An Evidence Overview',
+				'post_name'    => 'sleep-circadian-health-guide',
+				'post_content' => '<!-- wp:paragraph --><p>This placeholder guide covers the evidence for sleep hygiene, circadian alignment, and common interventions.</p><!-- /wp:paragraph -->',
+			),
+			'movement'     => array(
+				'post_type'    => 'post',
+				'post_title'   => 'Movement and Physical Capacity — Evidence Review',
+				'post_name'    => 'movement-physical-capacity-guide',
+				'post_content' => '<!-- wp:paragraph --><p>This placeholder guide reviews evidence for exercise modalities, physical capacity metrics, and healthy aging.</p><!-- /wp:paragraph -->',
+			),
+			'nutrition'    => array(
+				'post_type'    => 'post',
+				'post_title'   => 'Nutrition and Healthy Aging — What the Evidence Says',
+				'post_name'    => 'nutrition-healthy-aging-guide',
+				'post_content' => '<!-- wp:paragraph --><p>This placeholder guide summarizes the evidence for dietary patterns, supplements, and nutritional interventions.</p><!-- /wp:paragraph -->',
+			),
+			'wearables'    => array(
+				'post_type'    => 'post',
+				'post_title'   => 'Wearables and Consumer Measurement — Evidence Guide',
+				'post_name'    => 'wearables-consumer-measurement-guide',
+				'post_content' => '<!-- wp:paragraph --><p>This placeholder guide evaluates the accuracy and utility of consumer wearables and personal measurement devices.</p><!-- /wp:paragraph -->',
+			),
+			'supplements'  => array(
+				'post_type'    => 'post',
+				'post_title'   => 'Supplements and High-Uncertainty Interventions — Evidence Guide',
+				'post_name'    => 'supplements-high-uncertainty-guide',
+				'post_content' => '<!-- wp:paragraph --><p>This placeholder guide reviews the evidence for popular supplements and interventions with high scientific uncertainty.</p><!-- /wp:paragraph -->',
+			),
+			'consumer_lab' => array(
+				'post_type'    => 'review',
+				'post_title'   => 'Consumer Lab — Placeholder Product Review',
+				'post_name'    => 'consumer-lab-placeholder-review',
+				'post_content' => '<!-- wp:paragraph --><p>This placeholder product review demonstrates the Consumer Lab ranking and review template. Replace with an actual tested product before publication.</p><!-- /wp:paragraph -->',
+			),
+		);
+
+		foreach ( $post_blueprints as $key => $blueprint ) {
+			$existing_post = get_page_by_path( $blueprint['post_name'], OBJECT, $blueprint['post_type'] );
+
+			if ( $existing_post instanceof \WP_Post ) {
+				\WP_CLI::line( "{$blueprint['post_title']} (/{$blueprint['post_name']}/): already exists (ID {$existing_post->ID}, status {$existing_post->post_status})" );
+				++$existing;
+				continue;
+			}
+
+			if ( $dry_run ) {
+				\WP_CLI::line( "[DRY RUN] Would create {$blueprint['post_title']} (/{$blueprint['post_name']}/) as draft {$blueprint['post_type']}" );
+				++$created;
+				continue;
+			}
+
+			$post_id = wp_insert_post(
+				array(
+					'post_title'   => $blueprint['post_title'],
+					'post_name'    => $blueprint['post_name'],
+					'post_content' => $blueprint['post_content'],
+					'post_status'  => 'draft',
+					'post_type'    => $blueprint['post_type'],
+				),
+				true
+			);
+
+			if ( is_wp_error( $post_id ) ) {
+				$errors[] = "Failed to create {$blueprint['post_title']}: " . $post_id->get_error_message();
+				\WP_CLI::warning( "Failed to create {$blueprint['post_title']}: " . $post_id->get_error_message() );
+				continue;
+			}
+
+			\WP_CLI::line( "Created {$blueprint['post_title']} (/{$blueprint['post_name']}/) as draft {$blueprint['post_type']} (ID {$post_id})" );
+			++$created;
+			update_post_meta( $post_id, '_longevity_noindex', '1' );
+		}
+
+		\WP_CLI::success( sprintf( 'Bootstrap complete: %d created, %d existing, %d error(s).', $created, $existing, count( $errors ) ) );
+		if ( $errors ) {
+			\WP_CLI::halt( 1 );
+		}
+	}
+
+	/**
+	 * Run all bootstrap commands in sequence: pages, categories, content.
+	 *
+	 * ## OPTIONS
+	 * [--dry-run]     Preview changes without modifying the database.
+	 *
+	 * ## EXAMPLES
+	 *     wp longevity bootstrap all
+	 *     wp longevity bootstrap all --dry-run
+	 */
+	public function all( array $args, array $assoc_args ): void {
+		\WP_CLI::line( '=== Bootstrap: pages ===' );
+		$this->pages( $args, $assoc_args );
+
+		\WP_CLI::line( '' );
+		\WP_CLI::line( '=== Bootstrap: categories ===' );
+		$this->categories( $args, $assoc_args );
+
+		\WP_CLI::line( '' );
+		\WP_CLI::line( '=== Bootstrap: content ===' );
+		$this->content( $args, $assoc_args );
+
+		\WP_CLI::success( 'Full bootstrap complete.' );
 	}
 }
 
