@@ -11,6 +11,7 @@ defined( 'ABSPATH' ) || exit;
 
 $longevity_core_files = array(
 	'class-gate-result.php',
+	'class-routes.php',
 	'class-content-types.php',
 	'class-roles.php',
 	'class-meta-registry.php',
@@ -61,6 +62,7 @@ final class Bootstrap {
 		self::$initialized = true;
 
 		Content_Types::init();
+		Routes::init();
 		Roles::init();
 		Meta_Registry::init();
 		Claims::init();
