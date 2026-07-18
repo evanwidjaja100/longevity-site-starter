@@ -87,7 +87,41 @@ final class Bootstrap {
 
 		add_filter( 'the_generator', '__return_empty_string' );
 		add_filter( 'wp_robots', array( self::class, 'filter_noindex_placeholder_pages' ) );
+		add_action( 'wp_head', array( self::class, 'output_canonical_url' ), 11 );
 		add_action( 'send_headers', array( self::class, 'send_security_headers' ) );
+	}
+
+	/**
+	 * Output canonical URL for archive routes (categories, etc.).
+	 *
+	 * Runs at priority 11, after core rel_canonical (which only handles singular).
+	 */
+	public static function output_canonical_url(): void {
+		if ( is_category() ) {
+			$term = get_queried_object();
+			if ( ! $term instanceof \WP_Term ) {
+				return;
+			}
+			$slug = $term->slug;
+			$url  = null;
+			foreach ( Routes::definitions()['categories'] as $key => $def ) {
+				if ( $def['slug'] === $slug ) {
+					$url = Routes::category_url( $key );
+					break;
+				}
+				$legacy = $def['legacy_slug'] ?? null;
+				if ( $legacy && $legacy === $slug ) {
+					$url = Routes::category_url( $key );
+					break;
+				}
+			}
+			if ( ! $url ) {
+				$url = get_category_link( $term->term_id );
+			}
+			if ( $url ) {
+				echo '<link rel="canonical" href="' . esc_url( $url ) . '" />' . "\n";
+			}
+		}
 	}
 
 	/**

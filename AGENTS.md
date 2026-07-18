@@ -66,7 +66,7 @@ Branch: `improvement/launch-foundation-v2`
 - P1.3 ✅: `Bootstrap_Command` in `class-cli.php` — `wp longevity bootstrap pages`. Created Home (ID 72) as `page_on_front`, Start Here (ID 4) as standalone. 14 pages managed. Idempotent.
 - P1.4 ✅: Deleted short duplicate slugs `supplements`, `wearables`, `nutrition`; swapped Routes class to use long slugs as canonical; 19/19 E2E pass
 - P1.5 ✅: Add `_longevity_noindex` meta to draft pages; `wp_robots` filter in Bootstrap enforces noindex for drafts and placeholder pages
-- P1.6 ⬜: Verify canonical URLs in `<head>` via theme
+- P1.6 ✅: Added `wp_head` action for canonical URLs on category archives via Routes class; 19/19 E2E pass
 
 ### Phase 2 — Production-Grade Bootstrap
 - P2.1 ⬜: `wp longevity bootstrap categories` — CLI command for canonical categories
