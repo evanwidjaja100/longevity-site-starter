@@ -20,6 +20,7 @@ final class CLI {
 		\WP_CLI::add_command( 'longevity sources', Sources_Command::class );
 		\WP_CLI::add_command( 'longevity readiness', Readiness_Command::class );
 		\WP_CLI::add_command( 'longevity freshness', Freshness_Command::class );
+		\WP_CLI::add_command( 'longevity bootstrap', Bootstrap_Command::class );
 	}
 }
 
@@ -34,7 +35,7 @@ trait CSV_Command_Utilities {
 
 	/** Open an output stream. */
 	private function output_stream( array $assoc_args ) {
-		$file = isset( $assoc_args['file'] ) ? (string) $assoc_args['file'] : '';
+		$file   = isset( $assoc_args['file'] ) ? (string) $assoc_args['file'] : '';
 		$stream = fopen( '' === $file ? 'php://output' : $file, 'wb' );
 		if ( false === $stream ) {
 			\WP_CLI::error( 'Unable to open CSV output.' );
@@ -63,12 +64,15 @@ trait CSV_Command_Utilities {
 		while ( ( $values = fgetcsv( $stream ) ) !== false ) {
 			++$line;
 			if ( count( $values ) !== count( $headers ) ) {
-				$rows[] = array( '__line' => $line, '__error' => 'Column count does not match the header.' );
+				$rows[] = array(
+					'__line'  => $line,
+					'__error' => 'Column count does not match the header.',
+				);
 				continue;
 			}
-			$row = array_combine( $headers, $values );
+			$row           = array_combine( $headers, $values );
 			$row['__line'] = $line;
-			$rows[] = $row;
+			$rows[]        = $row;
 		}
 		fclose( $stream );
 		return array( $headers, $rows );
@@ -93,7 +97,15 @@ final class Claims_Command {
 		$this->require_capability( 'manage_claims' );
 		$stream = $this->output_stream( $assoc_args );
 		fputcsv( $stream, self::FIELDS );
-		$posts = get_posts( array( 'post_type' => 'lel_claim', 'post_status' => 'any', 'posts_per_page' => -1, 'orderby' => 'ID', 'order' => 'ASC' ) );
+		$posts = get_posts(
+			array(
+				'post_type'      => 'lel_claim',
+				'post_status'    => 'any',
+				'posts_per_page' => -1,
+				'orderby'        => 'ID',
+				'order'          => 'ASC',
+			)
+		);
 		foreach ( $posts as $post ) {
 			$row = array();
 			foreach ( self::FIELDS as $field ) {
@@ -122,15 +134,15 @@ final class Claims_Command {
 			\WP_CLI::error( 'Provide a readable --file.' );
 		}
 		list( $headers, $rows ) = $this->read_csv( $file );
-		$missing = array_diff( self::FIELDS, $headers );
+		$missing                = array_diff( self::FIELDS, $headers );
 		if ( $missing ) {
 			\WP_CLI::error( 'Missing required columns: ' . implode( ', ', $missing ) );
 		}
-		$dry_run = isset( $assoc_args['dry-run'] );
+		$dry_run      = isset( $assoc_args['dry-run'] );
 		$allow_update = isset( $assoc_args['update'] );
-		$created = 0;
-		$updated = 0;
-		$errors = $this->validate_rows( $rows );
+		$created      = 0;
+		$updated      = 0;
+		$errors       = $this->validate_rows( $rows );
 		if ( $errors ) {
 			foreach ( $errors as $error ) {
 				\WP_CLI::warning( $error );
@@ -181,8 +193,8 @@ final class Claims_Command {
 			\WP_CLI::error( 'Provide a readable --file.' );
 		}
 		list( $headers, $rows ) = $this->read_csv( $file );
-		$missing = array_diff( self::FIELDS, $headers );
-		$errors = $missing ? array( 'Missing columns: ' . implode( ', ', $missing ) ) : $this->validate_rows( $rows );
+		$missing                = array_diff( self::FIELDS, $headers );
+		$errors                 = $missing ? array( 'Missing columns: ' . implode( ', ', $missing ) ) : $this->validate_rows( $rows );
 		if ( $errors ) {
 			foreach ( $errors as $error ) {
 				\WP_CLI::warning( $error );
@@ -195,7 +207,7 @@ final class Claims_Command {
 	/** Validate rows and duplicate stable IDs. */
 	private function validate_rows( array $rows ): array {
 		$errors = array();
-		$seen = array();
+		$seen   = array();
 		foreach ( $rows as $row ) {
 			$line = (int) ( $row['__line'] ?? 0 );
 			if ( isset( $row['__error'] ) ) {
@@ -224,7 +236,16 @@ final class Claims_Command {
 
 	/** Find a claim by stable ID. */
 	private static function find_by_stable_id( string $claim_id ): int {
-		$posts = get_posts( array( 'post_type' => 'lel_claim', 'post_status' => 'any', 'fields' => 'ids', 'posts_per_page' => 1, 'meta_key' => 'claim_id', 'meta_value' => sanitize_key( $claim_id ) ) );
+		$posts = get_posts(
+			array(
+				'post_type'      => 'lel_claim',
+				'post_status'    => 'any',
+				'fields'         => 'ids',
+				'posts_per_page' => 1,
+				'meta_key'       => 'claim_id',
+				'meta_value'     => sanitize_key( $claim_id ),
+			)
+		);
 		return $posts ? (int) $posts[0] : 0;
 	}
 
@@ -259,7 +280,15 @@ final class Sources_Command {
 		$this->require_capability( 'manage_claims' );
 		$stream = $this->output_stream( $assoc_args );
 		fputcsv( $stream, self::FIELDS );
-		$posts = get_posts( array( 'post_type' => 'lel_source', 'post_status' => 'any', 'posts_per_page' => -1, 'orderby' => 'ID', 'order' => 'ASC' ) );
+		$posts = get_posts(
+			array(
+				'post_type'      => 'lel_source',
+				'post_status'    => 'any',
+				'posts_per_page' => -1,
+				'orderby'        => 'ID',
+				'order'          => 'ASC',
+			)
+		);
 		foreach ( $posts as $post ) {
 			$row = array_map( fn( string $field ) => $this->csv_safe( get_post_meta( $post->ID, $field, true ) ), self::FIELDS );
 			fputcsv( $stream, $row );
@@ -277,15 +306,15 @@ final class Sources_Command {
 			\WP_CLI::error( 'Provide a readable --file.' );
 		}
 		list( $headers, $rows ) = $this->read_csv( $file );
-		$errors = array();
-		$missing = array_diff( self::FIELDS, $headers );
+		$errors                 = array();
+		$missing                = array_diff( self::FIELDS, $headers );
 		if ( $missing ) {
 			$errors[] = 'Missing columns: ' . implode( ', ', $missing );
 		}
 		$seen = array();
 		foreach ( $rows as $row ) {
 			$line = (int) ( $row['__line'] ?? 0 );
-			$id = sanitize_key( (string) ( $row['source_id'] ?? '' ) );
+			$id   = sanitize_key( (string) ( $row['source_id'] ?? '' ) );
 			if ( '' === $id || isset( $seen[ $id ] ) ) {
 				$errors[] = sprintf( 'Row %d: source_id is missing or duplicated.', $line );
 			}
@@ -319,6 +348,184 @@ final class Readiness_Command {
 			\WP_CLI::halt( 1 );
 		}
 		\WP_CLI::success( 'Publication readiness passed.' );
+	}
+}
+
+/** Page bootstrap command — creates canonical pages idempotently. */
+final class Bootstrap_Command {
+
+	/** @var array<string, array> Canonical page definitions. */
+	private const CANONICAL_PAGES = array(
+		'home'                 => array(
+			'slug'   => 'home',
+			'title'  => 'Home',
+			'status' => 'publish',
+		),
+		'start_here'           => array(
+			'slug'   => 'start-here',
+			'title'  => 'Start Here',
+			'status' => 'publish',
+		),
+		'guides'               => array(
+			'slug'   => 'guides',
+			'title'  => 'Guides',
+			'status' => 'draft',
+		),
+		'topics'               => array(
+			'slug'   => 'topics',
+			'title'  => 'Topics',
+			'status' => 'draft',
+		),
+		'evidence_methodology' => array(
+			'slug'   => 'evidence-methodology',
+			'title'  => 'Evidence Methodology',
+			'status' => 'draft',
+		),
+		'about'                => array(
+			'slug'   => 'about',
+			'title'  => 'About',
+			'status' => 'draft',
+		),
+		'editorial_policy'     => array(
+			'slug'   => 'editorial-policy',
+			'title'  => 'Editorial Policy',
+			'status' => 'draft',
+		),
+		'medical_disclaimer'   => array(
+			'slug'   => 'medical-disclaimer',
+			'title'  => 'Medical Disclaimer',
+			'status' => 'draft',
+		),
+		'affiliate_disclosure' => array(
+			'slug'   => 'affiliate-disclosure',
+			'title'  => 'Affiliate Disclosure',
+			'status' => 'draft',
+		),
+		'corrections'          => array(
+			'slug'   => 'corrections',
+			'title'  => 'Corrections',
+			'status' => 'draft',
+		),
+		'testing_methodology'  => array(
+			'slug'   => 'testing-methodology',
+			'title'  => 'Testing Methodology',
+			'status' => 'draft',
+		),
+		'privacy'              => array(
+			'slug'   => 'privacy',
+			'title'  => 'Privacy',
+			'status' => 'draft',
+		),
+		'terms'                => array(
+			'slug'   => 'terms',
+			'title'  => 'Terms',
+			'status' => 'draft',
+		),
+		'contact'              => array(
+			'slug'   => 'contact',
+			'title'  => 'Contact',
+			'status' => 'draft',
+		),
+	);
+
+	/**
+	 * Create canonical pages idempotently.
+	 *
+	 * ## OPTIONS
+	 * [--dry-run]     Preview changes without modifying the database.
+	 *
+	 * ## EXAMPLES
+	 *     wp longevity bootstrap pages
+	 *     wp longevity bootstrap pages --dry-run
+	 */
+	public function pages( array $args, array $assoc_args ): void {
+		unset( $args );
+		$dry_run  = isset( $assoc_args['dry-run'] );
+		$created  = 0;
+		$existing = 0;
+		$errors   = array();
+
+		foreach ( self::CANONICAL_PAGES as $key => $def ) {
+			$slug = $def['slug'];
+
+			// Check if page already exists by slug.
+			$existing_page = get_page_by_path( $slug, OBJECT, 'page' );
+
+			if ( $existing_page instanceof \WP_Post ) {
+				\WP_CLI::line( "{$def['title']} (/{$slug}/): already exists (ID {$existing_page->ID}, status {$existing_page->post_status})" );
+				++$existing;
+				continue;
+			}
+
+			// Check if another page already claims this route key via page_on_front.
+			if ( 'home' === $key ) {
+				$front_page_id = (int) get_option( 'page_on_front' );
+				if ( $front_page_id > 0 ) {
+					$front_page = get_post( $front_page_id );
+					if ( $front_page && 'home' !== $front_page->post_name ) {
+						\WP_CLI::line( "Home route is currently assigned to /{$front_page->post_name}/ (ID {$front_page_id}). A new 'home' page will be created and assigned." );
+					}
+				}
+			}
+
+			if ( $dry_run ) {
+				\WP_CLI::line( "[DRY RUN] Would create {$def['title']} (/{$slug}/) as {$def['status']}" );
+				++$created;
+				continue;
+			}
+
+			$block_content = '';
+			if ( 'home' === $key ) {
+				$block_content = '<!-- wp:paragraph --><p>Welcome to Longevity Evidence Lab. This page serves as the static front page. The front-page.html template controls the visual layout.</p><!-- /wp:paragraph -->';
+			} elseif ( 'start_here' === $key ) {
+				$block_content = '<!-- wp:heading {"level":1} --><h1>Start Here</h1><!-- /wp:heading -->';
+			}
+
+			$post_id = wp_insert_post(
+				array(
+					'post_title'   => $def['title'],
+					'post_name'    => $slug,
+					'post_content' => $block_content,
+					'post_status'  => $def['status'],
+					'post_type'    => 'page',
+				),
+				true
+			);
+
+			if ( is_wp_error( $post_id ) ) {
+				$errors[] = "Failed to create {$def['title']}: " . $post_id->get_error_message();
+				\WP_CLI::warning( "Failed to create {$def['title']}: " . $post_id->get_error_message() );
+				continue;
+			}
+
+			\WP_CLI::line( "Created {$def['title']} (/{$slug}/) as {$def['status']} (ID {$post_id})" );
+			++$created;
+
+			// Set home page as front page.
+			if ( 'home' === $key ) {
+				update_option( 'page_on_front', (int) $post_id );
+				update_option( 'show_on_front', 'page' );
+				\WP_CLI::line( "Set Home (ID {$post_id}) as the static front page." );
+			}
+		}
+
+		// Ensure Start Here is NOT the front page.
+		$front_page_id = (int) get_option( 'page_on_front' );
+		if ( $front_page_id > 0 ) {
+			$front_page = get_post( $front_page_id );
+			if ( $front_page && 'start-here' === $front_page->post_name ) {
+				if ( ! $dry_run ) {
+					\WP_CLI::warning( 'Start Here is currently the front page. A Home page must be created first.' );
+				} else {
+					\WP_CLI::line( '[DRY RUN] Would reassign front page from Start Here to Home.' );
+				}
+			}
+		}
+
+		\WP_CLI::success( sprintf( 'Bootstrap complete: %d created, %d existing, %d error(s).', $created, $existing, count( $errors ) ) );
+		if ( $errors ) {
+			\WP_CLI::halt( 1 );
+		}
 	}
 }
 
