@@ -100,36 +100,35 @@ final class Routes {
 		self::$category_definitions = (array) apply_filters(
 			'longevity_route_category_definitions',
 			array(
-				'evidence'     => array(
-					'slug'       => 'evidence-literacy',
-					'name'       => 'Evidence Literacy',
-					'legacy_slug' => 'evidence-literacy',
-				),
-				'sleep'        => array(
-					'slug'        => 'sleep',
-					'name'        => 'Sleep and Circadian Health',
-					'legacy_slug' => 'sleep-and-circadian-health',
-				),
-				'movement'     => array(
-					'slug'        => 'movement',
-					'name'        => 'Movement and Physical Capacity',
-					'legacy_slug' => 'movement-and-physical-capacity',
-				),
-				'nutrition'    => array(
-					'slug'        => 'nutrition',
-					'name'        => 'Nutrition and Healthy Aging',
-					'legacy_slug' => 'nutrition-and-healthy-aging',
-				),
-				'wearables'    => array(
-					'slug'        => 'wearables',
-					'name'        => 'Wearables and Consumer Measurement',
-					'legacy_slug' => 'wearables-and-consumer-measurement',
-				),
-				'supplements'  => array(
-					'slug'        => 'supplements',
-					'name'        => 'Supplements and High-Uncertainty Interventions',
-					'legacy_slug' => 'supplements-and-high-uncertainty-interventions',
-				),
+			'evidence'     => array(
+				'slug'        => 'evidence-literacy',
+				'name'        => 'Evidence Literacy',
+			),
+			'sleep'        => array(
+				'slug'        => 'sleep-and-circadian-health',
+				'name'        => 'Sleep and Circadian Health',
+				'legacy_slug' => 'sleep',
+			),
+			'movement'     => array(
+				'slug'        => 'movement-and-physical-capacity',
+				'name'        => 'Movement and Physical Capacity',
+				'legacy_slug' => 'movement',
+			),
+			'nutrition'    => array(
+				'slug'        => 'nutrition-and-healthy-aging',
+				'name'        => 'Nutrition and Healthy Aging',
+				'legacy_slug' => 'nutrition',
+			),
+			'wearables'    => array(
+				'slug'        => 'wearables-and-consumer-measurement',
+				'name'        => 'Wearables and Consumer Measurement',
+				'legacy_slug' => 'wearables',
+			),
+			'supplements'  => array(
+				'slug'        => 'supplements-and-high-uncertainty-interventions',
+				'name'        => 'Supplements and High-Uncertainty Interventions',
+				'legacy_slug' => 'supplements',
+			),
 				'consumer_lab' => array(
 					'slug' => 'consumer-lab',
 					'name' => 'Consumer Lab',
