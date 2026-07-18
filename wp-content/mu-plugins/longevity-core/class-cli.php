@@ -501,6 +501,11 @@ final class Bootstrap_Command {
 			\WP_CLI::line( "Created {$def['title']} (/{$slug}/) as {$def['status']} (ID {$post_id})" );
 			++$created;
 
+			// Mark placeholder pages as noindex.
+			if ( 'draft' === $def['status'] ) {
+				update_post_meta( $post_id, '_longevity_noindex', '1' );
+			}
+
 			// Set home page as front page.
 			if ( 'home' === $key ) {
 				update_option( 'page_on_front', (int) $post_id );

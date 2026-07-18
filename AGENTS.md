@@ -65,7 +65,7 @@ Branch: `improvement/launch-foundation-v2`
 - P1.2 ✅: Routes integrated into theme nav-walker via `Route_Nav_Walker` (replaced `Nav_Menu_Fixer`)
 - P1.3 ✅: `Bootstrap_Command` in `class-cli.php` — `wp longevity bootstrap pages`. Created Home (ID 72) as `page_on_front`, Start Here (ID 4) as standalone. 14 pages managed. Idempotent.
 - P1.4 ✅: Deleted short duplicate slugs `supplements`, `wearables`, `nutrition`; swapped Routes class to use long slugs as canonical; 19/19 E2E pass
-- P1.5 ⬜: Noindex draft/placeholder pages
+- P1.5 ✅: Add `_longevity_noindex` meta to draft pages; `wp_robots` filter in Bootstrap enforces noindex for drafts and placeholder pages
 - P1.6 ⬜: Verify canonical URLs in `<head>` via theme
 
 ### Phase 2 — Production-Grade Bootstrap

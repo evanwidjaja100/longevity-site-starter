@@ -86,7 +86,32 @@ final class Bootstrap {
 		CLI::init();
 
 		add_filter( 'the_generator', '__return_empty_string' );
+		add_filter( 'wp_robots', array( self::class, 'filter_noindex_placeholder_pages' ) );
 		add_action( 'send_headers', array( self::class, 'send_security_headers' ) );
+	}
+
+	/**
+	 * Noindex pages marked as placeholders or in draft status.
+	 *
+	 * @param array $robots Current robots directives.
+	 * @return array Filtered robots directives.
+	 */
+	public static function filter_noindex_placeholder_pages( array $robots ): array {
+		if ( ! is_singular( 'page' ) ) {
+			return $robots;
+		}
+
+		$post = get_queried_object();
+		if ( ! $post instanceof \WP_Post ) {
+			return $robots;
+		}
+
+		if ( 'draft' === $post->post_status || '1' === get_post_meta( $post->ID, '_longevity_noindex', true ) ) {
+			$robots['noindex']  = true;
+			$robots['nofollow'] = true;
+		}
+
+		return $robots;
 	}
 
 	/**
