@@ -124,6 +124,7 @@ if ( ! function_exists( 'get_the_title' ) ) {
 
 require_once LONGEVITY_CORE_PATH . 'class-gate-result.php';
 require_once LONGEVITY_CORE_PATH . 'class-routes.php';
+require_once LONGEVITY_CORE_PATH . 'class-seo.php';
 require_once LONGEVITY_CORE_PATH . 'class-review-methodology.php';
 require_once LONGEVITY_CORE_PATH . 'class-meta-registry.php';
 require_once LONGEVITY_CORE_PATH . 'class-publication-gates.php';

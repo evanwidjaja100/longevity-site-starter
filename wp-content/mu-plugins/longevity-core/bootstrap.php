@@ -33,6 +33,7 @@ $longevity_core_files = array(
 	'class-schema.php',
 	'class-analytics.php',
 	'class-rest-api.php',
+	'class-seo.php',
 	'class-cli.php',
 );
 
@@ -63,6 +64,7 @@ final class Bootstrap {
 
 		Content_Types::init();
 		Routes::init();
+		SEO::init();
 		Roles::init();
 		Meta_Registry::init();
 		Claims::init();
@@ -88,6 +90,7 @@ final class Bootstrap {
 		add_filter( 'the_generator', '__return_empty_string' );
 		add_filter( 'wp_robots', array( self::class, 'filter_noindex_placeholder_pages' ) );
 		add_action( 'wp_head', array( self::class, 'output_canonical_url' ), 11 );
+		add_action( 'template_redirect', array( Routes::class, 'redirect_legacy_category' ), 10 );
 		add_action( 'send_headers', array( self::class, 'send_security_headers' ) );
 	}
 

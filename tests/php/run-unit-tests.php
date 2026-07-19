@@ -7,6 +7,20 @@ use Longevity\Core\Publication_Gates;
 use Longevity\Core\Review_Methodology;
 use Longevity\Core\Rankings;
 
+$exit_code = 0;
+
+// Run architecture tests first.
+$arch_failures = 0;
+echo "Running architecture tests...\n";
+ob_start();
+require __DIR__ . '/ArchitectureTest.php';
+$arch_result = ArchitectureTest::run();
+$arch_output  = ob_get_clean();
+echo $arch_output;
+if ( 0 !== $arch_result ) {
+	$exit_code = 1;
+}
+
 $failures = array();
 $assert = static function ( bool $condition, string $message ) use ( &$failures ): void {
 	if ( ! $condition ) {
@@ -65,4 +79,7 @@ if ( $failures ) {
 	exit( 1 );
 }
 
-echo "Fallback PHP unit tests passed.\n";
+if ( 0 === $exit_code ) {
+	echo "Fallback PHP unit tests passed.\n";
+}
+exit( $exit_code );
