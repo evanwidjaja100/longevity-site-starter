@@ -101,37 +101,39 @@ final class Routes {
 			'longevity_route_category_definitions',
 			array(
 			'evidence'     => array(
-				'slug'        => 'evidence-literacy',
-				'name'        => 'Evidence Literacy',
+				'slug'         => 'evidence-literacy',
+				'name'         => 'Evidence Literacy',
+				'legacy_slugs' => array(),
 			),
 			'sleep'        => array(
-				'slug'        => 'sleep-and-circadian-health',
-				'name'        => 'Sleep and Circadian Health',
-				'legacy_slug' => 'sleep',
+				'slug'         => 'sleep',
+				'name'         => 'Sleep and Circadian Health',
+				'legacy_slugs' => array( 'sleep-and-circadian-health' ),
 			),
 			'movement'     => array(
-				'slug'        => 'movement-and-physical-capacity',
-				'name'        => 'Movement and Physical Capacity',
-				'legacy_slug' => 'movement',
+				'slug'         => 'movement',
+				'name'         => 'Movement and Physical Capacity',
+				'legacy_slugs' => array( 'movement-and-physical-capacity' ),
 			),
 			'nutrition'    => array(
-				'slug'        => 'nutrition-and-healthy-aging',
-				'name'        => 'Nutrition and Healthy Aging',
-				'legacy_slug' => 'nutrition',
+				'slug'         => 'nutrition',
+				'name'         => 'Nutrition and Healthy Aging',
+				'legacy_slugs' => array( 'nutrition-and-healthy-aging' ),
 			),
 			'wearables'    => array(
-				'slug'        => 'wearables-and-consumer-measurement',
-				'name'        => 'Wearables and Consumer Measurement',
-				'legacy_slug' => 'wearables',
+				'slug'         => 'wearables',
+				'name'         => 'Wearables and Consumer Measurement',
+				'legacy_slugs' => array( 'wearables-and-consumer-measurement' ),
 			),
 			'supplements'  => array(
-				'slug'        => 'supplements-and-high-uncertainty-interventions',
-				'name'        => 'Supplements and High-Uncertainty Interventions',
-				'legacy_slug' => 'supplements',
+				'slug'         => 'supplements',
+				'name'         => 'Supplements and High-Uncertainty Interventions',
+				'legacy_slugs' => array( 'supplements-and-high-uncertainty-interventions' ),
 			),
 				'consumer_lab' => array(
-					'slug' => 'consumer-lab',
-					'name' => 'Consumer Lab',
+					'slug'         => 'consumer-lab',
+					'name'         => 'Consumer Lab',
+					'legacy_slugs' => array(),
 				),
 			)
 		);
@@ -150,6 +152,32 @@ final class Routes {
 			'pages'      => self::$page_definitions,
 			'categories' => self::$category_definitions,
 		);
+	}
+
+	/**
+	 * Return the canonical slug for a category key.
+	 *
+	 * @param string $key Category key (e.g. 'sleep', 'nutrition').
+	 * @return string Canonical slug or empty string if key not found.
+	 */
+	public static function canonical_slug( string $key ): string {
+		if ( empty( self::$category_definitions ) ) {
+			self::init();
+		}
+		return self::$category_definitions[ $key ]['slug'] ?? '';
+	}
+
+	/**
+	 * Return the legacy slugs for a category key.
+	 *
+	 * @param string $key Category key (e.g. 'sleep', 'nutrition').
+	 * @return array<int, string> Legacy slugs.
+	 */
+	public static function legacy_slugs( string $key ): array {
+		if ( empty( self::$category_definitions ) ) {
+			self::init();
+		}
+		return self::$category_definitions[ $key ]['legacy_slugs'] ?? array();
 	}
 
 	/**
@@ -220,12 +248,14 @@ final class Routes {
 		if ( array_key_exists( $key, self::$category_id_cache ) ) {
 			return self::$category_id_cache[ $key ];
 		}
-		$slug = self::$category_definitions[ $key ]['slug'];
+		$slug = self::canonical_slug( $key );
 		$term = get_term_by( 'slug', $slug, 'category' );
 		if ( ! ( $term && isset( $term->term_id ) ) ) {
-			$legacy = self::$category_definitions[ $key ]['legacy_slug'] ?? null;
-			if ( $legacy ) {
+			foreach ( self::legacy_slugs( $key ) as $legacy ) {
 				$term = get_term_by( 'slug', $legacy, 'category' );
+				if ( $term && isset( $term->term_id ) ) {
+					break;
+				}
 			}
 		}
 		self::$category_id_cache[ $key ] = ( $term && isset( $term->term_id ) ) ? (int) $term->term_id : null;
@@ -285,5 +315,75 @@ final class Routes {
 			return false;
 		}
 		return untrailingslashit( $url_a ) === untrailingslashit( $url_b );
+	}
+
+	/**
+	 * Return the canonical category key for a term ID.
+	 *
+	 * @param int $term_id Category term ID.
+	 * @return string|null Key or null if not found.
+	 */
+	public static function category_key( int $term_id ): ?string {
+		if ( empty( self::$category_definitions ) ) {
+			self::init();
+		}
+		foreach ( self::$category_definitions as $key => $def ) {
+			$id = self::category_id( $key );
+			if ( $id === $term_id ) {
+				return $key;
+			}
+		}
+		return null;
+	}
+
+	/**
+	 * Return the canonical URL for a category slug, looking up both canonical
+	 * and legacy slugs.
+	 *
+	 * @param string $slug The slug to resolve.
+	 * @return string|null Canonical URL or null if slug is not a known category.
+	 */
+	public static function canonical_url_for_slug( string $slug ): ?string {
+		if ( empty( self::$category_definitions ) ) {
+			self::init();
+		}
+		foreach ( self::$category_definitions as $key => $def ) {
+			if ( $def['slug'] === $slug ) {
+				return self::category_url( $key );
+			}
+			foreach ( $def['legacy_slugs'] as $legacy ) {
+				if ( $legacy === $slug ) {
+					return self::category_url( $key );
+				}
+			}
+		}
+		return null;
+	}
+
+	/**
+	 * Redirect legacy category paths to their canonical short-slug URLs.
+	 *
+	 * Runs on template_redirect. Only redirects known legacy category slugs.
+	 * Preserves safe query parameters and prevents redirect loops.
+	 */
+	public static function redirect_legacy_category(): void {
+		if ( ! is_category() ) {
+			return;
+		}
+		$term = get_queried_object();
+		if ( ! ( $term instanceof \WP_Term ) ) {
+			return;
+		}
+		$current_slug = $term->slug;
+		$canonical    = self::canonical_url_for_slug( $current_slug );
+		if ( null === $canonical ) {
+			return;
+		}
+		$current_url = home_url( add_query_arg( array() ) );
+		if ( untrailingslashit( $current_url ) === untrailingslashit( $canonical ) ) {
+			return;
+		}
+		wp_safe_redirect( $canonical, 301 );
+		exit;
 	}
 }

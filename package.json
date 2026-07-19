@@ -5,9 +5,14 @@
     "lint": "npm run lint:css && npm run lint:js",
     "lint:css": "stylelint wp-content/themes/longevity-starter/**/*.css",
     "lint:js": "eslint wp-content/mu-plugins/longevity-core/assets/**/*.js tests/e2e/**/*.js",
-    "test:e2e": "playwright test tests/e2e/core.spec.js",
+    "test:e2e": "playwright test tests/e2e/core.spec.js tests/e2e/seo.spec.js tests/e2e/bootstrap.spec.js tests/e2e/routes.spec.js tests/e2e/page-readiness.spec.js",
+    "test:e2e:all": "playwright test",
     "test:a11y": "playwright test tests/e2e/accessibility.spec.js",
     "test:visual": "playwright test tests/e2e/visual.spec.js",
+    "test:seo": "playwright test tests/e2e/seo.spec.js",
+    "test:routes": "playwright test tests/e2e/routes.spec.js",
+    "test:page-readiness": "playwright test tests/e2e/page-readiness.spec.js",
+    "test:bootstrap": "playwright test tests/e2e/bootstrap.spec.js",
     "test:lighthouse": "lhci autorun --config=lighthouserc.cjs"
   },
   "devDependencies": {
