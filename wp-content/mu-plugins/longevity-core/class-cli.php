@@ -21,6 +21,7 @@ final class CLI {
 		\WP_CLI::add_command( 'longevity readiness', Readiness_Command::class );
 		\WP_CLI::add_command( 'longevity freshness', Freshness_Command::class );
 		\WP_CLI::add_command( 'longevity bootstrap', Bootstrap_Command::class );
+		\WP_CLI::add_command( 'longevity migrate', Migrate_Command::class );
 	}
 }
 
@@ -333,6 +334,133 @@ final class Sources_Command {
 	}
 }
 
+/** Category route migration command. */
+final class Migrate_Command {
+
+	/**
+	 * Migrate category slugs from legacy long slugs to short canonical slugs.
+	 *
+	 * For each category defined in Routes:
+	 * 1. Detect the canonical short-slug term.
+	 * 2. Detect any long-slug legacy term.
+	 * 3. If only the long term exists, rename its slug.
+	 * 4. If both exist, merge assignments into the canonical term.
+	 *
+	 * ## OPTIONS
+	 * [--dry-run]     Preview changes without modifying the database.
+	 *
+	 * ## EXAMPLES
+	 *     wp longevity migrate category-routes
+	 *     wp longevity migrate category-routes --dry-run
+	 */
+	public function __invoke( array $args, array $assoc_args ): void {
+		$dry_run = isset( $assoc_args['dry-run'] );
+
+		if ( ! class_exists( Routes::class ) ) {
+			\WP_CLI::error( 'Routes class is not available.' );
+		}
+
+		$defs       = Routes::definitions();
+		$categories = $defs['categories'];
+		$changed    = 0;
+		$errors     = array();
+
+		foreach ( $categories as $key => $def ) {
+			$canonical_slug = $def['slug'];
+			$legacy_slugs   = $def['legacy_slugs'] ?? array();
+			$display_name   = $def['name'];
+
+			$canonical_term = get_term_by( 'slug', $canonical_slug, 'category' );
+
+			foreach ( $legacy_slugs as $legacy_slug ) {
+				$legacy_term = get_term_by( 'slug', $legacy_slug, 'category' );
+				if ( ! $legacy_term ) {
+					continue;
+				}
+
+				if ( $canonical_term && isset( $canonical_term->term_id ) && (int) $canonical_term->term_id !== (int) $legacy_term->term_id ) {
+					if ( $dry_run ) {
+						\WP_CLI::line( "[DRY RUN] Would merge '{$legacy_slug}' (ID {$legacy_term->term_id}) into '{$canonical_slug}' (ID {$canonical_term->term_id}) for {$display_name}" );
+						++$changed;
+						continue;
+					}
+
+					$merged = self::merge_terms( (int) $canonical_term->term_id, (int) $legacy_term->term_id, $display_name );
+					if ( $merged ) {
+						\WP_CLI::line( "Merged '{$legacy_slug}' into '{$canonical_slug}' for {$display_name}" );
+						++$changed;
+					} else {
+						$errors[] = "Failed to merge {$display_name} legacy '{$legacy_slug}' into '{$canonical_slug}'.";
+					}
+				} elseif ( ! $canonical_term || ! isset( $canonical_term->term_id ) ) {
+					if ( $dry_run ) {
+						\WP_CLI::line( "[DRY RUN] Would rename '{$legacy_slug}' (ID {$legacy_term->term_id}) to '{$canonical_slug}' for {$display_name}" );
+						++$changed;
+						continue;
+					}
+
+					$renamed = wp_update_term( (int) $legacy_term->term_id, 'category', array( 'slug' => $canonical_slug ) );
+					if ( ! is_wp_error( $renamed ) ) {
+						\WP_CLI::line( "Renamed '{$legacy_slug}' to '{$canonical_slug}' for {$display_name}" );
+						++$changed;
+					} else {
+						$errors[] = "Failed to rename {$display_name}: " . $renamed->get_error_message();
+					}
+				}
+			}
+		}
+
+		if ( $changed > 0 ) {
+			if ( ! $dry_run ) {
+				flush_rewrite_rules( false );
+				\WP_CLI::line( 'Rewrite rules flushed.' );
+			}
+		}
+
+		\WP_CLI::success( sprintf( 'Migration complete: %d change(s), %d error(s).', $changed, count( $errors ) ) );
+		if ( $errors ) {
+			\WP_CLI::halt( 1 );
+		}
+	}
+
+	/**
+	 * Merge posts and metadata from a legacy term into the canonical term.
+	 */
+	private static function merge_terms( int $canonical_id, int $legacy_id, string $display_name ): bool {
+		global $wpdb;
+
+		$legacy_posts = get_posts(
+			array(
+				'category'       => $legacy_id,
+				'fields'         => 'ids',
+				'posts_per_page' => -1,
+				'post_status'    => 'any',
+			)
+		);
+
+		foreach ( $legacy_posts as $post_id ) {
+			$result = wp_set_post_categories( $post_id, $canonical_id, true );
+			if ( is_wp_error( $result ) ) {
+				\WP_CLI::warning( "Failed to reassign post {$post_id} from {$display_name}: " . $result->get_error_message() );
+			}
+		}
+
+		$description = term_description( $legacy_id );
+		if ( $description ) {
+			$existing = term_description( $canonical_id );
+			if ( ! $existing ) {
+				wp_update_term( $canonical_id, 'category', array( 'description' => $description ) );
+			}
+		}
+
+		$deleted = wp_delete_term( $legacy_id, 'category' );
+		if ( is_wp_error( $deleted ) || false === $deleted ) {
+			return false;
+		}
+		return true;
+	}
+}
+
 /** Publication-readiness CLI command. */
 final class Readiness_Command {
 	/** Check a post readiness state. */
@@ -435,23 +563,23 @@ final class Bootstrap_Command {
 			'name' => 'Evidence Literacy',
 		),
 		'sleep'        => array(
-			'slug' => 'sleep-and-circadian-health',
+			'slug' => 'sleep',
 			'name' => 'Sleep and Circadian Health',
 		),
 		'movement'     => array(
-			'slug' => 'movement-and-physical-capacity',
+			'slug' => 'movement',
 			'name' => 'Movement and Physical Capacity',
 		),
 		'nutrition'    => array(
-			'slug' => 'nutrition-and-healthy-aging',
+			'slug' => 'nutrition',
 			'name' => 'Nutrition and Healthy Aging',
 		),
 		'wearables'    => array(
-			'slug' => 'wearables-and-consumer-measurement',
+			'slug' => 'wearables',
 			'name' => 'Wearables and Consumer Measurement',
 		),
 		'supplements'  => array(
-			'slug' => 'supplements-and-high-uncertainty-interventions',
+			'slug' => 'supplements',
 			'name' => 'Supplements and High-Uncertainty Interventions',
 		),
 		'consumer_lab' => array(

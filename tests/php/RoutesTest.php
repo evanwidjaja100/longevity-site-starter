@@ -58,10 +58,14 @@ reset_routes_globals(
 		'evidence-literacy'                => (object) array( 'term_id' => 2, 'slug' => 'evidence-literacy', 'name' => 'Evidence Literacy', 'taxonomy' => 'category' ),
 		'consumer-lab'                     => (object) array( 'term_id' => 7, 'slug' => 'consumer-lab', 'name' => 'Consumer Lab', 'taxonomy' => 'category' ),
 		'sleep-and-circadian-health'       => (object) array( 'term_id' => 3, 'slug' => 'sleep-and-circadian-health', 'name' => 'Sleep and Circadian Health', 'taxonomy' => 'category' ),
+		'movement'                         => (object) array( 'term_id' => 4, 'slug' => 'movement', 'name' => 'Movement and Physical Capacity', 'taxonomy' => 'category' ),
+		'nutrition'                        => (object) array( 'term_id' => 5, 'slug' => 'nutrition', 'name' => 'Nutrition and Healthy Aging', 'taxonomy' => 'category' ),
 	),
 	array( // term_links
 		2 => 'http://example.com/category/evidence-literacy/',
 		3 => 'http://example.com/category/sleep/',
+		4 => 'http://example.com/category/movement/',
+		5 => 'http://example.com/category/nutrition/',
 		7 => 'http://example.com/category/consumer-lab/',
 	)
 );
@@ -124,9 +128,9 @@ $assert( null === Routes::page_url( 'nonexistent' ), 'Missing page should return
 $expected_cats = array(
 	'evidence'     => 2,
 	'sleep'        => 3,
+	'movement'     => 4,
+	'nutrition'    => 5,
 	'consumer_lab' => 7,
-	'movement'     => null,
-	'nutrition'    => null,
 	'wearables'    => null,
 	'supplements'  => null,
 );
@@ -146,7 +150,9 @@ $assert( null === Routes::category_id( 'bogus' ), 'Unknown category key should r
 // --- Test 7: Category URLs resolve correctly ---
 
 $expected_cat_urls = array(
-	'sleep' => 'http://example.com/category/sleep/',
+	'sleep'    => 'http://example.com/category/sleep/',
+	'movement' => 'http://example.com/category/movement/',
+	'nutrition' => 'http://example.com/category/nutrition/',
 );
 
 foreach ( $expected_cat_urls as $key => $expected_url ) {
@@ -159,7 +165,7 @@ foreach ( $expected_cat_urls as $key => $expected_url ) {
 
 // --- Test 8: Missing category returns null URL ---
 
-$assert( null === Routes::category_url( 'movement' ), 'Missing category should return null URL' );
+$assert( null === Routes::category_url( 'wearables' ), 'Missing category should return null URL' );
 
 // --- Test 9: Review archive URL ---
 
@@ -191,9 +197,9 @@ $assert(
 	'Comparing with nonexistent key should return false'
 );
 
-// --- Test 13: Legacy slug fallback (movement not in mock, should be null) ---
+// --- Test 13: Legacy slug fallback (supplements not in mock, should be null) ---
 
-$assert( null === Routes::category_id( 'movement' ), 'movement category should be null when not in mock data' );
+$assert( null === Routes::category_id( 'supplements' ), 'supplements category should be null when not in mock data' );
 
 // --- Test 14: No admin or preview URLs ---
 
