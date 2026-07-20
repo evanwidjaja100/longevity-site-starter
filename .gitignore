@@ -15,3 +15,10 @@ build/
 *.log
 wp-content/uploads/*
 !wp-content/uploads/.gitkeep
+
+# Generated / session artifacts — never track
+/repomix-output.md
+/report.md
+/longevity-evidence-lab-ai-implementation-plan.md
+/source/
+/data/

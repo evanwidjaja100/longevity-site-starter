@@ -31,9 +31,9 @@ if grep -RInE --exclude-dir=.git --exclude-dir=vendor --exclude-dir=node_modules
   echo 'ERROR: placeholder production domains or credentials found in tracked runtime files.' >&2
   exit 1
 fi
-if find . -type f ! -path './.git/*' ! -path './vendor/*' ! -path './node_modules/*' ! -path './source/deep-research-report.md' -print0 | xargs -0 grep -Il '[[:blank:]]$' | grep -q .; then
+if find . -type f ! -path './.git/*' ! -path './vendor/*' ! -path './node_modules/*' -print0 | xargs -0 grep -Il '[[:blank:]]$' | grep -q .; then
   echo 'ERROR: trailing whitespace found.' >&2
-  find . -type f ! -path './.git/*' ! -path './vendor/*' ! -path './node_modules/*' ! -path './source/deep-research-report.md' -print0 | xargs -0 grep -Il '[[:blank:]]$'
+  find . -type f ! -path './.git/*' ! -path './vendor/*' ! -path './node_modules/*' -print0 | xargs -0 grep -Il '[[:blank:]]$'
   exit 1
 fi
 
