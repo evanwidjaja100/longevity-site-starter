@@ -14,7 +14,8 @@ test.describe('public route resolution', () => {
       const fullPath = path === SEARCH_PATH ? `${SEARCH_PATH}test` : path;
       const response = await page.goto(fullPath);
       expect(response?.status()).toBe(200);
-      const expected = new URL(fullPath, 'http://localhost:8080').pathname;
+      const base = process.env.WP_SITE_URL || 'http://localhost:8080';
+      const expected = new URL(fullPath, base).pathname;
       expect(new URL(page.url()).pathname).toBe(expected);
     });
   }

@@ -55,19 +55,6 @@ wp option update default_ping_status closed --allow-root
 wp option update users_can_register 0 --allow-root
 wp option update blog_public 0 --allow-root
 
-for category in \
-  "Evidence Literacy" \
-  "Sleep and Circadian Health" \
-  "Movement and Physical Capacity" \
-  "Nutrition and Healthy Aging" \
-  "Wearables and Consumer Measurement" \
-  "Consumer Lab" \
-  "Supplements and High-Uncertainty Interventions"; do
-  slug=$(printf '%s' "$category" | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9' '-' | sed 's/^-//;s/-$//')
-  wp term get category "$slug" --by=slug --allow-root >/dev/null 2>&1 || \
-    wp term create category "$category" --slug="$slug" --allow-root >/dev/null
- done
-
 create_page() {
   title=$1
   slug=$2
@@ -102,6 +89,10 @@ create_page 'Contact' 'contact' draft 'Add monitored editorial, corrections, pri
 
 wp option update show_on_front page --allow-root
 wp option update page_on_front "$home_id" --allow-root
+
+# Categories are managed by the wp longevity bootstrap categories CLI command
+# (defined in longevity-core). This replaces the old shell-based category creation.
+wp longevity bootstrap categories --allow-root
 
 if [ "${INSTALL_OPTIONAL_PLUGINS:-0}" = "1" ]; then
   wp plugin install wordpress-seo --activate --allow-root || true

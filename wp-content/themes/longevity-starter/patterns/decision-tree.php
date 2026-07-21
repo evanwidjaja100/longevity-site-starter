@@ -21,5 +21,5 @@
 <ul class="longevity-decision-options"><li><strong>I want the strongest evidence available</strong> — look for A- or B-grade claims</li><li><strong>I want to understand uncertainty</strong> — read the limitations section</li><li><strong>I just need an overview</strong> — the bottom line summary covers key findings</li></ul>
 <!-- /wp:list -->
 <!-- wp:separator {"className":"is-style-wide"} --><hr class="wp-block-separator has-alpha-channel-opacity is-style-wide"/><!-- /wp:separator -->
-<!-- wp:paragraph {"fontSize":"small"} --><p class="has-small-font-size"><strong>Not sure where to start?</strong> Visit the <a href="/start-here/">Start Here</a> page for a guided introduction.</p><!-- /wp:paragraph -->
+<!-- wp:paragraph {"fontSize":"small"} --><p class="has-small-font-size"><strong>Not sure where to start?</strong> Visit the <a href="<?php echo esc_url( \Longevity\Core\Routes::public_page_url( 'start_here' ) ); ?>">Start Here</a> page for a guided introduction.</p><!-- /wp:paragraph -->
 </div><!-- /wp:group -->
