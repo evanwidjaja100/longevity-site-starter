@@ -72,9 +72,9 @@ final class Freshness {
 			delete_option( 'lel_freshness_last_error' );
 		} catch ( \Throwable $error ) {
 			$report['status'] = 'failed';
-			update_option( 'lel_freshness_last_error', array( 'time' => gmdate( DATE_W3C ) ), false );
+			update_option( 'lel_freshness_last_error', array( 'time' => gmdate( DATE_W3C ), 'message' => $error->getMessage() ), false );
 			if ( function_exists( 'error_log' ) ) {
-				error_log( 'Longevity Core freshness job failed.' );
+				error_log( 'Longevity Core freshness job failed: ' . $error->getMessage() );
 			}
 		} finally {
 			delete_transient( self::LOCK );

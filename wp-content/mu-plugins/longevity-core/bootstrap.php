@@ -92,47 +92,9 @@ final class Bootstrap {
 
 		add_filter( 'the_generator', '__return_empty_string' );
 		add_filter( 'wp_robots', array( self::class, 'filter_noindex_placeholder_pages' ) );
-		add_action( 'wp_head', array( self::class, 'output_canonical_url' ), 11 );
 		add_action( 'template_redirect', array( Routes::class, 'redirect_legacy_category' ), 10 );
 		add_action( 'send_headers', array( self::class, 'send_security_headers' ) );
 		add_filter( 'render_block_core/navigation-link', array( self::class, 'filter_navigation_link' ), 10, 2 );
-	}
-
-	/**
-	 * Output canonical URL for archive routes (categories, etc.).
-	 *
-	 * Runs at priority 11, after core rel_canonical (which only handles singular).
-	 */
-	public static function output_canonical_url(): void {
-		// Skip when the SEO class handles categories at priority 4.
-		if ( class_exists( 'Longevity\Core\SEO' ) && ! defined( 'WPSEO_VERSION' ) && ! class_exists( 'RankMath' ) && ! class_exists( 'The_SEO_Framework\Load' ) ) {
-			return;
-		}
-		if ( is_category() ) {
-			$term = get_queried_object();
-			if ( ! $term instanceof \WP_Term ) {
-				return;
-			}
-			$slug = $term->slug;
-			$url  = null;
-			foreach ( Routes::definitions()['categories'] as $key => $def ) {
-				if ( $def['slug'] === $slug ) {
-					$url = Routes::category_url( $key );
-					break;
-				}
-				$legacy = $def['legacy_slug'] ?? null;
-				if ( $legacy && $legacy === $slug ) {
-					$url = Routes::category_url( $key );
-					break;
-				}
-			}
-			if ( ! $url ) {
-				$url = get_category_link( $term->term_id );
-			}
-			if ( $url ) {
-				echo '<link rel="canonical" href="' . esc_url( $url ) . '" />' . "\n";
-			}
-		}
 	}
 
 	/**

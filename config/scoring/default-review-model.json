@@ -2,7 +2,7 @@
   "version": "1.0.0",
   "scale": {"minimum": 0, "maximum": 5},
   "confidence_labels": ["High confidence", "Moderate confidence", "Low confidence", "Preliminary"],
-  "minimum_meaningful_difference": 0.2,
+  "minimum_meaningful_difference": 0.5,
   "rules": {
     "weights_must_total": 100,
     "missing_required_dimension_blocks_publication": true,

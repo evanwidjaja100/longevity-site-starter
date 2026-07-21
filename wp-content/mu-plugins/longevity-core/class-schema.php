@@ -16,10 +16,14 @@ final class Schema {
 		add_action( 'wp_head', array( self::class, 'output' ), 30 );
 	}
 
-	/** Output conservative social metadata when no supported SEO provider owns it. */
+	/**
+	 * Output conservative social metadata.
+	 *
+	 * @deprecated 3.1.0 Social meta is handled by SEO::output_social_meta() at priority 4.
+	 *             Kept as a no-op for external callers.
+	 */
 	public static function output_social_meta(): void {
-		// Deprecated — social meta is handled by SEO::output_social_meta() at priority 4.
-		// Kept as a no-op for callers that may reference it externally.
+		_deprecated_function( __METHOD__, '3.1.0', 'SEO::output_social_meta' );
 	}
 
 	/** Output the JSON-LD graph. */

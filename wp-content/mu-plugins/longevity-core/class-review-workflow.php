@@ -111,6 +111,7 @@ final class Review_Workflow {
 		}
 		if ( 'verified' !== get_user_meta( $user_id, 'credential_verification_status', true ) || '' === trim( (string) get_user_meta( $user_id, 'professional_credentials', true ) ) ) {
 			self::redirect( 'lel-medical-review-queue', $post_id, 'credentials_required' );
+			return;
 		}
 
 		$scope       = Meta_Registry::sanitize_value( 'review_scope', self::posted( 'medical_review_scope' ) );

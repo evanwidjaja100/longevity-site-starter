@@ -108,7 +108,7 @@ final class Review_Methodology {
 	/** Minimum score difference required for a meaningful ranking distinction. */
 	public static function minimum_meaningful_difference(): float {
 		$model = self::model();
-		return isset( $model['minimum_meaningful_difference'] ) ? (float) $model['minimum_meaningful_difference'] : 0.2;
+		return isset( $model['minimum_meaningful_difference'] ) ? (float) $model['minimum_meaningful_difference'] : 0.5;
 	}
 
 	/** Formatted scoring sensitivity disclosure for ranking pages. */

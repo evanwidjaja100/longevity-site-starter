@@ -356,10 +356,6 @@ final class Migrate_Command {
 	public function __invoke( array $args, array $assoc_args ): void {
 		$dry_run = isset( $assoc_args['dry-run'] );
 
-		if ( ! class_exists( Routes::class ) ) {
-			\WP_CLI::error( 'Routes class is not available.' );
-		}
-
 		$defs       = Routes::definitions();
 		$categories = $defs['categories'];
 		$changed    = 0;

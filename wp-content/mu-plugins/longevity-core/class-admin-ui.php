@@ -427,12 +427,7 @@ final class Admin_UI {
 		echo '</select></td><td><label class="screen-reader-text" for="lel-result-note-' . esc_attr( (string) $index ) . '">' . esc_html__( 'Interpretation note', 'longevity-core' ) . '</label><textarea id="lel-result-note-' . esc_attr( (string) $index ) . '" name="public_test_results_rows[' . esc_attr( (string) $index ) . '][note]" rows="2">' . esc_textarea( (string) ( $row['note'] ?? '' ) ) . '</textarea></td><td><label class="screen-reader-text" for="lel-result-order-' . esc_attr( (string) $index ) . '">' . esc_html__( 'Display order', 'longevity-core' ) . '</label><input id="lel-result-order-' . esc_attr( (string) $index ) . '" type="number" min="0" max="999" name="public_test_results_rows[' . esc_attr( (string) $index ) . '][display_order]" value="' . esc_attr( (string) ( $row['display_order'] ?? ( $index + 1 ) * 10 ) ) . '"></td><td><button type="button" class="button-link" data-lel-result-up aria-label="' . esc_attr__( 'Move row up', 'longevity-core' ) . '">↑</button> <button type="button" class="button-link" data-lel-result-down aria-label="' . esc_attr__( 'Move row down', 'longevity-core' ) . '">↓</button> <button type="button" class="button-link-delete" data-lel-remove-result>' . esc_html__( 'Remove', 'longevity-core' ) . '</button></td></tr>';
 	}
 
-	private static function json_textarea( int $post_id, string $key, string $label ): void {
-		$value = get_post_meta( $post_id, $key, true );
-		$value = is_array( $value ) ? wp_json_encode( $value, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) : (string) $value;
-		echo '<p><label for="' . esc_attr( $key ) . '"><strong>' . esc_html( $label ) . '</strong></label><br><textarea class="widefat code" rows="8" id="' . esc_attr( $key ) . '" name="' . esc_attr( $key ) . '">' . esc_textarea( $value ) . '</textarea></p>';
-	}
-
+	
 	private static function text( int $post_id, string $key, string $label ): void {
 		self::input( $post_id, $key, $label, 'text' );
 	}

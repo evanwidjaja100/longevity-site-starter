@@ -969,9 +969,29 @@ final class Public_Components {
 		return $html . '</aside>';
 	}
 
+	/**
+	 * Resolve the client IP address.
+	 *
+	 * Respects X-Forwarded-For only when REMOTE_ADDR matches a trusted proxy
+	 * defined via the LONGEVITY_TRUSTED_PROXIES constant. Without trusted-proxy
+	 * configuration, returns REMOTE_ADDR directly.
+	 */
+	private static function get_client_ip(): string {
+		$trusted_proxies = defined( 'LONGEVITY_TRUSTED_PROXIES' ) && is_array( LONGEVITY_TRUSTED_PROXIES ) ? LONGEVITY_TRUSTED_PROXIES : array();
+		$remote_addr     = isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) ) : '0.0.0.0';
+		if ( $trusted_proxies && in_array( $remote_addr, $trusted_proxies, true ) ) {
+			$forwarded = isset( $_SERVER['HTTP_X_FORWARDED_FOR'] ) ? sanitize_text_field( wp_unslash( $_SERVER['HTTP_X_FORWARDED_FOR'] ) ) : '';
+			if ( '' !== $forwarded ) {
+				$ips = explode( ',', $forwarded );
+				return trim( (string) end( $ips ) );
+			}
+		}
+		return $remote_addr;
+	}
+
 	/** Render a contact form with abuse protection. */
 	public static function render_contact_form(): string {
-		$ip      = isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) ) : '0.0.0.0';
+		$ip      = self::get_client_ip();
 		$blocked = get_transient( 'lel_contact_block_' . $ip );
 
 		if ( $blocked ) {
@@ -1026,7 +1046,7 @@ final class Public_Components {
 			wp_die( esc_html__( 'Submission rejected.', 'longevity-core' ), 400 );
 		}
 
-		$ip  = sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0' ) );
+		$ip  = self::get_client_ip();
 		$key = 'lel_contact_count_' . $ip;
 		$count = (int) get_transient( $key );
 		if ( $count >= 5 ) {
