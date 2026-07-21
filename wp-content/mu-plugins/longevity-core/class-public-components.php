@@ -1001,7 +1001,6 @@ final class Public_Components {
 		wp_enqueue_script( 'longevity-contact-form', LONGEVITY_CORE_URL . 'assets/contact-form.js', array(), LONGEVITY_CORE_VERSION, true );
 
 		$nonce = wp_create_nonce( 'longevity_contact' );
-		$api_url = rest_url( 'longevity/v1/contact' );
 
 		$html = '<form class="longevity-contact-form" method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '">';
 		$html .= '<input type="hidden" name="action" value="longevity_contact_submit">';
@@ -1086,6 +1085,15 @@ final class Public_Components {
 
 		if ( 'correction' === $subject ) {
 			update_post_meta( $post_id, 'contact_type', 'correction_report' );
+		}
+
+		if ( defined( 'SMTP_HOST' ) || has_action( 'phpmailer_init' ) ) {
+			wp_mail(
+				get_option( 'admin_email' ),
+				sprintf( '[Contact] %s from %s', $subject, $name ),
+				$message . "\n\nReply-to: {$email}",
+				array( "Reply-To: {$name} <{$email}>" )
+			);
 		}
 
 		$redirect = home_url( '/contact/?submitted=1' );

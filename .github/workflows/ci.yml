@@ -15,15 +15,15 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
       - name: Cache Composer dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830  # v4.3.0
         with:
           path: vendor
           key: composer-${{ hashFiles('composer.lock') }}
           restore-keys: composer-
       - name: Cache npm dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830  # v4.3.0
         with:
           path: node_modules
           key: npm-${{ hashFiles('package-lock.json') }}
@@ -32,7 +32,7 @@ jobs:
         run: |
           find wp-content/mu-plugins/longevity-core wp-content/themes/longevity-starter scripts -name '*.php' -exec php -l {} \;
       - name: ShellCheck
-        uses: ludeeus/action-shellcheck@2.0.0
+        uses: ludeeus/action-shellcheck@00cae500b08a931fb5698e11e79bfbd38e612a38  # 2.0.0
         with:
           severity: warning
       - name: Composer audit
@@ -42,13 +42,13 @@ jobs:
   quality:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: shivammathur/setup-php@v2
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
+      - uses: shivammathur/setup-php@b604ade2a87db23f8871b7182e69ec5e75effb45  # v2
         with:
           php-version: '8.3'
           coverage: none
       - name: Cache Composer dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830  # v4.3.0
         with:
           path: vendor
           key: composer-${{ hashFiles('composer.lock') }}
@@ -64,8 +64,8 @@ jobs:
   frontend:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4.4.0
         with:
           node-version: '22'
           cache: npm
@@ -78,16 +78,16 @@ jobs:
       contents: read
       security-events: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
       - name: CodeQL initialization
-        uses: github/codeql-action/init@v3
+        uses: github/codeql-action/init@d03f4cc0498d5a63039d157eb274d9c2fc50f17a  # v3.37.1
         with:
           languages: javascript, python, php
           queries: security-and-quality
       - name: CodeQL analysis
-        uses: github/codeql-action/analyze@v3
+        uses: github/codeql-action/analyze@d03f4cc0498d5a63039d157eb274d9c2fc50f17a  # v3.37.1
       - name: Secret scanning
-        uses: trufflesecurity/trufflehog@v3
+        uses: trufflesecurity/trufflehog@27b0417c16317ca9a472a9a8092acce143b49c55  # v3.95.9
         with:
           extra_args: --only-verified --results=verified,unknown
 
@@ -95,18 +95,18 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
       - name: Dependency Review
-        uses: actions/dependency-review-action@v4
+        uses: actions/dependency-review-action@2031cfc080254a8a887f58cffee85186f0e49e48  # v4 (branch)
         with:
           fail-on-severity: high
 
   container-scan:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
       - name: Trivy scan Docker compose
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@915b19bbe73b92a6cf82a1bc12b087c9a19a5fe2  # v0.28.0
         with:
           scan-type: config
           scan-ref: compose.yaml
@@ -116,9 +116,9 @@ jobs:
   sbom:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
       - name: Generate SBOM
-        uses: anchore/sbom-action@v0
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610  # v0
         with:
           path: ./
           format: spdx-json
@@ -127,7 +127,7 @@ jobs:
   e2e:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
       - name: Configure environment
         run: cp .env.ci .env
       - name: Start stack
@@ -143,7 +143,7 @@ jobs:
         run: docker compose run --rm --entrypoint sh wpcli /scripts/bootstrap.sh
       - name: Smoke test
         run: ./scripts/smoke-test.sh
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4.4.0
         with:
           node-version: '22'
           cache: npm
@@ -155,7 +155,7 @@ jobs:
         run: npm run test:e2e
       - name: Upload Playwright report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
         with:
           name: playwright-report
           path: reports/playwright/
