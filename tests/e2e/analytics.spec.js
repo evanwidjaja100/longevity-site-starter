@@ -2,11 +2,16 @@ import { test, expect } from '@playwright/test';
 
 test('analytics config is injected on public pages', async ({ page }) => {
   await page.goto('/');
-  const config = await page.evaluate(() => window.longevityAnalyticsConfig);
+  const config = await page.evaluate(() => {
+    const el = document.getElementById('longevity-analytics-config');
+    return el ? JSON.parse(el.textContent) : null;
+  });
   expect(config).toBeDefined();
   expect(config).toHaveProperty('contentGroup');
   expect(config).toHaveProperty('eventSchemas');
   expect(Array.isArray(config.eventSchemas.search_open)).toBe(true);
+  expect(Array.isArray(config.eventSchemas.start_here_open)).toBe(true);
+  expect(Array.isArray(config.eventSchemas.topic_open)).toBe(true);
 });
 
 test('analytics queue exists and accepts events', async ({ page }) => {
@@ -74,6 +79,24 @@ test('evidence_summary_open event wired on trust summary', async ({ page }) => {
     return el !== null;
   });
   expect(hasEvent).toBe(true);
+});
+
+test('start_here_open event wired on homepage hero button', async ({ page }) => {
+  await page.goto('/');
+  const el = await page.locator('[data-lel-event="start_here_open"][data-placement="hero"]');
+  await expect(el).toBeVisible();
+});
+
+test('topic_open events wired on homepage topic navigation', async ({ page }) => {
+  await page.goto('/');
+  const count = await page.locator('[data-lel-event="topic_open"]').count();
+  expect(count).toBeGreaterThanOrEqual(1);
+});
+
+test('methodology_open event wired on choose-your-path card', async ({ page }) => {
+  await page.goto('/');
+  const el = await page.locator('[data-lel-event="methodology_open"][data-placement="path-cards"]');
+  await expect(el).toBeVisible();
 });
 
 test('analytics custom event dispatches on push', async ({ page }) => {

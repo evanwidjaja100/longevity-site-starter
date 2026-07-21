@@ -99,6 +99,11 @@ Previous phases completed Route Consolidation, Production-Grade Bootstrap, SEO/n
 - PRv1-4 ✅: `Public_Components` god class (~1,225 lines) split into 5 domain classes via backward-compatible facade: `Public_Nav`, `Public_Contact`, `Public_Content`, `Public_Trust`, `Public_Rankings`. No call-site changes needed.
 - 🔴 **Phase 5 (human-only):** Production accounts, MFA, HTTPS/HSTS, SMTP/SPF/DKIM/DMARC, off-site encrypted backups with restore drills, uptime monitoring, CSP enforcement flip, branch-protection rules.
 
+### Phase 10 — Measurement and iteration
+- RX-1001 ✅: 5 new privacy-safe funnel events defined (`start_here_open`, `topic_open`, `guide_open`, `source_open`, `claim_matrix_expand`) and registered in `class-analytics.php` event allowlist. All events wired via `data-lel-event` attributes across 11 pattern files, 3 template files, 4 PHP render classes.
+- RX-1002 ✅: KPI definition document created (`operations/kpi-definitions.md`) covering content quality, reader engagement, product/review, and operational KPIs. All data sources documented.
+- RX-1003 ✅: Usability review plan created (`operations/usability-review-plan.md`) with 6 reader profiles, 10 test tasks, session format, privacy/ethics guidelines, and deliverables.
+
 ### Tip for next agent
 - All PHP CLI commands run via `docker compose run --rm wpcli wp ...` (not `docker exec`)
 - WordPress function LSP errors are expected (stubs unavailable on host)

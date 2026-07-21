@@ -26,7 +26,7 @@ class Public_Rankings {
 		$html = '<section class="longevity-ranking-directory" aria-labelledby="lel-ranking-directory-title"><div class="longevity-section-header"><div><p class="longevity-kicker">Consumer Lab rankings</p><h2 id="lel-ranking-directory-title">Compare protocol-complete product reports</h2></div><p>' . esc_html( sprintf( __( 'Categories that meet the minimum of %d eligible comparable reports for a numbered ranking.', 'longevity-core' ), $minimum ) ) . '</p></div><div class="longevity-ranking-category-grid">';
 		foreach ( $enough as $group ) {
 			$term = $group['term'];
-			$html .= '<article class="longevity-ranking-category"><div class="longevity-category-mark" aria-hidden="true">' . esc_html( strtoupper( mb_substr( $term->name, 0, 1 ) ) ) . '</div><div><p class="longevity-kicker">' . esc_html( sprintf( _n( '%d eligible report', '%d eligible reports', $group['count'], 'longevity-core' ), $group['count'] ) ) . '</p><h3><a href="' . esc_url( get_category_link( $term->term_id ) ) . '">' . esc_html( $term->name ) . '</a></h3><dl class="longevity-category-facts"><div><dt>' . esc_html__( 'Top score', 'longevity-core' ) . '</dt><dd>' . esc_html( number_format_i18n( $group['highest_score'], 1 ) ) . '/5</dd></div><div><dt>' . esc_html__( 'Updated', 'longevity-core' ) . '</dt><dd><time datetime="' . esc_attr( $group['latest'] ) . '">' . esc_html( $group['latest'] ) . '</time></dd></div></dl></div></article>';
+			$html .= '<article class="longevity-ranking-category"><div class="longevity-category-mark" aria-hidden="true">' . esc_html( strtoupper( mb_substr( $term->name, 0, 1 ) ) ) . '</div><div><p class="longevity-kicker">' . esc_html( sprintf( _n( '%d eligible report', '%d eligible reports', $group['count'], 'longevity-core' ), $group['count'] ) ) . '</p><h3><a href="' . esc_url( get_category_link( $term->term_id ) ) . '" data-lel-event="topic_open" data-topic="' . esc_attr( $term->slug ) . '" data-placement="ranking-directory">' . esc_html( $term->name ) . '</a></h3><dl class="longevity-category-facts"><div><dt>' . esc_html__( 'Top score', 'longevity-core' ) . '</dt><dd>' . esc_html( number_format_i18n( $group['highest_score'], 1 ) ) . '/5</dd></div><div><dt>' . esc_html__( 'Updated', 'longevity-core' ) . '</dt><dd><time datetime="' . esc_attr( $group['latest'] ) . '">' . esc_html( $group['latest'] ) . '</time></dd></div></dl></div></article>';
 		}
 		return $html . '</div></section>';
 	}
@@ -296,7 +296,7 @@ class Public_Rankings {
 			return '';
 		}
 		$id   = Public_Content::unique_id( 'sources', $post_id );
-		$html = '<section class="longevity-source-list" aria-labelledby="' . esc_attr( $id ) . '"><h2 id="' . esc_attr( $id ) . '">' . esc_html__( 'Sources', 'longevity-core' ) . '</h2><ol>';
+		$html = '<section class="longevity-source-list" aria-labelledby="' . esc_attr( $id ) . '" data-lel-event="source_open" data-content-id="' . esc_attr( (string) $post_id ) . '" data-placement="source-list"><h2 id="' . esc_attr( $id ) . '">' . esc_html__( 'Sources', 'longevity-core' ) . '</h2><ol>';
 		foreach ( $sources as $source ) {
 			$html .= '<li><cite>' . esc_html( $source['title'] ) . '</cite>';
 			$details = array_filter( array( $source['authors'], $source['publication_date'] ) );
@@ -352,7 +352,7 @@ class Public_Rankings {
 			return '';
 		}
 		$id   = Public_Content::unique_id( 'claims', $post_id );
-		$html = '<section class="longevity-claim-matrix" aria-labelledby="' . esc_attr( $id ) . '"><h2 id="' . esc_attr( $id ) . '">' . esc_html__( 'Claim-level evidence', 'longevity-core' ) . '</h2><div class="longevity-claim-table-wrapper"><table class="longevity-claim-table"><thead><tr><th>' . esc_html__( 'Claim', 'longevity-core' ) . '</th><th>' . esc_html__( 'Confidence', 'longevity-core' ) . '</th><th>' . esc_html__( 'Population', 'longevity-core' ) . '</th><th>' . esc_html__( 'Outcome', 'longevity-core' ) . '</th><th>' . esc_html__( 'Evidence design', 'longevity-core' ) . '</th><th>' . esc_html__( 'Rationale', 'longevity-core' ) . '</th><th>' . esc_html__( 'Verified', 'longevity-core' ) . '</th></tr></thead><tbody>';
+		$html = '<section class="longevity-claim-matrix" aria-labelledby="' . esc_attr( $id ) . '" data-lel-event="claim_matrix_expand" data-content-id="' . esc_attr( (string) $post_id ) . '"><h2 id="' . esc_attr( $id ) . '">' . esc_html__( 'Claim-level evidence', 'longevity-core' ) . '</h2><div class="longevity-claim-table-wrapper"><table class="longevity-claim-table"><thead><tr><th>' . esc_html__( 'Claim', 'longevity-core' ) . '</th><th>' . esc_html__( 'Confidence', 'longevity-core' ) . '</th><th>' . esc_html__( 'Population', 'longevity-core' ) . '</th><th>' . esc_html__( 'Outcome', 'longevity-core' ) . '</th><th>' . esc_html__( 'Evidence design', 'longevity-core' ) . '</th><th>' . esc_html__( 'Rationale', 'longevity-core' ) . '</th><th>' . esc_html__( 'Verified', 'longevity-core' ) . '</th></tr></thead><tbody>';
 		foreach ( $claims as $claim ) {
 			$claim_text    = trim( (string) get_post_meta( $claim->ID, 'claim_text', true ) );
 			$grade         = trim( (string) get_post_meta( $claim->ID, 'evidence_grade', true ) );

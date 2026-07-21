@@ -1263,3 +1263,9 @@ textarea:disabled {
 }
 
 } /* /components */
+
+/* Unlayered: beat WP unlayered global link styles */
+.longevity-site-footer a,
+.longevity-site-footer .wp-block-navigation a {
+	color: var(--wp--preset--color--paper);
+}

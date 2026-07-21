@@ -28,6 +28,11 @@ Do not send diagnoses, symptoms, medication names, supplement regimens, or other
 | `ranking_filter` | Ranking filter applied | `category`, `filter_name` | 26 months | Measure filter usage |
 | `ranking_report_open` | Click on "View report" in ranking table | `content_id`, `category`, `placement` | 26 months | Measure ranking-to-report conversion |
 | `search_open` | Search dialog opened | `placement` | 26 months | Measure search feature usage |
+| `start_here_open` | Reader opens or visits the Start Here onboarding page | `placement` | 26 months | Measure onboarding engagement |
+| `topic_open` | Reader opens a topic hub (category archive) | `topic`, `placement` | 26 months | Measure topic discovery |
+| `guide_open` | Reader opens a guide (category archive with guide content) | `guide_id`, `placement` | 26 months | Measure guide consumption |
+| `source_open` | Reader expands or opens a source/citation detail | `content_id`, `placement` | 26 months | Measure source transparency engagement |
+| `claim_matrix_expand` | Reader expands a claim-evidence matrix row | `content_id`, `claim_id` | 26 months | Measure claim evidence exploration |
 
 ## Prohibited payloads
 

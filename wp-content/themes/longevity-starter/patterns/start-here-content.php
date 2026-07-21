@@ -11,7 +11,7 @@
 <!-- /wp:html -->
 <!-- wp:heading {"level":2} --><h2 class="wp-block-heading">Choose a goal</h2><!-- /wp:heading -->
 <!-- wp:html -->
-<div class="longevity-start-here-path"><h3><a href="<?php echo esc_url( \Longevity\Core\Routes::public_page_url( 'start_here' ) ); ?>">Learn how to evaluate evidence</a></h3><p>Start with evidence-literacy guides if you want to assess health claims yourself.</p></div><div class="longevity-start-here-path"><h3><a href="/category/sleep/">Improve sleep, movement, or nutrition</a></h3><p>Find evidence-informed guidance on foundational health topics.</p></div><div class="longevity-start-here-path"><h3><a href="/reviews/">Compare tested products</a></h3><p>Browse Consumer Lab reports with documented test records.</p></div>
+<div class="longevity-start-here-path"><h3><a href="<?php echo esc_url( \Longevity\Core\Routes::public_page_url( 'start_here' ) ); ?>" data-lel-event="start_here_open" data-placement="start-here-page">Learn how to evaluate evidence</a></h3><p>Start with evidence-literacy guides if you want to assess health claims yourself.</p></div><div class="longevity-start-here-path"><h3><a href="/category/sleep/">Improve sleep, movement, or nutrition</a></h3><p>Find evidence-informed guidance on foundational health topics.</p></div><div class="longevity-start-here-path"><h3><a href="/reviews/">Compare tested products</a></h3><p>Browse Consumer Lab reports with documented test records.</p></div>
 <!-- /wp:html -->
 <!-- wp:heading {"level":2} --><h2 class="wp-block-heading">Recommended first resources</h2><!-- /wp:heading -->
 <!-- wp:html -->

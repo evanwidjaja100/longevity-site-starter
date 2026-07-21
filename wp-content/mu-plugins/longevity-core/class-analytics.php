@@ -53,6 +53,11 @@ final class Analytics {
 			'ranking_report_open'     => array( 'content_id', 'category', 'placement' ),
 			'outbound_click'          => array( 'content_id', 'placement' ),
 			'search_open'             => array( 'placement' ),
+			'start_here_open'         => array( 'placement' ),
+			'topic_open'              => array( 'topic', 'placement' ),
+			'guide_open'              => array( 'guide_id', 'placement' ),
+			'source_open'             => array( 'content_id', 'placement' ),
+			'claim_matrix_expand'     => array( 'content_id', 'claim_id' ),
 		);
 	}
 }

@@ -110,7 +110,9 @@ class Public_Content {
 		$id   = self::unique_id( 'related', $post_id );
 		$html = '<section class="longevity-related-content" aria-labelledby="' . esc_attr( $id ) . '"><h2 id="' . esc_attr( $id ) . '">' . esc_html__( 'Continue exploring', 'longevity-core' ) . '</h2><ul>';
 		foreach ( $posts as $related ) {
-			$html .= '<li><a href="' . esc_url( get_permalink( $related ) ) . '">' . esc_html( get_the_title( $related ) ) . '</a> <span class="longevity-small">' . esc_html( 'review' === $related->post_type ? __( 'Consumer Lab review', 'longevity-core' ) : __( 'Evidence guide', 'longevity-core' ) ) . '</span></li>';
+			$guide_event = 'review' === $related->post_type ? 'ranking_report_open' : 'guide_open';
+			$guide_attr  = 'guide_open' === $guide_event ? 'data-lel-event="guide_open" data-guide-id="' . esc_attr( $related->ID ) . '" data-placement="related-content"' : '';
+			$html .= '<li><a href="' . esc_url( get_permalink( $related ) ) . '" ' . $guide_attr . '>' . esc_html( get_the_title( $related ) ) . '</a> <span class="longevity-small">' . esc_html( 'review' === $related->post_type ? __( 'Consumer Lab review', 'longevity-core' ) : __( 'Evidence guide', 'longevity-core' ) ) . '</span></li>';
 		}
 		return $html . '</ul></section>';
 	}
@@ -262,7 +264,7 @@ class Public_Content {
 			}
 			$has_cards = true;
 
-			$html .= '<article class="longevity-topic-card"><h3><a href="' . esc_url( get_category_link( $term->term_id ) ) . '">' . esc_html( $topic['label'] ) . '</a></h3><p class="longevity-topic-desc">' . esc_html( $topic['desc'] ) . '</p><p class="longevity-topic-example">' . esc_html( $topic['example'] ) . '</p><p class="longevity-topic-counts">';
+			$html .= '<article class="longevity-topic-card"><h3><a href="' . esc_url( get_category_link( $term->term_id ) ) . '" data-lel-event="topic_open" data-topic="' . esc_attr( $topic['slug'] ?? $term->slug ) . '" data-placement="topic-directory">' . esc_html( $topic['label'] ) . '</a></h3><p class="longevity-topic-desc">' . esc_html( $topic['desc'] ) . '</p><p class="longevity-topic-example">' . esc_html( $topic['example'] ) . '</p><p class="longevity-topic-counts">';
 
 			$counts = array();
 			if ( $guide_count > 0 ) {
@@ -351,7 +353,7 @@ class Public_Content {
 			$html .= '<div class="longevity-card-grid">';
 			while ( $query->have_posts() ) {
 				$query->the_post();
-				$html .= '<article class="longevity-card"><h3><a href="' . esc_url( get_permalink() ) . '">' . esc_html( get_the_title() ) . '</a></h3>';
+				$html .= '<article class="longevity-card"><h3><a href="' . esc_url( get_permalink() ) . '" data-lel-event="guide_open" data-guide-id="' . esc_attr( (string) get_the_ID() ) . '" data-placement="guide-directory">' . esc_html( get_the_title() ) . '</a></h3>';
 				$excerpt = get_the_excerpt();
 				if ( $excerpt ) {
 					$html .= '<p>' . esc_html( wp_trim_words( $excerpt, 30 ) ) . '</p>';

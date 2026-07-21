@@ -49,7 +49,7 @@ test.describe('landmarks', () => {
     test(`${route.key} has banner, navigation, main, and contentinfo landmarks`, async ({ page }) => {
       await page.goto(route.path);
       await expect(page.locator('header')).toBeVisible();
-      await expect(page.getByRole('navigation')).toBeVisible();
+      await expect(page.getByRole('navigation').first()).toBeVisible();
       await expect(page.getByRole('main')).toBeVisible();
       await expect(page.locator('footer')).toBeVisible();
     });
