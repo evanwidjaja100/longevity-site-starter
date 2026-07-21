@@ -16,18 +16,23 @@ final class Analytics {
 		add_action( 'wp_enqueue_scripts', array( self::class, 'enqueue' ) );
 	}
 
-	/** Enqueue the small event collector. */
+	/** Enqueue the small event collector and print config as a data block. */
 	public static function enqueue(): void {
 		if ( is_admin() ) {
 			return;
 		}
 		wp_enqueue_script( 'longevity-analytics', LONGEVITY_CORE_URL . 'assets/analytics.js', array(), LONGEVITY_CORE_VERSION, true );
+		add_action( 'wp_footer', array( self::class, 'print_config' ), 0 );
+	}
+
+	/** Print analytics configuration as a JSON data block (safe for CSP). */
+	public static function print_config(): void {
 		$config = array(
 			'contentId'    => is_singular() ? (string) get_queried_object_id() : '',
 			'contentGroup' => is_singular() ? sanitize_key( (string) get_post_type() ) : 'archive',
 			'eventSchemas' => self::event_schemas(),
 		);
-		wp_add_inline_script( 'longevity-analytics', 'window.longevityAnalyticsConfig=' . wp_json_encode( $config ) . ';', 'before' );
+		echo '<script id="longevity-analytics-config" type="application/json">' . wp_json_encode( $config ) . '</script>' . "\n";
 	}
 
 	/** Return the only public parameters accepted for each event. */

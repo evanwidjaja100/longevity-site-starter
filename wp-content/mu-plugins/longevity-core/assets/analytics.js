@@ -1,7 +1,8 @@
 (() => {
   'use strict';
 
-  const config = window.longevityAnalyticsConfig || {};
+  const configEl = document.getElementById('longevity-analytics-config');
+  const config = configEl ? JSON.parse(configEl.textContent) : {};
   const schemas = config.eventSchemas || {};
   window.longevityAnalytics = window.longevityAnalytics || [];
   window.longevityConsent = window.longevityConsent || {
