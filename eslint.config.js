@@ -26,6 +26,7 @@ export default [
         document: 'readonly',
         URL: 'readonly',
         console: 'readonly',
+        process: 'readonly',
         page: 'readonly',
         browser: 'readonly'
       }

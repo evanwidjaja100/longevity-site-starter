@@ -88,7 +88,19 @@ Previous phases completed Route Consolidation, Production-Grade Bootstrap, SEO/n
 - P2.3 ✅: `wp longevity bootstrap all` — orchestrates pages, categories, content in sequence
 - P2.4 ✅: 6 E2E smoke tests for bootstrap commands (dry-run, idempotency, all sections)
 
+### Phase PRv1 — Production Readiness Implementation ✅
+- PRv1-0 ✅: Committed database dump and file backup removed from working tree; `.gitignore` updated with `*.sql`, `*.tgz`, `*.tar.gz`; CI guard added to `security.yml`; README rewritten to document current backup policy.
+  - ⏸ **History purge pending** (requires human sign-off for force-push)
+  - 🔴 **HUMAN: Rotate `longevity_app` MySQL password** (prefix `Delta_10` visible in dump header)
+- PRv1-1 ✅: `phpstan.neon.dist` includes WordPress stubs + test bootstrap; `RoutesTest.php` assertion corrected to 17 pages with key-based manifest comparison; `ci.yml` now runs PHPCS, PHPStan, PHPUnit, ESLint, Stylelint, and Playwright E2E via `quality`, `frontend`, and `e2e` jobs; CSS and JS lint issues fixed.
+- PRv1-2 ✅: All GitHub Actions SHA-pinned across 3 workflow files; Akismet and 3 default themes removed (unused); dead `$api_url` variable removed; contact-form email notification added (gated behind `SMTP_HOST`/`phpmailer_init`).
+- PRv1-3 ✅: Hardcoded route literals in 9 PHP pattern files replaced with `Routes::public_page_url()`; duplicate shell-based category creation removed from `bootstrap.sh` (delegated to CLI command); `routes.spec.js` URL comparison uses `process.env.WP_SITE_URL`.
+  - ⏸ **a11y/zoom/Lighthouse/cross-browser verification** requires Docker (not available on host)
+- PRv1-4 ✅: `Public_Components` god class (~1,225 lines) split into 5 domain classes via backward-compatible facade: `Public_Nav`, `Public_Contact`, `Public_Content`, `Public_Trust`, `Public_Rankings`. No call-site changes needed.
+- 🔴 **Phase 5 (human-only):** Production accounts, MFA, HTTPS/HSTS, SMTP/SPF/DKIM/DMARC, off-site encrypted backups with restore drills, uptime monitoring, CSP enforcement flip, branch-protection rules.
+
 ### Tip for next agent
 - All PHP CLI commands run via `docker compose run --rm wpcli wp ...` (not `docker exec`)
 - WordPress function LSP errors are expected (stubs unavailable on host)
 - The `Routes` class lives in `Longevity\Core` namespace; use `use` imports in new files
+- `Public_Components` is now a facade; new domain classes are in `Longevity\Core\Public_Nav`, `Public_Contact`, `Public_Content`, `Public_Trust`, `Public_Rankings`
