@@ -554,6 +554,16 @@ final class Bootstrap_Command {
 			'title'  => 'Contact',
 			'status' => 'draft',
 		),
+		'ai_assist_disclosure' => array(
+			'slug'   => 'ai-assisted-work-disclosure',
+			'title'  => 'AI-Assisted Work Disclosure',
+			'status' => 'draft',
+		),
+		'source_registry'      => array(
+			'slug'   => 'source-registry',
+			'title'  => 'Source Registry',
+			'status' => 'draft',
+		),
 	);
 
 	/** @var array<string, array> Canonical category definitions matching Routes. */
@@ -670,6 +680,13 @@ final class Bootstrap_Command {
 			}
 		}
 
+		// Ensure the tagline is set for OG/Twitter fallback descriptions.
+		$current_tagline = get_option( 'blogdescription' );
+		if ( ! $dry_run && empty( $current_tagline ) ) {
+			update_option( 'blogdescription', 'Independent health evidence and consumer testing — evidence grades, product measurements, limitations, and corrections.' );
+			\WP_CLI::line( 'Set site tagline for OG/Twitter fallback descriptions.' );
+		}
+
 		$front_page_id = (int) get_option( 'page_on_front' );
 		if ( $front_page_id > 0 ) {
 			$front_page = get_post( $front_page_id );
@@ -763,47 +780,53 @@ final class Bootstrap_Command {
 		$errors   = array();
 
 		$post_blueprints = array(
-			'evidence'     => array(
+			'LEL-001'     => array(
 				'post_type'    => 'post',
-				'post_title'   => 'Evidence Literacy — Understanding Evidence Levels',
-				'post_name'    => 'evidence-literacy-guide',
-				'post_content' => '<!-- wp:paragraph --><p>This placeholder evidence guide explains how to evaluate the strength of health claims using standard evidence frameworks.</p><!-- /wp:paragraph -->',
+				'post_title'   => 'What Longevity Evidence Lab Does—and Does Not Claim',
+				'post_name'    => 'what-we-do-and-do-not-claim',
+				'post_content' => '<!-- wp:paragraph --><p>Longevity Evidence Lab evaluates products, practices, and interventions that claim to support healthy aging. This page explains what we do—and what we do not—claim, so you can make an informed decision about whether to trust and use this publication.</p><!-- /wp:paragraph --><!-- wp:heading --><h2>What we do</h2><!-- /wp:heading --><!-- wp:list --><ul><li>Register every material health or performance claim before publication.</li><li>Assign evidence grades (A–U) using a defined scale.</li><li>Disclose commercial relationships and affiliate links per content item.</li><li>Publish correction notices for substantive errors.</li><li>Set a scheduled review date for all content.</li></ul><!-- /wp:list --><!-- wp:heading --><h2>What we do not do</h2><!-- /wp:heading --><!-- wp:list --><ul><li>We do not provide individual medical advice, diagnosis, or treatment recommendations.</li><li>We do not guarantee outcomes from any product or practice.</li><li>We do not claim superiority over other publications or methodologies.</li><li>We do not accept payment for positive coverage.</li></ul><!-- /wp:list --><!-- wp:heading --><h2>How to use this site</h2><!-- /wp:heading --><!-- wp:paragraph --><p>Start with our Start Here page for a guided introduction. Use the Topics hub to explore by subject area. Our Evidence and Testing Methodology pages explain how we produce scores and grades.</p><!-- /wp:paragraph -->',
 			),
-			'sleep'        => array(
+			'LEL-002'     => array(
 				'post_type'    => 'post',
-				'post_title'   => 'Sleep and Circadian Health — An Evidence Overview',
-				'post_name'    => 'sleep-circadian-health-guide',
-				'post_content' => '<!-- wp:paragraph --><p>This placeholder guide covers the evidence for sleep hygiene, circadian alignment, and common interventions.</p><!-- /wp:paragraph -->',
+				'post_title'   => 'What Is Biohacking? An Evidence and Risk Framework',
+				'post_name'    => 'biohacking-evidence-risk-framework',
+				'post_content' => '<!-- wp:paragraph --><p>Biohacking covers a wide range of self-experimentation practices, from supplements and nootropics to light therapy and wearable devices. This framework helps you assess any biohacking practice by its evidence level and risk profile.</p><!-- /wp:paragraph --><!-- wp:heading --><h2>The evidence-risk matrix</h2><!-- /wp:heading --><!-- wp:table --><figure class="wp-block-table"><table><thead><tr><th>Risk level</th><th>Strong evidence</th><th>Moderate evidence</th><th>Limited evidence</th></tr></thead><tbody><tr><td>Low</td><td>Proceed with confidence</td><td>Proceed with awareness</td><td>Proceed cautiously</td></tr><tr><td>Medium</td><td>Proceed with monitoring</td><td>Proceed with caution</td><td>Avoid or consult expert</td></tr><tr><td>High</td><td>Consult expert</td><td>Avoid</td><td>Avoid</td></tr></tbody></table></figure><!-- /wp:table --><!-- wp:heading --><h2>How to use this framework</h2><!-- /wp:heading --><!-- wp:paragraph --><p>For any intervention: (1) identify the risk level based on known side effects and regulatory status, (2) assess the evidence quality independently, (3) plot the intersection on the matrix above, and (4) decide accordingly.</p><!-- /wp:paragraph --><!-- wp:paragraph --><p><strong>Medical review note:</strong> This content discusses safety boundaries and escalation indicators. Medical review is pending before publication.</p><!-- /wp:paragraph -->',
 			),
-			'movement'     => array(
+			'LEL-003'     => array(
 				'post_type'    => 'post',
-				'post_title'   => 'Movement and Physical Capacity — Evidence Review',
-				'post_name'    => 'movement-physical-capacity-guide',
-				'post_content' => '<!-- wp:paragraph --><p>This placeholder guide reviews evidence for exercise modalities, physical capacity metrics, and healthy aging.</p><!-- /wp:paragraph -->',
+				'post_title'   => 'How to Read a Health Study Without Being Misled',
+				'post_name'    => 'how-to-read-a-health-study',
+				'post_content' => '<!-- wp:paragraph --><p>Health studies appear in headlines every day. Many are reliable; some are misleading. This guide provides a simple worksheet you can apply to any study to decide how much confidence to place in its findings.</p><!-- /wp:paragraph --><!-- wp:heading --><h2>Six questions for any study</h2><!-- /wp:heading --><!-- wp:list {"ordered":true} --><ol><li><strong>What study design was used?</strong> Randomised trials are stronger than observational studies for causal questions.</li><li><strong>How large was the sample?</strong> Small studies produce less precise estimates.</li><li><strong>Who was in the study?</strong> Does the population match your situation?</li><li><strong>How long did it last?</strong> Short durations may miss long-term effects.</li><li><strong>What was measured?</strong> Did they measure the outcome directly or by proxy?</li><li><strong>Who funded it?</strong> Consider potential conflicts of interest.</li></ol><!-- /wp:list --><!-- wp:heading --><h2>Study appraisal worksheet</h2><!-- /wp:heading --><!-- wp:paragraph --><p>Download or copy the worksheet below to evaluate any study. Each question maps to a domain: design, sample, relevance, duration, measurement, and sponsorship.</p><!-- /wp:paragraph -->',
 			),
-			'nutrition'    => array(
+			'LEL-004'     => array(
 				'post_type'    => 'post',
-				'post_title'   => 'Nutrition and Healthy Aging — What the Evidence Says',
-				'post_name'    => 'nutrition-healthy-aging-guide',
-				'post_content' => '<!-- wp:paragraph --><p>This placeholder guide summarizes the evidence for dietary patterns, supplements, and nutritional interventions.</p><!-- /wp:paragraph -->',
+				'post_title'   => 'How We Grade Evidence and Test Consumer Products',
+				'post_name'    => 'how-we-grade-evidence-and-test-products',
+				'post_content' => '<!-- wp:paragraph --><p>Every material claim on this site is assigned an evidence grade. Product reviews carry a Consumer Lab score. This page explains how both are produced so you can interpret them with confidence.</p><!-- /wp:paragraph --><!-- wp:heading --><h2>Evidence grades</h2><!-- /wp:heading --><!-- wp:paragraph --><p>Grades follow a defined scale: A (strong), B (moderate), C (limited), D (mechanistic or anecdotal), and U (unclear). Each grade is specific to a single claim, not an entire article. Grades are assigned conservatively and include a rationale.</p><!-- /wp:paragraph --><!-- wp:heading --><h2>Product scores</h2><!-- /wp:heading --><!-- wp:paragraph --><p>Consumer Lab scores use a multi-category buyer-facts framework. Each product is evaluated on the categories that matter for its type. Scores are calculated using the methodology published on our Testing Methodology page.</p><!-- /wp:paragraph --><!-- wp:heading --><h2>Protocol index</h2><!-- /wp:heading --><!-- wp:paragraph --><p>All test protocols are registered before testing begins. Protocol documents include measurement devices, test procedures, sample sizes, and statistical approaches. Deviations from registered protocols are noted in final reports.</p><!-- /wp:paragraph -->',
 			),
-			'wearables'    => array(
+			'LEL-005'     => array(
 				'post_type'    => 'post',
-				'post_title'   => 'Wearables and Consumer Measurement — Evidence Guide',
-				'post_name'    => 'wearables-consumer-measurement-guide',
-				'post_content' => '<!-- wp:paragraph --><p>This placeholder guide evaluates the accuracy and utility of consumer wearables and personal measurement devices.</p><!-- /wp:paragraph -->',
+				'post_title'   => 'How to Improve Sleep Before Buying Another Device',
+				'post_name'    => 'improve-sleep-before-buying-device',
+				'post_content' => '<!-- wp:paragraph --><p>Sleep trackers and smart devices promise better rest, but the fundamentals of sleep hygiene cost little and are backed by stronger evidence. This guide helps you decide whether to invest in fundamentals or a device.</p><!-- /wp:paragraph --><!-- wp:heading --><h2>Sleep fundamentals with strong evidence</h2><!-- /wp:heading --><!-- wp:list --><ul><li><strong>Consistent schedule:</strong> Going to bed and waking at the same time supports circadian alignment.</li><li><strong>Light management:</strong> Bright light exposure in the morning; dim, blue-reduced light in the evening.</li><li><strong>Temperature:</strong> A cool room (16–19°C) promotes sleep onset.</li><li><strong>Wind-down routine:</strong> 30 minutes of low-arousal activity before bed.</li><li><strong>Caffeine timing:</strong> Avoid caffeine within 8–10 hours of bedtime.</li></ul><!-- /wp:list --><!-- wp:heading --><h2>When to consider a device</h2><!-- /wp:heading --><!-- wp:paragraph --><p>After consistent application of fundamentals for 4–6 weeks, if sleep difficulties persist, a device that provides measurement and feedback may help identify patterns. Our decision tool below helps you assess whether you are ready to escalate.</p><!-- /wp:paragraph --><!-- wp:paragraph --><p><strong>Medical review note:</strong> This content includes safety boundaries and sleep-disorder red flags. Medical review is pending before publication.</p><!-- /wp:paragraph -->',
 			),
-			'supplements'  => array(
+			'LEL-006'     => array(
 				'post_type'    => 'post',
-				'post_title'   => 'Supplements and High-Uncertainty Interventions — Evidence Guide',
-				'post_name'    => 'supplements-high-uncertainty-guide',
-				'post_content' => '<!-- wp:paragraph --><p>This placeholder guide reviews the evidence for popular supplements and interventions with high scientific uncertainty.</p><!-- /wp:paragraph -->',
+				'post_title'   => 'How Accurate Are Consumer Sleep Trackers?',
+				'post_name'    => 'consumer-sleep-tracker-accuracy',
+				'post_content' => '<!-- wp:paragraph --><p>Consumer sleep trackers from brands like Oura, Fitbit, Apple, and Whoop claim to measure sleep stages, heart rate, and recovery. This page summarises the published evidence for what these devices can and cannot measure reliably.</p><!-- /wp:paragraph --><!-- wp:heading --><h2>Evidence matrix by metric</h2><!-- /wp:heading --><!-- wp:table --><figure class="wp-block-table"><table><thead><tr><th>Metric</th><th>Evidence level</th><th>Notes</th></tr></thead><tbody><tr><td>Heart rate (night)</td><td>B (Moderate)</td><td>Good agreement with ECG at group level; lower accuracy at individual level</td></tr><tr><td>Total sleep time</td><td>B (Moderate)</td><td>Generally reliable for longer sleep periods; less accurate with frequent awakenings</td></tr><tr><td>Sleep stages (NREM/REM)</td><td>C (Limited)</td><td>Limited agreement with polysomnography; misclassification of light sleep common</td></tr><tr><td>Sleep onset / offset</td><td>C (Limited)</td><td>Variable across devices; tends to overestimate sleep time</td></tr><tr><td>HRV</td><td>C (Limited)</td><td>Night-time HRV correlates with reference measures; daytime not well validated</td></tr></tbody></table></figure><!-- /wp:table --><!-- wp:heading --><h2>Key limitations</h2><!-- /wp:heading --><!-- wp:paragraph --><p>Consumer devices are not medical-grade. They can provide useful trend data but should not be used for diagnosis or clinical decision-making. Accuracy varies by device firmware version, user characteristics, and sleeping environment.</p><!-- /wp:paragraph --><p><strong>Medical review note:</strong> This content interprets accuracy data in clinical context. Medical review is pending before publication.</p><!-- /wp:paragraph -->',
 			),
-			'consumer_lab' => array(
-				'post_type'    => 'review',
-				'post_title'   => 'Consumer Lab — Placeholder Product Review',
-				'post_name'    => 'consumer-lab-placeholder-review',
-				'post_content' => '<!-- wp:paragraph --><p>This placeholder product review demonstrates the Consumer Lab ranking and review template. Replace with an actual tested product before publication.</p><!-- /wp:paragraph -->',
+			'LEL-007'     => array(
+				'post_type'    => 'post',
+				'post_title'   => 'Resistance Training for Healthy Aging: A Beginner Framework',
+				'post_name'    => 'resistance-training-healthy-aging',
+				'post_content' => '<!-- wp:paragraph --><p>Resistance training is one of the most evidence-supported interventions for healthy aging. This guide provides a progression framework for beginners, with safety boundaries and referral indicators.</p><!-- /wp:paragraph --><!-- wp:heading --><h2>Getting started (weeks 1–4)</h2><!-- /wp:heading --><!-- wp:list --><ul><li>Bodyweight exercises: squats, wall push-ups, glute bridges, planks.</li><li>2 sessions per week, 1 set of 10–15 repetitions per exercise.</li><li>Focus on form and controlled movement, not load.</li></ul><!-- /wp:list --><!-- wp:heading --><h2>Building consistency (weeks 5–12)</h2><!-- /wp:heading --><!-- wp:list --><ul><li>Add resistance bands or light dumbbells.</li><li>2–3 sessions per week, 2–3 sets of 10–12 repetitions.</li><li>Increase load when 12 repetitions become easy across all sets.</li></ul><!-- /wp:list --><!-- wp:heading --><h2>Safety and referral boundaries</h2><!-- /wp:heading --><!-- wp:paragraph --><p>Consult a healthcare professional before starting if you have: uncontrolled hypertension, recent joint surgery, hernia, chronic pain conditions, or any condition that affects balance. Stop any exercise that causes sharp or persistent pain.</p><!-- /wp:paragraph --><!-- wp:paragraph --><p><strong>Medical review note:</strong> This content includes safety screening guidance and contraindications. Medical review is pending before publication.</p><!-- /wp:paragraph -->',
+			),
+			'LEL-008'     => array(
+				'post_type'    => 'post',
+				'post_title'   => 'Foods and Dietary Patterns Associated With Healthy Aging',
+				'post_name'    => 'foods-dietary-patterns-healthy-aging',
+				'post_content' => '<!-- wp:paragraph --><p>Diet is one of the most studied modifiable factors in healthy aging. This guide reviews the dietary patterns with the strongest human evidence and provides an affordable meal-component matrix for practical application.</p><!-- /wp:paragraph --><!-- wp:heading --><h2>Dietary patterns with strongest evidence</h2><!-- /wp:heading --><!-- wp:list --><ul><li><strong>Mediterranean diet:</strong> Consistently associated with reduced cardiovascular events, cognitive decline, and all-cause mortality in prospective cohorts and trials.</li><li><strong>DASH diet:</strong> Strong evidence for blood pressure reduction and cardiovascular risk reduction.</li><li><strong>Plant-forward patterns:</strong> High intake of vegetables, fruit, legumes, whole grains, and nuts is consistently associated with better health outcomes.</li></ul><!-- /wp:list --><!-- wp:heading --><h2>Affordable meal-component matrix</h2><!-- /wp:heading --><!-- wp:paragraph --><p>Eating well need not be expensive. Below are affordable components organised by food group, with approximate weekly costs.</p><!-- /wp:paragraph --><!-- wp:table --><figure class="wp-block-table"><table><thead><tr><th>Food group</th><th>Affordable options</th><th>Estimated weekly cost (single)</th></tr></thead><tbody><tr><td>Vegetables</td><td>Frozen mixed vegetables, tinned tomatoes, seasonal greens</td><td>$8–12</td></tr><tr><td>Fruit</td><td>Bananas, frozen berries, tinned fruit in juice</td><td>$5–8</td></tr><tr><td>Protein</td><td>Eggs, tinned fish, legumes, tofu, bulk chicken</td><td>$12–18</td></tr><tr><td>Whole grains</td><td>Oats, brown rice, whole-wheat pasta, lentils</td><td>$4–7</td></tr><tr><td>Healthy fats</td><td>Olive oil (bulk), nuts (bulk), seeds</td><td>$5–10</td></tr></tbody></table></figure><!-- /wp:table --><!-- wp:paragraph --><p><strong>Medical review note:</strong> This content includes dietary safety considerations. Medical review is pending before publication.</p><!-- /wp:paragraph -->',
 			),
 		);
 

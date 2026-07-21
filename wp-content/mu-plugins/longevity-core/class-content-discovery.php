@@ -26,6 +26,13 @@ final class Content_Discovery {
 			$content_type = self::requested_content_type();
 			$query->set( 'post_type', 'guide' === $content_type ? 'post' : ( 'review' === $content_type ? 'review' : array( 'post', 'review' ) ) );
 			$query->set( 'posts_per_page', 10 );
+			$category_slug = self::requested_category();
+			if ( $category_slug ) {
+				$term = get_term_by( 'slug', $category_slug, 'category' );
+				if ( $term ) {
+					$query->set( 'category__in', array( $term->term_id ) );
+				}
+			}
 			$sort = self::requested_sort();
 			if ( 'newest' === $sort ) {
 				$query->set( 'orderby', array( 'date' => 'DESC', 'ID' => 'DESC' ) );
@@ -44,6 +51,16 @@ final class Content_Discovery {
 	public static function requested_content_type(): string {
 		$value = isset( $_GET['content_type'] ) ? sanitize_key( wp_unslash( $_GET['content_type'] ) ) : 'all';
 		return in_array( $value, array( 'all', 'guide', 'review' ), true ) ? $value : 'all';
+	}
+
+	/** Return an allowlisted category slug from GET, or empty string. */
+	public static function requested_category(): string {
+		$value = isset( $_GET['category'] ) ? sanitize_key( wp_unslash( $_GET['category'] ) ) : '';
+		if ( '' === $value ) {
+			return '';
+		}
+		$term = get_term_by( 'slug', $value, 'category' );
+		return $term ? $value : '';
 	}
 
 	/** Return an allowlisted sort value. */

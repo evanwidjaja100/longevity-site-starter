@@ -26,7 +26,8 @@ final class Blocks {
 		'content-card-meta' => 'render_content_card_meta',
 		'breadcrumbs'       => 'render_breadcrumbs',
 		'product-report-summary' => 'render_product_report_summary',
-		'test-results'      => 'render_test_results',
+		'test-results'           => 'render_test_results',
+		'claim-evidence-matrix'  => 'render_claim_evidence_matrix',
 	);
 
 	/** Register blocks on init. */
@@ -63,6 +64,14 @@ final class Blocks {
 		register_block_type(
 			LONGEVITY_CORE_PATH . 'blocks/author-profile',
 			array( 'render_callback' => static fn() => Public_Components::render_author_profile() )
+		);
+		register_block_type(
+			LONGEVITY_CORE_PATH . 'blocks/topic-directory',
+			array( 'render_callback' => static fn() => Public_Components::render_topic_directory() )
+		);
+		register_block_type(
+			LONGEVITY_CORE_PATH . 'blocks/guide-directory',
+			array( 'render_callback' => static fn() => Public_Components::render_guide_directory() )
 		);
 		register_block_type(
 			LONGEVITY_CORE_PATH . 'blocks/ranking-directory',

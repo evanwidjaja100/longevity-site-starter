@@ -43,6 +43,7 @@ final class Content_Types {
 		self::register_private_type( 'lel_test_record', __( 'Test Records', 'longevity-core' ), __( 'Test Record', 'longevity-core' ), 'dashicons-chart-line', 'manage_test_protocols' );
 		self::register_private_type( 'lel_correction', __( 'Corrections', 'longevity-core' ), __( 'Correction', 'longevity-core' ), 'dashicons-undo', 'manage_corrections' );
 		self::register_private_type( 'lel_affiliate', __( 'Affiliate Registry', 'longevity-core' ), __( 'Affiliate Merchant', 'longevity-core' ), 'dashicons-money-alt', 'manage_affiliate_registry' );
+		self::register_private_type( 'longevity_message', __( 'Messages', 'longevity-core' ), __( 'Message', 'longevity-core' ), 'dashicons-email-alt', 'manage_options' );
 
 		$statuses = array(
 			'lel_assigned'          => __( 'Assigned', 'longevity-core' ),

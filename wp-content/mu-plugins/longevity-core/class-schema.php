@@ -13,44 +13,13 @@ defined( 'ABSPATH' ) || exit;
 final class Schema {
 	/** Register hooks. */
 	public static function init(): void {
-		add_action( 'wp_head', array( self::class, 'output_social_meta' ), 5 );
 		add_action( 'wp_head', array( self::class, 'output' ), 30 );
 	}
 
 	/** Output conservative social metadata when no supported SEO provider owns it. */
 	public static function output_social_meta(): void {
-		if ( self::seo_provider_owns_schema() ) {
-			return;
-		}
-		$post_id     = is_singular() ? get_queried_object_id() : 0;
-		$title       = $post_id ? get_the_title( $post_id ) : wp_get_document_title();
-		$url         = $post_id ? get_permalink( $post_id ) : home_url( '/' );
-		$description = $post_id ? trim( (string) get_the_excerpt( $post_id ) ) : '';
-		if ( '' === $description && $post_id ) {
-			$description = trim( (string) get_post_meta( $post_id, 'content_summary', true ) );
-		}
-		if ( '' === $description ) {
-			$description = (string) get_bloginfo( 'description' );
-		}
-		$type  = is_singular( array( 'post', 'review' ) ) ? 'article' : 'website';
-		$image = $post_id ? wp_get_attachment_image_url( get_post_thumbnail_id( $post_id ), 'full' ) : '';
-		$tags  = array(
-			array( 'property' => 'og:title', 'content' => $title ),
-			array( 'property' => 'og:description', 'content' => $description ),
-			array( 'property' => 'og:url', 'content' => $url ),
-			array( 'property' => 'og:type', 'content' => $type ),
-			array( 'name' => 'twitter:card', 'content' => $image ? 'summary_large_image' : 'summary' ),
-			array( 'name' => 'twitter:title', 'content' => $title ),
-			array( 'name' => 'twitter:description', 'content' => $description ),
-		);
-		if ( $image ) {
-			$tags[] = array( 'property' => 'og:image', 'content' => $image );
-			$tags[] = array( 'name' => 'twitter:image', 'content' => $image );
-		}
-		foreach ( $tags as $tag ) {
-			$attribute = isset( $tag['property'] ) ? 'property="' . esc_attr( $tag['property'] ) . '"' : 'name="' . esc_attr( $tag['name'] ) . '"';
-			echo '<meta ' . $attribute . ' content="' . esc_attr( wp_strip_all_tags( (string) $tag['content'] ) ) . '">' . "\n";
-		}
+		// Deprecated — social meta is handled by SEO::output_social_meta() at priority 4.
+		// Kept as a no-op for callers that may reference it externally.
 	}
 
 	/** Output the JSON-LD graph. */

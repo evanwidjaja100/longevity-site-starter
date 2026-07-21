@@ -24,6 +24,8 @@ final class Shortcodes {
 		add_shortcode( 'longevity_corrections', static fn() => Public_Components::render_corrections( (int) get_the_ID() ) );
 		add_shortcode( 'longevity_policy_links', static fn() => Public_Components::render_policy_links() );
 		add_shortcode( 'longevity_footer_meta', static fn() => Public_Components::render_footer_meta() );
+		add_shortcode( 'longevity_footer_nav', static fn() => Public_Components::render_footer_nav() );
+		add_shortcode( 'longevity_contact_form', static fn() => Public_Components::render_contact_form() );
 	}
 
 	/** Preserve the affiliate shortcode interface and registry enforcement. */

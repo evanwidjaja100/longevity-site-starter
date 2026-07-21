@@ -87,11 +87,15 @@ final class Bootstrap {
 		Rest_API::init();
 		CLI::init();
 
+		add_action( 'admin_post_longevity_contact_submit', array( Public_Components::class, 'handle_contact_submission' ) );
+		add_action( 'admin_post_nopriv_longevity_contact_submit', array( Public_Components::class, 'handle_contact_submission' ) );
+
 		add_filter( 'the_generator', '__return_empty_string' );
 		add_filter( 'wp_robots', array( self::class, 'filter_noindex_placeholder_pages' ) );
 		add_action( 'wp_head', array( self::class, 'output_canonical_url' ), 11 );
 		add_action( 'template_redirect', array( Routes::class, 'redirect_legacy_category' ), 10 );
 		add_action( 'send_headers', array( self::class, 'send_security_headers' ) );
+		add_filter( 'render_block_core/navigation-link', array( self::class, 'filter_navigation_link' ), 10, 2 );
 	}
 
 	/**
@@ -100,6 +104,10 @@ final class Bootstrap {
 	 * Runs at priority 11, after core rel_canonical (which only handles singular).
 	 */
 	public static function output_canonical_url(): void {
+		// Skip when the SEO class handles categories at priority 4.
+		if ( class_exists( 'Longevity\Core\SEO' ) && ! defined( 'WPSEO_VERSION' ) && ! class_exists( 'RankMath' ) && ! class_exists( 'The_SEO_Framework\Load' ) ) {
+			return;
+		}
 		if ( is_category() ) {
 			$term = get_queried_object();
 			if ( ! $term instanceof \WP_Term ) {
@@ -152,6 +160,53 @@ final class Bootstrap {
 	}
 
 	/**
+	 * Filter navigation-link block output to suppress links to non-public routes.
+	 *
+	 * Checks whether the navigation link URL corresponds to a registered route.
+	 * If the route is not public (draft, noindex placeholder, or missing), the
+	 * link is removed from the rendered output. External and editorial links
+	 * that are not registered routes pass through unchanged.
+	 *
+	 * @param string $block_content The block content.
+	 * @param array  $block         The block data.
+	 * @return string Filtered block content.
+	 */
+	public static function filter_navigation_link( string $block_content, array $block ): string {
+		if ( empty( $block['attrs']['url'] ) ) {
+			return $block_content;
+		}
+
+		$url = $block['attrs']['url'];
+
+		$path = wp_parse_url( $url, PHP_URL_PATH );
+		if ( null === $path ) {
+			return $block_content;
+		}
+
+		$route_key = Routes::route_key_for_path( $path );
+		if ( null === $route_key ) {
+			return $block_content;
+		}
+
+		if ( Routes::is_public_page( $route_key ) ) {
+			if ( 'reviews' === $route_key && ! Rankings::has_public_ranking_inventory() ) {
+				return '';
+			}
+			$public_url = Routes::public_page_url( $route_key );
+			if ( null !== $public_url && $public_url !== $url ) {
+				$block_content = str_replace( esc_url( $url ), esc_url( $public_url ), $block_content );
+			}
+			return $block_content;
+		}
+
+		if ( Routes::is_public_category( $route_key ) ) {
+			return $block_content;
+		}
+
+		return '';
+	}
+
+	/**
 	 * Send conservative application headers. Infrastructure may add stricter headers.
 	 */
 	public static function send_security_headers(): void {
@@ -163,5 +218,27 @@ final class Bootstrap {
 		header( 'Referrer-Policy: strict-origin-when-cross-origin' );
 		header( 'Permissions-Policy: camera=(), microphone=(), geolocation=()' );
 		header( 'X-Frame-Options: SAMEORIGIN' );
+		header( 'X-XSS-Protection: 0' );
+
+		$csp = self::content_security_policy();
+		if ( $csp ) {
+			header( 'Content-Security-Policy-Report-Only: ' . $csp );
+		}
+	}
+
+	/** Build a conservative Content Security Policy in report-only mode. */
+	public static function content_security_policy(): string {
+		$directives = array(
+			"default-src 'self'",
+			"script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+			"style-src 'self' 'unsafe-inline'",
+			"img-src 'self' data: https:",
+			"font-src 'self' data:",
+			"connect-src 'self'",
+			"frame-ancestors 'none'",
+			"base-uri 'self'",
+			"form-action 'self'",
+		);
+		return implode( '; ', $directives );
 	}
 }

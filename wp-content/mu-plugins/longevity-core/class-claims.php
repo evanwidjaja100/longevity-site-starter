@@ -19,7 +19,7 @@ final class Claims {
 	/** Register private claim and source metadata. */
 	public static function register_meta(): void {
 		$claim_fields = array(
-			'claim_id', 'claim_text', 'claim_category', 'claim_importance', 'claim_location', 'source_id', 'source_type', 'source_title', 'source_authors', 'source_url', 'source_identifier', 'publication_date', 'accessed_date', 'jurisdiction', 'population', 'intervention', 'comparator', 'outcome', 'evidence_design', 'evidence_grade', 'conflict_notes', 'evidence_notes', 'verified_by', 'verification_date', 'verification_status', 'recheck_date', 'superseded_by',
+			'claim_id', 'claim_text', 'claim_category', 'claim_importance', 'claim_location', 'source_id', 'source_type', 'source_title', 'source_authors', 'source_url', 'source_identifier', 'publication_date', 'accessed_date', 'jurisdiction', 'population', 'intervention', 'comparator', 'outcome', 'evidence_design', 'evidence_grade', 'conflict_notes', 'evidence_notes', 'verified_by', 'verification_date', 'verification_status', 'recheck_date', 'superseded_by', 'archive_url',
 		);
 
 		foreach ( $claim_fields as $field ) {
@@ -147,13 +147,28 @@ final class Claims {
 				continue;
 			}
 			$seen[ $key ] = true;
-			$sources[]    = array(
-				'title'      => $title,
-				'authors'    => trim( (string) get_post_meta( $claim->ID, 'source_authors', true ) ),
-				'publisher'  => trim( (string) get_post_meta( $claim->ID, 'source_type', true ) ),
-				'date'       => trim( (string) get_post_meta( $claim->ID, 'publication_date', true ) ),
-				'url'        => $url,
-				'identifier' => $identifier,
+			$source_type  = trim( (string) get_post_meta( $claim->ID, 'source_type', true ) );
+			$design       = trim( (string) get_post_meta( $claim->ID, 'evidence_design', true ) );
+			$label        = $design ?: $source_type;
+
+			$public_conflict = '';
+			$conflict_notes  = trim( (string) get_post_meta( $claim->ID, 'conflict_notes', true ) );
+			if ( $conflict_notes && str_starts_with( $conflict_notes, '[public]' ) ) {
+				$public_conflict = ltrim( substr( $conflict_notes, 7 ) );
+			}
+
+			$sources[] = array(
+				'title'            => $title,
+				'authors'          => trim( (string) get_post_meta( $claim->ID, 'source_authors', true ) ),
+				'source_type'      => $source_type,
+				'label'            => $label,
+				'publication_date' => trim( (string) get_post_meta( $claim->ID, 'publication_date', true ) ),
+				'accessed_date'    => trim( (string) get_post_meta( $claim->ID, 'accessed_date', true ) ),
+				'jurisdiction'     => trim( (string) get_post_meta( $claim->ID, 'jurisdiction', true ) ),
+				'url'              => $url,
+				'identifier'       => $identifier,
+				'archive_url'      => esc_url_raw( (string) get_post_meta( $claim->ID, 'archive_url', true ) ),
+				'public_conflict'  => $public_conflict,
 			);
 		}
 		return $sources;

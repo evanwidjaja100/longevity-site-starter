@@ -231,6 +231,45 @@ final class Rankings {
 		return $posts;
 	}
 
+	/** Minimum eligible comparable reports required for a public ranking category. */
+	public static function minimum_ranking_size(): int {
+		return (int) apply_filters( 'longevity_minimum_ranking_size', 3 );
+	}
+
+	/** Whether at least one category has enough inventory for a public ranking. */
+	public static function has_public_ranking_inventory(): bool {
+		foreach ( self::directory() as $group ) {
+			if ( $group['count'] >= self::minimum_ranking_size() ) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/** Assign ranking bands based on meaningful difference threshold. */
+	public static function assign_bands( array $posts ): array {
+		if ( empty( $posts ) ) {
+			return array();
+		}
+		$threshold = Review_Methodology::minimum_meaningful_difference();
+		$bands     = array();
+		$current   = array();
+		$prev_score = null;
+		foreach ( $posts as $post ) {
+			$score = (float) get_post_meta( $post->ID, 'review_score', true );
+			if ( null !== $prev_score && ( $prev_score - $score ) > $threshold ) {
+				$bands[]  = $current;
+				$current  = array();
+			}
+			$current[]   = $post;
+			$prev_score  = $score;
+		}
+		if ( $current ) {
+			$bands[] = $current;
+		}
+		return $bands;
+	}
+
 	/** Aggregate categories that contain at least one eligible ranked review. */
 	public static function directory(): array {
 		$cache_key = 'directory_' . md5( (string) get_option( 'lel_rankings_cache_version', '1' ) );

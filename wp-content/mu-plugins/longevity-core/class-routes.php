@@ -27,6 +27,9 @@ final class Routes {
 	/** @var array<string, string|null> Request-cached URLs. */
 	private static array $url_cache = array();
 
+	/** @var array<string, string|null> Request-cached page statuses. */
+	private static array $status_cache = array();
+
 	/**
 	 * Register the default route definitions.
 	 */
@@ -93,6 +96,14 @@ final class Routes {
 				'terms'                => array(
 					'slug' => 'terms',
 					'name' => 'Terms',
+				),
+				'ai_assist_disclosure' => array(
+					'slug' => 'ai-assisted-work-disclosure',
+					'name' => 'AI-Assisted Work Disclosure',
+				),
+				'source_registry'      => array(
+					'slug' => 'source-registry',
+					'name' => 'Source Registry',
 				),
 			)
 		);
@@ -361,10 +372,122 @@ final class Routes {
 	}
 
 	/**
+	 * Return the post status for a page route key.
+	 *
+	 * @param string $key Page key.
+	 * @return string|null Post status or null if page not found.
+	 */
+	public static function page_status( string $key ): ?string {
+		if ( array_key_exists( $key, self::$status_cache ) ) {
+			return self::$status_cache[ $key ];
+		}
+		$id = self::page_id( $key );
+		if ( null === $id ) {
+			self::$status_cache[ $key ] = null;
+			return null;
+		}
+		$status = get_post_status( $id );
+		self::$status_cache[ $key ] = is_string( $status ) ? $status : null;
+		return self::$status_cache[ $key ];
+	}
+
+	/**
+	 * Check whether a page route is safe to link publicly.
+	 *
+	 * Requires an existing page with publish status, no _longevity_noindex
+	 * placeholder flag, and a valid permalink.
+	 *
+	 * @param string $key Page key.
+	 * @return bool True if the page is public.
+	 */
+	public static function is_public_page( string $key ): bool {
+		if ( 'publish' !== self::page_status( $key ) ) {
+			return false;
+		}
+		$id = self::page_id( $key );
+		if ( null === $id ) {
+			return false;
+		}
+		if ( '1' === get_post_meta( $id, '_longevity_noindex', true ) ) {
+			return false;
+		}
+		$url = self::page_url( $key );
+		return null !== $url && '' !== $url;
+	}
+
+	/**
+	 * Return the public URL for a page route only when it is safe to link.
+	 *
+	 * @param string $key Page key.
+	 * @return string|null URL or null if not public.
+	 */
+	public static function public_page_url( string $key ): ?string {
+		return self::is_public_page( $key ) ? self::page_url( $key ) : null;
+	}
+
+	/**
+	 * Check whether a category route exists and has published content.
+	 *
+	 * @param string $key Category key.
+	 * @return bool True if the category exists.
+	 */
+	public static function is_public_category( string $key ): bool {
+		$id = self::category_id( $key );
+		return null !== $id;
+	}
+
+	/**
+	 * Resolve a URL path to a route key.
+	 *
+	 * Matches page slugs and category paths. Returns the first matching key
+	 * or null if no registered route matches.
+	 *
+	 * @param string $path The URL path to resolve (e.g. '/start-here/' or '/category/sleep/').
+	 * @return string|null Route key or null.
+	 */
+	public static function route_key_for_path( string $path ): ?string {
+		$path = trim( $path, '/' );
+		if ( '' === $path ) {
+			return 'home';
+		}
+
+		if ( empty( self::$page_definitions ) ) {
+			self::init();
+		}
+		foreach ( self::$page_definitions as $key => $def ) {
+			if ( $def['slug'] === $path ) {
+				return $key;
+			}
+		}
+
+		$cat_prefix = 'category/';
+		if ( str_starts_with( $path, $cat_prefix ) ) {
+			$cat_slug = substr( $path, strlen( $cat_prefix ) );
+			foreach ( self::$category_definitions as $key => $def ) {
+				if ( $def['slug'] === $cat_slug ) {
+					return $key;
+				}
+				foreach ( $def['legacy_slugs'] as $legacy ) {
+					if ( $legacy === $cat_slug ) {
+						return $key;
+					}
+				}
+			}
+		}
+
+		if ( str_starts_with( $path, '?' ) || str_starts_with( $path, '?s=' ) ) {
+			return 'search';
+		}
+
+		return null;
+	}
+
+	/**
 	 * Redirect legacy category paths to their canonical short-slug URLs.
 	 *
 	 * Runs on template_redirect. Only redirects known legacy category slugs.
-	 * Preserves safe query parameters and prevents redirect loops.
+	 * Only allowlisted query parameters are preserved. Tracking and arbitrary
+	 * parameters are stripped by default.
 	 */
 	public static function redirect_legacy_category(): void {
 		if ( ! is_category() ) {
@@ -379,11 +502,25 @@ final class Routes {
 		if ( null === $canonical ) {
 			return;
 		}
+
+		$safe_params = array( 'paged', 'page', 'order', 'orderby' );
+		$preserved   = array();
+		foreach ( $safe_params as $p ) {
+			$val = get_query_var( $p );
+			if ( '' !== $val && false !== $val ) {
+				$preserved[ $p ] = $val;
+			}
+		}
+
+		$redirect_url = empty( $preserved )
+			? $canonical
+			: add_query_arg( $preserved, $canonical );
+
 		$current_url = home_url( add_query_arg( array() ) );
-		if ( untrailingslashit( $current_url ) === untrailingslashit( $canonical ) ) {
+		if ( untrailingslashit( $current_url ) === untrailingslashit( $redirect_url ) ) {
 			return;
 		}
-		wp_safe_redirect( $canonical, 301 );
+		wp_safe_redirect( $redirect_url, 301 );
 		exit;
 	}
 }

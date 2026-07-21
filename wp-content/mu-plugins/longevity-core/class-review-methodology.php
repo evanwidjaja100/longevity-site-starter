@@ -95,6 +95,40 @@ final class Review_Methodology {
 		return $sanitized;
 	}
 
+	/** Load and validate the review model from config. */
+	public static function model(): array {
+		$path = LONGEVITY_CORE_PATH . '../config/scoring/default-review-model.json';
+		if ( ! file_exists( $path ) ) {
+			return array();
+		}
+		$decoded = json_decode( (string) file_get_contents( $path ), true );
+		return is_array( $decoded ) ? $decoded : array();
+	}
+
+	/** Minimum score difference required for a meaningful ranking distinction. */
+	public static function minimum_meaningful_difference(): float {
+		$model = self::model();
+		return isset( $model['minimum_meaningful_difference'] ) ? (float) $model['minimum_meaningful_difference'] : 0.2;
+	}
+
+	/** Formatted scoring sensitivity disclosure for ranking pages. */
+	public static function scoring_sensitivity_note(): string {
+		$model      = self::model();
+		$version    = (string) ( $model['version'] ?? '' );
+		$threshold  = self::minimum_meaningful_difference();
+		$parts      = array();
+		if ( $version ) {
+			$parts[] = sprintf( __( 'Scoring model version %s', 'longevity-core' ), $version );
+		}
+		$parts[] = sprintf( __( 'Minimum meaningful difference: %s points', 'longevity-core' ), number_format_i18n( $threshold, 1 ) );
+		$parts[] = __( 'Missing dimensions block publication', 'longevity-core' );
+		if ( ! empty( $model['rules']['commercial_relationship_may_change_score'] ) ) {
+			$parts[] = __( 'Warning: commercial relationship may affect score', 'longevity-core' );
+		}
+		$parts[] = __( 'Manual override requires a documented reason', 'longevity-core' );
+		return implode( ' · ', $parts );
+	}
+
 	/** Calculate a reproducible score. */
 	public static function calculate_score( array $dimensions ): array {
 		$dimensions = self::sanitize_dimensions( $dimensions );

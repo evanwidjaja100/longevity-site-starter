@@ -18,6 +18,11 @@ final class SEO {
 		add_filter( 'wp_robots', array( self::class, 'filter_robots' ) );
 		add_action( 'wp_head', array( self::class, 'output_social_meta' ), self::PRIORITY );
 		add_action( 'wp_head', array( self::class, 'output_archive_description' ), self::PRIORITY );
+		add_action( 'init', array( self::class, 'remove_core_canonical' ), 10 );
+	}
+
+	public static function remove_core_canonical(): void {
+		remove_action( 'wp_head', 'rel_canonical', 10 );
 	}
 
 	private static function provider_active(): bool {
@@ -113,6 +118,8 @@ final class SEO {
 			$url = home_url( '/' );
 		} elseif ( is_search() ) {
 			$url = home_url( '/?s=' . rawurlencode( get_search_query() ) );
+		} elseif ( is_post_type_archive() ) {
+			$url = (string) get_post_type_archive_link( get_query_var( 'post_type' ) ?: 'review' );
 		}
 		if ( '' !== $url ) {
 			echo '<link rel="canonical" href="' . esc_url( $url ) . '">' . "\n";
@@ -126,6 +133,8 @@ final class SEO {
 		if ( is_search() ) {
 			$robots['noindex'] = true;
 		} elseif ( is_404() ) {
+			$robots['noindex'] = true;
+		} elseif ( is_post_type_archive( 'review' ) ) {
 			$robots['noindex'] = true;
 		} elseif ( is_singular() ) {
 			$post_id = get_queried_object_id();
