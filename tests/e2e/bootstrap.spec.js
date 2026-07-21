@@ -40,14 +40,14 @@ test.describe('bootstrap commands', () => {
     expect(output).toContain('=== Bootstrap: categories ===');
     expect(output).toContain('=== Bootstrap: content ===');
     expect(output).toContain('Full bootstrap complete');
-    expect(output).toContain('0 created, 14 existing');
+    expect(output).toContain('0 created, 16 existing');
     expect(output).toContain('0 created, 7 existing');
   });
 
   test('bootstrap pages is idempotent (no duplicates on re-run)', () => {
     const output = run('pages', '--dry-run');
     const lines = output.split('\n').filter(l => l.includes('already exists'));
-    expect(lines.length).toBeGreaterThanOrEqual(14);
+    expect(lines.length).toBeGreaterThanOrEqual(16);
   });
 
   test('bootstrap content is idempotent (no duplicates on re-run)', () => {

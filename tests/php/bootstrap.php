@@ -109,6 +109,12 @@ if ( ! function_exists( 'get_post_type_archive_link' ) ) {
 		return 'http://example.com/' . $post_type . '/';
 	}
 }
+if ( ! function_exists( 'get_post_status' ) ) {
+	function get_post_status( $post ): ?string {
+		$id = is_object( $post ) ? (int) $post->ID : (int) $post;
+		return $GLOBALS['lel_test_page_statuses'][ $id ] ?? null;
+	}
+}
 if ( ! function_exists( 'get_post_meta' ) ) {
 	function get_post_meta( int $post_id, string $key, bool $single = false ) {
 		unset( $single );

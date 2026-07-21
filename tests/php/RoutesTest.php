@@ -12,19 +12,23 @@ require_once __DIR__ . '/bootstrap.php';
 /**
  * Reset globals between test scenarios.
  *
- * @param int|null   $page_on_front Front page ID.
- * @param array|null $pages_by_slug Mock pages.
- * @param array|null $terms_by_slug Mock terms.
- * @param array|null $permalinks   Mock permalink map.
- * @param array|null $term_links   Mock term link map.
+ * @param int|null   $page_on_front  Front page ID.
+ * @param array|null $pages_by_slug  Mock pages.
+ * @param array|null $permalinks     Mock permalink map.
+ * @param array|null $terms_by_slug  Mock terms.
+ * @param array|null $term_links     Mock term link map.
+ * @param array|null $page_statuses  Mock post statuses.
+ * @param array|null $meta           Mock post meta.
  */
-function reset_routes_globals( $page_on_front = null, $pages_by_slug = null, $permalinks = null, $terms_by_slug = null, $term_links = null ): void {
+function reset_routes_globals( $page_on_front = null, $pages_by_slug = null, $permalinks = null, $terms_by_slug = null, $term_links = null, $page_statuses = null, $meta = null ): void {
 	$GLOBALS['lel_test_page_on_front'] = $page_on_front ?? 0;
 	$GLOBALS['lel_test_pages_by_slug'] = $pages_by_slug ?? array();
 	$GLOBALS['lel_test_permalinks']    = $permalinks ?? array();
 	$GLOBALS['lel_test_terms_by_slug'] = $terms_by_slug ?? array();
 	$GLOBALS['lel_test_terms_by_id']   = array();
 	$GLOBALS['lel_test_term_links']    = $term_links ?? array();
+	$GLOBALS['lel_test_page_statuses'] = $page_statuses ?? array();
+	$GLOBALS['lel_test_meta']          = $meta ?? array();
 }
 
 $failures = array();
@@ -201,7 +205,158 @@ $assert(
 
 $assert( null === Routes::category_id( 'supplements' ), 'supplements category should be null when not in mock data' );
 
-// --- Test 14: No admin or preview URLs ---
+// --- Test 14: page_status returns correct status ---
+
+reset_routes_globals(
+	42,
+	array(
+		'start-here'           => (object) array( 'ID' => 10, 'post_name' => 'start-here', 'post_type' => 'page' ),
+		'guides'               => (object) array( 'ID' => 20, 'post_name' => 'guides', 'post_type' => 'page' ),
+		'evidence-methodology' => (object) array( 'ID' => 60, 'post_name' => 'evidence-methodology', 'post_type' => 'page' ),
+	),
+	array(
+		10 => 'http://example.com/start-here/',
+		20 => 'http://example.com/guides/',
+		42 => 'http://example.com/',
+		60 => 'http://example.com/evidence-methodology/',
+	),
+	null,
+	null,
+	array(
+		10 => 'publish',
+		20 => 'draft',
+		42 => 'publish',
+		60 => 'publish',
+	),
+	array(
+		10 => array(),
+		60 => array( '_longevity_noindex' => '1' ),
+	)
+);
+Routes::init();
+
+$assert(
+	'publish' === Routes::page_status( 'start_here' ),
+	'page_status(start_here) should be publish'
+);
+$assert(
+	'draft' === Routes::page_status( 'guides' ),
+	'page_status(guides) should be draft'
+);
+$assert(
+	null === Routes::page_status( 'topics' ),
+	'page_status(topics) should be null (no page)'
+);
+
+// --- Test 15: is_public_page ---
+
+$assert(
+	true === Routes::is_public_page( 'start_here' ),
+	'is_public_page(start_here) should be true (published, no noindex)'
+);
+$assert(
+	false === Routes::is_public_page( 'guides' ),
+	'is_public_page(guides) should be false (draft)'
+);
+$assert(
+	false === Routes::is_public_page( 'evidence_methodology' ),
+	'is_public_page(evidence_methodology) should be false (noindex placeholder)'
+);
+$assert(
+	false === Routes::is_public_page( 'topics' ),
+	'is_public_page(topics) should be false (no page)'
+);
+
+// --- Test 16: public_page_url ---
+
+$assert(
+	'http://example.com/start-here/' === Routes::public_page_url( 'start_here' ),
+	'public_page_url(start_here) should return URL'
+);
+$assert(
+	null === Routes::public_page_url( 'guides' ),
+	'public_page_url(guides) should be null (draft)'
+);
+$assert(
+	null === Routes::public_page_url( 'evidence_methodology' ),
+	'public_page_url(evidence_methodology) should be null (noindex)'
+);
+
+// --- Test 17: is_public_category ---
+
+$assert(
+	true === Routes::is_public_category( 'sleep' ),
+	'is_public_category(sleep) should be true (exists)'
+);
+$assert(
+	false === Routes::is_public_category( 'wearables' ),
+	'is_public_category(wearables) should be false (no term)'
+);
+
+// --- Test 18: route_key_for_path ---
+
+$assert(
+	'home' === Routes::route_key_for_path( '/' ),
+	'route_key_for_path(/) should be home'
+);
+$assert(
+	'home' === Routes::route_key_for_path( '' ),
+	'route_key_for_path(empty) should be home'
+);
+$assert(
+	'start_here' === Routes::route_key_for_path( '/start-here/' ),
+	'route_key_for_path(/start-here/) should be start_here'
+);
+$assert(
+	'sleep' === Routes::route_key_for_path( '/category/sleep/' ),
+	'route_key_for_path(/category/sleep/) should be sleep'
+);
+$assert(
+	'sleep' === Routes::route_key_for_path( '/category/sleep-and-circadian-health/' ),
+	'route_key_for_path(/category/sleep-and-circadian-health/) should resolve legacy to sleep'
+);
+$assert(
+	null === Routes::route_key_for_path( '/unknown/path/' ),
+	'route_key_for_path(/unknown/path/) should be null'
+);
+
+// Restore globals for remaining tests.
+reset_routes_globals(
+	42,
+	array( // pages_by_slug
+		'start-here'           => (object) array( 'ID' => 10, 'post_name' => 'start-here', 'post_type' => 'page' ),
+		'guides'               => (object) array( 'ID' => 20, 'post_name' => 'guides', 'post_type' => 'page' ),
+		'topics'               => (object) array( 'ID' => 30, 'post_name' => 'topics', 'post_type' => 'page' ),
+		'about'                => (object) array( 'ID' => 50, 'post_name' => 'about', 'post_type' => 'page' ),
+		'evidence-methodology' => (object) array( 'ID' => 60, 'post_name' => 'evidence-methodology', 'post_type' => 'page' ),
+	),
+	array( // permalinks
+		10 => 'http://example.com/start-here/',
+		20 => 'http://example.com/guides/',
+		30 => 'http://example.com/topics/',
+		42 => 'http://example.com/',
+		50 => 'http://example.com/about/',
+		60 => 'http://example.com/evidence-methodology/',
+	),
+	array( // terms_by_slug
+		'sleep'                            => (object) array( 'term_id' => 3, 'slug' => 'sleep', 'name' => 'Sleep and Circadian Health', 'taxonomy' => 'category' ),
+		'evidence-literacy'                => (object) array( 'term_id' => 2, 'slug' => 'evidence-literacy', 'name' => 'Evidence Literacy', 'taxonomy' => 'category' ),
+		'consumer-lab'                     => (object) array( 'term_id' => 7, 'slug' => 'consumer-lab', 'name' => 'Consumer Lab', 'taxonomy' => 'category' ),
+		'sleep-and-circadian-health'       => (object) array( 'term_id' => 3, 'slug' => 'sleep-and-circadian-health', 'name' => 'Sleep and Circadian Health', 'taxonomy' => 'category' ),
+		'movement'                         => (object) array( 'term_id' => 4, 'slug' => 'movement', 'name' => 'Movement and Physical Capacity', 'taxonomy' => 'category' ),
+		'nutrition'                        => (object) array( 'term_id' => 5, 'slug' => 'nutrition', 'name' => 'Nutrition and Healthy Aging', 'taxonomy' => 'category' ),
+	),
+	array( // term_links
+		2 => 'http://example.com/category/evidence-literacy/',
+		3 => 'http://example.com/category/sleep/',
+		4 => 'http://example.com/category/movement/',
+		5 => 'http://example.com/category/nutrition/',
+		7 => 'http://example.com/category/consumer-lab/',
+	)
+);
+Routes::init();
+
+// --- Test 19: No admin or preview URLs ---
 
 foreach ( array( 'home', 'start_here', 'about' ) as $key ) {
 	$url = Routes::page_url( $key );

@@ -1,45 +1,40 @@
 import { test, expect } from '@playwright/test';
+import { ALL_PUBLIC_ROUTES } from './support/route-expectations.js';
 
 test.describe('SEO metadata', () => {
-  const publicRoutes = [
-    ['homepage', '/'],
-    ['start here', '/start-here/'],
-    ['category archive', '/category/evidence-literacy/'],
-    ['review archive', '/reviews/'],
-    ['search results', '/?s=evidence'],
-  ];
+  for (const { key, path, indexable } of ALL_PUBLIC_ROUTES) {
+    const fullPath = path === '/?s=' ? '/?s=evidence' : path;
 
-  for (const [name, path] of publicRoutes) {
-    test(`${name} has exactly one H1 and a visible main landmark`, async ({ page }) => {
-      const response = await page.goto(path);
+    test(`${key} has exactly one H1 and a visible main landmark`, async ({ page }) => {
+      const response = await page.goto(fullPath);
       expect(response?.status()).toBe(200);
       await expect(page.getByRole('heading', { level: 1 })).toHaveCount(1);
       await expect(page.getByRole('main')).toBeVisible();
     });
 
-    test(`${name} has a nonempty meta description`, async ({ page }) => {
-      await page.goto(path);
+    test(`${key} has a nonempty meta description`, async ({ page }) => {
+      await page.goto(fullPath);
       const description = await page.locator('meta[name="description"]').getAttribute('content');
       expect(description).toBeTruthy();
       expect(description?.trim().length).toBeGreaterThan(0);
     });
 
-    test(`${name} has a canonical link`, async ({ page }) => {
-      await page.goto(path);
+    test(`${key} has a canonical link`, async ({ page }) => {
+      await page.goto(fullPath);
       const canonical = await page.locator('link[rel="canonical"]').getAttribute('href');
       expect(canonical).toBeTruthy();
     });
 
-    test(`${name} has Open Graph meta tags`, async ({ page }) => {
-      await page.goto(path);
+    test(`${key} has Open Graph meta tags`, async ({ page }) => {
+      await page.goto(fullPath);
       await expect(page.locator('meta[property="og:title"]')).toHaveCount(1);
       await expect(page.locator('meta[property="og:description"]')).toHaveCount(1);
       await expect(page.locator('meta[property="og:url"]')).toHaveCount(1);
       await expect(page.locator('meta[property="og:type"]')).toHaveCount(1);
     });
 
-    test(`${name} has Twitter card meta tags`, async ({ page }) => {
-      await page.goto(path);
+    test(`${key} has Twitter card meta tags`, async ({ page }) => {
+      await page.goto(fullPath);
       await expect(page.locator('meta[name="twitter:card"]')).toHaveCount(1);
       await expect(page.locator('meta[name="twitter:title"]')).toHaveCount(1);
       await expect(page.locator('meta[name="twitter:description"]')).toHaveCount(1);
@@ -52,9 +47,12 @@ test.describe('SEO metadata', () => {
     expect(robots).toContain('noindex');
   });
 
-  test('placeholder page (draft) has noindex', async ({ page }) => {
-    await page.goto('/guides/');
+  test('draft placeholder page returns 404 with noindex', async ({ page }) => {
+    const response = await page.goto('/guides/');
+    expect(response?.status()).toBe(404);
     const robots = await page.locator('meta[name="robots"]').getAttribute('content');
-    expect(robots).toContain('noindex');
+    if (robots) {
+      expect(robots).toContain('noindex');
+    }
   });
 });
