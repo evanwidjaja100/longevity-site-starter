@@ -3,6 +3,7 @@ parameters:
   paths:
     - wp-content/mu-plugins/longevity-core
     - wp-content/themes/longevity-starter/functions.php
+    - scripts
   excludePaths:
     - vendor
   scanFiles:

@@ -5,13 +5,8 @@ b37a107785de2cf26c10906292db47c266d668fdd3b131bd670645c424547852 *./.github/depe
 fa2041f3032000ca632210d190b5286341ee16cd598d5d82a002af8fcd63d839 *./.github/workflows/ci.yml
 cc830555d0036e6ecda14d60f3c38b2d505025d1df874077a064f56d670ca4ea *./.github/workflows/scheduled-content-validation.yml
 99c4bd85e6bfdc73afd6b963a1b4b91a0d94b298f582d28d07ccec9c5eb1d423 *./.github/workflows/security.yml
-a7129b4f3f90bbc6ef221ca83a0f285bcd364fd5e3f173c0b236ae0754f33047 *./.gitignore
+fc5348bf024e5ee6af5b15ede7d67b2fb6c3cf9c7fc000da57334c6cdd5badef *./.gitignore
 cfa2d75ad28f3e20e39f11a15277753a396d2fea81caf1094bf9eb31a2bd1c7c *./.npmrc
-663a068e76d264d0bc6740f5450b6c4193c7b41ecf5e0dc222485b8a17404d95 *./.opencode/.gitignore
-e0f36358a70499278eb5dacf03112181356b87a16b7b9100df5fe4a8f3abb2ff *./.opencode/.goal-state.json
-cd1039ed7896c51a7b1751a870f47032cdf7cc34c002b1656539f2733e8f0473 *./.opencode/goal-archive.jsonl
-b6ebd9719f8c08ec08e82386fa70b3f7bdaf2be4ca0a570c7ec9bd95ffbdd201 *./.opencode/package.json
-51d125858de759ff2ce2f93c381cc7d0ef9e8f999421bb61dcceeb5aed3a9166 *./.opencode/package-lock.json
 396a27c4750af851492403954b6f45b9c2e47351cb39271db8414d814cd26655 *./.stylelintrc.json
 8d4cd84d3519a5d197a0e4becda5c031719ca38669ac23d117cf74aea7b9571f *./AGENTS.md
 bba9d7c96a8f6030aa84016dfa69b762d246f8cfe9d907833ef245922682538f *./compose.yaml

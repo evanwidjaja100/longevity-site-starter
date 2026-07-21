@@ -114,6 +114,27 @@ services:
     security_opt:
       - no-new-privileges:true
 
+  test-runner:
+    image: php:8.3-cli
+    profiles: ["test"]
+    working_dir: /workspace
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      WORDPRESS_DB_HOST: db:3306
+      WORDPRESS_DB_NAME: ${WORDPRESS_DB_NAME:-longevity}
+      WORDPRESS_DB_USER: ${WORDPRESS_DB_USER:-longevity_app}
+      WORDPRESS_DB_PASSWORD: ${WORDPRESS_DB_PASSWORD}
+      PHP_VERSION: 8.3
+    volumes:
+      - .:/workspace:ro
+      - ./reports:/workspace/reports:rw
+    entrypoint: ["sh", "-c"]
+    command: ["echo 'test-runner container ready. Use: docker compose run --rm --profile test test-runner php /workspace/tests/php/run-unit-tests.php'"]
+    security_opt:
+      - no-new-privileges:true
+
 volumes:
   db_data:
   wordpress_data:

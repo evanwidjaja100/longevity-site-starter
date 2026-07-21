@@ -50,9 +50,23 @@ Longevity Evidence Lab is a WordPress-based evidence-led consumer health and pro
 - Shell: ShellCheck
 - Accessibility: WCAG 2.1 AA (enforced via axe-core in CI)
 
-## Implementation Progress (Milestone A — Safe Canonical Foundation)
+## Implementation Progress (Milestone A — Safe Canonical Foundation → Reader Experience v3)
 
-Branch: `improvement/launch-foundation-v2`
+Branch: `improvement/reader-experience-v3`
+
+### Phase 1–8 — Reader Experience v3 Foundation ✅
+Previous phases completed Route Consolidation, Production-Grade Bootstrap, SEO/noindex, CSS cascade layers, visual snapshot tests, ranking directory prelaunch gating, and core E2E coverage.
+
+### Phase 9 — Trust-first content launch ✅
+- RX-901 ✅: All 11 trust pages (About, Editorial Policy, Evidence Methodology, Testing Methodology, Medical Disclaimer, Affiliate Disclosure, Corrections, Privacy, Terms, Contact, AI-Assisted Work Disclosure) populated with proper content from `content/templates/*.md` via markdown-to-WP-blocks conversion script (`scripts/populate-trust-pages.php`). Review dates recorded on all pages. Contact form implemented with abuse protection (honeypot + rate limiting via transient). Corrections channel functional (CPT `lel_correction` + contact form correction-report subject). Privacy page reflects actual tooling.
+- RX-902 ✅: 8 foundational articles (LEL-001 through LEL-008) updated with full editorial metadata — evidence cutoff dates, content summaries, limitations, original contributions, commercial relationships (none), region scopes, next review dates, editorial approval status (`ready`), and medical review flags where required. Metadata set via `scripts/update-article-metadata.php`. Articles await human publication per AI governance policy.
+- RX-903 ⏳: Consumer Lab testing infrastructure prepared — testing methodology page published, protocol/test-record CPTs exist. Real product testing (product acquisition, protocol registration, documented test execution) requires human action.
+- RX-904 ✅: Content QA and lifecycle checks operational — internal link validation test suite (`internal-links.spec.js`), freshness audit cron (`Freshness` class), analytics event layer (`Analytics` class), correction presentation (`Corrections::render()`), update dates and freshness triggers on all pages.
+
+### Remaining for Phase 9 exit
+- A human editor must publish the draft trust pages (Privacy, Terms, Contact, Evidence Methodology, AI-Assisted Work Disclosure) after jurisdiction review
+- A human editor must publish the 8 foundational articles after medical review (LEL-002, LEL-005–008 require medical review)
+- Consumer Lab testing (RX-903) requires real product acquisition and documented protocol-compliant testing
 
 ### Phase 0 — Baseline ✅
 - P0.1: Runtime baseline report saved to `docs/testing/pre-v2-runtime-baseline.md`

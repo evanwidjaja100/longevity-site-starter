@@ -22,3 +22,6 @@ wp-content/uploads/*
 /longevity-evidence-lab-ai-implementation-plan.md
 /source/
 /data/
+
+# Agent harness — local tooling, not part of the repo
+/.opencode/

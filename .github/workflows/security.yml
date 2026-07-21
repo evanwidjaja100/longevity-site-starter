@@ -23,7 +23,7 @@ jobs:
       - name: Reject tracked secrets and environment files
         run: |
           test ! -f .env
-          ! git grep -nEI '(BEGIN (RSA|OPENSSH|EC) PRIVATE KEY|ghp_[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16})'
+          ! git grep -nEI '(BEGIN (RSA|OPENSSH|EC) PRIVATE KEY|ghp_[A-Za-z0-9]{20,}|github_pat_[a-f0-9]{22,}_[A-Za-z0-9]{15,}|AKIA[0-9A-Z]{16})'
       - name: Check unsafe executable permissions
         run: |
           bad=$(find . -path ./.git -prune -o -type f -perm /022 -print)

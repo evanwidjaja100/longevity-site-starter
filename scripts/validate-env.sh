@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/usr/bin/env bash
 set -eu
 
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
@@ -40,7 +40,7 @@ warnings=0
 required="WORDPRESS_DB_NAME WORDPRESS_DB_USER WORDPRESS_DB_PASSWORD WORDPRESS_DB_ROOT_PASSWORD WP_SITE_URL WP_SITE_TITLE WP_ADMIN_USER WP_ADMIN_PASSWORD WP_ADMIN_EMAIL WP_ENVIRONMENT_TYPE WP_TIMEZONE WP_LOCALE WP_DEBUG WP_DEBUG_LOG WP_DEBUG_DISPLAY FORCE_SSL_ADMIN DISALLOW_FILE_MODS"
 
 for key in $required; do
-  eval "value=\${$key-}"
+  value="${!key-}"
   if [ -z "$value" ]; then
     echo "ERROR: $key is required." >&2
     errors=$((errors + 1))
@@ -52,7 +52,7 @@ is_placeholder() {
 }
 
 for key in WORDPRESS_DB_PASSWORD WORDPRESS_DB_ROOT_PASSWORD WP_ADMIN_PASSWORD; do
-  eval "value=\${$key-}"
+  value="${!key-}"
   if [ -n "$value" ] && is_placeholder "$value"; then
     echo "ERROR: $key still contains a placeholder value." >&2
     errors=$((errors + 1))
@@ -91,7 +91,7 @@ case "${WP_ENVIRONMENT_TYPE-}" in
 esac
 
 for key in WP_DEBUG WP_DEBUG_LOG WP_DEBUG_DISPLAY FORCE_SSL_ADMIN DISALLOW_FILE_MODS; do
-  eval "value=\${$key-}"
+  value="${!key-}"
   case "$value" in true|false|1|0) : ;; *) echo "ERROR: $key must be true or false." >&2; errors=$((errors + 1));; esac
 done
 
