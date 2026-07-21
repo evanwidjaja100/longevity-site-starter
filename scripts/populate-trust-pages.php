@@ -1,0 +1,252 @@
+<?php
+/**
+ * Populate trust policy pages with content from template markdown files.
+ *
+ * Reads content/templates/*.md and updates the corresponding WordPress page.
+ * Also sets required metadata (review dates, etc.)
+ *
+ * Usage: wp eval-file scripts/populate-trust-pages.php [--dry-run]
+ *
+ * @package LongevityCore
+ */
+
+namespace Longevity\Core;
+
+if ( ! defined( 'WP_CLI' ) || ! WP_CLI ) {
+	echo "This script must be run via WP-CLI.\n";
+	exit( 1 );
+}
+
+$dry_run = in_array( '--dry-run', $args ?? array(), true );
+
+$template_dir = '/project-content/templates';
+
+$page_map = array(
+	'about.md'                      => 'about',
+	'editorial-policy.md'           => 'editorial-policy',
+	'evidence-methodology.md'       => 'evidence-methodology',
+	'testing-methodology.md'        => 'testing-methodology',
+	'medical-disclaimer.md'         => 'medical-disclaimer',
+	'affiliate-disclosure.md'       => 'affiliate-disclosure',
+	'corrections.md'                => 'corrections',
+	'privacy.md'                    => 'privacy',
+	'terms.md'                      => 'terms',
+	'contact.md'                    => 'contact',
+	'ai-assisted-work-disclosure.md' => 'ai-assisted-work-disclosure',
+);
+
+$updated = 0;
+$errors  = array();
+
+foreach ( $page_map as $filename => $slug ) {
+	$filepath = $template_dir . '/' . $filename;
+
+	if ( ! file_exists( $filepath ) ) {
+		$errors[] = "Template not found: {$filename}";
+		\WP_CLI::warning( "Template not found: {$filepath}" );
+		continue;
+	}
+
+	$markdown = file_get_contents( $filepath );
+	if ( false === $markdown || '' === trim( $markdown ) ) {
+		$errors[] = "Empty template: {$filename}";
+		\WP_CLI::warning( "Empty template: {$filepath}" );
+		continue;
+	}
+
+	$posts = get_posts( array( 'name' => $slug, 'post_type' => 'page', 'post_status' => 'any', 'posts_per_page' => 1, 'no_found_rows' => true ) );
+	$post  = ! empty( $posts ) ? $posts[0] : null;
+	if ( ! $post ) {
+		$errors[] = "Page not found by slug: {$slug}";
+		\WP_CLI::warning( "Page /{$slug}/ does not exist. Run bootstrap first." );
+		continue;
+	}
+
+	$html = convert_markdown_to_blocks( $markdown );
+
+	if ( $dry_run ) {
+		\WP_CLI::line( "[DRY RUN] Would update /{$slug}/ (ID {$post->ID}) with content from {$filename}" );
+		++$updated;
+		continue;
+	}
+
+	$result = wp_update_post(
+	array(
+		'ID'           => $post->ID,
+		'post_content' => $html,
+	),
+	true
+	);
+
+	if ( is_wp_error( $result ) ) {
+		$errors[] = "Failed to update /{$slug}/: " . $result->get_error_message();
+		\WP_CLI::warning( "Failed to update /{$slug}/: " . $result->get_error_message() );
+		continue;
+	}
+
+	update_post_meta( $post->ID, 'last_material_update', gmdate( 'Y-m-d' ) );
+	update_post_meta( $post->ID, 'next_content_review_date', gmdate( 'Y-m-d', strtotime( '+12 months' ) ) );
+
+	\WP_CLI::line( "Updated /{$slug}/ (ID {$post->ID}) with content from {$filename}" );
+	++$updated;
+}
+
+\WP_CLI::success( sprintf( 'Done: %d page(s) updated, %d error(s).', $updated, count( $errors ) ) );
+if ( $errors ) {
+	\WP_CLI::halt( 1 );
+}
+
+/**
+ * Convert markdown content to basic WordPress block HTML.
+ */
+function convert_markdown_to_blocks( string $markdown ): string {
+	$lines = explode( "\n", $markdown );
+	$blocks = array();
+	$in_list = false;
+	$list_tag = 'ul';
+	$list_items = array();
+
+	foreach ( $lines as $line ) {
+		$trimmed = trim( $line );
+
+		// Skip front-matter lines (--- ... ---)
+		if ( '---' === $trimmed ) {
+			continue;
+		}
+
+		// Close any open list
+		if ( $in_list && ( '' === $trimmed || str_starts_with( $trimmed, '#' ) || str_starts_with( $trimmed, '|' ) ) ) {
+			$blocks[] = render_list( $list_tag, $list_items );
+			$list_items = array();
+			$in_list = false;
+		}
+
+		if ( '' === $trimmed ) {
+			continue;
+		}
+
+		// Heading
+		if ( str_starts_with( $trimmed, '## ' ) ) {
+			$text = esc_html( trim( substr( $trimmed, 3 ) ) );
+			$blocks[] = '<!-- wp:heading --><h2 class="wp-block-heading">' . $text . '</h2><!-- /wp:heading -->';
+			continue;
+		}
+		if ( str_starts_with( $trimmed, '### ' ) ) {
+			$text = esc_html( trim( substr( $trimmed, 4 ) ) );
+			$blocks[] = '<!-- wp:heading {"level":3} --><h3 class="wp-block-heading">' . $text . '</h3><!-- /wp:heading -->';
+			continue;
+		}
+		// Skip # Title lines — the theme renders the page title as H1.
+		if ( str_starts_with( $trimmed, '# ' ) ) {
+			continue;
+		}
+
+		// Table row
+		if ( str_starts_with( $trimmed, '|' ) ) {
+			$cells = array_map( 'trim', explode( '|', trim( $trimmed, '|' ) ) );
+			// Skip separator rows (|---|)
+			if ( preg_match( '/^[:\s\-|]+$/', $trimmed ) ) {
+				continue;
+			}
+			if ( ! isset( $GLOBALS['_table_header'] ) ) {
+				$GLOBALS['_table_header'] = $cells;
+				continue;
+			}
+			if ( ! isset( $GLOBALS['_table_rows'] ) ) {
+				$GLOBALS['_table_rows'] = array();
+			}
+			$GLOBALS['_table_rows'][] = $cells;
+			continue;
+		}
+
+		// List item
+		if ( str_starts_with( $trimmed, '- ' ) || str_starts_with( $trimmed, '* ' ) ) {
+			if ( ! $in_list ) {
+				$in_list = true;
+				$list_tag = 'ul';
+			}
+			$text = convert_inline_markdown( trim( substr( $trimmed, 2 ) ) );
+			$list_items[] = $text;
+			continue;
+		}
+		if ( preg_match( '/^\d+[.)]\s/', $trimmed ) ) {
+			if ( ! $in_list ) {
+				$in_list = true;
+				$list_tag = 'ol';
+			}
+			$text = convert_inline_markdown( preg_replace( '/^\d+[.)]\s/', '', $trimmed, 1 ) );
+			$list_items[] = $text;
+			continue;
+		}
+
+		// Horizontal rule
+		if ( str_starts_with( $trimmed, '---' ) ) {
+			$blocks[] = '<!-- wp:separator --><hr class="wp-block-separator has-alpha-channel-opacity"/><!-- /wp:separator -->';
+			continue;
+		}
+
+		// Paragraph
+		$text = convert_inline_markdown( $trimmed );
+		$blocks[] = '<!-- wp:paragraph --><p>' . $text . '</p><!-- /wp:paragraph -->';
+	}
+
+	// Close any remaining list
+	if ( $in_list && ! empty( $list_items ) ) {
+		$blocks[] = render_list( $list_tag, $list_items );
+	}
+
+	// Render any accumulated table
+	if ( ! empty( $GLOBALS['_table_header'] ) || ! empty( $GLOBALS['_table_rows'] ) ) {
+		$blocks[] = render_table( $GLOBALS['_table_header'] ?? array(), $GLOBALS['_table_rows'] ?? array() );
+	}
+	$GLOBALS['_table_header'] = null;
+	$GLOBALS['_table_rows']   = null;
+
+	return implode( "\n", $blocks );
+}
+
+/**
+ * Convert inline markdown (bold, italic, links).
+ */
+function convert_inline_markdown( string $text ): string {
+	$text = esc_html( $text );
+	// Bold
+	$text = preg_replace( '/\*\*(.+?)\*\*/', '<strong>$1</strong>', $text );
+	// Italic
+	$text = preg_replace( '/\*(.+?)\*/', '<em>$1</em>', $text );
+	// Links
+	$text = preg_replace( '/\[([^\]]+)\]\(([^)]+)\)/', '<a href="$2">$1</a>', $text );
+	return $text;
+}
+
+/**
+ * Render a list block.
+ */
+function render_list( string $tag, array $items ): string {
+	$html = '<!-- wp:list --><' . $tag . '>';
+	foreach ( $items as $item ) {
+		$html .= '<li>' . $item . '</li>';
+	}
+	$html .= '</' . $tag . '><!-- /wp:list -->';
+	return $html;
+}
+
+/**
+ * Render a table block.
+ */
+function render_table( array $header, array $rows ): string {
+	$html = '<!-- wp:table --><figure class="wp-block-table"><table><thead><tr>';
+	foreach ( $header as $cell ) {
+		$html .= '<th>' . esc_html( $cell ) . '</th>';
+	}
+	$html .= '</tr></thead><tbody>';
+	foreach ( $rows as $row ) {
+		$html .= '<tr>';
+		foreach ( $row as $cell ) {
+			$html .= '<td>' . esc_html( $cell ) . '</td>';
+		}
+		$html .= '</tr>';
+	}
+	$html .= '</tbody></table></figure><!-- /wp:table -->';
+	return $html;
+}
