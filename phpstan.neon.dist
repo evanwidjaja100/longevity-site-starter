@@ -1,3 +1,6 @@
+includes:
+  - vendor/szepeviktor/phpstan-wordpress/extension.neon
+
 parameters:
   level: 5
   paths:
@@ -8,3 +11,5 @@ parameters:
     - vendor
   scanFiles:
     - wp-content/mu-plugins/longevity-core.php
+  bootstrapFiles:
+    - tests/php/bootstrap.php

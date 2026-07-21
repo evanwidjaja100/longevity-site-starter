@@ -12,7 +12,6 @@ test.describe.configure({ mode: 'parallel' });
 for (const route of ALL_PUBLIC_ROUTES) {
   for (const viewport of VIEWPORTS) {
     test(`${route.key} @ ${viewport.name} matches snapshot`, async ({ page }) => {
-      const suffix = route.path.includes('?') ? route.path.split('?')[0] : route.path;
       const testPath = route.path.endsWith('=') ? `${route.path}evidence` : route.path;
       await page.setViewportSize({ width: viewport.width, height: viewport.height });
       await page.goto(testPath);

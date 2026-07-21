@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
-import { ALL_PUBLIC_ROUTES, REVIEW_ARCHIVE, SEARCH_PATH } from './support/route-expectations.js';
+import { ALL_PUBLIC_ROUTES, SEARCH_PATH } from './support/route-expectations.js';
 
 test.describe('automated accessibility — axe-core', () => {
   const axeRoutes = ALL_PUBLIC_ROUTES.map(r => r.path)

@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { PUBLIC_PAGES, ALL_PUBLIC_ROUTES, PUBLIC_CATEGORIES } from './support/route-expectations.js';
+import { ALL_PUBLIC_ROUTES } from './support/route-expectations.js';
 
 const PUBLIC_URLS = ALL_PUBLIC_ROUTES.map(r => ({
   key: r.key,

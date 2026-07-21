@@ -1,6 +1,5 @@
 import { test, expect } from '@playwright/test';
 
-/* global document, window */
 
 test('homepage exposes skip link, navigation, and search dialog', async ({ page }) => {
   await page.goto('/');

@@ -304,7 +304,7 @@ main {
 .longevity-topic-counts {
 	color: var(--wp--preset--color--muted);
 	font-size: var(--wp--preset--font-size--small);
-	margin-block: 0.5rem 0 0;
+	margin-block: 0.5rem 0;
 }
 
 .longevity-card-grid,
@@ -470,10 +470,11 @@ main {
 
 .longevity-empty-state {
 	background: var(--wp--preset--color--surface);
-	border: 1px dashed var(--wp--preset--color--border-strong);
+	border: 2px dashed var(--wp--preset--color--border);
 	border-radius: var(--wp--custom--radius--card);
 	max-width: 65ch;
-	padding: 1.5rem;
+	padding: clamp(1.5rem, 3vw, 2.5rem);
+	text-align: center;
 }
 
 /* 7. Article typography */
@@ -897,13 +898,6 @@ th {
 	content: "✓";
 }
 
-.longevity-empty-state {
-	border: 2px dashed var(--wp--preset--color--border);
-	border-radius: var(--wp--custom--radius--card);
-	padding: clamp(1.5rem, 3vw, 2.5rem);
-	text-align: center;
-}
-
 .longevity-empty-state h2,
 .longevity-empty-state h3 {
 	margin-block: 0 0.75rem;
@@ -1173,10 +1167,11 @@ textarea:disabled {
 	white-space: nowrap;
 }
 
-@media (max-width: 640px) {
+@media (width <= 640px) {
 	.longevity-claim-table-wrapper {
 		margin-inline: calc(-1 * clamp(1.1rem, 2.5vw, 1.75rem));
 	}
+
 	.longevity-claim-table-wrapper .longevity-claim-table {
 		border-radius: 0;
 	}

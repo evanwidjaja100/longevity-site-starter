@@ -18,7 +18,18 @@ export default [
   },
   {
     files: ['tests/e2e/**/*.js'],
-    languageOptions: { ecmaVersion: 2022, sourceType: 'module' }
+    languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: 'module',
+      globals: {
+        window: 'readonly',
+        document: 'readonly',
+        URL: 'readonly',
+        console: 'readonly',
+        page: 'readonly',
+        browser: 'readonly'
+      }
+    }
   },
   { ignores: ['node_modules/**', 'vendor/**'] }
 ];

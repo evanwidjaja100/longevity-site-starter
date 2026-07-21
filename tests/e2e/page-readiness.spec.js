@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { PUBLIC_PAGES, ALL_PUBLIC_ROUTES, ALL_PRIVATE_ROUTES } from './support/route-expectations.js';
+import { PUBLIC_PAGES, ALL_PRIVATE_ROUTES } from './support/route-expectations.js';
 
 test.describe('page readiness', () => {
   test.describe('public pages resolve', () => {

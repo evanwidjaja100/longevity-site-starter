@@ -186,8 +186,11 @@ $assert( 'http://example.com/?s=' === $search_url, 'Search URL mismatch: ' . $se
 $defs = Routes::definitions();
 $assert( isset( $defs['pages']['home'] ), 'Definitions should contain home page' );
 $assert( isset( $defs['categories']['sleep'] ), 'Definitions should contain sleep category' );
-$assert( 15 === count( $defs['pages'] ), 'Should have 15 page definitions, got ' . count( $defs['pages'] ) );
+$assert( 17 === count( $defs['pages'] ), 'Should have 17 page definitions, got ' . count( $defs['pages'] ) );
 $assert( 7 === count( $defs['categories'] ), 'Should have 7 category definitions, got ' . count( $defs['categories'] ) );
+
+$expected_page_keys = array( 'home', 'start_here', 'guides', 'topics', 'reviews', 'evidence_methodology', 'testing_methodology', 'editorial_policy', 'corrections', 'affiliate_disclosure', 'medical_disclaimer', 'about', 'contact', 'privacy', 'terms', 'ai_assist_disclosure', 'source_registry' );
+$assert( $expected_page_keys === array_keys( $defs['pages'] ), 'Page definition keys changed unexpectedly — update this test deliberately if intentional. Expected ' . implode( ', ', $expected_page_keys ) . ', got ' . implode( ', ', array_keys( $defs['pages'] ) ) );
 
 // --- Test 12: is_same_route ---
 

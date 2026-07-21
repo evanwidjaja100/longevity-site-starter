@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { ALL_PUBLIC_ROUTES } from './support/route-expectations.js';
 
 test.describe('SEO metadata', () => {
-  for (const { key, path, indexable } of ALL_PUBLIC_ROUTES) {
+  for (const { key, path } of ALL_PUBLIC_ROUTES) {
     const fullPath = path === '/?s=' ? '/?s=evidence' : path;
 
     test(`${key} has exactly one H1 and a visible main landmark`, async ({ page }) => {

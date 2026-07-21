@@ -39,6 +39,39 @@ jobs:
         run: |
           if [ -f composer.lock ]; then composer audit; fi
 
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          coverage: none
+      - name: Cache Composer dependencies
+        uses: actions/cache@v4
+        with:
+          path: vendor
+          key: composer-${{ hashFiles('composer.lock') }}
+          restore-keys: composer-
+      - run: composer install --no-interaction --prefer-dist
+      - name: PHPCS (WordPress Coding Standards)
+        run: composer phpcs
+      - name: PHPStan (static analysis)
+        run: composer phpstan
+      - name: PHPUnit
+        run: composer phpunit
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+
   security:
     runs-on: ubuntu-latest
     permissions:
@@ -90,3 +123,39 @@ jobs:
           path: ./
           format: spdx-json
           output-file: reports/sbom.spdx.json
+
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure environment
+        run: cp .env.ci .env
+      - name: Start stack
+        run: docker compose up -d db wordpress
+      - name: Wait for WordPress to be healthy
+        run: |
+          for i in $(seq 1 30); do
+            status=$(docker compose ps --format json wordpress | grep -o '"Health":"[a-z]*"' || echo "")
+            echo "$status" | grep -q healthy && break
+            sleep 5
+          done
+      - name: Bootstrap site
+        run: docker compose run --rm --entrypoint sh wpcli /scripts/bootstrap.sh
+      - name: Smoke test
+        run: ./scripts/smoke-test.sh
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Run Playwright core suite
+        env:
+          WP_SITE_URL: http://localhost:8080
+        run: npm run test:e2e
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: reports/playwright/

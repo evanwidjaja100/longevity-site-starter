@@ -5,12 +5,11 @@ import {
   ALL_PUBLIC_ROUTES,
   ALL_PRIVATE_ROUTES,
   LEGACY_REDIRECTS,
-  REVIEW_ARCHIVE,
   SEARCH_PATH,
 } from './support/route-expectations.js';
 
 test.describe('public route resolution', () => {
-  for (const { key, path, indexable } of ALL_PUBLIC_ROUTES) {
+  for (const { key, path } of ALL_PUBLIC_ROUTES) {
     test(`${key} returns 200 with correct pathname`, async ({ page }) => {
       const fullPath = path === SEARCH_PATH ? `${SEARCH_PATH}test` : path;
       const response = await page.goto(fullPath);
