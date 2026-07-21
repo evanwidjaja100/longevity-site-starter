@@ -16,6 +16,12 @@ build/
 wp-content/uploads/*
 !wp-content/uploads/.gitkeep
 
+# Database dumps and archives must never be committed — see docs/operations/backup-and-restore.md
+*.sql
+*.sql.gz
+*.tgz
+*.tar.gz
+
 # Generated / session artifacts — never track
 /repomix-output.md
 /report.md

@@ -1,0 +1,49 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "lsp": {
+    "php intelephense": {
+      "command": [
+        "intelephense",
+        "--stdio"
+      ],
+      "initialization": {
+        "intelephense.files.maxSize": 5000000,
+        "intelephense.environment.wordPress": true
+      }
+    },
+    "eslint": {
+      "command": [
+        "eslint",
+        "--stdio"
+      ],
+      "disabled": false
+    },
+    "typescript": {
+      "command": [
+        "typescript-language-server",
+        "--stdio"
+      ],
+      "disabled": false,
+      "extensions": [
+        ".js",
+        ".jsx",
+        ".mjs",
+        ".cjs"
+      ]
+    },
+    "yaml-ls": {
+      "command": [
+        "yaml-language-server",
+        "--stdio"
+      ],
+      "disabled": false
+    },
+    "bash": {
+      "command": [
+        "bash-language-server",
+        "start"
+      ],
+      "disabled": false
+    }
+  }
+}

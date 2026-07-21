@@ -28,3 +28,7 @@ jobs:
         run: |
           bad=$(find . -path ./.git -prune -o -type f -perm /022 -print)
           test -z "$bad" || { echo "$bad"; exit 1; }
+      - name: Reject tracked database dumps and archives
+        run: |
+          bad=$(git ls-files | grep -E '\.(sql|sql\.gz|tgz|tar\.gz)$' || true)
+          test -z "$bad" || { echo "Tracked backup/dump files found:"; echo "$bad"; exit 1; }
