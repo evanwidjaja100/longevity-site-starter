@@ -130,10 +130,10 @@ class Public_Content {
 			$grade_labels = array( 'A' => __( 'Strong', 'longevity-core' ), 'B' => __( 'Moderate', 'longevity-core' ), 'C' => __( 'Limited', 'longevity-core' ), 'D' => __( 'Mechanistic', 'longevity-core' ), 'U' => __( 'Unclear', 'longevity-core' ) );
 			$items[] = '<span>' . esc_html( sprintf( __( 'Main conclusion: %s', 'longevity-core' ), $grade_labels[ $grade ] ?? __( 'Unclassified', 'longevity-core' ) ) ) . '</span>';
 		}
-		if ( 'review' === get_post_type( $post_id ) && in_array( get_post_meta( $post_id, 'testing_status', true ), array( 'complete', 'approved' ), true ) && Review_Methodology::valid_test_record( (int) get_post_meta( $post_id, 'test_record_id', true ), (string) get_post_meta( $post_id, 'testing_protocol_version', true ) ) ) {
+		if ( 'review' === get_post_type( $post_id ) && Runtime_Config::scoring_model_status()['valid'] && Approval_Service::is_current( $post_id, 'testing' ) && Review_Methodology::valid_test_record( (int) get_post_meta( $post_id, 'test_record_id', true ), (string) get_post_meta( $post_id, 'testing_protocol_version', true ) ) ) {
 			$items[] = '<span>' . esc_html__( 'Tested', 'longevity-core' ) . '</span>';
 		}
-		if ( 'complete' === get_post_meta( $post_id, 'medical_review_status', true ) && get_post_meta( $post_id, 'medical_review_attested', true ) ) {
+		if ( Approval_Service::is_current( $post_id, 'medical' ) ) {
 			$items[] = '<span>' . esc_html__( 'Medical review recorded', 'longevity-core' ) . '</span>';
 		}
 		return '<div class="longevity-card-meta">' . implode( '', $items ) . '</div>';
@@ -171,10 +171,11 @@ class Public_Content {
 		if ( ! $user instanceof \WP_User ) {
 			return '';
 		}
+		$snapshot    = Reviewer_Credentials::public_snapshot( $user->ID );
 		$name        = $user->display_name;
 		$bio         = (string) get_the_author_meta( 'description', $user->ID );
-		$credentials = 'verified' === get_user_meta( $user->ID, 'credential_verification_status', true ) ? (string) get_user_meta( $user->ID, 'professional_credentials', true ) : '';
-		$scope       = $credentials ? (string) get_user_meta( $user->ID, 'review_scope', true ) : '';
+		$credentials = (string) ( $snapshot['credentials'] ?? '' );
+		$scope       = (string) ( $snapshot['scope'] ?? '' );
 		$conflict    = (string) get_user_meta( $user->ID, 'conflict_disclosure', true );
 		$html        = '<header class="longevity-author-profile"><h1>' . esc_html( $name ) . '</h1>';
 		if ( $credentials ) {

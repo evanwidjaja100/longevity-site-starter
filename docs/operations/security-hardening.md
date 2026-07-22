@@ -78,3 +78,14 @@ When deploying to a managed host (WP Engine, Kinsta, etc.):
 - `docs/operations/security-checklist.md` — sign-off checklist for pre-launch
 - `docs/operations/csp-enforcement-plan.md` — CSP enforcement timeline
 - `docs/operations/incident-response.md` — incident classification and response
+## Production Readiness v2 trust boundaries
+
+- `Meta_Authorization` is deny-by-default and is shared by classic editor, REST, and workflow paths.
+- Raw governance metadata and private CPTs are not anonymous REST contracts.
+- Reviewer credential evidence references, approval payloads, audit payloads, contact text, raw test observations, and private evidence locations are never emitted publicly.
+- Approval status strings alone are not trusted; current immutable snapshots and dependency hashes are required.
+- Governance events are inserted into the append-only audit table and use bounded sanitized payloads and request correlation IDs.
+- Contact throttling uses a versioned HMAC of the validated client network identifier rather than persisting raw IP addresses.
+- `/health` is liveness only; detailed readiness requires operator authorization.
+
+External WAF, SMTP, DNS authentication, backups, restore drills, and branch protection remain human-operated controls and must not be reported as successful until evidence is supplied.

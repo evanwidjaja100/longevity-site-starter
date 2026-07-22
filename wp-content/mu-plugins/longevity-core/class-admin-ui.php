@@ -33,7 +33,9 @@ final class Admin_UI {
 			add_meta_box( 'lel-readiness', __( 'Publication readiness', 'longevity-core' ), array( self::class, 'render_readiness' ), $post_type, 'side', 'high' );
 			add_meta_box( 'lel-governance', __( 'Evidence, review, testing, and disclosure', 'longevity-core' ), array( self::class, 'render_governance' ), $post_type, 'normal', 'high' );
 		}
-		add_meta_box( 'lel-public-test-results', __( 'Approved public test results', 'longevity-core' ), array( self::class, 'render_public_test_results_editor' ), 'lel_test_record', 'normal', 'high' );
+		if ( current_user_can( 'approve_test_records' ) ) {
+			add_meta_box( 'lel-public-test-results', __( 'Approved public test results', 'longevity-core' ), array( self::class, 'render_public_test_results_editor' ), 'lel_test_record', 'normal', 'high' );
+		}
 	}
 
 	/** Render readiness summary. */
@@ -65,6 +67,7 @@ final class Admin_UI {
 		self::text( $post->ID, 'region_scope', __( 'Region or jurisdiction scope', 'longevity-core' ) );
 		self::date( $post->ID, 'next_content_review_date', __( 'Next content review date', 'longevity-core' ) );
 		self::select( $post->ID, 'editorial_approval_status', __( 'Editorial workflow state', 'longevity-core' ), array( 'idea' => 'Idea', 'assigned' => 'Assigned', 'researching' => 'Researching', 'drafting' => 'Drafting', 'editorial_review' => 'Editorial review', 'fact_check' => 'Fact-check', 'medical_review' => 'Medical review', 'testing_incomplete' => 'Testing incomplete', 'commercial_review' => 'Commercial review', 'ready' => 'Ready for publication', 'published' => 'Published', 'update_due' => 'Update due', 'correction_pending' => 'Correction pending', 'archived' => 'Archived' ) );
+		self::approval_action( 'longevity_approve_editorial', 'approve_publication', __( 'Approve this exact editorial snapshot as ready for publication', 'longevity-core' ), __( 'Ready and published states are service projections. Selecting them above does not create approval without this explicit action.', 'longevity-core' ) );
 		self::checkbox( $post->ID, 'uncertainty_statement_present', __( 'Explicit uncertainty statement is present', 'longevity-core' ) );
 
 		echo '</div></details><details class="lel-governance-section" data-lel-section="evidence"><summary><strong>' . esc_html__( 'Evidence and claims', 'longevity-core' ) . '</strong><span>' . esc_html__( 'Evidence grade, linked claims, and fact-checking', 'longevity-core' ) . '</span></summary><div class="lel-governance-fields">';
@@ -103,10 +106,12 @@ final class Admin_UI {
 		self::url( $post->ID, 'testing_methodology_url', __( 'Public methodology URL', 'longevity-core' ) );
 		self::test_record_select( $post->ID );
 		self::select( $post->ID, 'product_acquisition_method', __( 'Product acquisition', 'longevity-core' ), array( '' => 'Select', 'purchased' => 'Purchased', 'product_supplied' => 'Product supplied', 'loaned' => 'Loaned', 'service_access' => 'Service access', 'independently_verified_only' => 'Independently verified specifications only' ) );
+		self::approval_action( 'longevity_approve_testing', 'approve_test_records', __( 'Approve this exact testing snapshot', 'longevity-core' ), __( 'The approver must be independent of the selected test record and its testers. Approved status is projected only after the snapshot passes validation.', 'longevity-core' ) );
 		echo '</div></details><details class="lel-governance-section" data-lel-conditional="commercial"><summary><strong>' . esc_html__( 'Commercial disclosure', 'longevity-core' ) . '</strong><span>' . esc_html__( 'Relationship, disclosure approval, and destination registry', 'longevity-core' ) . '</span></summary><div class="lel-governance-fields">';
 		self::select( $post->ID, 'commercial_relationship', __( 'Commercial relationship', 'longevity-core' ), array( 'none' => 'None', 'affiliate' => 'Affiliate', 'product_supplied' => 'Product supplied', 'sponsored' => 'Sponsored' ) );
 		self::select( $post->ID, 'affiliate_disclosure_status', __( 'Affiliate disclosure status', 'longevity-core' ), array( 'not_required' => 'Not required', 'required' => 'Required', 'draft' => 'Draft', 'approved' => 'Approved', 'complete' => 'Complete' ) );
 		self::checkbox( $post->ID, 'affiliate_registry_verified', __( 'Affiliate destinations verified in registry', 'longevity-core' ) );
+		self::approval_action( 'longevity_approve_commercial', 'approve_commercial_disclosure', __( 'Approve this exact commercial-disclosure snapshot', 'longevity-core' ), __( 'The relationship owner cannot approve their own commercial disclosure when independence is required.', 'longevity-core' ) );
 
 		if ( 'review' === $post->post_type ) {
 			echo '</div></details><details class="lel-governance-section" data-lel-section="review-score"><summary><strong>' . esc_html__( 'Review scoring and decision', 'longevity-core' ) . '</strong><span>' . esc_html__( 'Product identity, fit, failures, dimensions, and confidence', 'longevity-core' ) . '</span></summary><div class="lel-governance-fields">';
@@ -137,68 +142,87 @@ final class Admin_UI {
 		echo '</div></details></div>';
 	}
 
-	/** Save editor metadata without accepting unauthorized attestations. */
+	/** Save editor metadata through the shared field-authorization service. */
 	public static function save_editorial_meta( int $post_id, \WP_Post $post, bool $update ): void {
 		unset( $update );
-		if ( wp_is_post_revision( $post_id ) || wp_is_post_autosave( $post_id ) || ! current_user_can( 'edit_post', $post_id ) ) {
+		if ( wp_is_post_revision( $post_id ) || wp_is_post_autosave( $post_id ) ) {
 			return;
 		}
 		if ( empty( $_POST['longevity_editorial_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['longevity_editorial_nonce'] ) ), 'longevity_save_editorial' ) ) {
 			return;
 		}
-		if ( 'review' === $post->post_type && isset( $_POST['review_score_dimensions_rows'] ) && is_array( $_POST['review_score_dimensions_rows'] ) ) {
-			$dimensions = Review_Methodology::sanitize_dimensions( wp_unslash( $_POST['review_score_dimensions_rows'] ) );
-			update_post_meta( $post_id, 'review_score_dimensions', $dimensions );
-			try {
-				$calculated = Review_Methodology::calculate_score( $dimensions );
-				update_post_meta( $post_id, 'review_score', $calculated['score'] );
-			} catch ( \InvalidArgumentException $exception ) {
-				// Publication readiness remains blocked until weights total 100.
+		$user_id = get_current_user_id();
+		$present = isset( $_POST['lel_present'] ) && is_array( $_POST['lel_present'] ) ? array_map( 'sanitize_key', array_keys( wp_unslash( $_POST['lel_present'] ) ) ) : array();
+
+		if ( 'review' === $post->post_type && in_array( 'review_score_dimensions', $present, true ) && isset( $_POST['review_score_dimensions_rows'] ) && is_array( $_POST['review_score_dimensions_rows'] ) ) {
+			if ( Meta_Authorization::can_write( 'review_score_dimensions', $post_id, $user_id, 'classic' ) && Meta_Authorization::can_write( 'review_score', $post_id, $user_id, 'classic' ) ) {
+				$dimensions = Review_Methodology::sanitize_dimensions( wp_unslash( $_POST['review_score_dimensions_rows'] ) );
+				update_post_meta( $post_id, 'review_score_dimensions', $dimensions );
+				try {
+					$calculated = Review_Methodology::calculate_score( $dimensions );
+					update_post_meta( $post_id, 'review_score', $calculated['score'] );
+				} catch ( \InvalidArgumentException $exception ) {
+					// Readiness remains blocked until weights total 100.
+				}
+			} else {
+				Audit_Log::record( 'metadata_write_denied', 'post', $post_id, array( 'field' => 'review_score_dimensions' ), $user_id, 'classic' );
 			}
 		}
 
-		$allowed_fields = array_keys( Meta_Registry::definitions() );
-		$boolean_fields = array_filter(
-			$allowed_fields,
-			static fn( string $key ) => 'boolean' === ( Meta_Registry::definitions()[ $key ]['type'] ?? '' )
+		$approval_requests = array(
+			'testing'    => ! empty( $_POST['longevity_approve_testing'] ),
+			'commercial' => ! empty( $_POST['longevity_approve_commercial'] ),
+			'editorial'  => ! empty( $_POST['longevity_approve_editorial'] ),
 		);
+		$medical_attestation_requested = in_array( 'medical_review_attested', $present, true ) && ! empty( $_POST['medical_review_attested'] );
+		$assignment_was_present         = in_array( 'medical_reviewer_user_id', $present, true ) && array_key_exists( 'medical_reviewer_user_id', $_POST );
+		$assignment_before              = (int) get_post_meta( $post_id, 'medical_reviewer_user_id', true );
 
-		foreach ( $allowed_fields as $key ) {
-			if ( isset( $_POST['review_score_dimensions_rows'] ) && in_array( $key, array( 'review_score_dimensions', 'review_score' ), true ) ) {
+		$definitions = Meta_Registry::definitions();
+		foreach ( $present as $key ) {
+			if ( ! isset( $definitions[ $key ] ) || ! in_array( $post->post_type, $definitions[ $key ]['post_types'], true ) ) {
 				continue;
 			}
-			if ( ! in_array( $post->post_type, Meta_Registry::definitions()[ $key ]['post_types'], true ) ) {
+			if ( in_array( $key, array( 'review_score_dimensions', 'review_score' ), true ) && isset( $_POST['review_score_dimensions_rows'] ) ) {
 				continue;
 			}
-			if ( in_array( $key, array( 'medical_review_attested', 'medical_review_date', 'fact_checked_by', 'fact_checked_date' ), true ) ) {
+			if ( ! Meta_Authorization::can_write( $key, $post_id, $user_id, 'classic' ) ) {
+				Audit_Log::record( 'metadata_write_denied', 'post', $post_id, array( 'field' => $key ), $user_id, 'classic' );
 				continue;
 			}
-			if ( 'fact_check_status' === $key && isset( $_POST[ $key ] ) && 'complete' === sanitize_key( (string) wp_unslash( $_POST[ $key ] ) ) && ! current_user_can( 'complete_fact_check' ) ) {
+			if ( ! array_key_exists( $key, $_POST ) ) {
 				continue;
 			}
-			if ( 'medical_review_status' === $key && isset( $_POST[ $key ] ) && 'complete' === sanitize_key( (string) wp_unslash( $_POST[ $key ] ) ) && ! current_user_can( 'complete_medical_review' ) ) {
-				continue;
-			}
-			if ( in_array( $key, array( 'affiliate_disclosure_status', 'affiliate_registry_verified' ), true ) && ! current_user_can( 'approve_commercial_disclosure' ) ) {
-				continue;
-			}
-			if ( in_array( $key, $boolean_fields, true ) ) {
-				$value = isset( $_POST[ $key ] );
-			} elseif ( isset( $_POST[ $key ] ) ) {
-				$value = wp_unslash( $_POST[ $key ] );
-			} else {
-				continue;
-			}
+			$value     = wp_unslash( $_POST[ $key ] );
 			$sanitized = Meta_Registry::sanitize_by_key( $key, $value );
 			$old       = get_post_meta( $post_id, $key, true );
+			if ( self::is_service_only_transition( $key, $sanitized ) || ( 'medical_review_attested' === $key && (bool) $sanitized ) ) {
+				if ( $old !== $sanitized ) {
+					Audit_Log::record( 'workflow_transition_deferred', 'post', $post_id, array( 'field' => $key, 'requested_value' => is_scalar( $sanitized ) ? (string) $sanitized : '' ), $user_id, 'classic' );
+				}
+				continue;
+			}
 			if ( $old !== $sanitized ) {
 				update_post_meta( $post_id, $key, $sanitized );
-				Publication_Gates::log_event( $post_id, 'metadata_changed', array( 'field' => $key ) );
+				Audit_Log::record( 'risk_classification_changed', 'post', $post_id, array( 'field' => $key ), $user_id, 'classic' );
 			}
 		}
 
-		self::save_fact_check_completion( $post_id );
-		self::save_medical_attestation( $post_id );
+		if ( $assignment_was_present ) {
+			$assignment_after = (int) get_post_meta( $post_id, 'medical_reviewer_user_id', true );
+			if ( $assignment_after !== $assignment_before ) {
+				update_post_meta( $post_id, 'medical_review_status', $assignment_after > 0 ? 'assigned' : 'not_started' );
+				update_post_meta( $post_id, 'medical_review_attested', false );
+			}
+		}
+		if ( $medical_attestation_requested ) {
+			Approval_Service::approve( $post_id, 'medical', $user_id, array( 'scope' => get_post_meta( $post_id, 'medical_review_scope', true ) ) );
+		}
+		foreach ( $approval_requests as $approval_type => $requested ) {
+			if ( $requested ) {
+				Approval_Service::approve( $post_id, $approval_type, $user_id );
+			}
+		}
 	}
 
 	/** Render a structured editor so operational staff never need to hand-write JSON. */
@@ -213,13 +237,13 @@ final class Admin_UI {
 		foreach ( $rows as $index => $row ) {
 			self::public_result_row( $row, $index );
 		}
-		echo '</tbody></table></div><p><button type="button" class="button" data-lel-add-result>' . esc_html__( 'Add result row', 'longevity-core' ) . '</button></p></div>';
+		echo '</tbody></table></div><p><button type="button" class="button" data-lel-add-result>' . esc_html__( 'Add result row', 'longevity-core' ) . '</button></p><p><label><input type="checkbox" name="longevity_approve_test_record" value="1"> ' . esc_html__( 'Approve this exact test-record snapshot after saving', 'longevity-core' ) . '</label></p></div>';
 	}
 
 	/** Save structured public rows with nonce and least-privilege capability checks. */
 	public static function save_public_test_results( int $post_id, \WP_Post $post, bool $update ): void {
 		unset( $post, $update );
-		if ( wp_is_post_revision( $post_id ) || wp_is_post_autosave( $post_id ) || ! current_user_can( 'manage_test_protocols' ) ) {
+		if ( wp_is_post_revision( $post_id ) || wp_is_post_autosave( $post_id ) || ! current_user_can( 'approve_test_records' ) ) {
 			return;
 		}
 		if ( empty( $_POST['longevity_public_results_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['longevity_public_results_nonce'] ) ), 'longevity_save_public_results' ) ) {
@@ -227,28 +251,41 @@ final class Admin_UI {
 		}
 		$rows = isset( $_POST['public_test_results_rows'] ) && is_array( $_POST['public_test_results_rows'] ) ? wp_unslash( $_POST['public_test_results_rows'] ) : array();
 		update_post_meta( $post_id, 'public_test_results', Review_Methodology::sanitize_public_results( $rows ) );
+		if ( ! empty( $_POST['longevity_approve_test_record'] ) ) {
+			Review_Methodology::approve_test_record( $post_id, get_current_user_id() );
+		}
 	}
 
-	/** Render reviewer profile fields. */
+	/** Render reviewer profile and independent verification controls. */
 	public static function render_reviewer_profile( \WP_User $user ): void {
-		if ( ! current_user_can( 'edit_user', $user->ID ) ) {
+		if ( ! current_user_can( 'edit_user', $user->ID ) && ! Reviewer_Credentials::can_verify( get_current_user_id(), $user->ID ) ) {
 			return;
 		}
-		$fields = self::reviewer_profile_fields();
 		echo '<h2>' . esc_html__( 'Reviewer profile', 'longevity-core' ) . '</h2><table class="form-table" role="presentation">';
-		foreach ( $fields as $key => $label ) {
+		foreach ( self::reviewer_claimed_profile_fields() as $key => $label ) {
 			$value = get_user_meta( $user->ID, $key, true );
 			echo '<tr><th><label for="' . esc_attr( $key ) . '">' . esc_html( $label ) . '</label></th><td>';
 			if ( in_array( $key, array( 'professional_credentials', 'review_scope', 'jurisdictions', 'conflict_disclosure' ), true ) ) {
 				echo '<textarea class="regular-text" rows="4" id="' . esc_attr( $key ) . '" name="' . esc_attr( $key ) . '">' . esc_textarea( (string) $value ) . '</textarea>';
-			} elseif ( 'credential_verification_status' === $key ) {
-				echo '<select id="' . esc_attr( $key ) . '" name="' . esc_attr( $key ) . '">';
-				foreach ( array( '' => 'Not set', 'unverified' => 'Unverified', 'pending' => 'Pending', 'verified' => 'Verified', 'expired' => 'Expired' ) as $option => $option_label ) {
-					echo '<option value="' . esc_attr( $option ) . '" ' . selected( $value, $option, false ) . '>' . esc_html( $option_label ) . '</option>';
-				}
-				echo '</select>';
 			} else {
-				$type = str_contains( $key, 'date' ) ? 'date' : ( str_contains( $key, 'url' ) ? 'url' : 'text' );
+				echo '<input class="regular-text" type="url" id="' . esc_attr( $key ) . '" name="' . esc_attr( $key ) . '" value="' . esc_attr( (string) $value ) . '">';
+			}
+			echo '</td></tr>';
+		}
+		echo '</table>';
+
+		if ( ! Reviewer_Credentials::can_verify( get_current_user_id(), $user->ID ) ) {
+			return;
+		}
+		wp_nonce_field( 'longevity_verify_reviewer_' . $user->ID, 'longevity_reviewer_verification_nonce' );
+		echo '<h2>' . esc_html__( 'Independent credential verification', 'longevity-core' ) . '</h2><p class="description">' . esc_html__( 'Verification evidence is a controlled reference and is never public. A reviewer cannot verify their own profile.', 'longevity-core' ) . '</p><table class="form-table" role="presentation">';
+		foreach ( self::reviewer_verification_fields() as $key => $label ) {
+			$value = get_user_meta( $user->ID, $key, true );
+			$type  = str_contains( $key, 'date' ) ? 'date' : 'text';
+			echo '<tr><th><label for="' . esc_attr( $key ) . '">' . esc_html( $label ) . '</label></th><td>';
+			if ( in_array( $key, array( 'verified_professional_credentials', 'verified_review_scope', 'verified_jurisdictions' ), true ) ) {
+				echo '<textarea class="regular-text" rows="4" id="' . esc_attr( $key ) . '" name="' . esc_attr( $key ) . '">' . esc_textarea( (string) $value ) . '</textarea>';
+			} else {
 				echo '<input class="regular-text" type="' . esc_attr( $type ) . '" id="' . esc_attr( $key ) . '" name="' . esc_attr( $key ) . '" value="' . esc_attr( (string) $value ) . '">';
 			}
 			echo '</td></tr>';
@@ -256,24 +293,34 @@ final class Admin_UI {
 		echo '</table>';
 	}
 
-	/** Save reviewer profile fields. */
+	/** Save claimed profile data and, separately, an independent verified snapshot. */
 	public static function save_reviewer_profile( int $user_id ): void {
-		if ( ! current_user_can( 'edit_user', $user_id ) ) {
-			return;
-		}
-		foreach ( self::reviewer_profile_fields() as $key => $label ) {
-			unset( $label );
-			if ( ! isset( $_POST[ $key ] ) ) {
-				continue;
+		$actor_id = get_current_user_id();
+		if ( current_user_can( 'edit_user', $user_id ) ) {
+			$changed = false;
+			foreach ( self::reviewer_claimed_profile_fields() as $key => $label ) {
+				unset( $label );
+				if ( ! isset( $_POST[ $key ] ) ) {
+					continue;
+				}
+				$rule      = 'professional_profile_url' === $key ? 'url' : 'textarea';
+				$new_value = Meta_Registry::sanitize_value( $rule, wp_unslash( $_POST[ $key ] ) );
+				if ( get_user_meta( $user_id, $key, true ) !== $new_value ) {
+					update_user_meta( $user_id, $key, $new_value );
+					$changed = true;
+				}
 			}
-			$rule = match ( $key ) {
-				'credential_verification_date' => 'date',
-				'professional_profile_url' => 'url',
-				'credential_verification_status' => 'credential_status',
-				'professional_credentials', 'review_scope', 'jurisdictions', 'conflict_disclosure' => 'textarea',
-				default => 'text',
-			};
-			update_user_meta( $user_id, $key, Meta_Registry::sanitize_value( $rule, wp_unslash( $_POST[ $key ] ) ) );
+			if ( $changed && 'verified' === get_user_meta( $user_id, 'credential_verification_status', true ) ) {
+				Reviewer_Credentials::invalidate( $user_id, 'claimed_profile_changed', $actor_id );
+			}
+		}
+
+		if ( Reviewer_Credentials::can_verify( $actor_id, $user_id ) && ! empty( $_POST['longevity_reviewer_verification_nonce'] ) && wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['longevity_reviewer_verification_nonce'] ) ), 'longevity_verify_reviewer_' . $user_id ) ) {
+			$data = array();
+			foreach ( array_keys( self::reviewer_verification_fields() ) as $key ) {
+				$data[ $key ] = isset( $_POST[ $key ] ) ? wp_unslash( $_POST[ $key ] ) : '';
+			}
+			Reviewer_Credentials::verify( $user_id, $data, $actor_id );
 		}
 	}
 
@@ -292,35 +339,6 @@ final class Admin_UI {
 		printf( '<strong>%d%%</strong><br>%s', esc_html( (string) $result->completion_percentage() ), $result->is_blocked() ? esc_html__( 'Blocked', 'longevity-core' ) : esc_html__( 'Ready', 'longevity-core' ) );
 	}
 
-	/** Save authenticated fact-check completion. */
-	private static function save_fact_check_completion( int $post_id ): void {
-		if ( 'complete' !== get_post_meta( $post_id, 'fact_check_status', true ) || ! current_user_can( 'complete_fact_check' ) ) {
-			return;
-		}
-		update_post_meta( $post_id, 'fact_checked_by', get_current_user_id() );
-		update_post_meta( $post_id, 'fact_checked_date', gmdate( 'Y-m-d' ) );
-		Publication_Gates::log_event( $post_id, 'fact_check_completed' );
-	}
-
-	/** Save authenticated reviewer attestation. */
-	private static function save_medical_attestation( int $post_id ): void {
-		if ( empty( $_POST['medical_review_attested'] ) || ! current_user_can( 'complete_medical_review' ) ) {
-			return;
-		}
-		$reviewer_id = (int) get_post_meta( $post_id, 'medical_reviewer_user_id', true );
-		if ( $reviewer_id !== get_current_user_id() ) {
-			return;
-		}
-		$scope = get_post_meta( $post_id, 'medical_review_scope', true );
-		if ( '' === $scope ) {
-			return;
-		}
-		update_post_meta( $post_id, 'medical_review_attested', true );
-		update_post_meta( $post_id, 'medical_review_status', 'complete' );
-		update_post_meta( $post_id, 'medical_review_date', gmdate( 'Y-m-d' ) );
-		Publication_Gates::log_event( $post_id, 'medical_review_completed', array( 'scope' => $scope ) );
-	}
-
 	/** Render an attestation checkbox only to the assigned reviewer. */
 	private static function attestation( int $post_id ): void {
 		$reviewer_id = (int) get_post_meta( $post_id, 'medical_reviewer_user_id', true );
@@ -334,9 +352,10 @@ final class Admin_UI {
 
 	/** Render a reviewer selector. */
 	private static function reviewer_select( int $post_id ): void {
+		if ( ! self::can_edit_field( $post_id, 'medical_reviewer_user_id' ) ) { self::readonly_field( $post_id, 'medical_reviewer_user_id', __( 'Medical reviewer', 'longevity-core' ) ); return; }
 		$value = (int) get_post_meta( $post_id, 'medical_reviewer_user_id', true );
 		$users = get_users( array( 'capability' => 'complete_medical_review', 'orderby' => 'display_name' ) );
-		echo '<p><label for="medical_reviewer_user_id"><strong>' . esc_html__( 'Medical reviewer', 'longevity-core' ) . '</strong></label><br><select class="widefat" id="medical_reviewer_user_id" name="medical_reviewer_user_id"><option value="0">' . esc_html__( 'Select reviewer', 'longevity-core' ) . '</option>';
+		echo self::presence_marker( 'medical_reviewer_user_id' ) . '<p><label for="medical_reviewer_user_id"><strong>' . esc_html__( 'Medical reviewer', 'longevity-core' ) . '</strong></label><br><select class="widefat" id="medical_reviewer_user_id" name="medical_reviewer_user_id"><option value="0">' . esc_html__( 'Select reviewer', 'longevity-core' ) . '</option>';
 		foreach ( $users as $user ) {
 			$status = (string) get_user_meta( $user->ID, 'credential_verification_status', true );
 			echo '<option value="' . esc_attr( (string) $user->ID ) . '" ' . selected( $value, $user->ID, false ) . '>' . esc_html( sprintf( '%1$s (ID %2$d; %3$s)', $user->display_name, $user->ID, $status ?: __( 'unverified', 'longevity-core' ) ) ) . '</option>';
@@ -346,9 +365,10 @@ final class Admin_UI {
 
 	/** Render approved test records with human-readable titles and stable IDs. */
 	private static function test_record_select( int $post_id ): void {
+		if ( ! self::can_edit_field( $post_id, 'test_record_id' ) ) { self::readonly_field( $post_id, 'test_record_id', __( 'Test record', 'longevity-core' ) ); return; }
 		$value   = (int) get_post_meta( $post_id, 'test_record_id', true );
 		$records = get_posts( array( 'post_type' => 'lel_test_record', 'post_status' => 'any', 'posts_per_page' => 100, 'orderby' => array( 'title' => 'ASC', 'ID' => 'ASC' ) ) );
-		echo '<p><label for="test_record_id"><strong>' . esc_html__( 'Test record', 'longevity-core' ) . '</strong></label><br><select class="widefat" id="test_record_id" name="test_record_id"><option value="0">' . esc_html__( 'Select an approved record', 'longevity-core' ) . '</option>';
+		echo self::presence_marker( 'test_record_id' ) . '<p><label for="test_record_id"><strong>' . esc_html__( 'Test record', 'longevity-core' ) . '</strong></label><br><select class="widefat" id="test_record_id" name="test_record_id"><option value="0">' . esc_html__( 'Select an approved record', 'longevity-core' ) . '</option>';
 		foreach ( $records as $record ) {
 			$status = (string) get_post_meta( $record->ID, 'approval_status', true );
 			echo '<option value="' . esc_attr( (string) $record->ID ) . '" ' . selected( $value, $record->ID, false ) . '>' . esc_html( sprintf( '%1$s (ID %2$d; %3$s)', get_the_title( $record ), $record->ID, $status ?: __( 'not approved', 'longevity-core' ) ) ) . '</option>';
@@ -391,6 +411,8 @@ final class Admin_UI {
 
 	/** Render an accessible repeatable dimension editor backed by the existing meta shape. */
 	private static function score_dimensions_editor( int $post_id ): void {
+		if ( ! self::can_edit_field( $post_id, 'review_score_dimensions' ) ) { self::readonly_field( $post_id, 'review_score_dimensions', __( 'Scoring dimensions', 'longevity-core' ) ); return; }
+		echo self::presence_marker( 'review_score_dimensions' );
 		$dimensions = get_post_meta( $post_id, 'review_score_dimensions', true );
 		$dimensions = is_array( $dimensions ) && $dimensions ? $dimensions : array( array( 'name' => '', 'score' => '', 'weight' => '' ) );
 		echo '<fieldset id="review_score_dimensions" class="lel-score-editor"><legend><strong>' . esc_html__( 'Score dimensions', 'longevity-core' ) . '</strong></legend><p class="description">' . esc_html__( 'Weights must total 100%. The calculated score is saved server-side; confidence remains a separate editorial judgment.', 'longevity-core' ) . '</p><div class="lel-score-table-wrap"><table><thead><tr><th scope="col">' . esc_html__( 'Dimension', 'longevity-core' ) . '</th><th scope="col">' . esc_html__( 'Score (0–5)', 'longevity-core' ) . '</th><th scope="col">' . esc_html__( 'Weight %', 'longevity-core' ) . '</th><th scope="col">' . esc_html__( 'Action', 'longevity-core' ) . '</th></tr></thead><tbody data-lel-score-rows>';
@@ -409,8 +431,12 @@ final class Admin_UI {
 	}
 
 	private static function textarea( int $post_id, string $key, string $label ): void {
+		if ( ! self::can_edit_field( $post_id, $key ) ) {
+			self::readonly_field( $post_id, $key, $label );
+			return;
+		}
 		$value = get_post_meta( $post_id, $key, true );
-		echo '<p><label for="' . esc_attr( $key ) . '"><strong>' . esc_html( $label ) . '</strong></label><br><textarea class="widefat" rows="3" id="' . esc_attr( $key ) . '" name="' . esc_attr( $key ) . '" aria-describedby="' . esc_attr( $key ) . '-help">' . esc_textarea( (string) $value ) . '</textarea>' . self::field_help( $key ) . '</p>';
+		echo self::presence_marker( $key ) . '<p><label for="' . esc_attr( $key ) . '"><strong>' . esc_html( $label ) . '</strong></label><br><textarea class="widefat" rows="3" id="' . esc_attr( $key ) . '" name="' . esc_attr( $key ) . '" aria-describedby="' . esc_attr( $key ) . '-help">' . esc_textarea( (string) $value ) . '</textarea>' . self::field_help( $key ) . '</p>';
 	}
 
 	/** Render one structured public test-result row. */
@@ -427,7 +453,7 @@ final class Admin_UI {
 		echo '</select></td><td><label class="screen-reader-text" for="lel-result-note-' . esc_attr( (string) $index ) . '">' . esc_html__( 'Interpretation note', 'longevity-core' ) . '</label><textarea id="lel-result-note-' . esc_attr( (string) $index ) . '" name="public_test_results_rows[' . esc_attr( (string) $index ) . '][note]" rows="2">' . esc_textarea( (string) ( $row['note'] ?? '' ) ) . '</textarea></td><td><label class="screen-reader-text" for="lel-result-order-' . esc_attr( (string) $index ) . '">' . esc_html__( 'Display order', 'longevity-core' ) . '</label><input id="lel-result-order-' . esc_attr( (string) $index ) . '" type="number" min="0" max="999" name="public_test_results_rows[' . esc_attr( (string) $index ) . '][display_order]" value="' . esc_attr( (string) ( $row['display_order'] ?? ( $index + 1 ) * 10 ) ) . '"></td><td><button type="button" class="button-link" data-lel-result-up aria-label="' . esc_attr__( 'Move row up', 'longevity-core' ) . '">↑</button> <button type="button" class="button-link" data-lel-result-down aria-label="' . esc_attr__( 'Move row down', 'longevity-core' ) . '">↓</button> <button type="button" class="button-link-delete" data-lel-remove-result>' . esc_html__( 'Remove', 'longevity-core' ) . '</button></td></tr>';
 	}
 
-	
+
 	private static function text( int $post_id, string $key, string $label ): void {
 		self::input( $post_id, $key, $label, 'text' );
 	}
@@ -441,34 +467,84 @@ final class Admin_UI {
 	}
 
 	private static function number( int $post_id, string $key, string $label, $step = 1, $min = null, $max = null ): void {
+		if ( ! self::can_edit_field( $post_id, $key ) ) {
+			self::readonly_field( $post_id, $key, $label );
+			return;
+		}
 		$value = get_post_meta( $post_id, $key, true );
 		$attrs = '';
-		if ( null !== $min ) {
-			$attrs .= ' min="' . esc_attr( (string) $min ) . '"';
-		}
-		if ( null !== $max ) {
-			$attrs .= ' max="' . esc_attr( (string) $max ) . '"';
-		}
-		echo '<p><label for="' . esc_attr( $key ) . '"><strong>' . esc_html( $label ) . '</strong></label><br><input class="widefat" type="number" step="' . esc_attr( (string) $step ) . '"' . $attrs . ' id="' . esc_attr( $key ) . '" name="' . esc_attr( $key ) . '" value="' . esc_attr( (string) $value ) . '"></p>';
+		if ( null !== $min ) { $attrs .= ' min="' . esc_attr( (string) $min ) . '"'; }
+		if ( null !== $max ) { $attrs .= ' max="' . esc_attr( (string) $max ) . '"'; }
+		echo self::presence_marker( $key ) . '<p><label for="' . esc_attr( $key ) . '"><strong>' . esc_html( $label ) . '</strong></label><br><input class="widefat" type="number" step="' . esc_attr( (string) $step ) . '"' . $attrs . ' id="' . esc_attr( $key ) . '" name="' . esc_attr( $key ) . '" value="' . esc_attr( (string) $value ) . '"></p>';
 	}
 
 	private static function input( int $post_id, string $key, string $label, string $type ): void {
+		if ( ! self::can_edit_field( $post_id, $key ) ) {
+			self::readonly_field( $post_id, $key, $label );
+			return;
+		}
 		$value = get_post_meta( $post_id, $key, true );
-		echo '<p><label for="' . esc_attr( $key ) . '"><strong>' . esc_html( $label ) . '</strong></label><br><input class="widefat" type="' . esc_attr( $type ) . '" id="' . esc_attr( $key ) . '" name="' . esc_attr( $key ) . '" value="' . esc_attr( (string) $value ) . '" aria-describedby="' . esc_attr( $key ) . '-help">' . self::field_help( $key ) . '</p>';
+		echo self::presence_marker( $key ) . '<p><label for="' . esc_attr( $key ) . '"><strong>' . esc_html( $label ) . '</strong></label><br><input class="widefat" type="' . esc_attr( $type ) . '" id="' . esc_attr( $key ) . '" name="' . esc_attr( $key ) . '" value="' . esc_attr( (string) $value ) . '" aria-describedby="' . esc_attr( $key ) . '-help">' . self::field_help( $key ) . '</p>';
 	}
 
 	private static function checkbox( int $post_id, string $key, string $label ): void {
+		if ( ! self::can_edit_field( $post_id, $key ) ) {
+			self::readonly_field( $post_id, $key, $label );
+			return;
+		}
 		$value = (bool) get_post_meta( $post_id, $key, true );
-		echo '<p><label><input type="checkbox" name="' . esc_attr( $key ) . '" value="1" ' . checked( $value, true, false ) . '> ' . esc_html( $label ) . '</label></p>';
+		echo self::presence_marker( $key ) . '<input type="hidden" name="' . esc_attr( $key ) . '" value="0"><p><label><input type="checkbox" name="' . esc_attr( $key ) . '" value="1" ' . checked( $value, true, false ) . '> ' . esc_html( $label ) . '</label></p>';
+	}
+
+	/** Render an explicit snapshot-approval action separate from editable workflow state. */
+	private static function approval_action( string $name, string $capability, string $label, string $help ): void {
+		if ( ! current_user_can( $capability ) ) {
+			return;
+		}
+		echo '<p><label><input type="checkbox" name="' . esc_attr( $name ) . '" value="1"> <strong>' . esc_html( $label ) . '</strong></label><br><span class="description">' . esc_html( $help ) . '</span></p>';
 	}
 
 	private static function select( int $post_id, string $key, string $label, array $options ): void {
+		if ( ! self::can_edit_field( $post_id, $key ) ) {
+			self::readonly_field( $post_id, $key, $label );
+			return;
+		}
 		$value = (string) get_post_meta( $post_id, $key, true );
-		echo '<p><label for="' . esc_attr( $key ) . '"><strong>' . esc_html( $label ) . '</strong></label><br><select class="widefat" id="' . esc_attr( $key ) . '" name="' . esc_attr( $key ) . '" aria-describedby="' . esc_attr( $key ) . '-help">';
+		echo self::presence_marker( $key ) . '<p><label for="' . esc_attr( $key ) . '"><strong>' . esc_html( $label ) . '</strong></label><br><select class="widefat" id="' . esc_attr( $key ) . '" name="' . esc_attr( $key ) . '" aria-describedby="' . esc_attr( $key ) . '-help">';
 		foreach ( $options as $option => $option_label ) {
 			echo '<option value="' . esc_attr( $option ) . '" ' . selected( $value, $option, false ) . '>' . esc_html( $option_label ) . '</option>';
 		}
 		echo '</select>' . self::field_help( $key ) . '</p>';
+	}
+
+	/** Whether the current actor may edit a field. */
+	private static function can_edit_field( int $post_id, string $key ): bool {
+		return Meta_Authorization::can_write( $key, $post_id, get_current_user_id(), 'classic' );
+	}
+
+	/** Final workflow values are written only by Approval_Service after validation. */
+	private static function is_service_only_transition( string $key, $value ): bool {
+		$value = is_scalar( $value ) ? (string) $value : '';
+		$final_values = array(
+			'fact_check_status'           => array( 'complete' ),
+			'medical_review_status'        => array( 'complete' ),
+			'testing_status'               => array( 'approved' ),
+			'affiliate_disclosure_status'  => array( 'approved', 'complete' ),
+			'editorial_approval_status'    => array( 'ready', 'published' ),
+		);
+		return isset( $final_values[ $key ] ) && in_array( $value, $final_values[ $key ], true );
+	}
+
+	/** Presence marker prevents absent/unrendered protected booleans from being cleared. */
+	private static function presence_marker( string $key ): string {
+		return '<input type="hidden" name="lel_present[' . esc_attr( $key ) . ']" value="1">';
+	}
+
+	/** Read-only representation for actors lacking the write policy. */
+	private static function readonly_field( int $post_id, string $key, string $label ): void {
+		$value = get_post_meta( $post_id, $key, true );
+		if ( is_array( $value ) ) { $value = wp_json_encode( $value ); }
+		echo '<p><strong>' . esc_html( $label ) . '</strong><br><span class="description">' . esc_html( '' === (string) $value ? __( 'Not set', 'longevity-core' ) : (string) $value ) . '</span></p>';
 	}
 
 	/** Render registered field help without duplicating governance definitions. */
@@ -478,16 +554,27 @@ final class Admin_UI {
 		return $description ? '<span class="description" id="' . esc_attr( $key ) . '-help">' . esc_html( $description ) . '</span>' : '';
 	}
 
-	/** Reviewer profile field labels. */
-	private static function reviewer_profile_fields(): array {
+	/** Reviewer-claimed profile field labels. */
+	private static function reviewer_claimed_profile_fields(): array {
 		return array(
-			'professional_credentials'       => __( 'Professional credentials', 'longevity-core' ),
-			'credential_verification_status' => __( 'Credential verification status', 'longevity-core' ),
-			'credential_verification_date'   => __( 'Credential verification date', 'longevity-core' ),
-			'professional_profile_url'        => __( 'Professional profile URL', 'longevity-core' ),
-			'review_scope'                    => __( 'Qualified review scope', 'longevity-core' ),
-			'jurisdictions'                   => __( 'Jurisdictions', 'longevity-core' ),
-			'conflict_disclosure'             => __( 'Conflict disclosure', 'longevity-core' ),
+			'professional_credentials' => __( 'Claimed professional credentials', 'longevity-core' ),
+			'professional_profile_url'  => __( 'Professional profile URL', 'longevity-core' ),
+			'review_scope'              => __( 'Claimed review scope', 'longevity-core' ),
+			'jurisdictions'             => __( 'Claimed jurisdictions', 'longevity-core' ),
+			'conflict_disclosure'       => __( 'Conflict disclosure', 'longevity-core' ),
 		);
 	}
+
+	/** Independent verification field labels. */
+	private static function reviewer_verification_fields(): array {
+		return array(
+			'credential_verification_date'         => __( 'Verification date', 'longevity-core' ),
+			'credential_expiration_date'           => __( 'Expiration date', 'longevity-core' ),
+			'credential_verification_evidence_ref' => __( 'Controlled evidence reference', 'longevity-core' ),
+			'verified_professional_credentials'    => __( 'Verified credentials snapshot', 'longevity-core' ),
+			'verified_review_scope'                => __( 'Verified review scope', 'longevity-core' ),
+			'verified_jurisdictions'               => __( 'Verified jurisdictions', 'longevity-core' ),
+		);
+	}
+
 }

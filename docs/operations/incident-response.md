@@ -105,3 +105,8 @@ Do not send a breach notification before legal counsel has reviewed the content 
 - `docs/operations/security-checklist.md` — pre-launch security controls
 - `docs/operations/monitoring.md` — detection tools and alerts
 - `content/governance/corrections-policy.md` — editorial corrections policy
+## Production Readiness v2 governance evidence
+
+Security- and governance-relevant incidents must reference append-only audit event IDs and the applicable approval snapshot IDs. Do not edit or delete audit rows as part of remediation. Record invalidation reasons, affected object IDs, actor IDs, request/correlation IDs, containment actions, and whether public content remained live or was withdrawn.
+
+Sensitive contact text, raw IP addresses, credential evidence, private source content, and test observations must not be copied into audit payloads or incident tickets unless an authorized human determines that protected storage is necessary. Backup, SMTP, WAF, and monitoring status remains `unknown_external` until operator evidence is supplied.

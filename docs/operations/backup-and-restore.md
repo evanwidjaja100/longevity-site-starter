@@ -111,3 +111,6 @@ At least quarterly, conduct a full restore drill:
 - `scripts/restore-test-example.sh` — dev-reference restore script
 - `docs/operations/security-checklist.md` — backup sign-off checklist
 - `docs/operations/managed-wordpress-deployment.md` — host-specific guidance
+## Production Readiness v2 data preservation
+
+Backups and restore drills must include the approval snapshot and governance audit tables as well as legacy compatibility metadata. Rollback is forward-fix oriented: additive tables and records are retained, and no automated down migration deletes approvals or audit events. A restore drill must verify hash-bound approval records, audit-event queryability, current migration version, and that stale or legacy-unbound content remains blocked.

@@ -30,34 +30,34 @@ final class Freshness {
 
 	/** Run a bounded, locked scan and return a non-sensitive report. */
 	public static function run(): array {
-		if ( get_transient( self::LOCK ) ) {
-			return array( 'status' => 'locked', 'processed' => 0, 'due' => 0 );
+		$existing_lock = get_transient( self::LOCK );
+		if ( $existing_lock ) {
+			$lock_age = is_numeric( $existing_lock ) ? max( 0, time() - (int) $existing_lock ) : null;
+			return array( 'status' => 'locked', 'processed' => 0, 'due' => 0, 'lock_age' => $lock_age, 'last_error_code' => 'freshness_locked' );
 		}
-		set_transient( self::LOCK, '1', 15 * MINUTE_IN_SECONDS );
-		$report = array( 'status' => 'ok', 'processed' => 0, 'due' => 0, 'run_at' => gmdate( DATE_W3C ) );
+		set_transient( self::LOCK, (string) time(), 15 * MINUTE_IN_SECONDS );
+		$run_at = gmdate( DATE_W3C );
+		$report = array( 'status' => 'ok', 'processed' => 0, 'due' => 0, 'run_at' => $run_at, 'last_run_at' => $run_at, 'lock_age' => 0, 'last_error_code' => '' );
 		try {
 			$batch = min( 250, max( 10, (int) get_option( 'lel_freshness_batch_size', 100 ) ) );
-			$posts = get_posts(
-				array(
-					'post_type'              => array( 'post', 'review' ),
-					'post_status'            => array( 'publish', 'draft', 'pending', 'future', 'private' ),
-					'posts_per_page'         => $batch,
-					'fields'                 => 'ids',
-					'orderby'                => array( 'modified' => 'ASC', 'ID' => 'ASC' ),
-					'no_found_rows'          => true,
-					'update_post_term_cache' => false,
-				)
-			);
-			$today = gmdate( 'Y-m-d' );
+			$posts = Freshness_Repository::next_batch( $batch );
+			$today = Date_Validator::today();
+			$cycle_started = (string) get_option( 'lel_freshness_cycle_started_at', '' );
+			if ( '' === $cycle_started ) {
+				$cycle_started = gmdate( 'Y-m-d H:i:s' );
+				update_option( 'lel_freshness_cycle_started_at', $cycle_started, false );
+				update_option( 'lel_freshness_cycle_id', function_exists( 'wp_generate_uuid4' ) ? wp_generate_uuid4() : hash( 'sha256', $cycle_started ), false );
+			}
 			foreach ( $posts as $post_id ) {
 				++$report['processed'];
 				$due_fields = array();
 				foreach ( array( 'next_content_review_date', 'next_fact_check_date', 'next_medical_review_date' ) as $field ) {
 					$date = (string) get_post_meta( (int) $post_id, $field, true );
-					if ( '' !== $date && $date < $today ) {
+					if ( Date_Validator::is_valid( $date ) && Date_Validator::compare( $date, $today ) <= 0 ) {
 						$due_fields[] = $field;
 					}
 				}
+				update_post_meta( (int) $post_id, '_lel_freshness_last_scanned_at', gmdate( 'Y-m-d H:i:s' ) );
 				if ( $due_fields ) {
 					++$report['due'];
 					update_post_meta( (int) $post_id, '_lel_freshness_status', 'update_due' );
@@ -68,11 +68,36 @@ final class Freshness {
 					delete_post_meta( (int) $post_id, '_lel_freshness_due_fields' );
 				}
 			}
+			$report['eligible_total'] = Freshness_Repository::eligible_total();
+			$report['cycle_started_at'] = $cycle_started;
+			$report['last_cycle_started_at'] = $cycle_started;
+			$report['cycle_scanned'] = self::count_scanned_since( $cycle_started );
+			$report['processed_in_cycle'] = $report['cycle_scanned'];
+			$report['due_total'] = self::count_any_due( $today );
+			$report['remaining_estimate'] = max( 0, $report['eligible_total'] - $report['cycle_scanned'] );
+			$report['last_success_at'] = gmdate( DATE_W3C );
+			$report['cycle_complete'] = $report['eligible_total'] <= $report['cycle_scanned'];
+			if ( $report['cycle_complete'] ) {
+				$report['cycle_completed_at'] = gmdate( DATE_W3C );
+				$report['last_cycle_completed_at'] = $report['cycle_completed_at'];
+				update_option( 'lel_freshness_last_cycle_completed_at', $report['cycle_completed_at'], false );
+				delete_option( 'lel_freshness_cycle_started_at' );
+			} else {
+				$report['last_cycle_completed_at'] = (string) get_option( 'lel_freshness_last_cycle_completed_at', '' );
+				$next = wp_next_scheduled( self::HOOK );
+				if ( ! $next || $next > time() + ( 2 * HOUR_IN_SECONDS ) ) {
+					wp_schedule_single_event( time() + HOUR_IN_SECONDS, self::HOOK );
+				}
+			}
+			update_option( 'lel_cron_heartbeat_at', gmdate( DATE_W3C ), false );
 			update_option( 'lel_last_freshness_report', $report, false );
 			delete_option( 'lel_freshness_last_error' );
 		} catch ( \Throwable $error ) {
 			$report['status'] = 'failed';
-			update_option( 'lel_freshness_last_error', array( 'time' => gmdate( DATE_W3C ), 'message' => $error->getMessage() ), false );
+			$error_code = sanitize_key( ( new \ReflectionClass( $error ) )->getShortName() );
+			$report['last_error_code'] = $error_code;
+			Audit_Log::record( 'freshness_cycle_failed', 'system', 0, array( 'error_class' => get_class( $error ), 'error_code' => $error_code ), 0, 'cron' );
+			update_option( 'lel_freshness_last_error', array( 'time' => gmdate( DATE_W3C ), 'code' => $error_code ), false );
 			if ( function_exists( 'error_log' ) ) {
 				error_log( 'Longevity Core freshness job failed: ' . $error->getMessage() );
 			}
@@ -84,12 +109,12 @@ final class Freshness {
 
 	/** Register a capability-protected operational status page. */
 	public static function register_status_page(): void {
-		add_management_page( __( 'Longevity operational status', 'longevity-core' ), __( 'Longevity status', 'longevity-core' ), 'approve_publication', 'lel-operational-status', array( self::class, 'render_status_page' ) );
+		add_management_page( __( 'Longevity operational status', 'longevity-core' ), __( 'Longevity status', 'longevity-core' ), 'view_operational_readiness', 'lel-operational-status', array( self::class, 'render_status_page' ) );
 	}
 
 	/** Render bounded operational issue counts without exposing private records. */
 	public static function render_status_page(): void {
-		if ( ! current_user_can( 'approve_publication' ) ) {
+		if ( ! current_user_can( 'view_operational_readiness' ) ) {
 			wp_die( esc_html__( 'You are not allowed to view operational status.', 'longevity-core' ) );
 		}
 		$report = self::status();
@@ -114,6 +139,9 @@ final class Freshness {
 			'repeated_emergency_overrides' => self::count_repeated_overrides(),
 			'failed_freshness_jobs'     => get_option( 'lel_freshness_last_error', false ) ? 1 : 0,
 			'last_batch_processed'      => is_array( $last ) ? (int) ( $last['processed'] ?? 0 ) : 0,
+			'cycle_scanned'             => is_array( $last ) ? (int) ( $last['cycle_scanned'] ?? 0 ) : 0,
+			'eligible_total'            => is_array( $last ) ? (int) ( $last['eligible_total'] ?? 0 ) : 0,
+			'cycle_complete'            => is_array( $last ) ? (bool) ( $last['cycle_complete'] ?? false ) : false,
 		);
 	}
 
@@ -159,20 +187,49 @@ final class Freshness {
 		return (int) $query->found_posts;
 	}
 
-	/** Count posts with two or more recorded emergency publication overrides. */
+	/** Count unique records with at least one lifecycle date due today or earlier. */
+	private static function count_any_due( string $today ): int {
+		$query = new \WP_Query(
+			array(
+				'post_type'      => array( 'post', 'review' ),
+				'post_status'    => array( 'publish', 'draft', 'pending', 'future', 'private' ),
+				'fields'         => 'ids',
+				'posts_per_page' => 1,
+				'no_found_rows'  => false,
+				'meta_query'     => array(
+					'relation' => 'OR',
+					array( 'key' => 'next_content_review_date', 'value' => $today, 'compare' => '<=', 'type' => 'DATE' ),
+					array( 'key' => 'next_fact_check_date', 'value' => $today, 'compare' => '<=', 'type' => 'DATE' ),
+					array( 'key' => 'next_medical_review_date', 'value' => $today, 'compare' => '<=', 'type' => 'DATE' ),
+				),
+			)
+		);
+		return (int) $query->found_posts;
+	}
+
+	/** Count posts with two or more append-only emergency override events. */
 	private static function count_repeated_overrides(): int {
-		$posts = get_posts( array( 'post_type' => array( 'post', 'review' ), 'post_status' => 'any', 'fields' => 'ids', 'posts_per_page' => 250, 'meta_key' => '_longevity_audit_log', 'orderby' => 'ID', 'order' => 'DESC' ) );
-		$count = 0;
-		foreach ( $posts as $post_id ) {
-			$events = get_post_meta( (int) $post_id, '_longevity_audit_log', true );
-			if ( ! is_array( $events ) ) {
-				continue;
-			}
-			$overrides = array_filter( $events, static fn( $event ) => is_array( $event ) && 'publication_override_used' === ( $event['event'] ?? '' ) );
-			if ( count( $overrides ) >= 2 ) {
-				++$count;
-			}
+		global $wpdb;
+		if ( ! Audit_Log::exists() || ! isset( $wpdb ) || ! method_exists( $wpdb, 'get_var' ) ) {
+			return 0;
 		}
-		return $count;
+		$table = Audit_Log::table_name();
+		$sql   = "SELECT COUNT(*) FROM (SELECT object_id FROM {$table} WHERE event_type = 'publication_override_used' AND object_type = 'post' GROUP BY object_id HAVING COUNT(*) >= 2) AS repeated";
+		return (int) $wpdb->get_var( $sql );
+	}
+
+	/** Count records scanned since the current cycle began. */
+	private static function count_scanned_since( string $cycle_started ): int {
+		$query = new \WP_Query(
+			array(
+				'post_type'      => array( 'post', 'review' ),
+				'post_status'    => array( 'publish', 'draft', 'pending', 'future', 'private' ),
+				'fields'         => 'ids',
+				'posts_per_page' => 1,
+				'no_found_rows'  => false,
+				'meta_query'     => array( array( 'key' => '_lel_freshness_last_scanned_at', 'value' => $cycle_started, 'compare' => '>=', 'type' => 'DATETIME' ) ),
+			)
+		);
+		return (int) $query->found_posts;
 	}
 }

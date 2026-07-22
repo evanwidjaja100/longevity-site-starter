@@ -10,3 +10,8 @@
 8. Observe logs and health metrics; record release and any follow-up.
 
 Do not combine unrelated schema, workflow, theme, and infrastructure changes in one emergency release.
+## Production Readiness v2 release gates
+
+A release candidate must pass the same repository commands used by CI: dependency-state verification, deterministic manifest verification, strict test discovery, PHP quality, frontend lint, fallback security assertions, authoritative PHPUnit, WordPress integration contracts, Chromium and critical cross-browser suites, Linux visual regression, mobile and desktop Lighthouse, and supply-chain checks. Missing lockfiles, undiscovered suites, skipped critical tests, stale approvals, or private REST exposure are blocking.
+
+The generated evidence bundle records `PASS`, `FAIL`, or `UNAVAILABLE`; unavailable infrastructure is never represented as a pass. Branch protection, private staging, backup/restore, external mail/security controls, manual accessibility, and human editorial/medical/legal approval require separate verified evidence.

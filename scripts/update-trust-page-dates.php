@@ -13,6 +13,9 @@ if ( ! defined( 'WP_CLI' ) || ! WP_CLI ) {
 	echo "This script must be run via WP-CLI.\n";
 	exit( 1 );
 }
+if ( get_current_user_id() <= 0 || ! current_user_can( 'approve_publication' ) ) {
+	WP_CLI::error( 'Run this script with an authenticated --user that can manage publication lifecycle fields.' );
+}
 
 $today = gmdate( 'Y-m-d' );
 $next_year = gmdate( 'Y-m-d', strtotime( '+12 months' ) );

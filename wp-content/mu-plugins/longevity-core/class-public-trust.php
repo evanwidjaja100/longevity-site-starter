@@ -19,7 +19,7 @@ class Public_Trust {
 		$author_id      = (int) get_post_field( 'post_author', $post_id );
 		$reviewer_id    = (int) get_post_meta( $post_id, 'medical_reviewer_user_id', true );
 		$review_date    = (string) get_post_meta( $post_id, 'medical_review_date', true );
-		$review_attested = 'complete' === get_post_meta( $post_id, 'medical_review_status', true ) && get_post_meta( $post_id, 'medical_review_attested', true );
+		$review_attested = Approval_Service::is_current( $post_id, 'medical' );
 		$fact_date      = (string) get_post_meta( $post_id, 'fact_checked_date', true );
 		$fact_user      = (int) get_post_meta( $post_id, 'fact_checked_by', true );
 		$cutoff         = (string) get_post_meta( $post_id, 'evidence_cutoff_date', true );
@@ -49,7 +49,7 @@ class Public_Trust {
 		$html .= '</div>';
 
 		$html .= '<div class="longevity-meta-group longevity-meta-verification">';
-		if ( $fact_date && $fact_user ) {
+		if ( $fact_date && $fact_user && Approval_Service::is_current( $post_id, 'fact_check' ) ) {
 			$html .= '<span class="longevity-meta-factcheck">' . sprintf( '<span class="longevity-meta-label">%s</span> <a href="%s">%s</a> <time datetime="%s">%s</time>', esc_html__( 'Fact-checked by', 'longevity-core' ), esc_url( get_author_posts_url( $fact_user ) ), esc_html( get_the_author_meta( 'display_name', $fact_user ) ), esc_attr( $fact_date ), esc_html( $fact_date ) ) . '</span>';
 		}
 		$html .= '<span class="longevity-meta-reading">' . sprintf( '<span class="longevity-meta-label">%s</span> %s', esc_html__( 'Reading time', 'longevity-core' ), esc_html( sprintf( _n( '%s min', '%s min', $reading_time, 'longevity-core' ), number_format_i18n( $reading_time ) ) ) ) . '</span>';
@@ -104,15 +104,16 @@ class Public_Trust {
 
 	/** Render verified scoped reviewer identity. */
 	public static function render_reviewer_card( int $post_id ): string {
-		if ( $post_id <= 0 || 'complete' !== get_post_meta( $post_id, 'medical_review_status', true ) || ! get_post_meta( $post_id, 'medical_review_attested', true ) ) {
+		if ( $post_id <= 0 || ! Approval_Service::is_current( $post_id, 'medical' ) ) {
 			return '';
 		}
-		$user_id = (int) get_post_meta( $post_id, 'medical_reviewer_user_id', true );
-		if ( $user_id <= 0 || 'verified' !== get_user_meta( $user_id, 'credential_verification_status', true ) ) {
+		$user_id  = (int) get_post_meta( $post_id, 'medical_reviewer_user_id', true );
+		$snapshot = $user_id > 0 ? Reviewer_Credentials::public_snapshot( $user_id ) : array();
+		if ( empty( $snapshot ) ) {
 			return '';
 		}
-		$name        = (string) get_the_author_meta( 'display_name', $user_id );
-		$credentials = trim( (string) get_user_meta( $user_id, 'professional_credentials', true ) );
+		$name        = (string) ( $snapshot['display_name'] ?? '' );
+		$credentials = trim( (string) ( $snapshot['credentials'] ?? '' ) );
 		if ( '' === $name || '' === $credentials ) {
 			return '';
 		}

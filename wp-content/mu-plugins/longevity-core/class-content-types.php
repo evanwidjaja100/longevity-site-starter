@@ -40,7 +40,7 @@ final class Content_Types {
 		self::register_private_type( 'lel_claim', __( 'Claims', 'longevity-core' ), __( 'Claim', 'longevity-core' ), 'dashicons-yes-alt', 'manage_claims' );
 		self::register_private_type( 'lel_source', __( 'Sources', 'longevity-core' ), __( 'Source', 'longevity-core' ), 'dashicons-book-alt', 'manage_claims' );
 		self::register_private_type( 'lel_protocol', __( 'Test Protocols', 'longevity-core' ), __( 'Test Protocol', 'longevity-core' ), 'dashicons-clipboard', 'manage_test_protocols' );
-		self::register_private_type( 'lel_test_record', __( 'Test Records', 'longevity-core' ), __( 'Test Record', 'longevity-core' ), 'dashicons-chart-line', 'manage_test_protocols' );
+		self::register_private_type( 'lel_test_record', __( 'Test Records', 'longevity-core' ), __( 'Test Record', 'longevity-core' ), 'dashicons-chart-line', 'manage_test_records' );
 		self::register_private_type( 'lel_correction', __( 'Corrections', 'longevity-core' ), __( 'Correction', 'longevity-core' ), 'dashicons-undo', 'manage_corrections' );
 		self::register_private_type( 'lel_affiliate', __( 'Affiliate Registry', 'longevity-core' ), __( 'Affiliate Merchant', 'longevity-core' ), 'dashicons-money-alt', 'manage_affiliate_registry' );
 		self::register_private_type( 'longevity_message', __( 'Messages', 'longevity-core' ), __( 'Message', 'longevity-core' ), 'dashicons-email-alt', 'manage_options' );
@@ -84,7 +84,7 @@ final class Content_Types {
 				'public'              => false,
 				'publicly_queryable'  => false,
 				'show_ui'             => true,
-				'show_in_rest'        => true,
+				'show_in_rest'        => false,
 				'exclude_from_search' => true,
 				'menu_icon'           => $icon,
 				'supports'            => array( 'title', 'editor', 'author', 'revisions', 'custom-fields' ),

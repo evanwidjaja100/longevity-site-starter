@@ -95,12 +95,12 @@ class Public_Rankings {
 
 	/** Render the decision-dense header for a product report. */
 	public static function render_product_report_summary( int $post_id ): string {
-		if ( $post_id <= 0 || 'review' !== get_post_type( $post_id ) ) {
+		if ( $post_id <= 0 || 'review' !== get_post_type( $post_id ) || ! Runtime_Config::scoring_model_status()['valid'] || ! Approval_Service::is_current( $post_id, 'testing' ) || ! Approval_Service::is_current( $post_id, 'editorial' ) ) {
 			return '';
 		}
 		$version   = (string) get_post_meta( $post_id, 'testing_protocol_version', true );
 		$record_id = (int) get_post_meta( $post_id, 'test_record_id', true );
-		$complete  = in_array( get_post_meta( $post_id, 'testing_status', true ), array( 'complete', 'approved' ), true ) && Review_Methodology::valid_test_record( $record_id, $version );
+		$complete  = Review_Methodology::valid_test_record( $record_id, $version );
 
 		$acquisition_labels = array( 'purchased' => __( 'Purchased as consumer', 'longevity-core' ), 'product_supplied' => __( 'Product supplied for evaluation', 'longevity-core' ), 'loaned' => __( 'Loaned for testing', 'longevity-core' ), 'service_access' => __( 'Service access provided', 'longevity-core' ), 'independently_verified_only' => __( 'Independently verified only', 'longevity-core' ) );
 		$relationship_labels = array( 'none' => __( 'None', 'longevity-core' ), 'affiliate' => __( 'Affiliate relationships', 'longevity-core' ), 'product_supplied' => __( 'Product supplied for evaluation', 'longevity-core' ), 'sponsored' => __( 'Sponsored content', 'longevity-core' ) );
@@ -158,7 +158,7 @@ class Public_Rankings {
 
 	/** Render approved public-result rows without private record identifiers or raw notes. */
 	public static function render_test_results( int $post_id ): string {
-		if ( $post_id <= 0 || 'review' !== get_post_type( $post_id ) ) {
+		if ( $post_id <= 0 || 'review' !== get_post_type( $post_id ) || ! Approval_Service::is_current( $post_id, 'testing' ) ) {
 			return '';
 		}
 		$version   = (string) get_post_meta( $post_id, 'testing_protocol_version', true );
@@ -190,7 +190,7 @@ class Public_Rankings {
 
 	/** Render the review verdict and buying-decision context without blank rows. */
 	public static function render_review_decision( int $post_id ): string {
-		if ( $post_id <= 0 || 'review' !== get_post_type( $post_id ) ) {
+		if ( $post_id <= 0 || 'review' !== get_post_type( $post_id ) || ! Approval_Service::is_current( $post_id, 'testing' ) || ! Approval_Service::is_current( $post_id, 'editorial' ) ) {
 			return '';
 		}
 		$fields = array(
@@ -220,7 +220,7 @@ class Public_Rankings {
 
 	/** Render a reproducible score explanation. */
 	public static function render_review_score( int $post_id ): string {
-		if ( $post_id <= 0 || 'review' !== get_post_type( $post_id ) ) {
+		if ( $post_id <= 0 || 'review' !== get_post_type( $post_id ) || ! Runtime_Config::scoring_model_status()['valid'] || ! Approval_Service::is_current( $post_id, 'testing' ) || ! Approval_Service::is_current( $post_id, 'editorial' ) ) {
 			return '';
 		}
 		$score      = (float) get_post_meta( $post_id, 'review_score', true );
@@ -253,7 +253,7 @@ class Public_Rankings {
 
 	/** Render a valid, version-matched test method. */
 	public static function render_test_method( int $post_id ): string {
-		if ( $post_id <= 0 || ! get_post_meta( $post_id, 'testing_required', true ) ) {
+		if ( $post_id <= 0 || ! get_post_meta( $post_id, 'testing_required', true ) || ! Approval_Service::is_current( $post_id, 'testing' ) ) {
 			return '';
 		}
 		$status       = (string) get_post_meta( $post_id, 'testing_status', true );

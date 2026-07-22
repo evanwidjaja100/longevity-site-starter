@@ -1269,3 +1269,13 @@ textarea:disabled {
 .longevity-site-footer .wp-block-navigation a {
 	color: var(--wp--preset--color--paper);
 }
+
+/* Accessible anti-bot field: hidden visually and removed from keyboard order. */
+.longevity-honeypot {
+	height: 1px;
+	overflow: hidden;
+	position: absolute;
+	width: 1px;
+	clip-path: inset(50%);
+	white-space: nowrap;
+}

@@ -53,6 +53,11 @@ final class Publication_Gates {
 			(string) ( $context['testing_protocol_version'] ?? '' )
 		);
 		$context['medical_reviewer_valid'] = self::reviewer_is_valid( $context );
+		foreach ( array( 'fact_check', 'medical', 'testing', 'commercial', 'editorial' ) as $approval_type ) {
+			$context[ $approval_type . '_approval_current' ] = Approval_Service::is_current( $post_id, $approval_type );
+		}
+		$scoring_status = Runtime_Config::scoring_model_status();
+		$context['scoring_model_valid'] = ! empty( $scoring_status['valid'] );
 
 		return self::evaluate_values( $context );
 	}
@@ -60,9 +65,13 @@ final class Publication_Gates {
 	/** Pure readiness evaluation for testability. */
 	public static function evaluate_values( array $context ): Gate_Result {
 		$result = new Gate_Result();
+		$today  = Date_Validator::is_valid( (string) ( $context['as_of_date'] ?? '' ) ) ? (string) $context['as_of_date'] : Date_Validator::today();
 		self::required_text_check( $result, $context, 'content_summary', 'missing_summary', __( 'Add a concise content summary or direct answer.', 'longevity-core' ) );
 		self::required_text_check( $result, $context, 'content_limitations', 'missing_limitations', __( 'Add a meaningful limitations and uncertainty section.', 'longevity-core' ) );
 		self::required_text_check( $result, $context, 'next_content_review_date', 'missing_next_review', __( 'Set the next content review date.', 'longevity-core' ) );
+		if ( ! empty( $context['next_content_review_date'] ) && ! self::is_future_date( (string) $context['next_content_review_date'], $today ) ) {
+			$result->block( 'next_review_due', __( 'Set the next content review date to a valid future date.', 'longevity-core' ) );
+		}
 
 		if ( empty( $context['author_present'] ) ) {
 			$result->block( 'missing_author', __( 'Assign an accountable author.', 'longevity-core' ) );
@@ -80,8 +89,10 @@ final class Publication_Gates {
 		$editorial_state = (string) ( $context['editorial_approval_status'] ?? '' );
 		if ( ! in_array( $editorial_state, array( 'ready', 'published' ), true ) ) {
 			$result->block( 'editorial_approval_incomplete', __( 'Move the editorial workflow to Ready for publication before publishing.', 'longevity-core' ) );
+		} elseif ( empty( $context['editorial_approval_current'] ) ) {
+			$result->block( 'editorial_approval_stale', __( 'Editorial approval is missing or no longer matches the current content and dependent approvals.', 'longevity-core' ) );
 		} else {
-			$result->pass( 'editorial_approval_complete', __( 'Editorial approval is complete.', 'longevity-core' ) );
+			$result->pass( 'editorial_approval_complete', __( 'Editorial approval is current.', 'longevity-core' ) );
 		}
 
 		$content = (string) ( $context['content'] ?? '' );
@@ -95,11 +106,18 @@ final class Publication_Gates {
 		if ( $material_claims ) {
 			if ( 'complete' !== ( $context['fact_check_status'] ?? '' ) ) {
 				$result->block( 'fact_check_incomplete', __( 'Complete fact-checking for material health claims.', 'longevity-core' ) );
+			} elseif ( empty( $context['fact_check_approval_current'] ) ) {
+				$result->block( 'fact_check_stale', __( 'Fact-check approval is missing or stale for the current claim and source state.', 'longevity-core' ) );
 			} else {
-				$result->pass( 'fact_check_complete', __( 'Fact-checking is complete.', 'longevity-core' ) );
+				$result->pass( 'fact_check_complete', __( 'Fact-checking is complete and current.', 'longevity-core' ) );
 			}
 			if ( empty( $context['fact_checked_by'] ) || empty( $context['fact_checked_date'] ) ) {
 				$result->block( 'fact_check_identity_missing', __( 'Record the fact checker and completion date.', 'longevity-core' ) );
+			} elseif ( ! self::is_nonfuture_date( (string) $context['fact_checked_date'], $today ) ) {
+				$result->block( 'fact_check_date_invalid', __( 'The fact-check completion date must be a valid date no later than today.', 'longevity-core' ) );
+			}
+			if ( ! self::is_future_date( (string) ( $context['next_fact_check_date'] ?? '' ), $today ) ) {
+				$result->block( 'next_fact_check_due', __( 'Set the next fact-check date to a valid future date.', 'longevity-core' ) );
 			}
 			if ( empty( $context['claim_count'] ) ) {
 				$result->block( 'claims_missing', __( 'Register each material claim and its source.', 'longevity-core' ) );
@@ -129,6 +147,12 @@ final class Publication_Gates {
 					$result->block( 'medical_' . $field, sprintf( /* translators: %s: metadata field */ __( 'Complete required medical-review field: %s.', 'longevity-core' ), $field ) );
 				}
 			}
+			if ( ! empty( $context['medical_review_date'] ) && ! self::is_nonfuture_date( (string) $context['medical_review_date'], $today ) ) {
+				$result->block( 'medical_review_date_invalid', __( 'The medical-review date must be a valid date no later than today.', 'longevity-core' ) );
+			}
+			if ( ! self::is_future_date( (string) ( $context['next_medical_review_date'] ?? '' ), $today ) ) {
+				$result->block( 'next_medical_review_due', __( 'Set the next medical-review date to a valid future date.', 'longevity-core' ) );
+			}
 			if ( 'claim_ids' === ( $context['medical_review_scope'] ?? '' ) && empty( $context['medical_review_claim_ids'] ) ) {
 				$result->block( 'medical_claim_ids_missing', __( 'List the exact claim IDs covered by a claim-scoped medical review.', 'longevity-core' ) );
 			}
@@ -137,8 +161,10 @@ final class Publication_Gates {
 			}
 			if ( empty( $context['medical_review_attested'] ) ) {
 				$result->block( 'medical_attestation_missing', __( 'The authenticated reviewer must complete the review attestation.', 'longevity-core' ) );
+			} elseif ( empty( $context['medical_approval_current'] ) ) {
+				$result->block( 'medical_review_stale', __( 'Medical approval is missing or stale for the current reviewed state.', 'longevity-core' ) );
 			} else {
-				$result->pass( 'medical_review_complete', __( 'Scoped medical review and attestation are complete.', 'longevity-core' ) );
+				$result->pass( 'medical_review_complete', __( 'Scoped medical review and attestation are complete and current.', 'longevity-core' ) );
 			}
 			if ( 'required' === ( $context['medical_review_revision_status'] ?? '' ) || 'in_progress' === ( $context['medical_review_revision_status'] ?? '' ) ) {
 				$result->block( 'medical_revisions_open', __( 'Resolve required medical-review revisions.', 'longevity-core' ) );
@@ -150,11 +176,18 @@ final class Publication_Gates {
 		if ( ! empty( $context['testing_required'] ) ) {
 			if ( ! in_array( (string) ( $context['testing_status'] ?? '' ), array( 'complete', 'approved' ), true ) ) {
 				$result->block( 'testing_incomplete', __( 'Complete and approve the required product test.', 'longevity-core' ) );
+			} elseif ( empty( $context['testing_approval_current'] ) ) {
+				$result->block( 'testing_stale', __( 'Testing approval is missing or stale for the current test record and scoring inputs.', 'longevity-core' ) );
 			}
 			foreach ( array( 'testing_start_date', 'testing_end_date', 'testing_protocol_version', 'testing_methodology_url', 'product_acquisition_method' ) as $field ) {
 				if ( empty( $context[ $field ] ) ) {
 					$result->block( 'testing_' . $field, sprintf( /* translators: %s: metadata field */ __( 'Complete required testing field: %s.', 'longevity-core' ), $field ) );
 				}
+			}
+			$testing_start = (string) ( $context['testing_start_date'] ?? '' );
+			$testing_end   = (string) ( $context['testing_end_date'] ?? '' );
+			if ( ! Date_Validator::is_valid( $testing_start ) || ! self::is_nonfuture_date( $testing_end, $today ) || Date_Validator::compare( $testing_end, $testing_start ) < 0 ) {
+				$result->block( 'testing_dates_invalid', __( 'Testing dates must be valid, completed, and ordered from start to end.', 'longevity-core' ) );
 			}
 			if ( empty( $context['test_record_valid'] ) ) {
 				$result->block( 'test_record_invalid', __( 'Link an approved test record using the same protocol version.', 'longevity-core' ) );
@@ -169,6 +202,8 @@ final class Publication_Gates {
 		if ( $affiliate_present ) {
 			if ( ! in_array( (string) ( $context['affiliate_disclosure_status'] ?? '' ), array( 'approved', 'complete' ), true ) ) {
 				$result->block( 'affiliate_disclosure_incomplete', __( 'Approve the affiliate disclosure before publication.', 'longevity-core' ) );
+			} elseif ( empty( $context['commercial_approval_current'] ) ) {
+				$result->block( 'affiliate_disclosure_stale', __( 'Commercial approval is missing or stale for the current destinations and disclosure state.', 'longevity-core' ) );
 			}
 			if ( empty( $context['affiliate_registry_verified'] ) ) {
 				$result->block( 'affiliate_registry_unverified', __( 'Verify every affiliate destination in the affiliate registry.', 'longevity-core' ) );
@@ -192,6 +227,9 @@ final class Publication_Gates {
 			if ( $score > 0 && empty( $context['review_score_confidence'] ) ) {
 				$result->block( 'score_confidence_missing', __( 'Record confidence separately from the review score.', 'longevity-core' ) );
 			}
+			if ( $score > 0 && empty( $context['scoring_model_valid'] ) ) {
+				$result->block( 'scoring_model_unavailable', __( 'The configured scoring model is unavailable or invalid; public scores fail closed.', 'longevity-core' ) );
+			}
 			if ( $score > 0 ) {
 				$dimensions = $context['review_score_dimensions'] ?? array();
 				try {
@@ -212,6 +250,11 @@ final class Publication_Gates {
 			if ( ! empty( $context['price_region'] ) && empty( $context['price_checked_date'] ) ) {
 				$result->block( 'price_date_missing', __( 'Add a checked date for regional price claims.', 'longevity-core' ) );
 			}
+			foreach ( array( 'price_checked_date', 'warranty_checked_date', 'return_policy_checked_date', 'privacy_policy_checked_date' ) as $checked_field ) {
+				if ( ! empty( $context[ $checked_field ] ) && ! self::is_nonfuture_date( (string) $context[ $checked_field ], $today ) ) {
+					$result->block( $checked_field . '_invalid', __( 'Review fact-check dates must be valid dates no later than today.', 'longevity-core' ) );
+				}
+			}
 		}
 
 		if ( ! empty( $context['evidence_grade'] ) ) {
@@ -220,6 +263,8 @@ final class Publication_Gates {
 			}
 			if ( empty( $context['evidence_cutoff_date'] ) ) {
 				$result->block( 'evidence_cutoff_missing', __( 'Record the evidence cutoff date.', 'longevity-core' ) );
+			} elseif ( ! self::is_nonfuture_date( (string) $context['evidence_cutoff_date'], $today ) ) {
+				$result->block( 'evidence_cutoff_invalid', __( 'The evidence cutoff must be a valid date no later than today.', 'longevity-core' ) );
 			} else {
 				$result->pass( 'evidence_metadata_complete', __( 'Evidence grade metadata is present.', 'longevity-core' ) );
 			}
@@ -269,6 +314,7 @@ final class Publication_Gates {
 		}
 		$data['post_status'] = 'draft';
 		self::set_notice( array_column( $result->blocking(), 'message' ) );
+		Audit_Log::record( 'publication_blocked', 'post', $post_id, array( 'channel' => 'classic', 'blocking_codes' => implode( ',', array_column( $result->blocking(), 'code' ) ) ), get_current_user_id(), 'classic' );
 		return $data;
 	}
 
@@ -287,7 +333,7 @@ final class Publication_Gates {
 		if ( is_array( $meta ) ) {
 			$definitions = Meta_Registry::definitions();
 			foreach ( $meta as $key => $value ) {
-				if ( isset( $definitions[ $key ] ) && Meta_Registry::authorize( $key, $post_id, get_current_user_id() ) ) {
+				if ( isset( $definitions[ $key ] ) && Meta_Authorization::can_write( $key, $post_id, get_current_user_id(), 'rest' ) ) {
 					$overrides[ $key ] = Meta_Registry::sanitize_by_key( $key, $value );
 				}
 			}
@@ -301,6 +347,7 @@ final class Publication_Gates {
 			set_transient( 'lel_override_' . $post_id . '_' . get_current_user_id(), $reason, MINUTE_IN_SECONDS );
 			return $prepared_post;
 		}
+		Audit_Log::record( 'publication_blocked', 'post', $post_id, array( 'channel' => 'rest', 'blocking_codes' => implode( ',', array_column( $result->blocking(), 'code' ) ) ), get_current_user_id(), 'rest' );
 		return new \WP_Error(
 			'lel_publication_blocked',
 			__( 'Publication readiness checks failed.', 'longevity-core' ),
@@ -343,18 +390,9 @@ final class Publication_Gates {
 		self::log_event( $post_id, 'publication_override_used', array( 'reason' => $reason ) );
 	}
 
-	/** Append a bounded, non-sensitive audit record. */
+	/** Persist a non-sensitive append-only governance event. */
 	public static function log_event( int $post_id, string $event, array $details = array() ): void {
-		$log = get_post_meta( $post_id, '_longevity_audit_log', true );
-		$log = is_array( $log ) ? $log : array();
-		$log[] = array(
-			'event'   => sanitize_key( $event ),
-			'user_id' => get_current_user_id(),
-			'time'    => gmdate( DATE_ATOM ),
-			'details' => array_map( static fn( $value ) => sanitize_textarea_field( (string) $value ), $details ),
-		);
-		$log = array_slice( $log, -100 );
-		update_post_meta( $post_id, '_longevity_audit_log', $log );
+		Audit_Log::record( $event, 'post', $post_id, $details, get_current_user_id(), 'workflow' );
 	}
 
 	/** Add a required text check. */
@@ -366,6 +404,16 @@ final class Publication_Gates {
 		}
 	}
 
+	/** Whether a value is a valid date strictly after the supplied reference date. */
+	private static function is_future_date( string $value, string $today ): bool {
+		return Date_Validator::is_valid( $value ) && Date_Validator::after( $value, $today );
+	}
+
+	/** Whether a value is a valid date no later than the supplied reference date. */
+	private static function is_nonfuture_date( string $value, string $today ): bool {
+		return Date_Validator::is_valid( $value ) && Date_Validator::compare( $value, $today ) <= 0;
+	}
+
 	/** Read authorized metadata submitted by the classic editor for same-request evaluation. */
 	private static function classic_request_overrides( int $post_id ): array {
 		if ( empty( $_POST['longevity_editorial_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['longevity_editorial_nonce'] ) ), 'longevity_save_editorial' ) ) {
@@ -373,13 +421,12 @@ final class Publication_Gates {
 		}
 		$overrides   = array();
 		$definitions = Meta_Registry::definitions();
+		$present     = isset( $_POST['lel_present'] ) && is_array( $_POST['lel_present'] ) ? wp_unslash( $_POST['lel_present'] ) : array();
 		foreach ( $definitions as $key => $definition ) {
-			if ( ! Meta_Registry::authorize( $key, $post_id, get_current_user_id() ) ) {
+			if ( empty( $present[ $key ] ) || ! Meta_Authorization::can_write( $key, $post_id, get_current_user_id(), 'classic' ) ) {
 				continue;
 			}
-			if ( 'boolean' === $definition['type'] ) {
-				$overrides[ $key ] = isset( $_POST[ $key ] );
-			} elseif ( isset( $_POST[ $key ] ) ) {
+			if ( isset( $_POST[ $key ] ) ) {
 				$overrides[ $key ] = Meta_Registry::sanitize_by_key( $key, wp_unslash( $_POST[ $key ] ) );
 			}
 		}
@@ -402,12 +449,11 @@ final class Publication_Gates {
 	/** Verify reviewer identity and credentials. */
 	private static function reviewer_is_valid( array $context ): bool {
 		$user_id = (int) ( $context['medical_reviewer_user_id'] ?? 0 );
-		if ( $user_id <= 0 || ! user_can( $user_id, 'complete_medical_review' ) ) {
-			return false;
-		}
-		$status      = get_user_meta( $user_id, 'credential_verification_status', true );
-		$credentials = get_user_meta( $user_id, 'professional_credentials', true );
-		return 'verified' === $status && '' !== trim( (string) $credentials );
+		return Reviewer_Credentials::is_valid_for(
+			$user_id,
+			(string) ( $context['medical_review_scope'] ?? '' ),
+			(string) ( $context['region_scope'] ?? '' )
+		);
 	}
 
 	/** Check featured image alternative text only when an image exists. */

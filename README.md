@@ -130,3 +130,8 @@ Docker, full WordPress integration, Composer-based PHPCS/PHPStan/PHPUnit, and br
 ## Safety and scope
 
 This platform publishes general educational information. It must not present individualized medical advice, diagnosis, guaranteed longevity outcomes, disease treatment or prevention, unsupported dosage recommendations, fabricated testing, or popular “biohacks” as proven. Human review, transparent uncertainty, claim-level traceability, commercial independence, and visible corrections are release requirements—not optional decoration.
+## Production Readiness v2 enforcement status
+
+The current enforcement layer adds explicit metadata write policies, independent reviewer verification, immutable approval snapshots, stale-state invalidation, an allowlisted REST projection, deployable scoring configuration, fair freshness scans, append-only governance audit events, and privacy-safe contact controls.
+
+These controls are **implemented in code**, but production launch remains **NO-GO** until they are applied to the authoritative Git checkout, both lockfiles are committed, Composer/Docker/browser suites pass from a clean checkout, production-like staging evidence exists, and the required human governance and external-control approvals are recorded. See `docs/testing/production-readiness-v2-baseline.md` and `docs/testing/production-readiness-v2-implementation-report.md`.

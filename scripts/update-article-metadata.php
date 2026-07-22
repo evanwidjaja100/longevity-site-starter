@@ -16,6 +16,9 @@ if ( ! defined( 'WP_CLI' ) || ! WP_CLI ) {
 	echo "This script must be run via WP-CLI.\n";
 	exit( 1 );
 }
+if ( get_current_user_id() <= 0 || ! current_user_can( 'approve_publication' ) ) {
+	\WP_CLI::error( 'Run this script with an authenticated --user that can approve publication workflow changes.' );
+}
 
 $today = gmdate( 'Y-m-d' );
 $next_year = gmdate( 'Y-m-d', strtotime( '+12 months' ) );
@@ -31,7 +34,7 @@ $articles = array(
 			'region_scope'            => 'Global (educational content, not medical advice)',
 			'commercial_relationship' => 'none',
 			'next_content_review_date' => $next_year,
-			'editorial_approval_status' => 'ready',
+			'editorial_approval_status' => 'editorial_review',
 		),
 	),
 	array(
@@ -45,7 +48,7 @@ $articles = array(
 			'commercial_relationship' => 'none',
 			'medical_review_required' => true,
 			'next_content_review_date' => $next_year,
-			'editorial_approval_status' => 'ready',
+			'editorial_approval_status' => 'editorial_review',
 		),
 	),
 	array(
@@ -58,7 +61,7 @@ $articles = array(
 			'region_scope'            => 'Global',
 			'commercial_relationship' => 'none',
 			'next_content_review_date' => gmdate( 'Y-m-d', strtotime( '+24 months' ) ),
-			'editorial_approval_status' => 'ready',
+			'editorial_approval_status' => 'editorial_review',
 		),
 	),
 	array(
@@ -71,7 +74,7 @@ $articles = array(
 			'region_scope'            => 'Global',
 			'commercial_relationship' => 'none',
 			'next_content_review_date' => $next_year,
-			'editorial_approval_status' => 'ready',
+			'editorial_approval_status' => 'editorial_review',
 		),
 	),
 	array(
@@ -85,7 +88,7 @@ $articles = array(
 			'commercial_relationship' => 'none',
 			'medical_review_required' => true,
 			'next_content_review_date' => $next_year,
-			'editorial_approval_status' => 'ready',
+			'editorial_approval_status' => 'editorial_review',
 		),
 	),
 	array(
@@ -99,7 +102,7 @@ $articles = array(
 			'commercial_relationship' => 'none',
 			'medical_review_required' => true,
 			'next_content_review_date' => $next_year,
-			'editorial_approval_status' => 'ready',
+			'editorial_approval_status' => 'editorial_review',
 		),
 	),
 	array(
@@ -113,7 +116,7 @@ $articles = array(
 			'commercial_relationship' => 'none',
 			'medical_review_required' => true,
 			'next_content_review_date' => $next_year,
-			'editorial_approval_status' => 'ready',
+			'editorial_approval_status' => 'editorial_review',
 		),
 	),
 	array(
@@ -127,7 +130,7 @@ $articles = array(
 			'commercial_relationship' => 'none',
 			'medical_review_required' => true,
 			'next_content_review_date' => $next_year,
-			'editorial_approval_status' => 'ready',
+			'editorial_approval_status' => 'editorial_review',
 		),
 	),
 );
@@ -154,6 +157,11 @@ foreach ( $articles as $article ) {
 		continue;
 	}
 
+	foreach ( array_keys( $article['meta'] ) as $key ) {
+		if ( ! Meta_Authorization::can_write( $key, $post->ID, get_current_user_id(), 'cli' ) ) {
+			\WP_CLI::error( sprintf( 'Current user is not authorized to update %s on post %d.', $key, $post->ID ) );
+		}
+	}
 	foreach ( $article['meta'] as $key => $value ) {
 		update_post_meta( $post->ID, $key, $value );
 	}
@@ -163,6 +171,7 @@ foreach ( $articles as $article ) {
 }
 
 \WP_CLI::success( sprintf( 'Done: %d article(s) updated, %d error(s).', $updated, count( $errors ) ) );
+\WP_CLI::warning( 'No editorial approval snapshot was created. Records remain in editorial_review until a human approver uses the approval workflow.' );
 if ( $errors ) {
 	\WP_CLI::halt( 1 );
 }

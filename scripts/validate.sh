@@ -5,7 +5,17 @@ cd "$ROOT"
 
 find wp-content -type f -name '*.php' -print | sort | while IFS= read -r file; do php -l "$file" >/dev/null; done
 find tests -type f -name '*.php' -print | sort | while IFS= read -r file; do php -l "$file" >/dev/null; done
-find . -type f -name '*.json' ! -path './node_modules/*' ! -path './vendor/*' -print | sort | while IFS= read -r file; do python3 -m json.tool "$file" >/dev/null; done
+python3 - <<'__JSON_CHECK__'
+import json
+from pathlib import Path
+excluded = {'.git', 'node_modules', 'vendor', 'reports'}
+for path in sorted(Path('.').rglob('*.json')):
+    if any(part in excluded for part in path.parts):
+        continue
+    with path.open(encoding='utf-8') as handle:
+        json.load(handle)
+print('JSON validation passed')
+__JSON_CHECK__
 python3 - <<'__YAML_CHECK__'
 from pathlib import Path
 try:
@@ -27,34 +37,22 @@ python3 scripts/validate-internal-links.py
 python3 scripts/validate-freshness.py --no-fail
 ./tests/integration/environment-validation.sh
 
-if grep -RInE --exclude-dir=.git --exclude-dir=vendor --exclude-dir=node_modules --exclude-dir=tests/fixtures --exclude='*.md' --exclude='validate.sh' --exclude='validate-env.sh' --exclude='validate-content.py' --exclude='.env.example' --exclude='.env.ci' --exclude='MANIFEST.sha256' '(https?://(www\.)?example\.com|replace-with-|change-me-use-|changeme|your[-_](password|secret|token))' .; then
+if grep -RInE --exclude-dir=.git --exclude-dir=vendor --exclude-dir=node_modules --exclude-dir=tests --exclude='*.md' --exclude='validate.sh' --exclude='validate-env.sh' --exclude='validate-content.py' --exclude='.env.example' --exclude='.env.ci' --exclude='MANIFEST.sha256' '(https?://(www\.)?example\.com|replace-with-|change-me-use-|changeme|your[-_](password|secret|token))' .; then
   echo 'ERROR: placeholder production domains or credentials found in tracked runtime files.' >&2
   exit 1
 fi
-if find . -type f ! -path './.git/*' ! -path './vendor/*' ! -path './node_modules/*' -print0 | xargs -0 grep -Il '[[:blank:]]$' | grep -q .; then
+trailing_files=$(find . \
+  \( -path './.git' -o -path './vendor' -o -path './node_modules' -o -path './reports' -o -path './docs/testing/artifacts' -o -path './wp-content/uploads' \) -prune -o \
+  -type f \( -name '*.php' -o -name '*.js' -o -name '*.mjs' -o -name '*.cjs' -o -name '*.css' -o -name '*.json' -o -name '*.md' -o -name '*.txt' -o -name '*.csv' -o -name '*.xml' -o -name '*.yml' -o -name '*.yaml' -o -name '*.sh' -o -name '*.py' -o -name '*.dist' -o -name '*.example' -o -name '*.ci' -o -name 'Makefile' -o -name '.gitignore' -o -name '.gitattributes' -o -name '.npmrc' \) -print0 \
+  | xargs -0 grep -Il '[[:blank:]]$' || true)
+if [ -n "$trailing_files" ]; then
   echo 'ERROR: trailing whitespace found.' >&2
-  find . -type f ! -path './.git/*' ! -path './vendor/*' ! -path './node_modules/*' -print0 | xargs -0 grep -Il '[[:blank:]]$'
+  printf '%s\n' "$trailing_files"
   exit 1
 fi
 
 if [ -f MANIFEST.sha256 ]; then
-  duplicate_count=$(sed 's/^[^ ]*  //' MANIFEST.sha256 | sort | uniq -d | wc -l | tr -d ' ')
-  [ "$duplicate_count" -eq 0 ] || { echo 'ERROR: duplicate manifest entries.' >&2; exit 1; }
-  manifest_tmp=$(mktemp)
-  trap 'rm -f "$manifest_tmp"' EXIT HUP INT TERM
-  find . -type f \
-    ! -path './.git/*' \
-    ! -path './vendor/*' \
-    ! -path './node_modules/*' \
-    ! -name 'MANIFEST.sha256' \
-    ! -name '.env' \
-    -print0 | sort -z | xargs -0 sha256sum > "$manifest_tmp"
-  if ! cmp -s MANIFEST.sha256 "$manifest_tmp"; then
-    echo 'ERROR: MANIFEST.sha256 is out of date. Run make manifest.' >&2
-    exit 1
-  fi
-  rm -f "$manifest_tmp"
-  trap - EXIT HUP INT TERM
+	./scripts/verify-manifest.sh
 fi
 
 echo 'Repository validation passed.'

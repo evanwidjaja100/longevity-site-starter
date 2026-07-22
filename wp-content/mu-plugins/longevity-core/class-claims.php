@@ -12,14 +12,18 @@ defined( 'ABSPATH' ) || exit;
 /** Claim registry service. */
 final class Claims {
 	/** Register claim/source meta. */
+	private static bool $tracking = false;
+
 	public static function init(): void {
 		add_action( 'init', array( self::class, 'register_meta' ), 12 );
+		add_action( 'updated_post_meta', array( self::class, 'record_provenance' ), 20, 4 );
+		add_action( 'added_post_meta', array( self::class, 'record_provenance' ), 20, 4 );
 	}
 
 	/** Register private claim and source metadata. */
 	public static function register_meta(): void {
 		$claim_fields = array(
-			'claim_id', 'claim_text', 'claim_category', 'claim_importance', 'claim_location', 'source_id', 'source_type', 'source_title', 'source_authors', 'source_url', 'source_identifier', 'publication_date', 'accessed_date', 'jurisdiction', 'population', 'intervention', 'comparator', 'outcome', 'evidence_design', 'evidence_grade', 'conflict_notes', 'evidence_notes', 'verified_by', 'verification_date', 'verification_status', 'recheck_date', 'superseded_by', 'archive_url',
+			'claim_id', 'claim_text', 'claim_category', 'claim_importance', 'claim_location', 'source_id', 'source_type', 'source_title', 'source_authors', 'source_url', 'source_identifier', 'publication_date', 'accessed_date', 'jurisdiction', 'population', 'intervention', 'comparator', 'outcome', 'evidence_design', 'evidence_grade', 'conflict_notes', 'evidence_notes', 'verified_by', 'verified_at', 'verification_date', 'verification_status', 'verification_snapshot_hash', 'recheck_date', 'superseded_by', 'archive_url', 'last_edited_by', 'last_edited_at',
 		);
 
 		foreach ( $claim_fields as $field ) {
@@ -29,9 +33,9 @@ final class Claims {
 				array(
 					'type'              => 'string',
 					'single'            => true,
-					'show_in_rest'      => true,
+					'show_in_rest'      => false,
 					'sanitize_callback' => static fn( $value ) => self::sanitize_claim_field( $field, $value ),
-					'auth_callback'     => static fn() => current_user_can( 'manage_claims' ),
+					'auth_callback'     => static fn( $allowed, $key, $post_id, $user_id ) => self::can_write_field( (string) $key, (int) $post_id, (int) $user_id ),
 				)
 			);
 		}
@@ -41,9 +45,9 @@ final class Claims {
 			array(
 				'type'              => 'integer',
 				'single'            => true,
-				'show_in_rest'      => true,
+				'show_in_rest'      => false,
 				'sanitize_callback' => 'absint',
-				'auth_callback'     => static fn() => current_user_can( 'manage_claims' ),
+				'auth_callback'     => static fn( $allowed, $key, $post_id, $user_id ) => user_can( (int) $user_id, 'edit_claims' ),
 			)
 		);
 
@@ -55,11 +59,101 @@ final class Claims {
 				array(
 					'type'              => 'string',
 					'single'            => true,
-					'show_in_rest'      => true,
+					'show_in_rest'      => false,
 					'sanitize_callback' => static fn( $value ) => self::sanitize_source_field( $field, $value ),
-					'auth_callback'     => static fn() => current_user_can( 'manage_claims' ),
+					'auth_callback'     => static fn( $allowed, $key, $post_id, $user_id ) => user_can( (int) $user_id, 'edit_claims' ),
 				)
 			);
+		}
+	}
+
+
+	/** Enforce preparation/verification separation for claim metadata. */
+	public static function can_write_field( string $field, int $post_id, int $user_id ): bool {
+		if ( $user_id <= 0 ) {
+			return false;
+		}
+		if ( in_array( $field, array( 'last_edited_by', 'last_edited_at', 'verified_by', 'verified_at', 'verification_date', 'verification_snapshot_hash' ), true ) ) {
+			return false;
+		}
+		if ( 'verification_status' === $field ) {
+			$last_editor = (int) get_post_meta( $post_id, 'last_edited_by', true );
+			return user_can( $user_id, 'verify_claims' ) && $last_editor !== $user_id;
+		}
+		return user_can( $user_id, 'edit_claims' );
+	}
+
+	/** Verify the exact current claim snapshot through an explicit workflow service. */
+	public static function verify( int $post_id, int $actor_id ): bool {
+		if ( 'lel_claim' !== get_post_type( $post_id ) || ! self::can_write_field( 'verification_status', $post_id, $actor_id ) ) {
+			Audit_Log::record( 'metadata_write_denied', 'claim', $post_id, array( 'field' => 'verification_status' ), $actor_id, 'workflow' );
+			return false;
+		}
+		$claim_id   = trim( (string) get_post_meta( $post_id, 'claim_id', true ) );
+		$claim_text = trim( (string) get_post_meta( $post_id, 'claim_text', true ) );
+		$source_id  = trim( (string) get_post_meta( $post_id, 'source_id', true ) );
+		$source_url = trim( (string) get_post_meta( $post_id, 'source_url', true ) );
+		$identifier = trim( (string) get_post_meta( $post_id, 'source_identifier', true ) );
+		if ( '' === $claim_id || '' === $claim_text || ( '' === $source_id && '' === $source_url && '' === $identifier ) ) {
+			Audit_Log::record( 'claim_verification_rejected', 'claim', $post_id, array( 'reason' => 'required_fields_missing' ), $actor_id, 'workflow' );
+			return false;
+		}
+		$payload = array(
+			'claim_id'          => $claim_id,
+			'claim_text'        => $claim_text,
+			'source_id'         => $source_id,
+			'source_url'        => $source_url,
+			'source_identifier' => $identifier,
+			'status'            => 'verified',
+		);
+		$hash = hash( 'sha256', Approval_Fingerprint::canonical_json( $payload ) );
+		self::$tracking = true;
+		try {
+			update_post_meta( $post_id, 'verification_status', 'verified' );
+			update_post_meta( $post_id, 'verified_by', $actor_id );
+			update_post_meta( $post_id, 'verified_at', gmdate( DATE_ATOM ) );
+			update_post_meta( $post_id, 'verification_date', Date_Validator::today() );
+			update_post_meta( $post_id, 'verification_snapshot_hash', $hash );
+		} finally {
+			self::$tracking = false;
+		}
+		Audit_Log::record( 'claim_verified', 'claim', $post_id, array( 'snapshot_hash' => $hash ), $actor_id, 'workflow' );
+		return true;
+	}
+
+	/** Record immutable provenance fields after an authorized claim edit or verification. */
+	public static function record_provenance( int $meta_id, int $post_id, string $meta_key, $meta_value ): void {
+		unset( $meta_id );
+		if ( self::$tracking || 'lel_claim' !== get_post_type( $post_id ) ) {
+			return;
+		}
+		$actor = get_current_user_id();
+		if ( $actor <= 0 ) {
+			return;
+		}
+		self::$tracking = true;
+		try {
+			if ( 'verification_status' === $meta_key && 'verified' === (string) $meta_value && self::can_write_field( $meta_key, $post_id, $actor ) ) {
+				$payload = array(
+					'claim_id'  => (string) get_post_meta( $post_id, 'claim_id', true ),
+					'claim_text'=> (string) get_post_meta( $post_id, 'claim_text', true ),
+					'source_id' => (string) get_post_meta( $post_id, 'source_id', true ),
+					'status'    => 'verified',
+				);
+				update_post_meta( $post_id, 'verified_by', $actor );
+				update_post_meta( $post_id, 'verified_at', gmdate( DATE_ATOM ) );
+				update_post_meta( $post_id, 'verification_date', Date_Validator::today() );
+				update_post_meta( $post_id, 'verification_snapshot_hash', hash( 'sha256', Approval_Fingerprint::canonical_json( $payload ) ) );
+				Audit_Log::record( 'claim_verified', 'claim', $post_id, array( 'snapshot_hash' => hash( 'sha256', Approval_Fingerprint::canonical_json( $payload ) ) ), $actor, 'workflow' );
+			} elseif ( ! in_array( $meta_key, array( 'last_edited_by', 'last_edited_at', 'verified_by', 'verified_at', 'verification_date', 'verification_snapshot_hash' ), true ) ) {
+				update_post_meta( $post_id, 'last_edited_by', $actor );
+				update_post_meta( $post_id, 'last_edited_at', gmdate( DATE_ATOM ) );
+				if ( 'verification_status' !== $meta_key && 'verified' === get_post_meta( $post_id, 'verification_status', true ) ) {
+					update_post_meta( $post_id, 'verification_status', 'stale' );
+				}
+			}
+		} finally {
+			self::$tracking = false;
 		}
 	}
 

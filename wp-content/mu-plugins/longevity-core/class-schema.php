@@ -189,7 +189,7 @@ final class Schema {
 		$record_id  = (int) get_post_meta( $post_id, 'test_record_id', true );
 		$dimensions = get_post_meta( $post_id, 'review_score_dimensions', true );
 		$disclosure = (string) get_post_meta( $post_id, 'affiliate_disclosure_status', true );
-		if ( ! Rankings::is_eligible( $post_id ) || '' === $model || $score <= 0 || '' === $version || '' === $confidence || ! in_array( $test_state, array( 'complete', 'approved' ), true ) || ! Review_Methodology::valid_test_record( $record_id, (string) get_post_meta( $post_id, 'testing_protocol_version', true ) ) ) {
+		if ( ! Runtime_Config::scoring_model_status()['valid'] || ! Approval_Service::is_current( $post_id, 'testing' ) || ! Rankings::is_eligible( $post_id ) || '' === $model || $score <= 0 || '' === $version || '' === $confidence || ! in_array( $test_state, array( 'complete', 'approved' ), true ) || ! Review_Methodology::valid_test_record( $record_id, (string) get_post_meta( $post_id, 'testing_protocol_version', true ) ) ) {
 			return null;
 		}
 		if ( ! in_array( get_post_meta( $post_id, 'commercial_relationship', true ), array( '', 'none' ), true ) && ! in_array( $disclosure, array( 'approved', 'complete' ), true ) ) {
@@ -230,16 +230,14 @@ final class Schema {
 
 	/** Build reviewer person entity only for completed scoped review. */
 	private static function reviewer_schema( int $post_id, string $url ): ?array {
-		if ( 'complete' !== get_post_meta( $post_id, 'medical_review_status', true ) ) {
+		if ( ! Approval_Service::is_current( $post_id, 'medical' ) ) {
 			return null;
 		}
-		$user_id = (int) get_post_meta( $post_id, 'medical_reviewer_user_id', true );
-		if ( $user_id <= 0 ) {
-			return null;
-		}
-		$name = get_the_author_meta( 'display_name', $user_id );
-		$credentials = get_user_meta( $user_id, 'professional_credentials', true );
-		if ( 'verified' !== get_user_meta( $user_id, 'credential_verification_status', true ) || '' === trim( (string) $name ) || '' === trim( (string) $credentials ) ) {
+		$user_id  = (int) get_post_meta( $post_id, 'medical_reviewer_user_id', true );
+		$snapshot = $user_id > 0 ? Reviewer_Credentials::public_snapshot( $user_id ) : array();
+		$name     = (string) ( $snapshot['display_name'] ?? '' );
+		$credentials = (string) ( $snapshot['credentials'] ?? '' );
+		if ( '' === trim( $name ) || '' === trim( $credentials ) ) {
 			return null;
 		}
 		return array(

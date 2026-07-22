@@ -16,18 +16,9 @@ final class RestApiTest extends TestCase {
 		self::assertSame( 'ok', $data['status'] );
 	}
 
-	public function test_health_returns_version_constant(): void {
+	public function test_health_exposes_only_liveness(): void {
 		$response = Rest_API::health();
-		$data = $response->get_data();
-
-		self::assertSame( LONGEVITY_CORE_VERSION, $data['version'] );
-	}
-
-	public function test_health_returns_site_url(): void {
-		$response = Rest_API::health();
-		$data = $response->get_data();
-
-		self::assertSame( 'http://example.com/', $data['site'] );
+		self::assertSame( array( 'status' => 'ok' ), $response->get_data() );
 	}
 
 	public function test_health_sets_no_store_cache_header(): void {
@@ -43,13 +34,14 @@ final class RestApiTest extends TestCase {
 		$GLOBALS['lel_test_rest_routes'] = array();
 		Rest_API::register_routes();
 
-		self::assertCount( 2, $GLOBALS['lel_test_rest_routes'] );
+		self::assertCount( 3, $GLOBALS['lel_test_rest_routes'] );
 
 		$namespaces = array_column( $GLOBALS['lel_test_rest_routes'], 'namespace' );
-		self::assertSame( array( 'longevity/v1', 'longevity/v1' ), $namespaces );
+		self::assertSame( array( 'longevity/v1', 'longevity/v1', 'longevity/v1' ), $namespaces );
 
 		$routes = array_column( $GLOBALS['lel_test_rest_routes'], 'route' );
 		self::assertContains( '/health', $routes );
 		self::assertContains( '/readiness/(?P<id>\d+)', $routes );
+		self::assertContains( '/system-readiness', $routes );
 	}
 }

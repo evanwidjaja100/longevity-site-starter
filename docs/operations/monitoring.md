@@ -99,3 +99,8 @@ After each backup run, verify:
 - `docs/operations/backup-and-restore.md` — backup verification
 - `docs/operations/incident-response.md` — escalation paths
 - Script: `wp longevity freshness --report` — CLI freshness check
+## Protected readiness and freshness metrics
+
+Use the authenticated `longevity/v1/system-readiness` endpoint for database, migration, packaged scoring configuration, freshness heartbeat/cycle, cron heartbeat, audit table, approval table, uploads, and contact-mail configuration checks. Backup timestamp, restore drill, and external mail delivery remain `unknown_external` until an operator supplies evidence.
+
+Freshness monitoring records `last_run_at`, `last_success_at`, cycle start/completion, processed count, eligible total, due total, remaining estimate, lock age, and last error code. Alert on stale heartbeat, expired lock, or a cycle that does not eventually complete.

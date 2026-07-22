@@ -109,7 +109,7 @@ final class Review_Workflow {
 		if ( ! $post_id || $user_id !== (int) get_post_meta( $post_id, 'medical_reviewer_user_id', true ) ) {
 			wp_die( esc_html__( 'This review is not assigned to your account.', 'longevity-core' ) );
 		}
-		if ( 'verified' !== get_user_meta( $user_id, 'credential_verification_status', true ) || '' === trim( (string) get_user_meta( $user_id, 'professional_credentials', true ) ) ) {
+		if ( ! Reviewer_Credentials::is_valid_for( $user_id, (string) get_post_meta( $post_id, 'medical_review_scope', true ), (string) get_post_meta( $post_id, 'region_scope', true ) ) ) {
 			self::redirect( 'lel-medical-review-queue', $post_id, 'credentials_required' );
 			return;
 		}
@@ -124,7 +124,7 @@ final class Review_Workflow {
 		$next_date   = Meta_Registry::sanitize_value( 'date', self::posted( 'next_medical_review_date' ) );
 		$version     = Meta_Registry::sanitize_value( 'version', self::posted( 'medical_review_version' ) );
 
-		if ( '' === $scope || '' === $sections || '' === $limitations || '' === $conflicts || '' === $next_date || '' === $version || ( 'claim_ids' === $scope && '' === $claim_ids ) ) {
+		if ( '' === $scope || '' === $sections || '' === $limitations || '' === $conflicts || '' === $next_date || ! Date_Validator::after( $next_date, Date_Validator::today() ) || '' === $version || ( 'claim_ids' === $scope && '' === $claim_ids ) ) {
 			self::redirect( 'lel-medical-review-queue', $post_id, 'required_fields' );
 		}
 		$values = array(
@@ -153,10 +153,11 @@ final class Review_Workflow {
 			self::redirect( 'lel-medical-review-queue', $post_id, 'attestation_required' );
 		}
 
-		update_post_meta( $post_id, 'medical_review_attested', true );
-		update_post_meta( $post_id, 'medical_review_status', 'complete' );
-		update_post_meta( $post_id, 'medical_review_date', gmdate( 'Y-m-d' ) );
-		Publication_Gates::log_event( $post_id, 'medical_review_completed', array( 'scope' => $scope, 'version' => $version ) );
+		$approval = Approval_Service::approve( $post_id, 'medical', $user_id, array( 'scope' => $scope, 'version' => $version ) );
+		if ( ! $approval ) {
+			self::redirect( 'lel-medical-review-queue', $post_id, 'credentials_required' );
+			return;
+		}
 		self::redirect( 'lel-medical-review-queue', $post_id, 'medical_complete' );
 	}
 
@@ -186,14 +187,15 @@ final class Review_Workflow {
 
 		$claim_count    = Claims::count_for_post( $post_id );
 		$verified_count = Claims::count_for_post( $post_id, 'verified' );
-		if ( $claim_count <= 0 || $verified_count !== $claim_count || '' === $next_date ) {
+		if ( $claim_count <= 0 || $verified_count !== $claim_count || '' === $next_date || ! Date_Validator::after( $next_date, Date_Validator::today() ) ) {
 			self::redirect( 'lel-fact-check-queue', $post_id, 'claims_incomplete' );
 		}
-		update_post_meta( $post_id, 'fact_check_status', 'complete' );
-		update_post_meta( $post_id, 'fact_checked_by', get_current_user_id() );
-		update_post_meta( $post_id, 'fact_checked_date', gmdate( 'Y-m-d' ) );
 		update_post_meta( $post_id, 'next_fact_check_date', $next_date );
-		Publication_Gates::log_event( $post_id, 'fact_check_completed', array( 'claims' => $claim_count, 'notes' => $notes ) );
+		$approval = Approval_Service::approve( $post_id, 'fact_check', get_current_user_id(), array( 'claims' => $claim_count, 'notes_summary' => $notes ? 'recorded' : 'none' ) );
+		if ( ! $approval ) {
+			self::redirect( 'lel-fact-check-queue', $post_id, 'claims_incomplete' );
+			return;
+		}
 		self::redirect( 'lel-fact-check-queue', $post_id, 'fact_complete' );
 	}
 
@@ -269,8 +271,8 @@ final class Review_Workflow {
 	/** Show reviewer credential readiness without exposing private fields. */
 	private static function render_reviewer_identity_status( int $user_id ): void {
 		$status      = (string) get_user_meta( $user_id, 'credential_verification_status', true );
-		$credentials = trim( (string) get_user_meta( $user_id, 'professional_credentials', true ) );
-		$class       = 'verified' === $status && '' !== $credentials ? 'notice-success' : 'notice-warning';
+		$is_valid    = Reviewer_Credentials::is_valid_for( $user_id, '', '' );
+		$class       = $is_valid ? 'notice-success' : 'notice-warning';
 		$message     = 'notice-success' === $class ? __( 'Your reviewer credentials are recorded and verified.', 'longevity-core' ) : __( 'An administrator must record and verify your public credentials before a review can be completed.', 'longevity-core' );
 		echo '<div class="notice ' . esc_attr( $class ) . ' inline"><p>' . esc_html( $message ) . '</p></div>';
 	}

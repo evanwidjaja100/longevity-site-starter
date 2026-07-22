@@ -24,6 +24,14 @@ final class Roles {
 		'manage_test_protocols',
 		'manage_affiliate_registry',
 		'manage_claims',
+		'edit_claims',
+		'verify_claims',
+		'manage_test_records',
+		'approve_test_records',
+		'manage_affiliate_relationships',
+		'verify_reviewer_credentials',
+		'view_operational_readiness',
+		'view_governance_audit',
 	);
 
 	/** @var array<int, string> */
@@ -34,6 +42,13 @@ final class Roles {
 		'approve_publication',
 		'manage_corrections',
 		'manage_claims',
+		'edit_claims',
+		'verify_claims',
+		'manage_test_records',
+		'approve_test_records',
+		'manage_affiliate_relationships',
+		'view_operational_readiness',
+		'view_governance_audit',
 	);
 
 	/** Register hooks. */
@@ -53,6 +68,7 @@ final class Roles {
 				'upload_files'              => true,
 				'submit_for_fact_check'     => true,
 				'submit_for_medical_review' => true,
+				'edit_claims'                => true,
 			)
 		);
 		add_role(
@@ -61,7 +77,7 @@ final class Roles {
 			array(
 				'read'                => true,
 				'complete_fact_check' => true,
-				'manage_claims'       => true,
+				'verify_claims'       => true,
 			)
 		);
 		add_role(
@@ -78,6 +94,7 @@ final class Roles {
 			array(
 				'read'                  => true,
 				'manage_test_protocols' => true,
+				'manage_test_records'   => true,
 				'upload_files'          => true,
 			)
 		);
@@ -119,6 +136,10 @@ final class Roles {
 					'approve_publication_override',
 					'manage_test_protocols',
 					'manage_affiliate_registry',
+					'approve_test_records',
+					'manage_affiliate_relationships',
+					'view_operational_readiness',
+					'view_governance_audit',
 				)
 			);
 		}

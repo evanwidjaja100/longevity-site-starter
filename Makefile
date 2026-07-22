@@ -1,26 +1,59 @@
 SHELL := /bin/sh
 
-.PHONY: validate lint test test-php test-content test-e2e docker-config up down bootstrap smoke clean manifest
+.PHONY: validate quality test test-security test-php test-content test-integration test-e2e test-a11y test-cross-browser test-lighthouse test-all release-evidence deploy-check docker-config up down bootstrap smoke manifest clean
 
 validate:
 	./scripts/validate.sh
+	./scripts/verify-dependency-state.sh
+	./scripts/verify-manifest.sh
+	php scripts/verify-test-discovery.php
 
-lint: validate
-	@if command -v composer >/dev/null 2>&1; then composer lint; else echo "Composer unavailable; PHP coding-standard lint deferred."; fi
-	@if command -v npm >/dev/null 2>&1 && [ -d node_modules ]; then npm run lint; else echo "npm dependencies unavailable; front-end lint deferred."; fi
+quality:
+	composer validate --strict
+	composer install --no-interaction --prefer-dist --no-progress
+	npm ci
+	composer phpcs
+	composer phpstan
+	npm run lint
 
 test: test-php test-content
 
+test-security:
+	php tests/php/run-unit-tests.php
+	php scripts/verify-test-discovery.php
+	composer phpunit -- --testsuite longevity-core --filter 'Architecture|Authorization|Credentials|Approval|RestPublicBoundary|PublicationGates|Affiliate|Freshness|SystemReadiness'
+
 test-php:
-	@if command -v composer >/dev/null 2>&1 && [ -f vendor/bin/phpunit ]; then composer phpunit; else php tests/php/run-unit-tests.php; fi
+	composer test
+	composer test:fallback
 
 test-content:
 	python3 scripts/validate-content.py
 	python3 scripts/validate-internal-links.py
-	python3 scripts/validate-freshness.py --no-fail
+	python3 scripts/validate-freshness.py
+
+test-integration:
+	@for script in tests/integration/*.sh; do chmod +x "$$script"; "$$script"; done
 
 test-e2e:
-	@if [ -d node_modules ]; then npm run test:e2e; else echo "Install npm dependencies before E2E tests."; exit 1; fi
+	npm run test:e2e:all -- --project=chromium
+
+test-a11y:
+	npm run test:a11y -- --project=chromium
+
+test-cross-browser:
+	npx playwright test tests/e2e/critical-cross-browser.spec.js --project=firefox-critical --project=webkit-critical
+
+test-lighthouse:
+	npm run test:lighthouse
+	npm run test:lighthouse:desktop
+
+test-all: validate quality test-security test test-integration test-e2e test-cross-browser test-lighthouse
+
+release-evidence:
+	./scripts/generate-release-evidence.sh
+
+deploy-check: validate docker-config test-security
 
 docker-config:
 	docker compose config --quiet
@@ -41,4 +74,4 @@ manifest:
 	./scripts/regenerate-manifest.sh
 
 clean:
-	rm -rf build coverage test-results playwright-report .phpunit.cache
+	rm -rf build coverage test-results playwright-report .phpunit.cache .lighthouseci reports/generated

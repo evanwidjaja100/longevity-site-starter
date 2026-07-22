@@ -129,7 +129,7 @@ final class Claims_Command {
 	 */
 	public function import( array $args, array $assoc_args ): void {
 		unset( $args );
-		$this->require_capability( 'manage_claims' );
+		$this->require_capability( 'edit_claims' );
 		$file = (string) ( $assoc_args['file'] ?? '' );
 		if ( '' === $file || ! is_readable( $file ) ) {
 			\WP_CLI::error( 'Provide a readable --file.' );
@@ -150,6 +150,7 @@ final class Claims_Command {
 			}
 			\WP_CLI::error( 'Import rejected because validation failed. No rows were changed.' );
 		}
+		$ignored_verification = false;
 		foreach ( $rows as $row ) {
 			$existing = self::find_by_stable_id( (string) $row['claim_id'] );
 			if ( $existing && ! $allow_update ) {
@@ -172,12 +173,38 @@ final class Claims_Command {
 				\WP_CLI::error( $post_id->get_error_message() );
 			}
 			foreach ( self::FIELDS as $field ) {
+				if ( in_array( $field, array( 'verified_by', 'verification_date', 'verification_status' ), true ) ) {
+					$ignored_verification = $ignored_verification || '' !== trim( (string) ( $row[ $field ] ?? '' ) );
+					continue;
+				}
 				$value = 'post_id' === $field ? absint( $row[ $field ] ) : Meta_Registry::sanitize_value( self::rule_for_field( $field ), $row[ $field ] );
 				update_post_meta( (int) $post_id, $field, $value );
 			}
+			if ( ! $existing && '' === (string) get_post_meta( (int) $post_id, 'verification_status', true ) ) {
+				update_post_meta( (int) $post_id, 'verification_status', 'not_verified' );
+			}
 			$existing ? ++$updated : ++$created;
 		}
+		if ( $ignored_verification ) {
+			\WP_CLI::warning( 'Verification columns were ignored. Use `wp longevity claims verify <post-id>` with an independent verifier.' );
+		}
 		\WP_CLI::success( sprintf( '%s: %d create(s), %d update(s).', $dry_run ? 'Dry run valid' : 'Import complete', $created, $updated ) );
+	}
+
+	/**
+	 * Verify an imported claim through the independent verification service.
+	 *
+	 * ## OPTIONS
+	 * <post-id>
+	 */
+	public function verify( array $args, array $assoc_args ): void {
+		unset( $assoc_args );
+		$this->require_capability( 'verify_claims' );
+		$post_id = absint( $args[0] ?? 0 );
+		if ( $post_id <= 0 || ! Claims::verify( $post_id, get_current_user_id() ) ) {
+			\WP_CLI::error( 'Claim verification failed. Confirm required fields and independent verifier ownership.' );
+		}
+		\WP_CLI::success( sprintf( 'Claim %d verified against its current snapshot.', $post_id ) );
 	}
 
 	/**
@@ -188,7 +215,7 @@ final class Claims_Command {
 	 */
 	public function validate( array $args, array $assoc_args ): void {
 		unset( $args );
-		$this->require_capability( 'manage_claims' );
+		$this->require_capability( 'edit_claims' );
 		$file = (string) ( $assoc_args['file'] ?? '' );
 		if ( '' === $file || ! is_readable( $file ) ) {
 			\WP_CLI::error( 'Provide a readable --file.' );

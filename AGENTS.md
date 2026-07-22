@@ -109,3 +109,19 @@ Previous phases completed Route Consolidation, Production-Grade Bootstrap, SEO/n
 - WordPress function LSP errors are expected (stubs unavailable on host)
 - The `Routes` class lives in `Longevity\Core` namespace; use `use` imports in new files
 - `Public_Components` is now a facade; new domain classes are in `Longevity\Core\Public_Nav`, `Public_Contact`, `Public_Content`, `Public_Trust`, `Public_Rankings`
+### Phase PRv2 — Trust Boundary and Enforcement
+
+**Source limitation:** This implementation was prepared in an editable reconstruction of the Repomix snapshot. The authoritative Git checkout, branch, commit history, and ignored files were not available in this environment.
+
+- PR2-0: **partial** — baseline recorded in `docs/testing/production-readiness-v2-baseline.md`; real clean-checkout/Git evidence, Composer suites, Docker, browsers, and Lighthouse remain required.
+- PR2-1: **implemented, human governance review required** — explicit metadata policies and shared server-side authorization.
+- PR2-2: **implemented, human verifier assignment/reverification required** — independent credential snapshots.
+- PR2-3: **implemented, staging migration/editorial policy approval required** — immutable approval snapshots and automatic stale-state invalidation.
+- PR2-4: **implemented** — allowlisted public REST projection, private raw metadata, minimal health.
+- PR2-5: **blocked on authoritative `composer.lock` and real clean checkout** — package lock/test discovery/manifest/CI enforcement implemented; Composer lock was not fabricated.
+- PR2-6: **implemented in code, production-like operational verification required** — packaged scoring config, semantic dates, fair freshness cycles, protected readiness.
+- PR2-7: **implemented in code, retention/separation policy approval required** — split capabilities, approval-aware records, affiliate lifecycle, append-only audit, contact privacy.
+- PR2-8: **CI lanes defined, not executed here** — branch protection and release evidence require GitHub/repository and Docker/browser access.
+- PR2-9: **human/external gate outstanding** — private staging, workflow exercise, backup/rollback drill, external controls, CSP, and launch sign-off.
+
+**Public production launch remains NO-GO until all PR2 P0 gates pass in the authoritative repository and human approvals are recorded.**

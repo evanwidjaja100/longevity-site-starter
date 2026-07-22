@@ -24,11 +24,14 @@
       "@phpstan"
     ],
     "test": [
+      "@test:discovery",
       "@phpunit"
     ],
     "phpcs": "phpcs -q",
     "phpcbf": "phpcbf",
     "phpstan": "phpstan analyse --no-progress",
-    "phpunit": "phpunit --colors=always"
+    "phpunit": "phpunit --colors=always",
+    "test:discovery": "php scripts/verify-test-discovery.php",
+    "test:fallback": "php tests/php/run-unit-tests.php"
   }
 }

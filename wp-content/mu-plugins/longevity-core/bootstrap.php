@@ -11,10 +11,18 @@ defined( 'ABSPATH' ) || exit;
 
 $longevity_core_files = array(
 	'class-gate-result.php',
+	'class-date-validator.php',
+	'class-runtime-config.php',
 	'class-routes.php',
 	'class-content-types.php',
 	'class-roles.php',
 	'class-meta-registry.php',
+	'class-meta-authorization.php',
+	'class-reviewer-credentials.php',
+	'class-audit-log.php',
+	'class-approval-fingerprint.php',
+	'class-approval-repository.php',
+	'class-approval-service.php',
 	'class-claims.php',
 	'class-affiliate-registry.php',
 	'class-review-methodology.php',
@@ -23,7 +31,9 @@ $longevity_core_files = array(
 	'class-publication-gates.php',
 	'class-review-workflow.php',
 	'class-migrations.php',
+	'class-freshness-repository.php',
 	'class-freshness.php',
+	'class-system-readiness.php',
 	'class-content-discovery.php',
 	'class-public-nav.php',
 	'class-public-contact.php',
@@ -79,8 +89,10 @@ final class Bootstrap {
 		Corrections::init();
 		Publication_Gates::init();
 		Review_Workflow::init();
+		Approval_Service::init();
 		Migrations::init();
 		Freshness::init();
+		Public_Contact::init();
 		Content_Discovery::init();
 		Public_Components::init();
 		Blocks::init();

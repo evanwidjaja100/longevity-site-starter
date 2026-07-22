@@ -50,6 +50,15 @@ final class Rankings {
 		if ( Publication_Gates::evaluate( $post_id )->is_blocked() ) {
 			$reasons[] = 'publication_gate_failed';
 		}
+		if ( ! Runtime_Config::scoring_model_status()['valid'] ) {
+			$reasons[] = 'scoring_model_invalid';
+		}
+		if ( ! Approval_Service::is_current( $post_id, 'testing' ) ) {
+			$reasons[] = 'testing_approval_stale';
+		}
+		if ( ! Approval_Service::is_current( $post_id, 'editorial' ) ) {
+			$reasons[] = 'editorial_approval_stale';
+		}
 		foreach ( array( 'content_summary', 'content_limitations', 'tested_product_model', 'comparison_set', 'review_score_version', 'review_score_confidence', 'last_material_update', 'next_content_review_date' ) as $field ) {
 			if ( '' === trim( (string) get_post_meta( $post_id, $field, true ) ) ) {
 				$reasons[] = 'missing_' . $field;
@@ -96,7 +105,7 @@ final class Rankings {
 		if ( 'affiliate' === get_post_meta( $post_id, 'commercial_relationship', true ) && ( ! in_array( get_post_meta( $post_id, 'affiliate_disclosure_status', true ), array( 'approved', 'complete' ), true ) || ! Affiliate_Registry::all_destinations_registered( $post->post_content ) ) ) {
 			$reasons[] = 'affiliate_controls_incomplete';
 		}
-		if ( get_post_meta( $post_id, 'medical_review_required', true ) && ( 'complete' !== get_post_meta( $post_id, 'medical_review_status', true ) || ! get_post_meta( $post_id, 'medical_review_attested', true ) ) ) {
+		if ( get_post_meta( $post_id, 'medical_review_required', true ) && ! Approval_Service::is_current( $post_id, 'medical' ) ) {
 			$reasons[] = 'medical_review_incomplete';
 		}
 		if ( in_array( get_post_meta( $post_id, 'correction_status', true ), array( 'reported', 'investigating', 'pending' ), true ) ) {
@@ -106,7 +115,7 @@ final class Rankings {
 			$reasons[] = 'archived';
 		}
 		$next_review = (string) get_post_meta( $post_id, 'next_content_review_date', true );
-		if ( $next_review && $next_review < gmdate( 'Y-m-d' ) ) {
+		if ( $next_review && Date_Validator::is_valid( $next_review ) && Date_Validator::compare( $next_review, Date_Validator::today() ) < 0 ) {
 			$reasons[] = 'materially_overdue';
 		}
 		return array_values( array_unique( $reasons ) );

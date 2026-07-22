@@ -1,129 +1,94 @@
 #!/usr/bin/env bash
-# Generate release evidence bundle at reports/release/<version>/
-set -euo pipefail
+# Generate a non-secret release evidence bundle without fabricating unavailable checks.
+set -u
 
-VERSION="${1:-unknown}"
+ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+cd "$ROOT"
+VERSION="${1:-}"
+if [ -z "$VERSION" ]; then
+  if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    VERSION=$(git rev-parse --short HEAD)
+  else
+    VERSION="reconstructed-$(date -u +%Y%m%dT%H%M%SZ)"
+  fi
+fi
 DIR="reports/release/$VERSION"
-mkdir -p "$DIR"
+mkdir -p "$DIR" "$DIR/logs"
 
-echo "=== Generating release evidence bundle for $VERSION ==="
+record_command() {
+  local name=$1
+  shift
+  local log="$DIR/logs/$name.log"
+  if "$@" >"$log" 2>&1; then
+    printf '%s\tPASS\t%s\n' "$name" "$*" >> "$DIR/verification.tsv"
+  else
+    local status=$?
+    printf '%s\tFAIL(%s)\t%s\n' "$name" "$status" "$*" >> "$DIR/verification.tsv"
+  fi
+}
 
-# 1. Commit info
-git log -1 --format="%H %s%n%ai%n%an <%ae>" > "$DIR/commit.txt"
+printf 'check\tresult\tcommand\n' > "$DIR/verification.tsv"
 
-# 2. Environment info
+if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  git log -1 --format='%H%n%s%n%aI%n%an <%ae>' > "$DIR/commit.txt"
+  git status --short > "$DIR/working-tree.txt"
+else
+  cat > "$DIR/commit.txt" <<'TXT'
+UNAVAILABLE: this artifact was generated from a reconstructed Repomix snapshot, not a Git checkout.
+TXT
+fi
+
 {
-  echo "PHP: $(php -v 2>/dev/null | head -1 || echo 'N/A')"
-  echo "Node: $(node -v 2>/dev/null || echo 'N/A')"
-  echo "WP: $(docker compose exec -T wordpress wp core version 2>/dev/null || echo 'N/A')"
-  echo "Docker Compose: $(docker compose version 2>/dev/null || echo 'N/A')"
-  echo "Date: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  echo "Generated (UTC): $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  echo "PHP: $(php -v 2>/dev/null | head -1 || echo UNAVAILABLE)"
+  echo "Composer: $(composer --version 2>/dev/null || echo UNAVAILABLE)"
+  echo "Node: $(node -v 2>/dev/null || echo UNAVAILABLE)"
+  echo "npm: $(npm -v 2>/dev/null || echo UNAVAILABLE)"
+  echo "Docker: $(docker --version 2>/dev/null || echo UNAVAILABLE)"
+  echo "Docker Compose: $(docker compose version 2>/dev/null || echo UNAVAILABLE)"
 } > "$DIR/environment.txt"
 
-# 3. Validation results
+record_command php-syntax bash -c "find wp-content tests/php scripts -type f -name '*.php' -print0 | xargs -0 -n1 php -l"
+record_command fallback-security php tests/php/run-unit-tests.php
+record_command test-discovery php scripts/verify-test-discovery.php
+record_command manifest ./scripts/verify-manifest.sh
+record_command dependency-state ./scripts/verify-dependency-state.sh
+
+if command -v npm >/dev/null 2>&1 && [ -d node_modules ]; then
+  record_command frontend-lint npm run lint
+  record_command npm-audit npm audit --audit-level=high
+else
+  printf '%s\tUNAVAILABLE\t%s\n' frontend-lint 'node_modules is absent' >> "$DIR/verification.tsv"
+  printf '%s\tUNAVAILABLE\t%s\n' npm-audit 'node_modules is absent' >> "$DIR/verification.tsv"
+fi
+
+for source in reports/playwright reports/playwright-artifacts reports/lighthouse reports/system-readiness.json reports/sbom.spdx.json; do
+  if [ -e "$source" ]; then
+    cp -R "$source" "$DIR/" 2>/dev/null || true
+  fi
+done
+
+cat > "$DIR/human-verification-required.md" <<'EOF_HUMAN'
+# Human and external verification required
+
+The following controls must remain `unknown_external` until an authorized owner supplies evidence:
+
+- private staging deployment and migration rehearsal;
+- backup restore drill and rollback rehearsal;
+- MFA, WAF/CDN, HTTPS/HSTS, secure cookies, and production cron;
+- SMTP plus SPF/DKIM/DMARC;
+- uptime, error, and centralized-log monitoring;
+- GitHub branch protection and required-check configuration;
+- manual accessibility checks at keyboard-only, screen reader, 200%, and 400% zoom;
+- legal/privacy approval;
+- real reviewer credential verification;
+- real medical, product-testing, commercial, and publication approvals;
+- final launch go/no-go decision.
+EOF_HUMAN
+
 {
-  echo "=== PHP Lint ==="
-  find wp-content/mu-plugins/longevity-core -name '*.php' -exec php -l {} \; 2>&1 | grep -v 'No syntax errors'
-  echo "=== ShellCheck ==="
-  shellcheck scripts/*.sh 2>&1 || true
-} > "$DIR/validation.txt" 2>&1 || true
+  printf '# Production Readiness v2 evidence — %s\n\n' "$VERSION"
+  printf '%s\n' 'This bundle records checks that executed in the current environment. A `FAIL` or `UNAVAILABLE` result is not a pass. See `verification.tsv`, individual logs, and `human-verification-required.md`.'
+} > "$DIR/README.md"
 
-# 4. PHPUnit tests
-if [ -f vendor/bin/phpunit ]; then
-  vendor/bin/phpunit --log-junit "$DIR/php-tests.xml" 2>&1 | tail -5 || true
-elif [ -f tests/php/run-unit-tests.php ]; then
-  php tests/php/run-unit-tests.php 2>&1 | tee "$DIR/php-tests.xml" || true
-fi
-
-# 5. Integration tests
-{
-  bash tests/integration/health-endpoint.sh 2>&1 || true
-  bash tests/integration/environment-validation.sh 2>&1 || true
-} > "$DIR/integration-tests.txt" 2>&1 || true
-
-# 6. Playwright E2E report (if exists)
-if [ -d reports/playwright ]; then
-  cp -r reports/playwright "$DIR/playwright-report/" 2>/dev/null || true
-fi
-
-# 7. Accessibility report
-if [ -f reports/playwright/accessibility-results.json ]; then
-  cp reports/playwright/accessibility-results.json "$DIR/accessibility-report.json" 2>/dev/null || true
-fi
-
-# 8. Visual diff report
-if [ -d tests/e2e/snapshots ]; then
-  cp -r tests/e2e/snapshots "$DIR/visual-diff-report/" 2>/dev/null || true
-fi
-
-# 9. Lighthouse reports
-if [ -d reports/lighthouse ]; then
-  cp -r reports/lighthouse "$DIR/" 2>/dev/null || true
-  for f in "$DIR"/lighthouse/*.json; do
-    dir=$(dirname "$f")
-    base=$(basename "$f" .json)
-    mkdir -p "$DIR/lighthouse-mobile" "$DIR/lighthouse-desktop"
-    if echo "$base" | grep -qi 'desktop'; then
-      mv "$f" "$DIR/lighthouse-desktop/" 2>/dev/null || true
-    else
-      mv "$f" "$DIR/lighthouse-mobile/" 2>/dev/null || true
-    fi
-  done
-  rmdir "$DIR/lighthouse" 2>/dev/null || true
-fi
-
-# 10. Route crawl CSV
-{
-  echo "route,status,time"
-  for url in \
-    "/" "/start-here/" "/topics/" "/reviews/" "/editorial-policy/" \
-    "/testing-methodology/" "/medical-disclaimer/" "/corrections/" \
-    "/about/" "/affiliate-disclosure/" "/category/evidence-literacy/" \
-    "/category/sleep/" "/category/movement/";
-  do
-    code=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:8080$url" 2>/dev/null || echo '000')
-    echo "$url,$code,$(date -u +%H:%M:%S)"
-  done
-} > "$DIR/route-crawl.csv" 2>&1 || true
-
-# 11. Security scan placeholder
-echo "Security scan results: see docs/operations/security-checklist.md" > "$DIR/security-scan/README.md" 2>/dev/null || true
-
-# 12. Placeholder manual QA
-cat > "$DIR/manual-qa.md" << 'MANUAL'
-# Manual QA — $VERSION
-
-## Browser checks
-- [ ] Chromium: all critical paths pass
-- [ ] Firefox: critical paths pass
-- [ ] Safari: critical paths pass
-
-## Accessibility
-- [ ] Keyboard-only navigation verified
-- [ ] VoiceOver + Safari tested
-- [ ] NVDA + Firefox/Chrome tested
-- [ ] 200% and 400% zoom no overflow
-
-## Content
-- [ ] No draft pages linked from navigation
-- [ ] Missing meta or broken sections documented
-MANUAL
-
-# 13. Backup/restore evidence placeholder
-cat > "$DIR/backup-restore-evidence.md" << 'BACKUP'
-# Backup/Restore — $VERSION
-
-- Database backup: [datetime/duration]
-- Files backup: [datetime/duration]
-- Restore test: [pass/fail with notes]
-BACKUP
-
-# 14. Known limitations
-cat > "$DIR/known-limitations.md" << 'LIMITATIONS'
-# Known Limitations — $VERSION
-
-List known deviations from the plan, deferred items, or acceptable risks.
-LIMITATIONS
-
-echo "=== Release evidence bundle written to $DIR ==="
-ls -la "$DIR/"
+printf 'Release evidence written to %s\n' "$DIR"

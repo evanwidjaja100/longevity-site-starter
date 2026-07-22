@@ -8,154 +8,373 @@ on:
 
 permissions:
   contents: read
-  security-events: write
-  pull-requests: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PHP_VERSION: '8.3'
+  NODE_VERSION: '22'
 
 jobs:
-  lint:
+  clean-build:
+    name: Clean build and discovery
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
-      - name: Cache Composer dependencies
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830  # v4.3.0
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: shivammathur/setup-php@b604ade2a87db23f8871b7182e69ec5e75effb45 # v2
         with:
-          path: vendor
-          key: composer-${{ hashFiles('composer.lock') }}
-          restore-keys: composer-
-      - name: Cache npm dependencies
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830  # v4.3.0
-        with:
-          path: node_modules
-          key: npm-${{ hashFiles('package-lock.json') }}
-          restore-keys: npm-
-      - name: PHP lint
-        run: |
-          find wp-content/mu-plugins/longevity-core wp-content/themes/longevity-starter scripts -name '*.php' -exec php -l {} \;
-      - name: ShellCheck
-        uses: ludeeus/action-shellcheck@00cae500b08a931fb5698e11e79bfbd38e612a38  # 2.0.0
-        with:
-          severity: warning
-      - name: Composer audit
-        run: |
-          if [ -f composer.lock ]; then composer audit; fi
-
-  quality:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
-      - uses: shivammathur/setup-php@b604ade2a87db23f8871b7182e69ec5e75effb45  # v2
-        with:
-          php-version: '8.3'
+          php-version: ${{ env.PHP_VERSION }}
           coverage: none
-      - name: Cache Composer dependencies
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830  # v4.3.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
-          path: vendor
-          key: composer-${{ hashFiles('composer.lock') }}
-          restore-keys: composer-
-      - run: composer install --no-interaction --prefer-dist
-      - name: PHPCS (WordPress Coding Standards)
-        run: composer phpcs
-      - name: PHPStan (static analysis)
-        run: composer phpstan
-      - name: PHPUnit
-        run: composer phpunit
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - name: Verify locked dependency state
+        run: ./scripts/verify-dependency-state.sh
+      - name: Install exact dependencies
+        run: |
+          composer validate --strict
+          composer install --no-interaction --prefer-dist --no-progress
+          npm ci
+      - name: Verify release manifest
+        run: ./scripts/verify-manifest.sh
+      - name: Verify critical test discovery
+        run: php scripts/verify-test-discovery.php
+      - name: Run dependency-free security fallback
+        run: php tests/php/run-unit-tests.php
 
-  frontend:
+  quality-php:
+    name: PHP quality
+    needs: clean-build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4.4.0
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: shivammathur/setup-php@b604ade2a87db23f8871b7182e69ec5e75effb45 # v2
         with:
-          node-version: '22'
+          php-version: ${{ env.PHP_VERSION }}
+          coverage: none
+      - run: composer install --no-interaction --prefer-dist --no-progress
+      - name: PHP syntax
+        run: find wp-content/mu-plugins/longevity-core wp-content/themes/longevity-starter scripts tests/php -name '*.php' -print0 | xargs -0 -n1 php -l
+      - run: composer phpcs
+      - run: composer phpstan
+      - name: PHPUnit authoritative suite
+        run: composer test
+      - name: Composer locked audit
+        run: composer audit --locked
+
+  quality-frontend:
+    name: Frontend quality
+    needs: clean-build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
           cache: npm
       - run: npm ci
       - run: npm run lint
+      - run: npm audit --audit-level=high
 
-  security:
+  content-and-config:
+    name: Content and configuration
+    needs: clean-build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - run: cp .env.ci .env
+      - run: ./scripts/validate.sh
+      - run: python3 scripts/validate-content.py
+      - run: python3 scripts/validate-internal-links.py
+      - run: python3 scripts/validate-freshness.py
+      - run: docker compose config --quiet
+      - run: ./scripts/verify-manifest.sh
+
+  wordpress-integration:
+    name: WordPress integration
+    needs: [quality-php, content-and-config]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - run: cp .env.ci .env
+      - name: Start WordPress
+        run: docker compose up -d db wordpress
+      - name: Bootstrap and smoke test
+        run: |
+          docker compose run --rm --entrypoint sh wpcli /scripts/bootstrap.sh
+          ./scripts/smoke-test.sh
+      - name: Integration contracts
+        run: |
+          for script in tests/integration/*.sh; do
+            [ -x "$script" ] || chmod +x "$script"
+            "$script"
+          done
+      - name: Capture Docker logs
+        if: failure()
+        run: docker compose logs --no-color > docker-integration.log
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: wordpress-integration-evidence
+          path: |
+            docker-integration.log
+            reports/
+          if-no-files-found: ignore
+      - if: always()
+        run: docker compose down -v
+
+  playwright-chromium:
+    name: Playwright Chromium
+    needs: [quality-frontend, wordpress-integration]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: cp .env.ci .env && npm ci
+      - run: docker compose up -d db wordpress
+      - run: docker compose run --rm --entrypoint sh wpcli /scripts/bootstrap.sh
+      - run: npx playwright install --with-deps chromium
+      - name: Core, routes, SEO, contact, a11y and security contracts
+        env:
+          WP_SITE_URL: http://localhost:8080
+        run: npm run test:e2e:all -- --project=chromium
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: playwright-chromium-evidence
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+      - if: always()
+        run: docker compose down -v
+
+  playwright-cross-browser:
+    name: Critical Firefox and WebKit
+    needs: [quality-frontend, wordpress-integration]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: cp .env.ci .env && npm ci
+      - run: docker compose up -d db wordpress
+      - run: docker compose run --rm --entrypoint sh wpcli /scripts/bootstrap.sh
+      - run: npx playwright install --with-deps firefox webkit
+      - env:
+          WP_SITE_URL: http://localhost:8080
+        run: npx playwright test tests/e2e/critical-cross-browser.spec.js --project=firefox-critical --project=webkit-critical
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: playwright-cross-browser-evidence
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+      - if: always()
+        run: docker compose down -v
+
+  visual-linux:
+    name: Linux visual regression
+    needs: [quality-frontend, wordpress-integration]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - run: cp .env.ci .env
+      - run: docker compose up -d db wordpress
+      - run: docker compose run --rm --entrypoint sh wpcli /scripts/bootstrap.sh
+      - name: Run visual suite in version-pinned Playwright image
+        run: |
+          docker run --rm --network host \
+            -e WP_SITE_URL=http://localhost:8080 \
+            -v "$PWD:/work" -w /work \
+            mcr.microsoft.com/playwright:v1.61.1-noble \
+            sh -lc 'npm ci && npx playwright test tests/e2e/visual.spec.js --project=chromium'
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: visual-linux-evidence
+          path: |
+            reports/playwright/
+            reports/playwright-artifacts/
+            test-results/
+          if-no-files-found: ignore
+      - if: always()
+        run: docker compose down -v
+
+  lighthouse-mobile:
+    name: Lighthouse mobile
+    needs: [quality-frontend, wordpress-integration]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: cp .env.ci .env && npm ci
+      - run: docker compose up -d db wordpress
+      - run: docker compose run --rm --entrypoint sh wpcli /scripts/bootstrap.sh
+      - env:
+          WP_SITE_URL: http://localhost:8080
+        run: npm run test:lighthouse
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: lighthouse-evidence
+          path: .lighthouseci/
+          if-no-files-found: ignore
+      - if: always()
+        run: docker compose down -v
+
+  lighthouse-desktop:
+    name: Lighthouse desktop
+    needs: [quality-frontend, wordpress-integration]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: cp .env.ci .env && npm ci
+      - run: docker compose up -d db wordpress
+      - run: docker compose run --rm --entrypoint sh wpcli /scripts/bootstrap.sh
+      - env:
+          WP_SITE_URL: http://localhost:8080
+        run: npm run test:lighthouse:desktop
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: lighthouse-desktop-evidence
+          path: reports/lighthouse/desktop/
+          if-no-files-found: ignore
+      - if: always()
+        run: docker compose down -v
+
+  codeql:
+    name: CodeQL
     runs-on: ubuntu-latest
     permissions:
       contents: read
       security-events: write
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
-      - name: CodeQL initialization
-        uses: github/codeql-action/init@d03f4cc0498d5a63039d157eb274d9c2fc50f17a  # v3.37.1
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: github/codeql-action/init@d03f4cc0498d5a63039d157eb274d9c2fc50f17a # v3.37.1
         with:
           languages: javascript, python, php
           queries: security-and-quality
-      - name: CodeQL analysis
-        uses: github/codeql-action/analyze@d03f4cc0498d5a63039d157eb274d9c2fc50f17a  # v3.37.1
-      - name: Secret scanning
-        uses: trufflesecurity/trufflehog@27b0417c16317ca9a472a9a8092acce143b49c55  # v3.95.9
+      - uses: github/codeql-action/analyze@d03f4cc0498d5a63039d157eb274d9c2fc50f17a # v3.37.1
+
+  security-supply-chain:
+    name: Supply-chain and secret guards
+    needs: clean-build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+      - uses: shivammathur/setup-php@b604ade2a87db23f8871b7182e69ec5e75effb45 # v2
+        with:
+          php-version: ${{ env.PHP_VERSION }}
+          coverage: none
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: composer install --no-interaction --prefer-dist --no-progress
+      - run: npm ci
+      - run: composer audit --locked
+      - run: npm audit --audit-level=high
+      - uses: trufflesecurity/trufflehog@27b0417c16317ca9a472a9a8092acce143b49c55 # v3.95.9
         with:
           extra_args: --only-verified --results=verified,unknown
-
-  dependency-review:
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
-      - name: Dependency Review
-        uses: actions/dependency-review-action@2031cfc080254a8a887f58cffee85186f0e49e48  # v4 (branch)
-        with:
-          fail-on-severity: high
-
-  container-scan:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
-      - name: Trivy scan Docker compose
-        uses: aquasecurity/trivy-action@915b19bbe73b92a6cf82a1bc12b087c9a19a5fe2  # v0.28.0
+      - uses: aquasecurity/trivy-action@915b19bbe73b92a6cf82a1bc12b087c9a19a5fe2 # v0.28.0
         with:
           scan-type: config
           scan-ref: compose.yaml
           severity: HIGH,CRITICAL
           exit-code: 1
-
-  sbom:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
-      - name: Generate SBOM
-        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610  # v0
+      - uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0
         with:
           path: ./
           format: spdx-json
           output-file: reports/sbom.spdx.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: supply-chain-evidence
+          path: reports/sbom.spdx.json
+          if-no-files-found: ignore
 
-  e2e:
+  dependency-review:
+    name: Dependency review
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/dependency-review-action@2031cfc080254a8a887f58cffee85186f0e49e48 # v4
+        with:
+          fail-on-severity: high
+
+  release-evidence:
+    name: Release evidence index
+    if: always()
+    needs:
+      - clean-build
+      - quality-php
+      - quality-frontend
+      - content-and-config
+      - wordpress-integration
+      - playwright-chromium
+      - playwright-cross-browser
+      - visual-linux
+      - lighthouse-mobile
+      - lighthouse-desktop
+      - codeql
+      - security-supply-chain
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
-      - name: Configure environment
-        run: cp .env.ci .env
-      - name: Start stack
-        run: docker compose up -d db wordpress
-      - name: Wait for WordPress to be healthy
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Record upstream job outcomes
         run: |
-          for i in $(seq 1 30); do
-            status=$(docker compose ps --format json wordpress | grep -o '"Health":"[a-z]*"' || echo "")
-            echo "$status" | grep -q healthy && break
-            sleep 5
-          done
-      - name: Bootstrap site
-        run: docker compose run --rm --entrypoint sh wpcli /scripts/bootstrap.sh
-      - name: Smoke test
-        run: ./scripts/smoke-test.sh
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4.4.0
-        with:
-          node-version: '22'
-          cache: npm
-      - run: npm ci
-      - run: npx playwright install --with-deps chromium
-      - name: Run Playwright core suite
-        env:
-          WP_SITE_URL: http://localhost:8080
-        run: npm run test:e2e
-      - name: Upload Playwright report
+          mkdir -p reports
+          cat > reports/ci-job-results.json <<'JSON'
+          {
+            "clean-build": "${{ needs.clean-build.result }}",
+            "quality-php": "${{ needs.quality-php.result }}",
+            "quality-frontend": "${{ needs.quality-frontend.result }}",
+            "content-and-config": "${{ needs.content-and-config.result }}",
+            "wordpress-integration": "${{ needs.wordpress-integration.result }}",
+            "playwright-chromium": "${{ needs.playwright-chromium.result }}",
+            "playwright-cross-browser": "${{ needs.playwright-cross-browser.result }}",
+            "visual-linux": "${{ needs.visual-linux.result }}",
+            "lighthouse-mobile": "${{ needs.lighthouse-mobile.result }}",
+            "lighthouse-desktop": "${{ needs.lighthouse-desktop.result }}",
+            "codeql": "${{ needs.codeql.result }}",
+            "security-supply-chain": "${{ needs.security-supply-chain.result }}"
+          }
+          JSON
+      - run: ./scripts/generate-release-evidence.sh "${{ github.sha }}"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
         with:
-          name: playwright-report
-          path: reports/playwright/
+          name: release-evidence-index
+          path: |
+            reports/ci-job-results.json
+            reports/release/
+          if-no-files-found: error

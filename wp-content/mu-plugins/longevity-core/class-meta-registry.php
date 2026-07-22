@@ -41,16 +41,24 @@ final class Meta_Registry {
 	/** Register reviewer profile metadata. */
 	public static function register_user_meta(): void {
 		$fields = array(
-			'professional_credentials'        => array( 'type' => 'string', 'sanitize' => 'textarea', 'description' => 'Public professional credentials.' ),
-			'credential_verification_status'  => array( 'type' => 'string', 'sanitize' => 'credential_status', 'description' => 'Administrative credential verification status.' ),
-			'credential_verification_date'    => array( 'type' => 'string', 'sanitize' => 'date', 'description' => 'Date credentials were checked.' ),
-			'professional_profile_url'         => array( 'type' => 'string', 'sanitize' => 'url', 'description' => 'Public professional profile URL.' ),
-			'review_scope'                     => array( 'type' => 'string', 'sanitize' => 'textarea', 'description' => 'Topics this reviewer is qualified to review.' ),
-			'jurisdictions'                    => array( 'type' => 'string', 'sanitize' => 'textarea', 'description' => 'Relevant professional jurisdictions.' ),
-			'conflict_disclosure'              => array( 'type' => 'string', 'sanitize' => 'textarea', 'description' => 'Public conflicts disclosure.' ),
+			'professional_credentials'            => array( 'type' => 'string', 'sanitize' => 'textarea', 'description' => 'Reviewer-claimed public professional credentials.', 'verified' => false ),
+			'professional_profile_url'             => array( 'type' => 'string', 'sanitize' => 'url', 'description' => 'Public professional profile URL.', 'verified' => false ),
+			'review_scope'                         => array( 'type' => 'string', 'sanitize' => 'textarea', 'description' => 'Reviewer-claimed qualified topics.', 'verified' => false ),
+			'jurisdictions'                        => array( 'type' => 'string', 'sanitize' => 'textarea', 'description' => 'Reviewer-claimed professional jurisdictions.', 'verified' => false ),
+			'conflict_disclosure'                  => array( 'type' => 'string', 'sanitize' => 'textarea', 'description' => 'Public conflicts disclosure.', 'verified' => false ),
+			'credential_verification_status'       => array( 'type' => 'string', 'sanitize' => 'credential_status', 'description' => 'Independent verification status.', 'verified' => true ),
+			'credential_verification_date'         => array( 'type' => 'string', 'sanitize' => 'date', 'description' => 'Date credentials were independently checked.', 'verified' => true ),
+			'credential_expiration_date'           => array( 'type' => 'string', 'sanitize' => 'date', 'description' => 'Credential verification expiry date.', 'verified' => true ),
+			'credential_verified_by_user_id'       => array( 'type' => 'integer', 'sanitize' => 'absint', 'description' => 'Independent verifier user ID.', 'verified' => true ),
+			'credential_verification_evidence_ref' => array( 'type' => 'string', 'sanitize' => 'text', 'description' => 'Controlled nonpublic evidence reference.', 'verified' => true ),
+			'verified_professional_credentials'    => array( 'type' => 'string', 'sanitize' => 'textarea', 'description' => 'Verified public credential snapshot.', 'verified' => true ),
+			'verified_review_scope'                => array( 'type' => 'string', 'sanitize' => 'textarea', 'description' => 'Verified review scope snapshot.', 'verified' => true ),
+			'verified_jurisdictions'               => array( 'type' => 'string', 'sanitize' => 'textarea', 'description' => 'Verified jurisdiction snapshot.', 'verified' => true ),
+			'credential_verification_version'      => array( 'type' => 'string', 'sanitize' => 'version', 'description' => 'Credential verification schema version.', 'verified' => true ),
 		);
 
 		foreach ( $fields as $key => $definition ) {
+			$is_verified = ! empty( $definition['verified'] );
 			register_meta(
 				'user',
 				$key,
@@ -60,7 +68,11 @@ final class Meta_Registry {
 					'description'       => $definition['description'],
 					'show_in_rest'      => false,
 					'sanitize_callback' => static fn( $value ) => self::sanitize_value( $definition['sanitize'], $value ),
-					'auth_callback'     => static fn( bool $allowed, string $meta_key, int $user_id ) => current_user_can( 'edit_user', $user_id ),
+					'auth_callback'     => static function ( bool $allowed, string $meta_key, int $user_id ) use ( $is_verified ): bool {
+						unset( $allowed, $meta_key );
+						$actor_id = get_current_user_id();
+						return $is_verified ? Reviewer_Credentials::can_verify( $actor_id, $user_id ) : current_user_can( 'edit_user', $user_id );
+					},
 				)
 			);
 		}
@@ -71,7 +83,7 @@ final class Meta_Registry {
 		$editorial = array( 'post', 'review' );
 		$review    = array( 'review' );
 
-		return array(
+		$definitions = array(
 			'content_summary'                  => self::field( 'string', '', 'textarea', $editorial, true, true, 'A concise public scope or answer summary.' ),
 			'content_scope'                    => self::field( 'string', '', 'textarea', $editorial, true, true, 'What the content covers.' ),
 			'content_limitations'              => self::field( 'string', '', 'textarea', $editorial, true, true, 'Material limitations and uncertainty.' ),
@@ -150,6 +162,36 @@ final class Meta_Registry {
 			'last_fact_checked'                 => self::field( 'string', '', 'date', $editorial, true, true, 'Deprecated fact-check date.' ),
 			'evidence_level'                   => self::field( 'string', '', 'text', $editorial, true, true, 'Deprecated evidence level.' ),
 		);
+
+		$policies = self::field_policy_map();
+		foreach ( $definitions as $key => &$definition ) {
+			$definition['write_policy'] = $policies[ $key ] ?? 'deny';
+			// Raw governance meta is not an anonymous REST contract. Public data is projected explicitly.
+			$definition['rest'] = false;
+		}
+		unset( $definition );
+		return $definitions;
+	}
+
+	/** Explicit write policy for every registered field. */
+	public static function field_policy_map(): array {
+		return array(
+			'content_summary' => 'post_editor', 'content_scope' => 'post_editor', 'content_limitations' => 'post_editor', 'original_contribution' => 'post_editor',
+			'evidence_grade' => 'evidence_manager', 'evidence_grade_rationale' => 'evidence_manager', 'evidence_cutoff_date' => 'evidence_manager',
+			'material_health_claims' => 'risk_classifier', 'medical_review_required' => 'risk_classifier', 'testing_required' => 'risk_classifier', 'affiliate_disclosure_required' => 'risk_classifier',
+			'medical_review_status' => 'system_only', 'medical_reviewer_user_id' => 'medical_assigner', 'medical_reviewer_name_fallback' => 'medical_assigner', 'medical_review_scope' => 'medical_assigner',
+			'medical_reviewer_credentials' => 'system_only', 'medical_review_sections' => 'assigned_medical_reviewer', 'medical_review_claim_ids' => 'assigned_medical_reviewer', 'medical_review_limitations' => 'assigned_medical_reviewer',
+			'medical_review_required_revisions' => 'assigned_medical_reviewer', 'medical_review_revision_status' => 'assigned_medical_reviewer', 'medical_review_conflicts' => 'assigned_medical_reviewer',
+			'medical_review_date' => 'system_only', 'next_medical_review_date' => 'assigned_medical_reviewer', 'medical_review_version' => 'assigned_medical_reviewer', 'medical_review_attested' => 'assigned_medical_reviewer',
+			'fact_check_status' => 'fact_checker', 'fact_checked_by' => 'system_only', 'fact_checked_date' => 'system_only', 'next_fact_check_date' => 'fact_checker',
+			'testing_status' => 'testing_editor', 'testing_start_date' => 'testing_editor', 'testing_end_date' => 'testing_editor', 'testing_duration' => 'testing_editor', 'testing_methodology_url' => 'testing_editor', 'testing_protocol_version' => 'testing_editor', 'product_acquisition_method' => 'testing_editor',
+			'test_record_id' => 'testing_approver', 'review_score' => 'testing_approver', 'review_score_version' => 'testing_approver', 'review_score_confidence' => 'testing_approver', 'review_score_dimensions' => 'testing_approver', 'review_score_override_reason' => 'testing_approver',
+			'commercial_relationship' => 'commercial_approver', 'affiliate_disclosure_status' => 'commercial_approver', 'affiliate_registry_verified' => 'system_only',
+			'editorial_approval_status' => 'editorial_approver', 'correction_status' => 'corrections_manager', 'last_material_update' => 'system_only', 'next_content_review_date' => 'editorial_approver',
+			'_longevity_related_post_ids' => 'post_editor', 'region_scope' => 'post_editor', 'uncertainty_statement_present' => 'post_editor',
+			'best_for' => 'testing_editor', 'not_for' => 'testing_editor', 'price_checked_date' => 'testing_editor', 'price_region' => 'testing_editor', 'tested_product_model' => 'testing_editor', 'tested_firmware_version' => 'testing_editor', 'tested_app_version' => 'testing_editor', 'test_unit_identifier' => 'testing_editor', 'comparison_set' => 'testing_editor', 'major_failures' => 'testing_editor', 'data_export_available' => 'testing_editor', 'subscription_required' => 'testing_editor', 'warranty_checked_date' => 'testing_editor', 'return_policy_checked_date' => 'testing_editor', 'privacy_policy_checked_date' => 'testing_editor', 'billing_interval' => 'testing_editor', 'product_brand' => 'testing_editor', 'product_variant' => 'testing_editor', 'product_price_amount' => 'testing_editor', 'product_price_currency' => 'testing_editor',
+			'medical_reviewer' => 'system_only', 'last_fact_checked' => 'system_only', 'evidence_level' => 'system_only',
+		);
 	}
 
 	/** Construct a field definition. */
@@ -208,7 +250,7 @@ final class Meta_Registry {
 				return preg_match( '/^[A-Z]{3}$/', $value ) ? $value : '';
 			case 'date':
 				$value = sanitize_text_field( (string) $value );
-				return preg_match( '/^\d{4}-\d{2}-\d{2}$/', $value ) ? $value : '';
+				return Date_Validator::normalize( $value );
 			case 'url':
 				return esc_url_raw( (string) $value );
 			case 'textarea':
@@ -224,29 +266,29 @@ final class Meta_Registry {
 			case 'evidence_grade':
 				return self::enum( $value, array( '', 'A', 'B', 'C', 'D', 'U' ), '' );
 			case 'medical_status':
-				return self::enum( $value, array( 'not_required', 'not_started', 'assigned', 'in_review', 'revisions_required', 'complete' ), 'not_required' );
+				return self::enum( $value, array( 'not_required', 'not_started', 'assigned', 'in_review', 'revisions_required', 'complete', 'stale', 'legacy_unbound' ), 'not_required' );
 			case 'review_scope':
 				return self::enum( $value, array( '', 'full_article', 'safety_only', 'contraindications_only', 'dosage_language_only', 'product_accuracy_only', 'medical_disclaimer_only', 'claim_ids' ), '' );
 			case 'revision_status':
 				return self::enum( $value, array( 'not_applicable', 'required', 'in_progress', 'complete' ), 'not_applicable' );
 			case 'fact_status':
-				return self::enum( $value, array( 'not_started', 'in_progress', 'revisions_required', 'complete', 'not_required' ), 'not_started' );
+				return self::enum( $value, array( 'not_started', 'in_progress', 'revisions_required', 'complete', 'not_required', 'stale', 'legacy_unbound' ), 'not_started' );
 			case 'testing_status':
-				return self::enum( $value, array( 'not_required', 'planned', 'in_progress', 'incomplete', 'complete', 'approved' ), 'not_required' );
+				return self::enum( $value, array( 'not_required', 'planned', 'in_progress', 'incomplete', 'complete', 'approved', 'stale', 'legacy_unbound' ), 'not_required' );
 			case 'acquisition':
 				return self::enum( $value, array( '', 'purchased', 'product_supplied', 'loaned', 'service_access', 'independently_verified_only' ), '' );
 			case 'commercial':
 				return self::enum( $value, array( 'none', 'affiliate', 'product_supplied', 'sponsored' ), 'none' );
 			case 'disclosure_status':
-				return self::enum( $value, array( 'not_required', 'required', 'draft', 'approved', 'complete' ), 'not_required' );
+				return self::enum( $value, array( 'not_required', 'required', 'draft', 'approved', 'complete', 'stale', 'legacy_unbound' ), 'not_required' );
 			case 'editorial_status':
-				return self::enum( $value, array( 'idea', 'assigned', 'researching', 'drafting', 'editorial_review', 'fact_check', 'medical_review', 'testing_incomplete', 'commercial_review', 'ready', 'published', 'update_due', 'correction_pending', 'archived' ), 'drafting' );
+				return self::enum( $value, array( 'idea', 'assigned', 'researching', 'drafting', 'editorial_review', 'fact_check', 'medical_review', 'testing_incomplete', 'commercial_review', 'ready', 'published', 'update_due', 'correction_pending', 'archived', 'stale', 'legacy_unbound' ), 'drafting' );
 			case 'correction_status':
 				return self::enum( $value, array( 'none', 'reported', 'investigating', 'pending', 'complete' ), 'none' );
 			case 'confidence':
 				return self::enum( $value, array( '', 'High confidence', 'Moderate confidence', 'Low confidence', 'Preliminary' ), '' );
 			case 'credential_status':
-				return self::enum( $value, array( '', 'unverified', 'pending', 'verified', 'expired' ), '' );
+				return self::enum( $value, array( '', 'unverified', 'pending', 'verified', 'expired', 'stale', 'legacy_unbound' ), '' );
 			case 'text':
 			default:
 				return sanitize_text_field( (string) $value );
@@ -259,26 +301,9 @@ final class Meta_Registry {
 		return ! empty( $definitions[ $key ]['public'] );
 	}
 
-	/** Authorize metadata writes by field sensitivity and post. */
-	public static function authorize( string $meta_key, int $post_id, int $user_id ): bool {
-		if ( in_array( $meta_key, array( 'medical_review_attested', 'medical_review_date' ), true ) ) {
-			$assigned_user_id = (int) get_post_meta( $post_id, 'medical_reviewer_user_id', true );
-			return $assigned_user_id === $user_id && user_can( $user_id, 'complete_medical_review' );
-		}
-		if ( in_array( $meta_key, array( 'fact_checked_by', 'fact_checked_date' ), true ) ) {
-			return user_can( $user_id, 'complete_fact_check' );
-		}
-		if ( str_starts_with( $meta_key, 'medical_review_' ) || in_array( $meta_key, array( 'medical_reviewer_user_id', 'medical_reviewer_credentials', 'next_medical_review_date' ), true ) ) {
-			return user_can( $user_id, 'complete_medical_review' ) || user_can( $user_id, 'edit_post', $post_id );
-		}
-		if ( str_starts_with( $meta_key, 'fact_check' ) || 'next_fact_check_date' === $meta_key ) {
-			return user_can( $user_id, 'complete_fact_check' ) || user_can( $user_id, 'edit_post', $post_id );
-		}
-		if ( str_starts_with( $meta_key, 'affiliate_' ) || 'commercial_relationship' === $meta_key ) {
-			return user_can( $user_id, 'approve_commercial_disclosure' ) || user_can( $user_id, 'edit_post', $post_id );
-		}
-
-		return user_can( $user_id, 'edit_post', $post_id );
+	/** Authorize metadata writes through the shared deny-by-default service. */
+	public static function authorize( string $meta_key, int $post_id, int $user_id, string $channel = 'rest' ): bool {
+		return Meta_Authorization::can_write( $meta_key, $post_id, $user_id, $channel );
 	}
 
 	/** Sanitize enum values. */
