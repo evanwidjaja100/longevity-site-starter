@@ -86,9 +86,29 @@ The following controls must remain `unknown_external` until an authorized owner 
 - final launch go/no-go decision.
 EOF_HUMAN
 
+has_failures=0
+if [ -f reports/ci-job-results.json ]; then
+  cp reports/ci-job-results.json "$DIR/ci-job-results.json"
+  if grep -Eq '"(failure|cancelled|skipped)"' reports/ci-job-results.json; then
+    printf 'ERROR: One or more mandatory CI jobs failed, skipped, or cancelled.\n' >&2
+    has_failures=1
+  fi
+fi
+
+if grep -Eq '\tFAIL' "$DIR/verification.tsv"; then
+  printf 'ERROR: One or more verification checks failed in evidence generation.\n' >&2
+  has_failures=1
+fi
+
 {
   printf '# Production Readiness v2 evidence — %s\n\n' "$VERSION"
   printf '%s\n' 'This bundle records checks that executed in the current environment. A `FAIL` or `UNAVAILABLE` result is not a pass. See `verification.tsv`, individual logs, and `human-verification-required.md`.'
 } > "$DIR/README.md"
 
 printf 'Release evidence written to %s\n' "$DIR"
+
+if [ "$has_failures" -ne 0 ]; then
+  printf 'Release evidence aggregate FAILED.\n' >&2
+  exit 1
+fi
+
