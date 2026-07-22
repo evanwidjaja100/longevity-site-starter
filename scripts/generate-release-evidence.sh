@@ -4,6 +4,7 @@ set -u
 
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$ROOT"
+mkdir -p reports
 VERSION="${1:-}"
 if [ -z "$VERSION" ]; then
   if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then

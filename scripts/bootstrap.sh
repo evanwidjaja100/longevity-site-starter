@@ -68,7 +68,7 @@ create_page() {
   fi
 }
 
-home_content='<!-- wp:heading {"level":1} --><h1>Evaluate health practices and consumer products with better evidence.</h1><!-- /wp:heading --><!-- wp:paragraph {"fontSize":"large"} --><p class="has-large-font-size">Transparent evidence reviews, reproducible testing methods, and clearly stated uncertainty???without individualized medical advice or guaranteed longevity outcomes.</p><!-- /wp:paragraph --><!-- wp:buttons --><div class="wp-block-buttons"><!-- wp:button --><div class="wp-block-button"><a class="wp-block-button__link wp-element-button" href="/editorial-policy/">Read our editorial standards</a></div><!-- /wp:button --></div><!-- /wp:buttons -->'
+home_content='<!-- wp:heading {"level":1} --><h1>Evaluate health practices and consumer products with better evidence.</h1><!-- /wp:heading --><!-- wp:paragraph {"fontSize":"large"} --><p class="has-large-font-size">Transparent evidence reviews, reproducible testing methods, and clearly stated uncertainty without individualized medical advice or guaranteed longevity outcomes.</p><!-- /wp:paragraph --><!-- wp:buttons --><div class="wp-block-buttons"><!-- wp:button --><div class="wp-block-button"><a class="wp-block-button__link wp-element-button" href="/editorial-policy/">Read our editorial standards</a></div><!-- /wp:button --></div><!-- /wp:buttons -->'
 home_id=$(create_page 'Start Here' 'start-here' publish "$home_content")
 
 editorial_content=$(cat /project-content/editorial-policy.md)
