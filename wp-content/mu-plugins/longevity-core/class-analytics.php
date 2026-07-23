@@ -56,6 +56,7 @@ final class Analytics {
 			'start_here_open'         => array( 'placement' ),
 			'topic_open'              => array( 'topic', 'placement' ),
 			'guide_open'              => array( 'guide_id', 'placement' ),
+			'methodology_open'         => array( 'placement' ),
 			'source_open'             => array( 'content_id', 'placement' ),
 			'claim_matrix_expand'     => array( 'content_id', 'claim_id' ),
 		);

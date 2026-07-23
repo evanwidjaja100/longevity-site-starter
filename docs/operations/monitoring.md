@@ -1,8 +1,8 @@
 # Monitoring
 
-## Application health endpoint
+## Application health endpoint (liveness)
 
-The longevity-core MU plugin exposes a public health endpoint:
+The longevity-core MU plugin exposes a public **liveness** endpoint:
 
 ```
 GET /wp-json/longevity/v1/health
@@ -10,10 +10,12 @@ GET /wp-json/longevity/v1/health
 
 Response (200 OK):
 ```json
-{ "status": "ok", "version": "3.0.0" }
+{ "status": "ok" }
 ```
 
-This endpoint requires no authentication and exposes only non-sensitive service state. Use it for external uptime monitoring.
+This endpoint requires no authentication and exposes only non-sensitive service state. It confirms the application process is running and can serve HTTP. Use it for external uptime monitoring and load-balancer health checks.
+
+**Note:** This is a liveness check only. For full operational readiness (database, migrations, queue, audit), use the protected `longevity/v1/system-readiness` endpoint (requires `approve_publication` + `view_operational_readiness` capabilities).
 
 Expected check (every 5 minutes, external):
 ```bash
@@ -67,7 +69,7 @@ Key log prefixes to watch:
 | Unresolved corrections | `wp post list --post_type=lel_correction --post_status=pending` |
 | Unapproved affiliate relationships | `wp post list --post_type=lel_affiliate --post_status=draft` |
 | Missing testing evidence | `wp longevity readiness <post_id>` |
-| Repeated publication overrides | Audit log `_longevity_audit_log` meta query |
+| Repeated publication overrides | Audit log custom table: `SELECT * FROM wp_lel_audit_events WHERE event_type = 'publication_gate_override'` |
 | Stale evidence cutoffs | Freshness audit `_lel_freshness_due_fields` meta |
 
 ## Uptime and infrastructure
@@ -101,6 +103,16 @@ After each backup run, verify:
 - Script: `wp longevity freshness --report` — CLI freshness check
 ## Protected readiness and freshness metrics
 
-Use the authenticated `longevity/v1/system-readiness` endpoint for database, migration, packaged scoring configuration, freshness heartbeat/cycle, cron heartbeat, audit table, approval table, uploads, and contact-mail configuration checks. Backup timestamp, restore drill, and external mail delivery remain `unknown_external` until an operator supplies evidence.
+Use the authenticated `longevity/v1/system-readiness` endpoint for database, migration, packaged scoring configuration, freshness heartbeat/cycle, cron heartbeat, audit table, approval table, publication lock, invalidation queue, uploads, and contact-mail configuration checks. Backup timestamp, restore drill, and external mail delivery use structured JSON evidence (set via `wp longevity evidence set --type=<type> --result=ok ...`) and remain `unknown_external` until an operator supplies valid evidence.
 
 Freshness monitoring records `last_run_at`, `last_success_at`, cycle start/completion, processed count, eligible total, due total, remaining estimate, lock age, and last error code. Alert on stale heartbeat, expired lock, or a cycle that does not eventually complete.
+
+## CSP violation monitoring
+
+When Content-Security-Policy is in Report-Only or Enforce mode, browser violation reports are sent to:
+
+```
+POST /wp-json/longevity/v1/csp-report
+```
+
+Violations are logged via `error_log()` with prefix `[longevity-csp]` and counted in the `lel_csp_violation_count` option. Monitor this counter in staging to resolve violations before enabling enforcement in production.

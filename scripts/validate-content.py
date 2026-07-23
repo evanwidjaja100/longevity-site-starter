@@ -182,7 +182,15 @@ def validate_policies() -> None:
         ROOT / "content/governance/corrections-policy.md",
         ROOT / "content/governance/ai-assisted-work-policy.md",
     ]
-    placeholders = re.compile(r"\b(TODO|TBD|lorem ipsum|insert policy|example\.com)\b", re.I)
+    placeholders = re.compile(
+        r"\b(TODO|TBD|lorem ipsum|insert policy|example\.com"
+        r"|To be assigned|To be set|To be populated|To be determined"
+        r"|To be confirmed|To be completed|PLACEHOLDER)\b",
+        re.I,
+    )
+    encoding_issues = re.compile(
+        r"(\?\?\?|\ufffd|\[\d{4}-\d{2}-\d{2}\]|\[date\]|\[TBD\]|\[TODO\])"
+    )
     for path in required:
         if not path.exists():
             error(f"{path}: required policy file is missing")
@@ -192,6 +200,8 @@ def validate_policies() -> None:
             error(f"{path}: policy content is unexpectedly short")
         if placeholders.search(text):
             error(f"{path}: contains placeholder policy content")
+        if encoding_issues.search(text):
+            error(f"{path}: contains encoding artifacts or bracketed placeholders")
 
 
 def validate_templates() -> None:
@@ -204,6 +214,36 @@ def validate_templates() -> None:
     for path in required:
         if not path.exists() or not path.read_text(encoding="utf-8").strip():
             error(f"{path}: required operational template is missing or empty")
+
+
+def validate_encoding_integrity() -> None:
+    """Detect mojibake, replacement characters, and corrupted copy in governed content."""
+    encoding_issues = re.compile(
+        "(\ufffd|\\?\\?\\?|\u00c3[\u0080-\u00bf]|\u00c2[\u0080-\u00bf]|\u00e2\u0080[\u0098\u0099\u009c\u009d\u009e\u009f])"
+    )
+    bracketed_placeholders = re.compile(
+        r"\[(TBD|TODO|DATE|To be \w+|\d{4}-\d{2}-\d{2})\]"
+    )
+    scan_dirs = [
+        ROOT / "content" / "launch-briefs",
+        ROOT / "content" / "governance",
+        ROOT / "policies",
+    ]
+    for scan_dir in scan_dirs:
+        if not scan_dir.exists():
+            continue
+        for path in sorted(scan_dir.glob("*.md")):
+            try:
+                text = path.read_text(encoding="utf-8")
+            except UnicodeDecodeError:
+                error(f"{path}: file is not valid UTF-8")
+                continue
+            match = encoding_issues.search(text)
+            if match:
+                error(f"{path}: encoding artifact detected near {match.group(0)!r}")
+            bracket_match = bracketed_placeholders.search(text)
+            if bracket_match:
+                error(f"{path}: unresolved bracketed placeholder {bracket_match.group(0)!r}")
 
 
 def validate_no_tracked_env() -> None:
@@ -233,6 +273,7 @@ def main() -> int:
     validate_briefs(launch_rows)
     validate_policies()
     validate_templates()
+    validate_encoding_integrity()
     validate_no_tracked_env()
     if ERRORS:
         for item in ERRORS:

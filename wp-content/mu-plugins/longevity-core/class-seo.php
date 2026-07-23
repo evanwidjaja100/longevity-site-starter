@@ -17,7 +17,6 @@ final class SEO {
 		add_action( 'wp_head', array( self::class, 'output_meta_description' ), self::PRIORITY );
 		add_filter( 'wp_robots', array( self::class, 'filter_robots' ) );
 		add_action( 'wp_head', array( self::class, 'output_social_meta' ), self::PRIORITY );
-		add_action( 'wp_head', array( self::class, 'output_archive_description' ), self::PRIORITY );
 		add_action( 'init', array( self::class, 'remove_core_canonical' ), 10 );
 	}
 
@@ -183,17 +182,4 @@ final class SEO {
 		}
 	}
 
-	public static function output_archive_description(): void {
-		if ( self::provider_active() || ! ( is_category() || is_tag() || is_tax() ) ) {
-			return;
-		}
-		$term = get_queried_object();
-		if ( ! ( $term instanceof WP_Term ) ) {
-			return;
-		}
-		$desc = term_description( $term );
-		if ( $desc ) {
-			echo '<meta name="description" content="' . esc_attr( wp_strip_all_tags( $desc ) ) . '">' . "\n";
-		}
-	}
 }

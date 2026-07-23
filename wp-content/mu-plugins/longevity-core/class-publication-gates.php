@@ -15,6 +15,7 @@ final class Publication_Gates {
 
 	/** Register hooks. */
 	public static function init(): void {
+		register_shutdown_function( array( Publication_Lock::class, 'release_all' ) );
 		add_filter( 'wp_insert_post_data', array( self::class, 'enforce_classic_publish' ), 99, 2 );
 		add_filter( 'rest_pre_insert_post', array( self::class, 'enforce_rest_publish' ), 99, 2 );
 		add_filter( 'rest_pre_insert_review', array( self::class, 'enforce_rest_publish' ), 99, 2 );
@@ -22,6 +23,7 @@ final class Publication_Gates {
 		add_action( 'transition_post_status', array( self::class, 'log_status_transition' ), 10, 3 );
 		add_action( 'save_post_post', array( self::class, 'persist_override_audit' ), 100, 3 );
 		add_action( 'save_post_review', array( self::class, 'persist_override_audit' ), 100, 3 );
+		add_action( 'post_updated', array( self::class, 'release_after_post_update' ), 999, 1 );
 	}
 
 	/** Evaluate a post from persisted WordPress state. */
@@ -33,11 +35,12 @@ final class Publication_Gates {
 			return $result;
 		}
 
-		$context = array(
+		$prospective = self::prospective_state( $overrides );
+		$context     = array(
 			'post_type'                     => $post->post_type,
 			'content'                       => $post->post_content,
-			'author_present'                => (int) $post->post_author > 0,
-			'featured_image_alt_present'    => self::featured_image_alt_present( $post_id ),
+			'author_present'                => (int) ( $prospective['post_author'] ?? $post->post_author ) > 0,
+			'featured_image_alt_present'    => self::featured_image_alt_present( $post_id, $prospective['featured_image_id'] ?? null ),
 			'claim_count'                   => Claims::count_for_post( $post_id ),
 			'verified_claim_count'          => Claims::count_for_post( $post_id, 'verified' ),
 		);
@@ -54,12 +57,18 @@ final class Publication_Gates {
 		);
 		$context['medical_reviewer_valid'] = self::reviewer_is_valid( $context );
 		foreach ( array( 'fact_check', 'medical', 'testing', 'commercial', 'editorial' ) as $approval_type ) {
-			$context[ $approval_type . '_approval_current' ] = Approval_Service::is_current( $post_id, $approval_type );
+			$context[ $approval_type . '_approval_current' ] = $prospective
+				? Approval_Service::is_current_for_state( $post_id, $approval_type, $prospective )
+				: Approval_Service::is_current( $post_id, $approval_type );
 		}
 		$scoring_status = Runtime_Config::scoring_model_status();
 		$context['scoring_model_valid'] = ! empty( $scoring_status['valid'] );
 
-		return self::evaluate_values( $context );
+		$result = self::evaluate_values( $context );
+		if ( ! empty( $overrides['__governance_request_denied'] ) ) {
+			$result->block( 'governed_metadata_unauthorized', __( 'The request included governed metadata that this channel cannot write.', 'longevity-core' ) );
+		}
+		return $result;
 	}
 
 	/** Pure readiness evaluation for testability. */
@@ -291,6 +300,39 @@ final class Publication_Gates {
 		return $result;
 	}
 
+	/** Compute the prospective combined hash for a post with pending changes. */
+	private static function prospective_hash( int $post_id, array $prospective ): string {
+		return (string) Approval_Fingerprint::build( $post_id, 'editorial', $prospective )['combined_hash'];
+	}
+
+	/** Verify editorial approval covers the prospective state (DB + pending changes). */
+	private static function prospective_state_matches_approval( int $post_id, array $prospective ): bool {
+		return Approval_Service::is_current_for_state( $post_id, 'editorial', $prospective );
+	}
+
+	/** Convert gate overrides into the canonical state used by every approval. */
+	private static function prospective_state( array $overrides ): array {
+		$state = array();
+		foreach ( array( 'post_title', 'post_excerpt', 'post_content', 'post_author', 'featured_image_id' ) as $key ) {
+			if ( array_key_exists( $key, $overrides ) ) {
+				$state[ $key ] = $overrides[ $key ];
+			}
+		}
+		if ( ! array_key_exists( 'post_content', $state ) && array_key_exists( 'content', $overrides ) ) {
+			$state['post_content'] = $overrides['content'];
+		}
+		$meta = array();
+		foreach ( Meta_Registry::definitions() as $key => $definition ) {
+			if ( array_key_exists( $key, $overrides ) ) {
+				$meta[ $key ] = $overrides[ $key ];
+			}
+		}
+		if ( ! empty( $meta ) ) {
+			$state['meta'] = $meta;
+		}
+		return $state;
+	}
+
 	/** Enforce classic-editor publishing by preserving content as a draft. */
 	public static function enforce_classic_publish( array $data, array $postarr ): array {
 		if ( ! in_array( $data['post_type'] ?? '', array( 'post', 'review' ), true ) || ! in_array( $data['post_status'] ?? '', array( 'publish', 'future', 'private' ), true ) ) {
@@ -302,25 +344,45 @@ final class Publication_Gates {
 			self::set_notice( array( __( 'Save the draft and complete editorial metadata before first publication.', 'longevity-core' ) ) );
 			return $data;
 		}
-		$overrides = self::classic_request_overrides( $post_id );
-		$overrides['content'] = $data['post_content'] ?? '';
-		$result = self::evaluate( $post_id, $overrides );
-		if ( ! $result->is_blocked() ) {
+		if ( ! Publication_Lock::acquire( $post_id ) ) {
+			$data['post_status'] = 'draft';
+			self::set_notice( array( __( 'Publication is temporarily blocked while governance state is being checked.', 'longevity-core' ) ) );
 			return $data;
 		}
-		if ( self::override_allowed_from_request() ) {
-			set_transient( 'lel_override_' . $post_id . '_' . get_current_user_id(), sanitize_textarea_field( wp_unslash( $_POST['longevity_override_reason'] ) ), MINUTE_IN_SECONDS );
+		$overrides = array_merge( self::postarr_meta_overrides( $postarr ), self::classic_request_overrides( $post_id ) );
+		$overrides['content']          = wp_unslash( (string) ( $data['post_content'] ?? '' ) );
+		$overrides['post_title']       = wp_unslash( (string) ( $data['post_title'] ?? '' ) );
+		$overrides['post_excerpt']     = wp_unslash( (string) ( $data['post_excerpt'] ?? '' ) );
+		$overrides['post_author']      = wp_unslash( (string) ( $data['post_author'] ?? '' ) );
+		$featured_image_id             = self::classic_featured_image( $postarr );
+		if ( null !== $featured_image_id ) {
+			$overrides['featured_image_id'] = $featured_image_id;
+		}
+		$prospective = self::prospective_state( $overrides );
+		$result      = self::evaluate( $post_id, $overrides );
+		$matches     = self::prospective_state_matches_approval( $post_id, $prospective );
+		$blocked     = $result->is_blocked() || ! $matches;
+		if ( ! $blocked ) {
 			return $data;
 		}
+		if ( $matches && self::override_allowed_from_request() ) {
+			$reason = sanitize_textarea_field( wp_unslash( $_POST['longevity_override_reason'] ) );
+			set_transient( 'lel_override_' . $post_id . '_' . get_current_user_id(), $reason, MINUTE_IN_SECONDS );
+			set_transient( 'lel_override_fp_' . $post_id . '_' . get_current_user_id(), self::prospective_hash( $post_id, $prospective ), MINUTE_IN_SECONDS );
+			return $data;
+		}
+		Publication_Lock::release( $post_id );
 		$data['post_status'] = 'draft';
-		self::set_notice( array_column( $result->blocking(), 'message' ) );
-		Audit_Log::record( 'publication_blocked', 'post', $post_id, array( 'channel' => 'classic', 'blocking_codes' => implode( ',', array_column( $result->blocking(), 'code' ) ) ), get_current_user_id(), 'classic' );
+		$codes = $result->is_blocked() ? array_column( $result->blocking(), 'code' ) : array( 'prospective_fingerprint_mismatch' );
+		self::set_notice( $result->is_blocked() ? array_column( $result->blocking(), 'message' ) : array( __( 'Publication blocked: the content or metadata has changed since the last editorial approval.', 'longevity-core' ) ) );
+		Audit_Log::record( 'publication_blocked', 'post', $post_id, array( 'channel' => 'classic', 'blocking_codes' => implode( ',', $codes ) ), get_current_user_id(), 'classic' );
 		return $data;
 	}
 
 	/** Enforce REST/block-editor publishing with a structured error. */
 	public static function enforce_rest_publish( $prepared_post, \WP_REST_Request $request ) {
-		$status = (string) ( $prepared_post->post_status ?? $request->get_param( 'status' ) );
+		$status_param = $request->get_param( 'status' );
+		$status       = (string) ( null !== $status_param ? $status_param : ( $prepared_post->post_status ?? '' ) );
 		if ( ! in_array( $status, array( 'publish', 'future', 'private' ), true ) ) {
 			return $prepared_post;
 		}
@@ -328,32 +390,58 @@ final class Publication_Gates {
 		if ( $post_id <= 0 ) {
 			return new \WP_Error( 'lel_gate_new_post', __( 'Save the draft before attempting first publication.', 'longevity-core' ), array( 'status' => 400 ) );
 		}
-		$overrides = array( 'content' => (string) ( $prepared_post->post_content ?? '' ) );
+		if ( ! Publication_Lock::acquire( $post_id ) ) {
+			return new \WP_Error( 'lel_publication_lock_unavailable', __( 'Publication is temporarily blocked while governance state is being checked.', 'longevity-core' ), array( 'status' => 409 ) );
+		}
+		$overrides = array(
+			'content'      => (string) ( $prepared_post->post_content ?? '' ),
+			'post_title'   => (string) ( $prepared_post->post_title ?? '' ),
+			'post_excerpt' => (string) ( $prepared_post->post_excerpt ?? '' ),
+			'post_author'  => (int) ( $prepared_post->post_author ?? 0 ),
+		);
+		if ( null !== $request->get_param( 'featured_media' ) ) {
+			$overrides['featured_image_id'] = absint( $request->get_param( 'featured_media' ) );
+		}
 		$meta = $request->get_param( 'meta' );
 		if ( is_array( $meta ) ) {
 			$definitions = Meta_Registry::definitions();
 			foreach ( $meta as $key => $value ) {
 				if ( isset( $definitions[ $key ] ) && Meta_Authorization::can_write( $key, $post_id, get_current_user_id(), 'rest' ) ) {
 					$overrides[ $key ] = Meta_Registry::sanitize_by_key( $key, $value );
+				} elseif ( isset( $definitions[ $key ] ) ) {
+					$overrides['__governance_request_denied'] = true;
 				}
 			}
 		}
-		$result = self::evaluate( $post_id, $overrides );
-		if ( ! $result->is_blocked() ) {
+		$prospective = self::prospective_state( $overrides );
+		$result      = self::evaluate( $post_id, $overrides );
+		$matches     = self::prospective_state_matches_approval( $post_id, $prospective );
+		$blocked     = $result->is_blocked() || ! $matches;
+		if ( ! $blocked ) {
 			return $prepared_post;
 		}
 		$reason = sanitize_textarea_field( (string) $request->get_param( 'longevity_override_reason' ) );
-		if ( current_user_can( 'approve_publication_override' ) && '' !== $reason ) {
+		if ( $matches && current_user_can( 'approve_publication_override' ) && '' !== $reason ) {
 			set_transient( 'lel_override_' . $post_id . '_' . get_current_user_id(), $reason, MINUTE_IN_SECONDS );
+			set_transient( 'lel_override_fp_' . $post_id . '_' . get_current_user_id(), self::prospective_hash( $post_id, $prospective ), MINUTE_IN_SECONDS );
 			return $prepared_post;
 		}
-		Audit_Log::record( 'publication_blocked', 'post', $post_id, array( 'channel' => 'rest', 'blocking_codes' => implode( ',', array_column( $result->blocking(), 'code' ) ) ), get_current_user_id(), 'rest' );
+		Publication_Lock::release( $post_id );
+		$codes = $result->is_blocked() ? array_column( $result->blocking(), 'code' ) : array( 'prospective_fingerprint_mismatch' );
+		Audit_Log::record( 'publication_blocked', 'post', $post_id, array( 'channel' => 'rest', 'blocking_codes' => implode( ',', $codes ) ), get_current_user_id(), 'rest' );
 		return new \WP_Error(
 			'lel_publication_blocked',
 			__( 'Publication readiness checks failed.', 'longevity-core' ),
 			array( 'status' => 400, 'readiness' => $result->to_array() )
 		);
 	}
+
+	/** Release the publication lock after WordPress has saved the post. */
+	public static function release_after_post_update( int $post_id ): void {
+		Publication_Lock::release( $post_id );
+	}
+
+
 
 	/** Display a one-use gate notice. */
 	public static function admin_notice(): void {
@@ -387,7 +475,10 @@ final class Publication_Gates {
 			return;
 		}
 		delete_transient( $key );
-		self::log_event( $post_id, 'publication_override_used', array( 'reason' => $reason ) );
+		$fp_key = 'lel_override_fp_' . $post_id . '_' . get_current_user_id();
+		$fingerprint = get_transient( $fp_key );
+		delete_transient( $fp_key );
+		self::log_event( $post_id, 'publication_override_used', array( 'reason' => $reason, 'combined_hash' => $fingerprint ) );
 	}
 
 	/** Persist a non-sensitive append-only governance event. */
@@ -414,6 +505,34 @@ final class Publication_Gates {
 		return Date_Validator::is_valid( $value ) && Date_Validator::compare( $value, $today ) <= 0;
 	}
 
+	/** Include metadata that WordPress will write after the post data filter. */
+	private static function postarr_meta_overrides( array $postarr ): array {
+		$input      = isset( $postarr['meta_input'] ) && is_array( $postarr['meta_input'] ) ? $postarr['meta_input'] : array();
+		$overrides  = array();
+		$definitions = Meta_Registry::definitions();
+		foreach ( $input as $key => $value ) {
+			if ( ! isset( $definitions[ $key ] ) ) {
+				continue;
+			}
+			$overrides[ $key ] = Meta_Registry::sanitize_by_key( $key, $value );
+			if ( self::service_only_meta( $key, $overrides[ $key ] ) ) {
+				$overrides['__governance_request_denied'] = true;
+			}
+		}
+		return $overrides;
+	}
+
+	/** Read a classic request's prospective featured-image relationship. */
+	private static function classic_featured_image( array $postarr ): ?int {
+		if ( isset( $postarr['meta_input'] ) && is_array( $postarr['meta_input'] ) && array_key_exists( '_thumbnail_id', $postarr['meta_input'] ) ) {
+			return absint( $postarr['meta_input']['_thumbnail_id'] );
+		}
+		if ( array_key_exists( '_thumbnail_id', $_POST ) ) {
+			return absint( wp_unslash( $_POST['_thumbnail_id'] ) );
+		}
+		return null;
+	}
+
 	/** Read authorized metadata submitted by the classic editor for same-request evaluation. */
 	private static function classic_request_overrides( int $post_id ): array {
 		if ( empty( $_POST['longevity_editorial_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['longevity_editorial_nonce'] ) ), 'longevity_save_editorial' ) ) {
@@ -423,14 +542,45 @@ final class Publication_Gates {
 		$definitions = Meta_Registry::definitions();
 		$present     = isset( $_POST['lel_present'] ) && is_array( $_POST['lel_present'] ) ? wp_unslash( $_POST['lel_present'] ) : array();
 		foreach ( $definitions as $key => $definition ) {
-			if ( empty( $present[ $key ] ) || ! Meta_Authorization::can_write( $key, $post_id, get_current_user_id(), 'classic' ) ) {
+			if ( empty( $present[ $key ] ) ) {
+				continue;
+			}
+			if ( ! Meta_Authorization::can_write( $key, $post_id, get_current_user_id(), 'classic' ) ) {
+				$overrides['__governance_request_denied'] = true;
+				continue;
+			}
+			if ( self::service_only_meta( $key, isset( $_POST[ $key ] ) ? wp_unslash( $_POST[ $key ] ) : '' ) ) {
 				continue;
 			}
 			if ( isset( $_POST[ $key ] ) ) {
 				$overrides[ $key ] = Meta_Registry::sanitize_by_key( $key, wp_unslash( $_POST[ $key ] ) );
 			}
 		}
+		if ( in_array( 'review_score_dimensions', array_keys( $present ), true ) && isset( $_POST['review_score_dimensions_rows'] ) && is_array( $_POST['review_score_dimensions_rows'] ) ) {
+			if ( Meta_Authorization::can_write( 'review_score_dimensions', $post_id, get_current_user_id(), 'classic' ) && Meta_Authorization::can_write( 'review_score', $post_id, get_current_user_id(), 'classic' ) ) {
+				$dimensions = Review_Methodology::sanitize_dimensions( wp_unslash( $_POST['review_score_dimensions_rows'] ) );
+				$overrides['review_score_dimensions'] = $dimensions;
+				try {
+					$overrides['review_score'] = Review_Methodology::calculate_score( $dimensions )['score'];
+				} catch ( \InvalidArgumentException $exception ) {
+					unset( $exception );
+				}
+			}
+		}
 		return $overrides;
+	}
+
+	/** Values that are projected only by an approval service, never by a request. */
+	public static function service_only_meta( string $key, $value ): bool {
+		$value = is_scalar( $value ) ? (string) $value : '';
+		$final = array(
+			'fact_check_status'          => array( 'complete' ),
+			'medical_review_status'      => array( 'complete' ),
+			'testing_status'             => array( 'approved' ),
+			'affiliate_disclosure_status' => array( 'approved', 'complete' ),
+			'editorial_approval_status'   => array( 'ready', 'published' ),
+		);
+		return ( 'medical_review_attested' === $key && '1' === $value ) || ( isset( $final[ $key ] ) && in_array( $value, $final[ $key ], true ) );
 	}
 
 	/** Store a user-scoped notice. */
@@ -457,8 +607,8 @@ final class Publication_Gates {
 	}
 
 	/** Check featured image alternative text only when an image exists. */
-	private static function featured_image_alt_present( int $post_id ): bool {
-		$thumbnail_id = get_post_thumbnail_id( $post_id );
+	private static function featured_image_alt_present( int $post_id, ?int $prospective_thumbnail_id = null ): bool {
+		$thumbnail_id = null === $prospective_thumbnail_id ? get_post_thumbnail_id( $post_id ) : $prospective_thumbnail_id;
 		if ( ! $thumbnail_id ) {
 			return true;
 		}

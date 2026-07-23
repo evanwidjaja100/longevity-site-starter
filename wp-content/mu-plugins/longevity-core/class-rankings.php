@@ -34,6 +34,40 @@ final class Rankings {
 	}
 
 	/**
+	 * Return the complete set of eligible review IDs from a persistent cache.
+	 *
+	 * Evaluates ALL published reviews (not just the newest 100) and stores
+	 * the eligible ID set in a versioned transient. Invalidation is triggered
+	 * by governed transitions via the hooks registered in init().
+	 *
+	 * @return list<int> Eligible review post IDs.
+	 */
+	public static function eligible_ids(): array {
+		$version   = (string) get_option( 'lel_rankings_cache_version', '1' );
+		$cache_key = 'eligible_ids_' . md5( $version );
+		$cached    = get_transient( 'lel_rankings_' . $cache_key );
+		if ( is_array( $cached ) ) {
+			return $cached;
+		}
+		$all_reviews = get_posts(
+			array(
+				'post_type'              => 'review',
+				'post_status'            => 'publish',
+				'posts_per_page'         => 500,
+				'fields'                 => 'ids',
+				'orderby'                => array( 'modified' => 'DESC', 'ID' => 'DESC' ),
+				'ignore_sticky_posts'    => true,
+				'no_found_rows'          => true,
+				'update_post_term_cache' => false,
+				'update_post_meta_cache' => false,
+			)
+		);
+		$eligible = array_values( array_filter( array_map( 'intval', $all_reviews ), static fn( int $id ) => self::is_eligible( $id ) ) );
+		set_transient( 'lel_rankings_' . $cache_key, $eligible, 6 * HOUR_IN_SECONDS );
+		return $eligible;
+	}
+
+	/**
 	 * Return machine-readable reasons a review cannot appear in a test-based ranking.
 	 *
 	 * @param int $post_id Review post ID.
@@ -160,16 +194,25 @@ final class Rankings {
 	/**
 	 * Get a bounded eligible result set and apply safe in-memory deterministic ordering.
 	 *
+	 * Uses the persistent eligible_ids() cache to avoid re-evaluating governance
+	 * rules on every request. Sorting and filtering remain in-memory for
+	 * deterministic tie-breaking.
+	 *
 	 * @param int    $category_id Optional category term ID.
 	 * @param string $sort        Allowlisted sort key.
 	 * @param array  $filters     Allowlisted filter values.
 	 * @param int    $limit       Bounded result limit.
 	 */
 	public static function reviews( int $category_id = 0, string $sort = '', array $filters = array(), int $limit = 100 ): array {
+		$eligible = self::eligible_ids();
+		if ( empty( $eligible ) ) {
+			return array();
+		}
 		$args = array(
 			'post_type'              => 'review',
 			'post_status'            => 'publish',
-			'posts_per_page'         => min( 100, max( 1, $limit ) ),
+			'post__in'               => $eligible,
+			'posts_per_page'         => min( 500, max( 1, count( $eligible ) ) ),
 			'orderby'                => array(
 				'modified' => 'DESC',
 				'ID'       => 'DESC',
@@ -182,7 +225,7 @@ final class Rankings {
 		if ( 0 < $category_id ) {
 			$args['cat'] = $category_id;
 		}
-		$posts = array_values( array_filter( get_posts( $args ), static fn( $post ) => self::is_eligible( (int) $post->ID ) ) );
+		$posts = get_posts( $args );
 		if ( array() === $filters ) {
 			$filters = self::requested_filters();
 		}
@@ -203,6 +246,7 @@ final class Rankings {
 				}
 			)
 		);
+		$posts = array_slice( $posts, 0, min( 100, max( 1, $limit ) ) );
 		return self::sort( $posts, '' === $sort ? self::requested_sort() : $sort );
 	}
 

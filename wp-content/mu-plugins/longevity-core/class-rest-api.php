@@ -47,6 +47,15 @@ final class Rest_API {
 				'args'                => array( 'id' => array( 'validate_callback' => static fn( $value ) => is_numeric( $value ) && (int) $value > 0 ) ),
 			)
 		);
+		register_rest_route(
+			'longevity/v1',
+			'/csp-report',
+			array(
+				'methods'             => \WP_REST_Server::CREATABLE,
+				'permission_callback' => '__return_true',
+				'callback'            => array( self::class, 'csp_report' ),
+			)
+		);
 	}
 
 
@@ -112,5 +121,36 @@ final class Rest_API {
 		);
 		$response->header( 'Cache-Control', 'no-store, max-age=0' );
 		return $response;
+	}
+
+	/**
+	 * Collect CSP violation reports.
+	 *
+	 * Accepts application/csp-report JSON bodies from browsers.
+	 * Logs violations and increments a counter for observability.
+	 */
+	public static function csp_report( \WP_REST_Request $request ): \WP_REST_Response {
+		$body = $request->get_json_params();
+		if ( empty( $body ) ) {
+			$raw = $request->get_body();
+			$body = json_decode( $raw, true );
+		}
+		$report = isset( $body['csp-report'] ) ? $body['csp-report'] : $body;
+		if ( ! is_array( $report ) ) {
+			return new \WP_REST_Response( array( 'status' => 'ignored' ), 204 );
+		}
+
+		// Extract bounded fields for logging.
+		$violated   = substr( sanitize_text_field( (string) ( $report['violated-directive'] ?? $report['effectiveDirective'] ?? '' ) ), 0, 128 );
+		$blocked    = substr( sanitize_text_field( (string) ( $report['blocked-uri'] ?? $report['blockedURL'] ?? '' ) ), 0, 256 );
+		$doc_uri    = substr( sanitize_text_field( (string) ( $report['document-uri'] ?? $report['documentURL'] ?? '' ) ), 0, 256 );
+
+		error_log( sprintf( '[longevity-csp] Violation: directive=%s blocked=%s page=%s', $violated, $blocked, $doc_uri ) );
+
+		// Increment violation counter for readiness observability.
+		$count = (int) get_option( 'lel_csp_violation_count', 0 );
+		update_option( 'lel_csp_violation_count', $count + 1, false );
+
+		return new \WP_REST_Response( array( 'status' => 'recorded' ), 204 );
 	}
 }

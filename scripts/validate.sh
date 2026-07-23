@@ -30,12 +30,18 @@ for path in [Path('compose.yaml'), *Path('.github/workflows').glob('*.yml')]:
         yaml.safe_load(text)
 print('YAML validation passed' if yaml else 'YAML parser unavailable; non-empty YAML files confirmed')
 __YAML_CHECK__
-find scripts -type f -name '*.sh' -print | sort | while IFS= read -r file; do sh -n "$file"; done
-if command -v shellcheck >/dev/null 2>&1; then find scripts -type f -name '*.sh' -print0 | xargs -0 shellcheck; else echo 'ShellCheck unavailable; skipped locally.'; fi
+find scripts -type f -name '*.sh' -print | sort | while IFS= read -r file; do
+  if head -1 "$file" | grep -q 'bash'; then bash -n "$file"; else sh -n "$file"; fi
+done
+if command -v shellcheck >/dev/null 2>&1; then
+  find scripts -type f -name '*.sh' -print | sort | while IFS= read -r file; do
+    if head -1 "$file" | grep -q 'bash'; then shellcheck --shell=bash "$file"; else shellcheck --shell=sh "$file"; fi
+  done
+else echo 'ShellCheck unavailable; skipped locally.'; fi
 python3 scripts/validate-content.py
 python3 scripts/validate-internal-links.py
 python3 scripts/validate-freshness.py --no-fail
-./tests/integration/environment-validation.sh
+bash tests/integration/environment-validation.sh
 
 if grep -RInE --exclude-dir=.git --exclude-dir=vendor --exclude-dir=node_modules --exclude-dir=tests --exclude='*.md' --exclude='validate.sh' --exclude='validate-env.sh' --exclude='validate-content.py' --exclude='.env.example' --exclude='.env.ci' --exclude='MANIFEST.sha256' '(https?://(www\.)?example\.com|replace-with-|change-me-use-|changeme|your[-_](password|secret|token))' .; then
   echo 'ERROR: placeholder production domains or credentials found in tracked runtime files.' >&2
@@ -51,8 +57,24 @@ if [ -n "$trailing_files" ]; then
   exit 1
 fi
 
+# Plugin/theme allowlist: fail if unapproved third-party code is present.
+allowed_plugins='index.php'
+allowed_themes='index.php longevity-starter'
+for entry in wp-content/plugins/*; do
+  base=$(basename "$entry")
+  case " $allowed_plugins " in *" $base "*) ;; *)
+    echo "ERROR: plugin not in allowlist: $entry" >&2; exit 1 ;;
+  esac
+done
+for entry in wp-content/themes/*; do
+  base=$(basename "$entry")
+  case " $allowed_themes " in *" $base "*) ;; *)
+    echo "ERROR: theme not in allowlist: $entry" >&2; exit 1 ;;
+  esac
+done
+
 if [ -f MANIFEST.sha256 ]; then
-	./scripts/verify-manifest.sh
+  bash scripts/verify-manifest.sh
 fi
 
 echo 'Repository validation passed.'

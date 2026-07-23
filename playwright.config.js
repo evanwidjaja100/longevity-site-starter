@@ -5,7 +5,8 @@ export default defineConfig({
   outputDir: './reports/playwright-artifacts',
   snapshotDir: './tests/e2e/snapshots',
   reporter: [['list'], ['html', { outputFolder: './reports/playwright', open: 'never' }]],
-  retries: process.env.CI ? 1 : 0,
+  forbidOnly: !!process.env.CI,
+  retries: 0,
   use: {
     baseURL: process.env.WP_SITE_URL || 'http://localhost:8080',
     trace: 'retain-on-failure',

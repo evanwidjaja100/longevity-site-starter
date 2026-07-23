@@ -21,7 +21,11 @@ printf '%s' "$WP_ADMIN_EMAIL" | grep -Eq '^[^[:space:]@]+@[^[:space:]@]+\.[^[:sp
 # Use PHP's database driver for readiness. The MariaDB client bundled with the
 # WP-CLI image can reject MySQL 8.4's self-signed development certificate even
 # though WordPress can connect successfully.
-until php -r '
+attempt=0
+max_attempts=${DB_READINESS_ATTEMPTS:-40}
+while :; do
+  if php -r '
+mysqli_report(MYSQLI_REPORT_OFF);
 $connection = @mysqli_connect(
     getenv("WORDPRESS_DB_HOST"),
     getenv("WORDPRESS_DB_USER"),
@@ -29,7 +33,14 @@ $connection = @mysqli_connect(
     getenv("WORDPRESS_DB_NAME")
 );
 exit($connection ? 0 : 1);
-'; do
+  '; then
+    break
+  fi
+  attempt=$((attempt + 1))
+  if [ "$attempt" -ge "$max_attempts" ]; then
+    echo "ERROR: Database was not ready after $max_attempts attempts. Check the isolated environment credentials and database volume." >&2
+    exit 1
+  fi
   echo "Waiting for the database..."
   sleep 3
 done

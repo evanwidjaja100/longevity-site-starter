@@ -483,10 +483,29 @@ final class Routes {
 	}
 
 	/**
+	 * Whether a slug is a known legacy (non-canonical) category slug.
+	 *
+	 * @param string $slug The slug to check.
+	 * @return bool True if the slug is a legacy slug that should redirect.
+	 */
+	public static function is_legacy_slug( string $slug ): bool {
+		if ( empty( self::$category_definitions ) ) {
+			self::init();
+		}
+		foreach ( self::$category_definitions as $def ) {
+			if ( in_array( $slug, $def['legacy_slugs'], true ) ) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
 	 * Redirect legacy category paths to their canonical short-slug URLs.
 	 *
-	 * Runs on template_redirect. Only redirects known legacy category slugs.
-	 * Only allowlisted query parameters are preserved. Tracking and arbitrary
+	 * Runs on template_redirect. Only redirects known legacy category slugs;
+	 * canonical slugs are never redirected. Only allowlisted query parameters
+	 * explicitly present in the request are preserved. Tracking and arbitrary
 	 * parameters are stripped by default.
 	 */
 	public static function redirect_legacy_category(): void {
@@ -498,24 +517,43 @@ final class Routes {
 			return;
 		}
 		$current_slug = $term->slug;
-		$canonical    = self::canonical_url_for_slug( $current_slug );
+
+		// Never redirect canonical slugs — only actual legacy slugs.
+		if ( ! self::is_legacy_slug( $current_slug ) ) {
+			return;
+		}
+
+		$canonical = self::canonical_url_for_slug( $current_slug );
 		if ( null === $canonical ) {
 			return;
 		}
 
-		$safe_params = array( 'paged', 'page', 'order', 'orderby' );
+		// Preserve only allowlisted ranking/pagination params explicitly in the request.
+		$safe_params = array( 'paged', 'ranking_sort', 'confidence', 'subscription' );
 		$preserved   = array();
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only redirect preservation.
 		foreach ( $safe_params as $p ) {
-			$val = get_query_var( $p );
-			if ( '' !== $val && false !== $val ) {
-				$preserved[ $p ] = $val;
+			// phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			if ( ! isset( $_GET[ $p ] ) || '' === $_GET[ $p ] ) {
+				continue;
 			}
+			// phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			$val = sanitize_text_field( wp_unslash( $_GET[ $p ] ) );
+			// Do not append default/meaningless values.
+			if ( 'paged' === $p && (int) $val <= 1 ) {
+				continue;
+			}
+			if ( 'ranking_sort' === $p && ! in_array( $val, array( 'score', 'confidence', 'updated', 'title' ), true ) ) {
+				continue;
+			}
+			$preserved[ $p ] = $val;
 		}
 
 		$redirect_url = empty( $preserved )
 			? $canonical
 			: add_query_arg( $preserved, $canonical );
 
+		// Prevent redirect loops.
 		$current_url = home_url( add_query_arg( array() ) );
 		if ( untrailingslashit( $current_url ) === untrailingslashit( $redirect_url ) ) {
 			return;

@@ -18,8 +18,8 @@ services:
       test: ["CMD-SHELL", "MYSQL_PWD=$$MYSQL_ROOT_PASSWORD mysqladmin ping -h 127.0.0.1 -u root --silent"]
       interval: 10s
       timeout: 5s
-      retries: 12
-      start_period: 30s
+      retries: 18
+      start_period: 180s
     security_opt:
       - no-new-privileges:true
 
@@ -101,16 +101,18 @@ services:
       wordpress:
         condition: service_healthy
     working_dir: /var/www/html
-    entrypoint: ["sh", "-c"]
-    command: ["while true; do wp cron event run --due-now --allow-root || true; sleep 300; done"]
+    entrypoint: ["sh", "/scripts/cron-wrapper.sh"]
     environment:
       WORDPRESS_DB_HOST: db:3306
       WORDPRESS_DB_NAME: ${WORDPRESS_DB_NAME}
       WORDPRESS_DB_USER: ${WORDPRESS_DB_USER}
       WORDPRESS_DB_PASSWORD: ${WORDPRESS_DB_PASSWORD}
+      LEL_CRON_FAILURE_THRESHOLD: ${LEL_CRON_FAILURE_THRESHOLD:-5}
+      LEL_CRON_SLEEP_INTERVAL: ${LEL_CRON_SLEEP_INTERVAL:-300}
     volumes:
       - wordpress_data:/var/www/html
       - ./wp-content:/var/www/html/wp-content
+      - ./scripts:/scripts:ro
     security_opt:
       - no-new-privileges:true
 

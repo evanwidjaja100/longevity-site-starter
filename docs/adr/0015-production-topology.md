@@ -1,0 +1,65 @@
+# ADR-0015: Production Deployment Topology
+
+**Status:** Proposed  
+**Date:** 2026-07-23  
+**Deciders:** Engineering, Operations  
+
+## Context
+
+The production-readiness audit (PR-006) identified that no documented, reproducible production deployment topology exists. The development environment uses Docker Compose with a local MySQL container, but production requires an immutable, hardened deployment with secrets injection, health probes, and rollback capability.
+
+## Decision
+
+We support two production topologies:
+
+### Topology A: Managed WordPress Host (Primary)
+
+- WordPress managed hosting (e.g., Cloudways, Kinsta, WP Engine)
+- MU plugin and theme deployed via Git-based deployment or SFTP artifact push
+- Database managed by host; migrations run via SSH + WP-CLI before traffic promotion
+- Secrets managed via host control panel environment variables
+- CDN/WAF handles TLS termination, rate limiting, and static caching
+- External cron via host scheduler or systemd timer calling `wp cron event run --due-now`
+
+### Topology B: VPS with Docker (Secondary)
+
+- Single VPS or small cluster running Docker containers
+- Production image built from `docker/production/Dockerfile` (multi-stage, pinned base)
+- Secrets injected via environment variables from a secrets manager (Vault, SOPS, or cloud KMS)
+- Reverse proxy (Caddy/Traefik/nginx) handles TLS, HSTS, and rate limiting
+- Health probes: liveness at `/wp-json/longevity/v1/health`, readiness via protected internal endpoint
+- External one-shot cron invocation (systemd timer or K8s CronJob)
+
+## Deployment Sequence
+
+1. Build immutable artifact (Docker image or tarball) from tagged release commit
+2. Push artifact to registry/storage
+3. Run `wp longevity migrate` against target database (with lock protection)
+4. Deploy new artifact (rolling update or blue-green)
+5. Verify health endpoint returns `{"status":"ok"}`
+6. Promote traffic
+7. Monitor error rates for 15 minutes
+
+## Rollback Procedure
+
+1. Redeploy previous immutable artifact
+2. Verify health endpoint
+3. Promote traffic to previous version
+4. Database remains forward-compatible (all migrations are additive)
+5. Record incident if rollback was due to failure
+
+## Secrets Injection
+
+- **Never** bake secrets into images or commit them to the repository
+- Use environment variables at runtime: `WORDPRESS_DB_PASSWORD`, `AUTH_KEY`, `AUTH_SALT`, etc.
+- In Docker: use `--env-file` or Docker secrets
+- In managed hosts: use host-provided environment variable configuration
+- Rotate credentials per the security checklist
+
+## Consequences
+
+- All deployments are reproducible from artifact + secrets
+- Rollback is safe because migrations are additive-only
+- `GET_LOCK` usage must be verified on managed hosts (some restrict it)
+- CSP enforcement mode is environment-configurable (`LEL_CSP_ENFORCE`)
+- Rate limiting at the application layer is defense-in-depth; primary rate limiting belongs at CDN/WAF

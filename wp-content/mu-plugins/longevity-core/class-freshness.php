@@ -23,6 +23,9 @@ final class Freshness {
 
 	/** Schedule the daily bounded audit if it is not already scheduled. */
 	public static function schedule(): void {
+		if ( ! Migrations::wordpress_ready() ) {
+			return;
+		}
 		if ( ! wp_next_scheduled( self::HOOK ) ) {
 			wp_schedule_event( time() + HOUR_IN_SECONDS, 'daily', self::HOOK );
 		}
@@ -70,9 +73,7 @@ final class Freshness {
 			}
 			$report['eligible_total'] = Freshness_Repository::eligible_total();
 			$report['cycle_started_at'] = $cycle_started;
-			$report['last_cycle_started_at'] = $cycle_started;
 			$report['cycle_scanned'] = self::count_scanned_since( $cycle_started );
-			$report['processed_in_cycle'] = $report['cycle_scanned'];
 			$report['due_total'] = self::count_any_due( $today );
 			$report['remaining_estimate'] = max( 0, $report['eligible_total'] - $report['cycle_scanned'] );
 			$report['last_success_at'] = gmdate( DATE_W3C );

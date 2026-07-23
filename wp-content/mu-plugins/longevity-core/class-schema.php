@@ -16,16 +16,6 @@ final class Schema {
 		add_action( 'wp_head', array( self::class, 'output' ), 30 );
 	}
 
-	/**
-	 * Output conservative social metadata.
-	 *
-	 * @deprecated 3.1.0 Social meta is handled by SEO::output_social_meta() at priority 4.
-	 *             Kept as a no-op for external callers.
-	 */
-	public static function output_social_meta(): void {
-		_deprecated_function( __METHOD__, '3.1.0', 'SEO::output_social_meta' );
-	}
-
 	/** Output the JSON-LD graph. */
 	public static function output(): void {
 		if ( self::seo_provider_owns_schema() ) {
@@ -256,7 +246,7 @@ final class Schema {
 
 	/** Build breadcrumbs from visible navigation facts. */
 	private static function breadcrumb_schema( int $post_id, string $id ): array {
-		$visible = Public_Components::breadcrumb_items( $post_id );
+		$visible = Public_Nav::breadcrumb_items( $post_id );
 		$items   = array();
 		foreach ( $visible as $index => $item ) {
 			$items[] = array( '@type' => 'ListItem', 'position' => $index + 1, 'name' => $item['name'], 'item' => $item['url'] ?: get_permalink( $post_id ) );

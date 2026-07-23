@@ -1,6 +1,6 @@
 <?php
 /**
- * Public navigation components extracted from Public_Components.
+ * Public navigation components.
  *
  * @package LongevityCore
  */
@@ -134,8 +134,10 @@ class Public_Nav {
 		$links = array( 'about' => __( 'About', 'longevity-core' ), 'editorial-policy' => __( 'Editorial Policy', 'longevity-core' ), 'medical-disclaimer' => __( 'Medical Disclaimer', 'longevity-core' ), 'affiliate-disclosure' => __( 'Affiliate Disclosure', 'longevity-core' ), 'corrections' => __( 'Corrections', 'longevity-core' ), 'testing-methodology' => __( 'Testing Methodology', 'longevity-core' ), 'privacy' => __( 'Privacy', 'longevity-core' ), 'terms' => __( 'Terms', 'longevity-core' ), 'contact' => __( 'Contact', 'longevity-core' ) );
 		$html  = '<nav class="longevity-policy-nav" aria-label="' . esc_attr__( 'Publication policies', 'longevity-core' ) . '"><ul>';
 		foreach ( $links as $slug => $label ) {
-			$page = get_page_by_path( $slug );
-			$url  = $page ? get_permalink( $page ) : home_url( '/' . $slug . '/' );
+			$url = Routes::public_page_url( $slug );
+			if ( null === $url ) {
+				$url = home_url( '/' . $slug . '/' );
+			}
 			$html .= '<li><a href="' . esc_url( $url ) . '">' . esc_html( $label ) . '</a></li>';
 		}
 		return $html . '</ul></nav>';

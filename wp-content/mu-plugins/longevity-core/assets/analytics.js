@@ -40,11 +40,26 @@
   document.addEventListener('click', (event) => {
     const target = event.target.closest('[data-lel-event]');
     if (!target) return;
+    // Select elements emit on change, not click.
+    if (target instanceof HTMLSelectElement) return;
     push(target.dataset.lelEvent, {
       placement: target.dataset.placement,
       merchant: target.dataset.merchant,
       destination_domain: target.hostname
     });
+  });
+
+  document.addEventListener('change', (event) => {
+    const target = event.target;
+    if (target instanceof HTMLSelectElement && target.dataset.lelEvent) {
+      push(target.dataset.lelEvent, {
+        placement: target.dataset.placement,
+        category: target.dataset.category,
+        product_category: target.dataset.category,
+        sort: target.value,
+        value: target.value
+      });
+    }
   });
 
   document.addEventListener('toggle', (event) => {

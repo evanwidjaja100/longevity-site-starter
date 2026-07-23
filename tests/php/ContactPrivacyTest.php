@@ -23,6 +23,7 @@ final class ContactPrivacyTest extends TestCase {
 		self::assertStringContainsString( 'Do not submit diagnoses', $html );
 		self::assertStringContainsString( 'class="longevity-honeypot"', $html );
 		self::assertStringContainsString( 'aria-hidden="true"', $html );
+		self::assertStringContainsString( ' inert', $html );
 		self::assertStringContainsString( 'tabindex="-1"', $html );
 	}
 }

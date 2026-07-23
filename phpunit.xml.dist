@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <phpunit bootstrap="tests/php/bootstrap.php" colors="true" cacheDirectory=".phpunit.cache" failOnWarning="true" failOnRisky="true" failOnSkipped="true" failOnIncomplete="true" beStrictAboutTestsThatDoNotTestAnything="true">
   <testsuites>
-    <testsuite name="Longevity Core">
-      <directory suffix="Test.php">tests/php</directory>
-    </testsuite>
+		<testsuite name="Longevity Core">
+			<directory suffix="Test.php">tests/php</directory>
+			<exclude>tests/php/RoutesTest.php</exclude>
+		</testsuite>
   </testsuites>
 </phpunit>

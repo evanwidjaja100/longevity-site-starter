@@ -1,6 +1,7 @@
 <?php
 
-use Longevity\Core\Public_Components;
+use Longevity\Core\Public_Trust;
+use Longevity\Core\Public_Nav;
 use PHPUnit\Framework\TestCase;
 
 final class PublicComponentsTest extends TestCase {
@@ -10,14 +11,14 @@ final class PublicComponentsTest extends TestCase {
 	}
 
 	public function test_render_medical_disclaimer_contains_class_and_text(): void {
-		$html = Public_Components::render_medical_disclaimer();
+		$html = Public_Trust::render_medical_disclaimer();
 		self::assertStringContainsString( 'longevity-medical-disclaimer', $html );
 		self::assertStringContainsString( 'Medical disclaimer:', $html );
 		self::assertStringContainsString( 'educational', $html );
 	}
 
 	public function test_render_medical_disclaimer_uses_note_role(): void {
-		$html = Public_Components::render_medical_disclaimer();
+		$html = Public_Trust::render_medical_disclaimer();
 		self::assertStringContainsString( 'role="note"', $html );
 	}
 
@@ -30,7 +31,7 @@ final class PublicComponentsTest extends TestCase {
 			10 => 'http://example.com/about/',
 			20 => 'http://example.com/privacy/',
 		);
-		$html = Public_Components::render_policy_links();
+		$html = Public_Nav::render_policy_links();
 		self::assertStringContainsString( 'longevity-policy-nav', $html );
 		self::assertStringContainsString( 'About', $html );
 		self::assertStringContainsString( 'Editorial Policy', $html );
@@ -41,7 +42,7 @@ final class PublicComponentsTest extends TestCase {
 	public function test_render_policy_links_falls_back_to_home_url_when_page_missing(): void {
 		$GLOBALS['lel_test_pages_by_slug'] = array();
 		$GLOBALS['lel_test_permalinks'] = array();
-		$html = Public_Components::render_policy_links();
+		$html = Public_Nav::render_policy_links();
 		self::assertStringContainsString( '/about/', $html );
 		self::assertStringContainsString( '/privacy/', $html );
 	}

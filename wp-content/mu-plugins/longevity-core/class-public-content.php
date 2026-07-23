@@ -1,6 +1,6 @@
 <?php
 /**
- * Public content components extracted from Public_Components.
+ * Public content components.
  *
  * @package LongevityCore
  */

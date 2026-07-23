@@ -196,7 +196,7 @@ final class Admin_UI {
 			$value     = wp_unslash( $_POST[ $key ] );
 			$sanitized = Meta_Registry::sanitize_by_key( $key, $value );
 			$old       = get_post_meta( $post_id, $key, true );
-			if ( self::is_service_only_transition( $key, $sanitized ) || ( 'medical_review_attested' === $key && (bool) $sanitized ) ) {
+			if ( Publication_Gates::service_only_meta( $key, $sanitized ) ) {
 				if ( $old !== $sanitized ) {
 					Audit_Log::record( 'workflow_transition_deferred', 'post', $post_id, array( 'field' => $key, 'requested_value' => is_scalar( $sanitized ) ? (string) $sanitized : '' ), $user_id, 'classic' );
 				}
@@ -520,19 +520,6 @@ final class Admin_UI {
 	/** Whether the current actor may edit a field. */
 	private static function can_edit_field( int $post_id, string $key ): bool {
 		return Meta_Authorization::can_write( $key, $post_id, get_current_user_id(), 'classic' );
-	}
-
-	/** Final workflow values are written only by Approval_Service after validation. */
-	private static function is_service_only_transition( string $key, $value ): bool {
-		$value = is_scalar( $value ) ? (string) $value : '';
-		$final_values = array(
-			'fact_check_status'           => array( 'complete' ),
-			'medical_review_status'        => array( 'complete' ),
-			'testing_status'               => array( 'approved' ),
-			'affiliate_disclosure_status'  => array( 'approved', 'complete' ),
-			'editorial_approval_status'    => array( 'ready', 'published' ),
-		);
-		return isset( $final_values[ $key ] ) && in_array( $value, $final_values[ $key ], true );
 	}
 
 	/** Presence marker prevents absent/unrendered protected booleans from being cleared. */

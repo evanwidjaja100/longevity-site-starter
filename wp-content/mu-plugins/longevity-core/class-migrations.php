@@ -2,6 +2,10 @@
 /**
  * Idempotent internal data-version migrations.
  *
+ * Migrations run exclusively via the `wp longevity migrate` CLI command,
+ * never during ordinary web requests. A global lock prevents concurrent
+ * execution and data migrations are chunked for resumability.
+ *
  * @package LongevityCore
  */
 
@@ -9,35 +13,125 @@ namespace Longevity\Core;
 
 defined( 'ABSPATH' ) || exit;
 
-/** Advances additive, restart-safe governance migrations. */
+/** Advances additive, restart-safe governance migrations via explicit CLI invocation. */
 final class Migrations {
-	public const CURRENT_VERSION = 6;
+	public const CURRENT_VERSION = 9;
 
-	/** Register the version check. */
+	/** Lock time-to-live in seconds. */
+	private const LOCK_TTL = 300;
+
+	/** Batch size for chunked data migrations. */
+	private const BATCH_SIZE = 200;
+
+	/**
+	 * Register the version check. Migrations no longer run on web requests.
+	 * The init hook only records pending state for readiness reporting.
+	 */
 	public static function init(): void {
-		add_action( 'init', array( self::class, 'maybe_run' ), 1 );
+		// Intentionally empty: migrations are run via `wp longevity migrate`.
+		// Readiness reporting checks lel_data_version directly.
 	}
 
-	/** Apply only missing versions and record success after each completed step. */
-	public static function maybe_run(): void {
+	/**
+	 * Apply only missing versions under a global lock.
+	 * Called exclusively from the CLI migrate command.
+	 *
+	 * @param bool $force Override a stale lock.
+	 * @return array{success: bool, migrated: list<int>, error: string}
+	 */
+	public static function run_migrations( bool $force = false ): array {
+		if ( ! self::wordpress_ready() ) {
+			return array( 'success' => false, 'migrated' => array(), 'error' => 'WordPress is not ready.' );
+		}
 		$current = (int) get_option( 'lel_data_version', 0 );
 		if ( $current >= self::CURRENT_VERSION ) {
-			return;
+			return array( 'success' => true, 'migrated' => array(), 'error' => '' );
 		}
-		for ( $version = $current + 1; $version <= self::CURRENT_VERSION; ++$version ) {
-			try {
+		if ( ! self::acquire_lock( $force ) ) {
+			$lock = get_option( 'lel_migration_lock', array() );
+			return array( 'success' => false, 'migrated' => array(), 'error' => sprintf( 'Migration lock held by PID %s (expires %s). Use --force to override.', $lock['owner'] ?? 'unknown', gmdate( DATE_W3C, (int) ( $lock['expires_at'] ?? 0 ) ) ) );
+		}
+		$migrated = array();
+		try {
+			for ( $version = $current + 1; $version <= self::CURRENT_VERSION; ++$version ) {
 				self::run_version( $version );
 				update_option( 'lel_data_version', $version, false );
 				delete_option( 'lel_data_migration_error' );
+				delete_option( 'lel_migration_cursor_' . $version );
+				$migrated[] = $version;
 				Audit_Log::record( 'migration_completed', 'system', 0, array( 'version' => $version ), 0, 'migration' );
-			} catch ( \Throwable $error ) {
-				update_option( 'lel_data_migration_error', array( 'version' => $version, 'time' => gmdate( DATE_W3C ) ), false );
-				Audit_Log::record( 'migration_failed', 'system', 0, array( 'version' => $version, 'error_class' => get_class( $error ) ), 0, 'migration' );
-				if ( function_exists( 'error_log' ) ) {
-					error_log( sprintf( 'Longevity Core migration %d failed.', $version ) );
-				}
-				return;
 			}
+		} catch ( \Throwable $error ) {
+			$failed_version = $current + count( $migrated ) + 1;
+			update_option( 'lel_data_migration_error', array( 'version' => $failed_version, 'time' => gmdate( DATE_W3C ), 'message' => substr( $error->getMessage(), 0, 255 ) ), false );
+			Audit_Log::record( 'migration_failed', 'system', 0, array( 'version' => $failed_version, 'error_class' => get_class( $error ) ), 0, 'migration' );
+			if ( function_exists( 'error_log' ) ) {
+				error_log( sprintf( 'Longevity Core migration %d failed: %s', $failed_version, $error->getMessage() ) );
+			}
+			return array( 'success' => false, 'migrated' => $migrated, 'error' => sprintf( 'Migration %d failed: %s', $failed_version, $error->getMessage() ) );
+		} finally {
+			self::release_lock();
+		}
+		return array( 'success' => true, 'migrated' => $migrated, 'error' => '' );
+	}
+
+	/** Legacy entry point retained for backward compatibility. Does NOT run migrations. */
+	public static function maybe_run(): void {
+		// No-op on web requests. Migrations require explicit CLI invocation.
+	}
+
+	/** Whether WordPress has finished creating the tables used by MU-plugin hooks. */
+	public static function wordpress_ready(): bool {
+		if ( function_exists( 'wp_installing' ) && wp_installing() ) {
+			return false;
+		}
+		global $wpdb;
+		if ( ! isset( $wpdb ) || ! method_exists( $wpdb, 'get_var' ) || ! method_exists( $wpdb, 'prepare' ) || empty( $wpdb->options ) ) {
+			return false;
+		}
+		$options_table = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->options ) );
+		return $options_table === $wpdb->options;
+	}
+
+	/** Whether migrations are pending (for readiness reporting). */
+	public static function is_pending(): bool {
+		return (int) get_option( 'lel_data_version', 0 ) < self::CURRENT_VERSION;
+	}
+
+	/** Current migration error state. */
+	public static function error_state(): ?array {
+		$error = get_option( 'lel_data_migration_error', false );
+		return is_array( $error ) ? $error : null;
+	}
+
+	/** Acquire the global migration lock. */
+	private static function acquire_lock( bool $force = false ): bool {
+		$lock = get_option( 'lel_migration_lock', null );
+		if ( is_array( $lock ) && isset( $lock['expires_at'] ) && (int) $lock['expires_at'] > time() && ! $force ) {
+			return false;
+		}
+		if ( $force && is_array( $lock ) && isset( $lock['expires_at'] ) && (int) $lock['expires_at'] > time() ) {
+			Audit_Log::record( 'migration_lock_forced', 'system', 0, array( 'previous_owner' => $lock['owner'] ?? 0 ), 0, 'migration' );
+		}
+		update_option( 'lel_migration_lock', array(
+			'owner'       => function_exists( 'getmypid' ) ? getmypid() : 0,
+			'acquired_at' => time(),
+			'expires_at'  => time() + self::LOCK_TTL,
+		), false );
+		return true;
+	}
+
+	/** Release the global migration lock. */
+	private static function release_lock(): void {
+		delete_option( 'lel_migration_lock' );
+	}
+
+	/** Extend the lock TTL during long-running batches. */
+	private static function extend_lock(): void {
+		$lock = get_option( 'lel_migration_lock', null );
+		if ( is_array( $lock ) ) {
+			$lock['expires_at'] = time() + self::LOCK_TTL;
+			update_option( 'lel_migration_lock', $lock, false );
 		}
 	}
 
@@ -73,6 +167,21 @@ final class Migrations {
 			add_option( 'lel_cron_heartbeat_at', '', '', false );
 			add_option( 'lel_require_upload_writes', false, '', false );
 		}
+		if ( 7 === $version ) {
+			Roles::register();
+		}
+		if ( 8 === $version ) {
+			self::load_db_delta();
+			Audit_Log::install();
+			self::backfill_audit_sequence();
+			Roles::reconcile();
+		}
+		if ( 9 === $version ) {
+			self::load_db_delta();
+			Dependency_Index::install();
+			Invalidation_Queue::install();
+			Public_Contact::install_rate_table();
+		}
 	}
 
 	/** Ensure WordPress's additive schema helper is available. */
@@ -98,10 +207,9 @@ final class Migrations {
 		update_option( 'lel_legacy_reviewer_verifications_marked', $count, false );
 	}
 
-	/** Existing status strings lack immutable fingerprints and require reapproval. */
+	/** Existing status strings lack immutable fingerprints and require reapproval. Chunked for resumability. */
 	private static function mark_legacy_approvals_unbound(): void {
-		$posts = get_posts( array( 'post_type' => array( 'post', 'review' ), 'post_status' => 'any', 'fields' => 'ids', 'posts_per_page' => -1, 'no_found_rows' => true ) );
-		$count = 0;
+		$cursor = (int) get_option( 'lel_migration_cursor_5', 0 );
 		$legacy = array(
 			'fact_check_status'           => array( 'complete' ),
 			'medical_review_status'       => array( 'complete' ),
@@ -109,15 +217,35 @@ final class Migrations {
 			'affiliate_disclosure_status' => array( 'complete', 'approved' ),
 			'editorial_approval_status'   => array( 'ready', 'published' ),
 		);
-		foreach ( $posts as $post_id ) {
-			foreach ( $legacy as $key => $completed_values ) {
-				if ( in_array( (string) get_post_meta( (int) $post_id, $key, true ), $completed_values, true ) && ! Approval_Repository::current( (int) $post_id, self::approval_type_for_status( $key ) ) ) {
-					update_post_meta( (int) $post_id, $key, 'legacy_unbound' );
-					++$count;
+		$total_marked = (int) get_option( 'lel_legacy_approvals_marked', 0 );
+		while ( true ) {
+			$posts = get_posts( array(
+				'post_type'      => array( 'post', 'review' ),
+				'post_status'    => 'any',
+				'fields'         => 'ids',
+				'posts_per_page' => self::BATCH_SIZE,
+				'offset'         => $cursor,
+				'orderby'        => 'ID',
+				'order'          => 'ASC',
+				'no_found_rows'  => true,
+			) );
+			if ( empty( $posts ) ) {
+				break;
+			}
+			foreach ( $posts as $post_id ) {
+				foreach ( $legacy as $key => $completed_values ) {
+					if ( in_array( (string) get_post_meta( (int) $post_id, $key, true ), $completed_values, true ) && ! Approval_Repository::current( (int) $post_id, self::approval_type_for_status( $key ) ) ) {
+						update_post_meta( (int) $post_id, $key, 'legacy_unbound' );
+						++$total_marked;
+					}
 				}
 			}
+			$cursor += self::BATCH_SIZE;
+			update_option( 'lel_migration_cursor_5', $cursor, false );
+			update_option( 'lel_legacy_approvals_marked', $total_marked, false );
+			self::extend_lock();
 		}
-		update_option( 'lel_legacy_approvals_marked', $count, false );
+		update_option( 'lel_legacy_approvals_marked', $total_marked, false );
 	}
 
 	/** Map compatibility statuses to snapshot types. */
@@ -129,5 +257,29 @@ final class Migrations {
 			'affiliate_disclosure_status' => 'commercial',
 			'editorial_approval_status'   => 'editorial',
 		)[ $key ] ?? '';
+	}
+
+	/** Assign sequence numbers to pre-existing audit rows that lack them. Chunked with keyset pagination. */
+	private static function backfill_audit_sequence(): void {
+		global $wpdb;
+		if ( ! isset( $wpdb ) || ! method_exists( $wpdb, 'query' ) || ! Audit_Log::exists() ) {
+			return;
+		}
+		$table  = Audit_Log::table_name();
+		$cursor = (int) get_option( 'lel_migration_cursor_8', 0 );
+		$seq    = (int) $wpdb->get_var( "SELECT COALESCE(MAX(sequence), 0) FROM {$table} WHERE sequence > 0" );
+		while ( true ) {
+			$rows = $wpdb->get_col( $wpdb->prepare( "SELECT id FROM {$table} WHERE sequence = 0 AND id > %d ORDER BY id ASC LIMIT %d", $cursor, self::BATCH_SIZE ) );
+			if ( empty( $rows ) ) {
+				break;
+			}
+			foreach ( $rows as $row_id ) {
+				++$seq;
+				$wpdb->query( $wpdb->prepare( "UPDATE {$table} SET sequence = %d WHERE id = %d", $seq, (int) $row_id ) );
+			}
+			$cursor = (int) end( $rows );
+			update_option( 'lel_migration_cursor_8', $cursor, false );
+			self::extend_lock();
+		}
 	}
 }

@@ -3,6 +3,7 @@
 
 define( 'ABSPATH', __DIR__ . '/' );
 define( 'OBJECT', 'OBJECT' );
+define( 'ARRAY_A', 'ARRAY_A' );
 define( 'LONGEVITY_CORE_PATH', dirname( __DIR__, 2 ) . '/wp-content/mu-plugins/longevity-core/' );
 define( 'LONGEVITY_CORE_VERSION', '3.0.0' );
 define( 'LONGEVITY_CORE_URL', 'http://example.com/wp-content/mu-plugins/longevity-core/' );
@@ -130,6 +131,90 @@ if ( ! function_exists( 'get_the_title' ) ) {
 	}
 }
 
+if ( ! isset( $GLOBALS['wpdb'] ) ) {
+	$GLOBALS['wpdb'] = new class {
+		public string $prefix = 'wp_';
+		public int $insert_id = 0;
+		private array $rows = array(
+			'wp_lel_approval_snapshots' => array(),
+			'wp_lel_audit_events'       => array(),
+		);
+
+		public function insert( string $table, array $data ): int {
+			$this->insert_id = count( $this->rows[ $table ] ?? array() ) + 1;
+			$data['id']      = $this->insert_id;
+			$this->rows[ $table ][] = $data;
+			return 1;
+		}
+
+		public function prepare( string $query, ...$args ): string {
+			foreach ( $args as $arg ) {
+				$replacement = is_int( $arg ) ? (string) $arg : "'" . addslashes( (string) $arg ) . "'";
+				$query       = preg_replace( '/%[ds]/', $replacement, $query, 1 ) ?? $query;
+			}
+			return $query;
+		}
+
+		public function get_row( string $query, string $output = OBJECT ) {
+			preg_match( '/post_id = (\d+)/', $query, $post_match );
+			preg_match( "/approval_type = '([^']+)'/", $query, $type_match );
+			$rows = array_filter(
+				$this->rows['wp_lel_approval_snapshots'],
+				static function ( array $row ) use ( $post_match, $type_match ): bool {
+					return (int) $row['post_id'] === (int) ( $post_match[1] ?? 0 )
+						&& (string) $row['approval_type'] === (string) ( $type_match[1] ?? '')
+						&& 'approved' === (string) $row['approval_status']
+						&& empty( $row['invalidated_at'] );
+				}
+			);
+			$rows = array_values( $rows );
+			$row = $rows ? end( $rows ) : null;
+			return $row ? ( ARRAY_A === $output ? $row : (object) $row ) : null;
+		}
+
+		public function get_var( string $query ) {
+			if ( false !== strpos( $query, 'GET_LOCK' ) || false !== strpos( $query, 'RELEASE_LOCK' ) ) {
+				return '1';
+			}
+			if ( false !== strpos( $query, 'SELECT 1' ) ) {
+				return '1';
+			}
+			if ( preg_match( '/SHOW TABLES LIKE [\'\"]?([^\'\" ]+)/', $query, $match ) ) {
+				return isset( $this->rows[ $match[1] ] ) ? $match[1] : null;
+			}
+			if ( false !== strpos( $query, 'SELECT event_hash' ) ) {
+				$rows = $this->rows['wp_lel_audit_events'];
+				$row  = $rows ? end( $rows ) : null;
+				return $row['event_hash'] ?? '';
+			}
+			return 0;
+		}
+
+		public function query( string $query ): int {
+			if ( 0 === stripos( trim( $query ), 'UPDATE wp_lel_approval_snapshots' ) ) {
+				preg_match( '/post_id = (\d+)/', $query, $post_match );
+				preg_match( "/approval_type = '([^']+)'/", $query, $type_match );
+				$count = 0;
+				foreach ( $this->rows['wp_lel_approval_snapshots'] as &$row ) {
+					if ( (int) $row['post_id'] === (int) ( $post_match[1] ?? 0 ) && (string) $row['approval_type'] === (string) ( $type_match[1] ?? '' ) && empty( $row['invalidated_at'] ) ) {
+						$row['invalidated_at'] = '2026-07-22 00:00:00';
+						++$count;
+					}
+				}
+				unset( $row );
+				return $count;
+			}
+			return 0;
+		}
+	};
+}
+if ( ! function_exists( 'get_post_thumbnail_id' ) ) {
+	function get_post_thumbnail_id( $post ): int {
+		$post_id = is_object( $post ) ? (int) $post->ID : (int) $post;
+		return (int) ( $GLOBALS['lel_test_thumbnails'][ $post_id ] ?? 0 );
+	}
+}
+
 require_once LONGEVITY_CORE_PATH . 'class-gate-result.php';
 require_once LONGEVITY_CORE_PATH . 'class-date-validator.php';
 require_once LONGEVITY_CORE_PATH . 'class-runtime-config.php';
@@ -141,6 +226,7 @@ require_once LONGEVITY_CORE_PATH . 'class-meta-authorization.php';
 require_once LONGEVITY_CORE_PATH . 'class-reviewer-credentials.php';
 require_once LONGEVITY_CORE_PATH . 'class-approval-fingerprint.php';
 require_once LONGEVITY_CORE_PATH . 'class-approval-repository.php';
+require_once LONGEVITY_CORE_PATH . 'class-publication-lock.php';
 require_once LONGEVITY_CORE_PATH . 'class-audit-log.php';
 require_once LONGEVITY_CORE_PATH . 'class-approval-service.php';
 require_once LONGEVITY_CORE_PATH . 'class-claims.php';
@@ -148,7 +234,10 @@ require_once LONGEVITY_CORE_PATH . 'class-affiliate-registry.php';
 require_once LONGEVITY_CORE_PATH . 'class-publication-gates.php';
 require_once LONGEVITY_CORE_PATH . 'class-rankings.php';
 require_once LONGEVITY_CORE_PATH . 'class-public-contact.php';
-require_once LONGEVITY_CORE_PATH . 'class-public-components.php';
+require_once LONGEVITY_CORE_PATH . 'class-public-content.php';
+require_once LONGEVITY_CORE_PATH . 'class-public-nav.php';
+require_once LONGEVITY_CORE_PATH . 'class-public-trust.php';
+require_once LONGEVITY_CORE_PATH . 'class-public-rankings.php';
 require_once LONGEVITY_CORE_PATH . 'class-admin-ui.php';
 require_once LONGEVITY_CORE_PATH . 'class-content-discovery.php';
 require_once LONGEVITY_CORE_PATH . 'class-rest-api.php';
@@ -432,6 +521,7 @@ if ( ! function_exists( 'get_posts' ) ) {
 if ( ! class_exists( 'WP_Query' ) ) {
 	class WP_Query {
 		public array $query_vars = array();
+		public int $found_posts = 0;
 		public bool $_is_main_query = true;
 		public bool $_is_search = false;
 		public bool $_is_category = false;
@@ -453,6 +543,8 @@ if ( ! class_exists( 'WP_Post' ) ) {
 	class WP_Post {
 		public int $ID = 0;
 		public string $post_type = 'post';
+		public string $post_title = '';
+		public string $post_excerpt = '';
 		public string $post_content = '';
 		public string $post_author = '0';
 		public string $post_status = 'draft';
@@ -503,6 +595,24 @@ if ( ! class_exists( 'WP_REST_Request' ) ) {
 		}
 		public function offsetExists( $offset ): bool {
 			return isset( $this->params[ $offset ] );
+		}
+	}
+}
+
+if ( ! class_exists( 'WP_Error' ) ) {
+	class WP_Error {
+		private array $errors = array();
+		private string $code = '';
+		public function __construct( string $code = '', string $message = '', array $data = array() ) {
+			$this->code = $code;
+			if ( '' !== $message ) {
+				$this->errors[ $code ][] = $message;
+			}
+		}
+		public function get_error_code(): string { return $this->code; }
+		public function get_error_message( string $code = '' ): string {
+			if ( '' === $code ) { $code = $this->code; }
+			return $this->errors[ $code ][0] ?? '';
 		}
 	}
 }

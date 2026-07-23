@@ -18,8 +18,8 @@ final class RestPublicBoundaryTest extends TestCase {
 	public function test_material_evidence_and_commercial_relationships_fail_closed_without_current_approvals(): void {
 		$source = (string) file_get_contents( LONGEVITY_CORE_PATH . 'class-rest-api.php' );
 
-		self::assertStringContainsString( "Approval_Service::is_current( $post_id, 'fact_check' )", $source );
-		self::assertStringContainsString( "Approval_Service::is_current( $post_id, 'commercial' )", $source );
+		self::assertStringContainsString( "Approval_Service::is_current( \$post_id, 'fact_check' )", $source );
+		self::assertStringContainsString( "Approval_Service::is_current( \$post_id, 'commercial' )", $source );
 		self::assertStringNotContainsString( "'commercial_relationship' => (string) get_post_meta", $source );
 	}
 

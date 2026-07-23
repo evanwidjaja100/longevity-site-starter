@@ -1,6 +1,6 @@
 <?php
 /**
- * Public contact components extracted from Public_Components.
+ * Public contact components.
  *
  * @package LongevityCore
  */
@@ -69,7 +69,7 @@ class Public_Contact {
 		$html = '<form class="longevity-contact-form" method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '">';
 		$html .= '<input type="hidden" name="action" value="longevity_contact_submit">';
 		$html .= '<input type="hidden" name="_wpnonce" value="' . esc_attr( $nonce ) . '">';
-		$html .= '<div class="longevity-honeypot" aria-hidden="true"><label for="longevity-website">' . esc_html__( 'Website', 'longevity-core' ) . '</label><input type="text" name="longevity_website" id="longevity-website" tabindex="-1" autocomplete="off"></div>';
+		$html .= '<div class="longevity-honeypot" aria-hidden="true" inert><label for="longevity-website">' . esc_html__( 'Website', 'longevity-core' ) . '</label><input type="text" name="longevity_website" id="longevity-website" tabindex="-1" autocomplete="off"></div>';
 
 		$html .= '<p><label for="longevity-contact-name">' . esc_html__( 'Name', 'longevity-core' ) . ' <span class="required">*</span></label>';
 		$html .= '<input type="text" name="longevity_contact_name" id="longevity-contact-name" required maxlength="100"></p>';
@@ -102,34 +102,115 @@ class Public_Contact {
 
 	/** Schedule daily deletion of expired private contact records. */
 	public static function schedule_retention(): void {
+		if ( ! Migrations::wordpress_ready() ) {
+			return;
+		}
 		if ( ! wp_next_scheduled( self::RETENTION_HOOK ) ) {
 			wp_schedule_event( time() + DAY_IN_SECONDS, 'daily', self::RETENTION_HOOK );
 		}
 	}
 
-	/** Permanently remove contact records after the configured retention period. */
+	/** Permanently remove contact records after the configured retention period. Processes multiple batches within a runtime cap. */
 	public static function run_retention_cleanup(): int {
 		$retention_days = min( 365, max( 1, (int) get_option( 'lel_contact_retention_days', 90 ) ) );
 		$cutoff         = gmdate( 'Y-m-d H:i:s', time() - ( $retention_days * DAY_IN_SECONDS ) );
-		$messages       = get_posts(
-			array(
-				'post_type'      => 'longevity_message',
-				'post_status'    => 'any',
-				'posts_per_page' => 100,
-				'fields'         => 'ids',
-				'date_query'     => array( array( 'before' => $cutoff, 'inclusive' => true, 'column' => 'post_date_gmt' ) ),
-			)
-		);
-		$deleted = 0;
-		foreach ( $messages as $message_id ) {
-			if ( wp_delete_post( (int) $message_id, true ) ) {
-				++$deleted;
+		$runtime_cap    = 25; // seconds
+		$start          = time();
+		$total_deleted  = 0;
+
+		while ( true ) {
+			$messages = get_posts(
+				array(
+					'post_type'      => 'longevity_message',
+					'post_status'    => 'any',
+					'posts_per_page' => 100,
+					'fields'         => 'ids',
+					'date_query'     => array( array( 'before' => $cutoff, 'inclusive' => true, 'column' => 'post_date_gmt' ) ),
+					'no_found_rows'  => true,
+				)
+			);
+			if ( empty( $messages ) ) {
+				break;
+			}
+			foreach ( $messages as $message_id ) {
+				if ( wp_delete_post( (int) $message_id, true ) ) {
+					++$total_deleted;
+				}
+			}
+			// Stop if runtime cap exceeded; reschedule for remaining backlog.
+			if ( ( time() - $start ) >= $runtime_cap ) {
+				wp_schedule_single_event( time() + 60, self::RETENTION_HOOK );
+				break;
 			}
 		}
-		if ( $deleted > 0 ) {
-			Audit_Log::record( 'contact_retention_cleanup', 'system', 0, array( 'deleted_count' => $deleted, 'retention_days' => $retention_days ), 0, 'cron' );
+
+		if ( $total_deleted > 0 ) {
+			Audit_Log::record( 'contact_retention_cleanup', 'system', 0, array( 'deleted_count' => $total_deleted, 'retention_days' => $retention_days ), 0, 'cron' );
 		}
-		return $deleted;
+		return $total_deleted;
+	}
+
+	/**
+	 * Atomically increment a rate-limit counter.
+	 *
+	 * Uses wp_cache_incr/wp_cache_add when a persistent object cache is available
+	 * (atomic under concurrency). Falls back to a dedicated DB table with
+	 * INSERT ... ON DUPLICATE KEY UPDATE for environments without object cache.
+	 *
+	 * @param string $key Transient-style key identifying the rate bucket.
+	 * @return int The new count after increment.
+	 */
+	private static function atomic_rate_increment( string $key ): int {
+		$ttl = HOUR_IN_SECONDS;
+
+		// Attempt atomic object-cache increment first.
+		$added = wp_cache_add( $key, 1, 'longevity_rate', $ttl );
+		if ( $added ) {
+			return 1;
+		}
+		$incremented = wp_cache_incr( $key, 1, 'longevity_rate' );
+		if ( false !== $incremented && is_numeric( $incremented ) ) {
+			return (int) $incremented;
+		}
+
+		// Fallback: dedicated DB table with atomic upsert.
+		global $wpdb;
+		$table = $wpdb->prefix . 'lel_rate_limits';
+
+		// Ensure table exists (lightweight; idempotent via dbDelta in install).
+		if ( $table !== $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table ) ) ) {
+			self::install_rate_table();
+		}
+
+		$expires_at = gmdate( 'Y-m-d H:i:s', time() + $ttl );
+		$wpdb->query(
+			$wpdb->prepare(
+				"INSERT INTO {$table} (rate_key, hit_count, expires_at) VALUES (%s, 1, %s) ON DUPLICATE KEY UPDATE hit_count = IF(expires_at < NOW(), 1, hit_count + 1), expires_at = IF(expires_at < NOW(), VALUES(expires_at), expires_at)",
+				$key,
+				$expires_at
+			)
+		);
+
+		$count = $wpdb->get_var( $wpdb->prepare( "SELECT hit_count FROM {$table} WHERE rate_key = %s AND expires_at >= NOW()", $key ) );
+		return max( 1, (int) $count );
+	}
+
+	/** Create the rate-limit table (additive, idempotent). */
+	public static function install_rate_table(): void {
+		global $wpdb;
+		if ( ! isset( $wpdb ) || ! function_exists( 'dbDelta' ) ) {
+			return;
+		}
+		$charset = method_exists( $wpdb, 'get_charset_collate' ) ? $wpdb->get_charset_collate() : '';
+		$table   = $wpdb->prefix . 'lel_rate_limits';
+		$sql     = "CREATE TABLE {$table} (
+			rate_key varchar(191) NOT NULL,
+			hit_count int(10) unsigned NOT NULL DEFAULT 1,
+			expires_at datetime NOT NULL,
+			PRIMARY KEY  (rate_key),
+			KEY expires_at (expires_at)
+		) {$charset};";
+		dbDelta( $sql );
 	}
 
 	/** Handle contact form submission. */
@@ -146,12 +227,11 @@ class Public_Contact {
 
 		$identifier = self::rate_limit_identifier( self::get_client_ip() );
 		$key        = 'lel_contact_count_' . $identifier;
-		$count = (int) get_transient( $key );
-		if ( $count >= 5 ) {
+		$count      = self::atomic_rate_increment( $key );
+		if ( $count > 5 ) {
 			set_transient( 'lel_contact_block_' . $identifier, '1', HOUR_IN_SECONDS );
 			wp_die( esc_html__( 'Too many submissions. Please try again later.', 'longevity-core' ), 429 );
 		}
-		set_transient( $key, $count + 1, HOUR_IN_SECONDS );
 
 		$name    = sanitize_text_field( wp_unslash( $_POST['longevity_contact_name'] ?? '' ) );
 		$email   = sanitize_email( wp_unslash( $_POST['longevity_contact_email'] ?? '' ) );
@@ -160,6 +240,23 @@ class Public_Contact {
 
 		if ( '' === $name || '' === $email || '' === $subject || '' === $message || ! in_array( $subject, self::SUBJECTS, true ) ) {
 			wp_die( esc_html__( 'All required fields must be completed.', 'longevity-core' ), 400 );
+		}
+		if ( ! is_email( $email ) ) {
+			wp_die( esc_html__( 'Please enter a valid email address.', 'longevity-core' ), 400 );
+		}
+		// Server-side length enforcement matching form constraints.
+		if ( mb_strlen( $name ) > 100 ) {
+			wp_die( esc_html__( 'Name is too long.', 'longevity-core' ), 400 );
+		}
+		if ( mb_strlen( $email ) > 254 ) {
+			wp_die( esc_html__( 'Email address is too long.', 'longevity-core' ), 400 );
+		}
+		if ( mb_strlen( $message ) > 5000 ) {
+			wp_die( esc_html__( 'Message is too long.', 'longevity-core' ), 400 );
+		}
+		// Prevent header injection: reject CR/LF in name and email.
+		if ( preg_match( '/[\r\n]/', $name ) || preg_match( '/[\r\n]/', $email ) ) {
+			wp_die( esc_html__( 'Submission contains invalid characters.', 'longevity-core' ), 400 );
 		}
 
 		$post_id = wp_insert_post(

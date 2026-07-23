@@ -1,6 +1,6 @@
 <?php
 /**
- * Public trust/editorial components extracted from Public_Components.
+ * Public trust/editorial components.
  *
  * @package LongevityCore
  */

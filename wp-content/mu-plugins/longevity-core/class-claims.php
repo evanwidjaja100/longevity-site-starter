@@ -73,19 +73,15 @@ final class Claims {
 		if ( $user_id <= 0 ) {
 			return false;
 		}
-		if ( in_array( $field, array( 'last_edited_by', 'last_edited_at', 'verified_by', 'verified_at', 'verification_date', 'verification_snapshot_hash' ), true ) ) {
+		if ( in_array( $field, array( 'last_edited_by', 'last_edited_at', 'verified_by', 'verified_at', 'verification_date', 'verification_snapshot_hash', 'verification_status' ), true ) ) {
 			return false;
-		}
-		if ( 'verification_status' === $field ) {
-			$last_editor = (int) get_post_meta( $post_id, 'last_edited_by', true );
-			return user_can( $user_id, 'verify_claims' ) && $last_editor !== $user_id;
 		}
 		return user_can( $user_id, 'edit_claims' );
 	}
 
 	/** Verify the exact current claim snapshot through an explicit workflow service. */
 	public static function verify( int $post_id, int $actor_id ): bool {
-		if ( 'lel_claim' !== get_post_type( $post_id ) || ! self::can_write_field( 'verification_status', $post_id, $actor_id ) ) {
+		if ( 'lel_claim' !== get_post_type( $post_id ) || $actor_id <= 0 || ! user_can( $actor_id, 'verify_claims' ) || (int) get_post_meta( $post_id, 'last_edited_by', true ) === $actor_id ) {
 			Audit_Log::record( 'metadata_write_denied', 'claim', $post_id, array( 'field' => 'verification_status' ), $actor_id, 'workflow' );
 			return false;
 		}
@@ -133,18 +129,23 @@ final class Claims {
 		}
 		self::$tracking = true;
 		try {
-			if ( 'verification_status' === $meta_key && 'verified' === (string) $meta_value && self::can_write_field( $meta_key, $post_id, $actor ) ) {
-				$payload = array(
-					'claim_id'  => (string) get_post_meta( $post_id, 'claim_id', true ),
-					'claim_text'=> (string) get_post_meta( $post_id, 'claim_text', true ),
-					'source_id' => (string) get_post_meta( $post_id, 'source_id', true ),
-					'status'    => 'verified',
-				);
-				update_post_meta( $post_id, 'verified_by', $actor );
-				update_post_meta( $post_id, 'verified_at', gmdate( DATE_ATOM ) );
-				update_post_meta( $post_id, 'verification_date', Date_Validator::today() );
-				update_post_meta( $post_id, 'verification_snapshot_hash', hash( 'sha256', Approval_Fingerprint::canonical_json( $payload ) ) );
-				Audit_Log::record( 'claim_verified', 'claim', $post_id, array( 'snapshot_hash' => hash( 'sha256', Approval_Fingerprint::canonical_json( $payload ) ) ), $actor, 'workflow' );
+			if ( 'verification_status' === $meta_key && 'verified' === (string) $meta_value ) {
+				if ( self::can_write_field( $meta_key, $post_id, $actor ) ) {
+					$payload = array(
+						'claim_id'  => (string) get_post_meta( $post_id, 'claim_id', true ),
+						'claim_text'=> (string) get_post_meta( $post_id, 'claim_text', true ),
+						'source_id' => (string) get_post_meta( $post_id, 'source_id', true ),
+						'status'    => 'verified',
+					);
+					update_post_meta( $post_id, 'verified_by', $actor );
+					update_post_meta( $post_id, 'verified_at', gmdate( DATE_ATOM ) );
+					update_post_meta( $post_id, 'verification_date', Date_Validator::today() );
+					update_post_meta( $post_id, 'verification_snapshot_hash', hash( 'sha256', Approval_Fingerprint::canonical_json( $payload ) ) );
+					Audit_Log::record( 'claim_verified', 'claim', $post_id, array( 'snapshot_hash' => hash( 'sha256', Approval_Fingerprint::canonical_json( $payload ) ) ), $actor, 'workflow' );
+				} else {
+					update_post_meta( $post_id, 'verification_status', 'stale' );
+					Audit_Log::record( 'metadata_write_denied', 'claim', $post_id, array( 'field' => 'verification_status', 'reason' => 'direct_write_bypass' ), $actor, 'workflow' );
+				}
 			} elseif ( ! in_array( $meta_key, array( 'last_edited_by', 'last_edited_at', 'verified_by', 'verified_at', 'verification_date', 'verification_snapshot_hash' ), true ) ) {
 				update_post_meta( $post_id, 'last_edited_by', $actor );
 				update_post_meta( $post_id, 'last_edited_at', gmdate( DATE_ATOM ) );

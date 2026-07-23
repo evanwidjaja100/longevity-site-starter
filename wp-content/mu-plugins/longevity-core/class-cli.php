@@ -22,6 +22,7 @@ final class CLI {
 		\WP_CLI::add_command( 'longevity freshness', Freshness_Command::class );
 		\WP_CLI::add_command( 'longevity bootstrap', Bootstrap_Command::class );
 		\WP_CLI::add_command( 'longevity migrate', Migrate_Command::class );
+		\WP_CLI::add_command( 'longevity evidence', Evidence_Command::class );
 	}
 }
 
@@ -358,129 +359,6 @@ final class Sources_Command {
 			\WP_CLI::error( 'Source validation failed.' );
 		}
 		\WP_CLI::success( sprintf( 'Validated %d source row(s).', count( $rows ) ) );
-	}
-}
-
-/** Category route migration command. */
-final class Migrate_Command {
-
-	/**
-	 * Migrate category slugs from legacy long slugs to short canonical slugs.
-	 *
-	 * For each category defined in Routes:
-	 * 1. Detect the canonical short-slug term.
-	 * 2. Detect any long-slug legacy term.
-	 * 3. If only the long term exists, rename its slug.
-	 * 4. If both exist, merge assignments into the canonical term.
-	 *
-	 * ## OPTIONS
-	 * [--dry-run]     Preview changes without modifying the database.
-	 *
-	 * ## EXAMPLES
-	 *     wp longevity migrate category-routes
-	 *     wp longevity migrate category-routes --dry-run
-	 */
-	public function __invoke( array $args, array $assoc_args ): void {
-		$dry_run = isset( $assoc_args['dry-run'] );
-
-		$defs       = Routes::definitions();
-		$categories = $defs['categories'];
-		$changed    = 0;
-		$errors     = array();
-
-		foreach ( $categories as $key => $def ) {
-			$canonical_slug = $def['slug'];
-			$legacy_slugs   = $def['legacy_slugs'] ?? array();
-			$display_name   = $def['name'];
-
-			$canonical_term = get_term_by( 'slug', $canonical_slug, 'category' );
-
-			foreach ( $legacy_slugs as $legacy_slug ) {
-				$legacy_term = get_term_by( 'slug', $legacy_slug, 'category' );
-				if ( ! $legacy_term ) {
-					continue;
-				}
-
-				if ( $canonical_term && isset( $canonical_term->term_id ) && (int) $canonical_term->term_id !== (int) $legacy_term->term_id ) {
-					if ( $dry_run ) {
-						\WP_CLI::line( "[DRY RUN] Would merge '{$legacy_slug}' (ID {$legacy_term->term_id}) into '{$canonical_slug}' (ID {$canonical_term->term_id}) for {$display_name}" );
-						++$changed;
-						continue;
-					}
-
-					$merged = self::merge_terms( (int) $canonical_term->term_id, (int) $legacy_term->term_id, $display_name );
-					if ( $merged ) {
-						\WP_CLI::line( "Merged '{$legacy_slug}' into '{$canonical_slug}' for {$display_name}" );
-						++$changed;
-					} else {
-						$errors[] = "Failed to merge {$display_name} legacy '{$legacy_slug}' into '{$canonical_slug}'.";
-					}
-				} elseif ( ! $canonical_term || ! isset( $canonical_term->term_id ) ) {
-					if ( $dry_run ) {
-						\WP_CLI::line( "[DRY RUN] Would rename '{$legacy_slug}' (ID {$legacy_term->term_id}) to '{$canonical_slug}' for {$display_name}" );
-						++$changed;
-						continue;
-					}
-
-					$renamed = wp_update_term( (int) $legacy_term->term_id, 'category', array( 'slug' => $canonical_slug ) );
-					if ( ! is_wp_error( $renamed ) ) {
-						\WP_CLI::line( "Renamed '{$legacy_slug}' to '{$canonical_slug}' for {$display_name}" );
-						++$changed;
-					} else {
-						$errors[] = "Failed to rename {$display_name}: " . $renamed->get_error_message();
-					}
-				}
-			}
-		}
-
-		if ( $changed > 0 ) {
-			if ( ! $dry_run ) {
-				flush_rewrite_rules( false );
-				\WP_CLI::line( 'Rewrite rules flushed.' );
-			}
-		}
-
-		\WP_CLI::success( sprintf( 'Migration complete: %d change(s), %d error(s).', $changed, count( $errors ) ) );
-		if ( $errors ) {
-			\WP_CLI::halt( 1 );
-		}
-	}
-
-	/**
-	 * Merge posts and metadata from a legacy term into the canonical term.
-	 */
-	private static function merge_terms( int $canonical_id, int $legacy_id, string $display_name ): bool {
-		global $wpdb;
-
-		$legacy_posts = get_posts(
-			array(
-				'category'       => $legacy_id,
-				'fields'         => 'ids',
-				'posts_per_page' => -1,
-				'post_status'    => 'any',
-			)
-		);
-
-		foreach ( $legacy_posts as $post_id ) {
-			$result = wp_set_post_categories( $post_id, $canonical_id, true );
-			if ( is_wp_error( $result ) ) {
-				\WP_CLI::warning( "Failed to reassign post {$post_id} from {$display_name}: " . $result->get_error_message() );
-			}
-		}
-
-		$description = term_description( $legacy_id );
-		if ( $description ) {
-			$existing = term_description( $canonical_id );
-			if ( ! $existing ) {
-				wp_update_term( $canonical_id, 'category', array( 'description' => $description ) );
-			}
-		}
-
-		$deleted = wp_delete_term( $legacy_id, 'category' );
-		if ( is_wp_error( $deleted ) || false === $deleted ) {
-			return false;
-		}
-		return true;
 	}
 }
 
@@ -897,6 +775,27 @@ final class Bootstrap_Command {
 	}
 
 	/**
+	 * Create editorial roles and capabilities idempotently.
+	 *
+	 * ## OPTIONS
+	 * [--dry-run]     Preview changes without modifying the database.
+	 *
+	 * ## EXAMPLES
+	 *     wp longevity bootstrap roles
+	 *     wp longevity bootstrap roles --dry-run
+	 */
+	public function roles( array $args, array $assoc_args ): void {
+		unset( $args );
+		$dry_run = isset( $assoc_args['dry-run'] );
+		if ( $dry_run ) {
+			\WP_CLI::line( '[DRY RUN] Would register editorial roles and assign capabilities.' );
+			return;
+		}
+		Roles::register();
+		\WP_CLI::success( 'Editorial roles and capabilities registered.' );
+	}
+
+	/**
 	 * Run all bootstrap commands in sequence: pages, categories, content.
 	 *
 	 * ## OPTIONS
@@ -944,5 +843,150 @@ final class Freshness_Command {
 			\WP_CLI::error( 'Use `wp longevity freshness status` or `wp longevity freshness run`.' );
 		}
 		\WP_CLI::line( wp_json_encode( Freshness::status(), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+	}
+}
+
+/** Database migration command — runs pending migrations under a global lock. */
+final class Migrate_Command {
+	/**
+	 * Run pending governance data migrations.
+	 *
+	 * Migrations are idempotent, chunked, and resumable. They must be run
+	 * before promoting a new release to production traffic.
+	 *
+	 * ## OPTIONS
+	 * [--force]
+	 * : Override a stale migration lock.
+	 *
+	 * [--status]
+	 * : Display current migration state without running migrations.
+	 *
+	 * ## EXAMPLES
+	 *     wp longevity migrate
+	 *     wp longevity migrate --force
+	 *     wp longevity migrate --status
+	 */
+	public function __invoke( array $args, array $assoc_args ): void {
+		unset( $args );
+
+		if ( isset( $assoc_args['status'] ) ) {
+			$current = (int) get_option( 'lel_data_version', 0 );
+			$state   = array(
+				'current_version' => $current,
+				'target_version'  => Migrations::CURRENT_VERSION,
+				'pending'         => $current < Migrations::CURRENT_VERSION,
+				'last_error'      => Migrations::error_state(),
+				'lock'            => get_option( 'lel_migration_lock', null ),
+			);
+			\WP_CLI::line( wp_json_encode( $state, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+			return;
+		}
+
+		$force  = isset( $assoc_args['force'] );
+		$result = Migrations::run_migrations( $force );
+
+		if ( $result['migrated'] ) {
+			\WP_CLI::log( sprintf( 'Migrated version(s): %s', implode( ', ', $result['migrated'] ) ) );
+		}
+
+		if ( $result['success'] ) {
+			if ( empty( $result['migrated'] ) ) {
+				\WP_CLI::success( sprintf( 'Already at version %d. No migrations needed.', Migrations::CURRENT_VERSION ) );
+			} else {
+				\WP_CLI::success( sprintf( 'Migrations complete. Now at version %d.', Migrations::CURRENT_VERSION ) );
+			}
+		} else {
+			\WP_CLI::error( $result['error'] );
+		}
+	}
+}
+
+/** Structured external evidence management for operators. */
+final class Evidence_Command {
+	/** @var array<string, string> Valid evidence types mapped to their option keys. */
+	private const EVIDENCE_OPTIONS = array(
+		'backup'       => 'lel_last_backup_evidence',
+		'restore'      => 'lel_last_restore_drill_evidence',
+		'mail'         => 'lel_mail_transport_evidence',
+	);
+
+	/**
+	 * Set structured external readiness evidence.
+	 *
+	 * ## OPTIONS
+	 *
+	 * --type=<type>
+	 * : Evidence type (backup, restore, mail).
+	 *
+	 * --result=<result>
+	 * : Result value (ok, pass, fail, error).
+	 *
+	 * [--artifact=<ref>]
+	 * : Artifact reference (e.g. backup file path or ID).
+	 *
+	 * [--performed-at=<datetime>]
+	 * : ISO 8601 datetime when the action was performed. Defaults to now.
+	 *
+	 * [--expires-at=<datetime>]
+	 * : ISO 8601 datetime when this evidence expires.
+	 *
+	 * [--actor=<name>]
+	 * : Name or identifier of the operator performing the action.
+	 *
+	 * ## EXAMPLES
+	 *     wp longevity evidence set --type=backup --result=ok --artifact=s3://bucket/backup-2026-07-23.sql.gz --actor=ops-bot
+	 *     wp longevity evidence set --type=restore --result=ok --performed-at=2026-07-20T10:00:00Z --expires-at=2026-10-20T10:00:00Z
+	 *     wp longevity evidence list
+	 *
+	 * @subcommand set
+	 */
+	public function set( array $args, array $assoc_args ): void {
+		unset( $args );
+		$type   = (string) ( $assoc_args['type'] ?? '' );
+		$result = (string) ( $assoc_args['result'] ?? '' );
+
+		if ( ! isset( self::EVIDENCE_OPTIONS[ $type ] ) ) {
+			\WP_CLI::error( sprintf( 'Invalid evidence type "%s". Valid types: %s', $type, implode( ', ', array_keys( self::EVIDENCE_OPTIONS ) ) ) );
+		}
+		if ( ! in_array( $result, array( 'ok', 'pass', 'fail', 'error' ), true ) ) {
+			\WP_CLI::error( 'Result must be one of: ok, pass, fail, error.' );
+		}
+
+		$environment = function_exists( 'wp_get_environment_type' ) ? wp_get_environment_type() : 'production';
+		$evidence    = array(
+			'type'         => $type,
+			'result'       => $result,
+			'artifact_ref' => sanitize_text_field( (string) ( $assoc_args['artifact'] ?? '' ) ),
+			'performed_at' => sanitize_text_field( (string) ( $assoc_args['performed-at'] ?? gmdate( DATE_W3C ) ) ),
+			'expires_at'   => sanitize_text_field( (string) ( $assoc_args['expires-at'] ?? '' ) ),
+			'actor'        => sanitize_text_field( (string) ( $assoc_args['actor'] ?? '' ) ),
+			'environment'  => $environment,
+			'release_id'   => sanitize_text_field( (string) ( $assoc_args['release-id'] ?? '' ) ),
+		);
+
+		$option = self::EVIDENCE_OPTIONS[ $type ];
+		update_option( $option, wp_json_encode( $evidence, JSON_UNESCAPED_SLASHES ), false );
+
+		Audit_Log::record( 'evidence_recorded', 'system', 0, array( 'type' => $type, 'result' => $result ), function_exists( 'get_current_user_id' ) ? get_current_user_id() : 0, 'cli' );
+		\WP_CLI::success( sprintf( 'Evidence for "%s" recorded (result: %s).', $type, $result ) );
+	}
+
+	/**
+	 * List current external evidence state.
+	 *
+	 * ## EXAMPLES
+	 *     wp longevity evidence list
+	 *
+	 * @subcommand list
+	 */
+	public function list( array $args, array $assoc_args ): void {
+		unset( $args, $assoc_args );
+		$out = array();
+		foreach ( self::EVIDENCE_OPTIONS as $type => $option ) {
+			$value   = get_option( $option, '' );
+			$decoded = is_string( $value ) ? json_decode( $value, true ) : null;
+			$out[ $type ] = is_array( $decoded ) ? $decoded : ( '' !== $value ? array( 'legacy_value' => $value ) : null );
+		}
+		\WP_CLI::line( wp_json_encode( $out, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
 	}
 }

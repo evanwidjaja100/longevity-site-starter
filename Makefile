@@ -3,9 +3,9 @@ SHELL := /bin/sh
 .PHONY: validate quality test test-security test-php test-content test-integration test-e2e test-a11y test-cross-browser test-lighthouse test-all release-evidence deploy-check docker-config up down bootstrap smoke manifest clean
 
 validate:
-	./scripts/validate.sh
-	./scripts/verify-dependency-state.sh
-	./scripts/verify-manifest.sh
+	bash scripts/validate.sh
+	bash scripts/verify-dependency-state.sh
+	bash scripts/verify-manifest.sh
 	php scripts/verify-test-discovery.php
 
 quality:
@@ -21,7 +21,7 @@ test: test-php test-content
 test-security:
 	php tests/php/run-unit-tests.php
 	php scripts/verify-test-discovery.php
-	composer phpunit -- --testsuite longevity-core --filter 'Architecture|Authorization|Credentials|Approval|RestPublicBoundary|PublicationGates|Affiliate|Freshness|SystemReadiness'
+	composer phpunit -- --testsuite "Longevity Core" --filter 'Architecture|Authorization|Credentials|Approval|RestPublicBoundary|PublicationGates|Affiliate|Freshness|SystemReadiness'
 
 test-php:
 	composer test
@@ -51,7 +51,7 @@ test-lighthouse:
 test-all: validate quality test-security test test-integration test-e2e test-cross-browser test-lighthouse
 
 release-evidence:
-	./scripts/generate-release-evidence.sh
+	bash scripts/generate-release-evidence.sh
 
 deploy-check: validate docker-config test-security
 
@@ -67,11 +67,14 @@ down:
 bootstrap:
 	docker compose run --rm --entrypoint sh wpcli /scripts/bootstrap.sh
 
+ci-setup:
+	bash scripts/ci-setup.sh
+
 smoke:
-	./scripts/smoke-test.sh
+	bash scripts/smoke-test.sh
 
 manifest:
-	./scripts/regenerate-manifest.sh
+	bash scripts/regenerate-manifest.sh
 
 clean:
 	rm -rf build coverage test-results playwright-report .phpunit.cache .lighthouseci reports/generated

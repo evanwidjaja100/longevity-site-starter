@@ -9,6 +9,7 @@ case "$status" in
   *) echo "ERROR: anonymous readiness request returned HTTP $status" >&2; cat /tmp/lel-readiness-anonymous.json >&2; exit 1 ;;
 esac
 
+mkdir -p "$ROOT/reports"
 docker compose run --rm -v "$ROOT/tests:/tests:ro" wpcli wp eval '
 $report = \Longevity\Core\System_Readiness::report();
 $required = array("database", "migrations", "scoring_model", "freshness", "cron_heartbeat", "uploads", "approval_table", "audit_table", "mail_transport", "last_backup", "last_restore_drill");

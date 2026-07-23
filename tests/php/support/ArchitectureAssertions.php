@@ -79,7 +79,7 @@ final class ArchitectureAssertions {
 		}
 
 		$admin_ui = (string) file_get_contents( $root . 'class-admin-ui.php' );
-		foreach ( array( 'is_service_only_transition', 'longevity_approve_testing', 'longevity_approve_commercial', 'longevity_approve_editorial', 'Approval_Service::approve' ) as $required ) {
+		foreach ( array( 'Publication_Gates::service_only_meta', 'longevity_approve_testing', 'longevity_approve_commercial', 'longevity_approve_editorial', 'Approval_Service::approve' ) as $required ) {
 			if ( ! str_contains( $admin_ui, $required ) ) {
 				$failures[] = "Classic editor final-state enforcement is missing {$required}.";
 			}

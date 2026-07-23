@@ -22,6 +22,9 @@ $longevity_core_files = array(
 	'class-audit-log.php',
 	'class-approval-fingerprint.php',
 	'class-approval-repository.php',
+	'class-publication-lock.php',
+	'class-dependency-index.php',
+	'class-invalidation-queue.php',
 	'class-approval-service.php',
 	'class-claims.php',
 	'class-affiliate-registry.php',
@@ -37,11 +40,10 @@ $longevity_core_files = array(
 	'class-content-discovery.php',
 	'class-public-nav.php',
 	'class-public-contact.php',
-	'class-public-content.php',
-	'class-public-trust.php',
-	'class-public-rankings.php',
-	'class-public-components.php',
-	'class-blocks.php',
+		'class-public-content.php',
+		'class-public-trust.php',
+		'class-public-rankings.php',
+		'class-blocks.php',
 	'class-admin-assets.php',
 	'class-admin-ui.php',
 	'class-shortcodes.php',
@@ -90,11 +92,12 @@ final class Bootstrap {
 		Publication_Gates::init();
 		Review_Workflow::init();
 		Approval_Service::init();
+		Invalidation_Queue::init();
 		Migrations::init();
 		Freshness::init();
 		Public_Contact::init();
 		Content_Discovery::init();
-		Public_Components::init();
+		Public_Content::init();
 		Blocks::init();
 		Admin_Assets::init();
 		Admin_UI::init();
@@ -104,14 +107,31 @@ final class Bootstrap {
 		Rest_API::init();
 		CLI::init();
 
-		add_action( 'admin_post_longevity_contact_submit', array( Public_Components::class, 'handle_contact_submission' ) );
-		add_action( 'admin_post_nopriv_longevity_contact_submit', array( Public_Components::class, 'handle_contact_submission' ) );
+		add_action( 'admin_post_longevity_contact_submit', array( Public_Contact::class, 'handle_contact_submission' ) );
+		add_action( 'admin_post_nopriv_longevity_contact_submit', array( Public_Contact::class, 'handle_contact_submission' ) );
 
 		add_filter( 'the_generator', '__return_empty_string' );
 		add_filter( 'wp_robots', array( self::class, 'filter_noindex_placeholder_pages' ) );
 		add_action( 'template_redirect', array( Routes::class, 'redirect_legacy_category' ), 10 );
 		add_action( 'send_headers', array( self::class, 'send_security_headers' ) );
 		add_filter( 'render_block_core/navigation-link', array( self::class, 'filter_navigation_link' ), 10, 2 );
+
+		// Register custom cron interval for invalidation queue processing.
+		add_filter( 'cron_schedules', array( self::class, 'register_cron_intervals' ) );
+	}
+
+	/**
+	 * Register custom cron intervals.
+	 *
+	 * @param array $schedules Existing schedules.
+	 * @return array Modified schedules.
+	 */
+	public static function register_cron_intervals( array $schedules ): array {
+		$schedules['lel_every_minute'] = array(
+			'interval' => 60,
+			'display'  => __( 'Every minute (Longevity Core)', 'longevity-core' ),
+		);
+		return $schedules;
 	}
 
 	/**
@@ -201,23 +221,56 @@ final class Bootstrap {
 
 		$csp = self::content_security_policy();
 		if ( $csp ) {
-			header( 'Content-Security-Policy-Report-Only: ' . $csp );
+			$enforce = self::csp_enforce_mode();
+			if ( $enforce ) {
+				header( 'Content-Security-Policy: ' . $csp );
+			} else {
+				header( 'Content-Security-Policy-Report-Only: ' . $csp );
+			}
 		}
 	}
 
-	/** Build a conservative Content Security Policy in report-only mode. */
+	/** Whether CSP should be enforced (production) or report-only (staging/dev). */
+	private static function csp_enforce_mode(): bool {
+		// Environment variable override.
+		$env = getenv( 'LEL_CSP_ENFORCE' );
+		if ( false !== $env ) {
+			return in_array( strtolower( $env ), array( '1', 'true', 'yes' ), true );
+		}
+		// Constant override.
+		if ( defined( 'LEL_CSP_ENFORCE' ) ) {
+			return (bool) LEL_CSP_ENFORCE;
+		}
+		// Default: enforce only in production environment type.
+		return function_exists( 'wp_get_environment_type' ) && 'production' === wp_get_environment_type();
+	}
+
+	/** Build a Content Security Policy with nonce-based script/style allowance. */
 	public static function content_security_policy(): string {
+		$nonce = self::csp_nonce();
+		$report_uri = rest_url( 'longevity/v1/csp-report' );
+
 		$directives = array(
 			"default-src 'self'",
-			"script-src 'self' 'unsafe-inline' 'unsafe-eval'",
-			"style-src 'self' 'unsafe-inline'",
+			"script-src 'self' 'nonce-{$nonce}'",
+			"style-src 'self' 'nonce-{$nonce}'",
 			"img-src 'self' data: https:",
 			"font-src 'self' data:",
 			"connect-src 'self'",
 			"frame-ancestors 'none'",
 			"base-uri 'self'",
 			"form-action 'self'",
+			"report-uri {$report_uri}",
 		);
 		return implode( '; ', $directives );
+	}
+
+	/** Per-request CSP nonce (generated once, reused within the request). */
+	public static function csp_nonce(): string {
+		static $nonce = null;
+		if ( null === $nonce ) {
+			$nonce = base64_encode( random_bytes( 16 ) );
+		}
+		return $nonce;
 	}
 }

@@ -21,8 +21,11 @@ jobs:
   clean-build:
     name: Clean build and discovery
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Initialize evidence directory
+        run: mkdir -p reports/clean-build && printf 'job=clean-build\ncommit=%s\n' "$GITHUB_SHA" > reports/clean-build/job.txt
       - uses: shivammathur/setup-php@b604ade2a87db23f8871b7182e69ec5e75effb45 # v2
         with:
           php-version: ${{ env.PHP_VERSION }}
@@ -32,30 +35,41 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
       - name: Verify locked dependency state
-        run: ./scripts/verify-dependency-state.sh
+        run: bash scripts/verify-dependency-state.sh
       - name: Install exact dependencies
         run: |
           composer validate --strict
           composer install --no-interaction --prefer-dist --no-progress
           npm ci
       - name: Verify release manifest
-        run: ./scripts/verify-manifest.sh
+        run: bash scripts/verify-manifest.sh
       - name: Verify critical test discovery
         run: php scripts/verify-test-discovery.php
       - name: Run dependency-free security fallback
         run: php tests/php/run-unit-tests.php
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: clean-build-evidence
+          path: reports/clean-build/
+          if-no-files-found: error
 
   quality-php:
     name: PHP quality
     needs: clean-build
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Initialize evidence directory
+        run: mkdir -p reports/php-quality && printf 'job=quality-php\ncommit=%s\n' "$GITHUB_SHA" > reports/php-quality/job.txt
       - uses: shivammathur/setup-php@b604ade2a87db23f8871b7182e69ec5e75effb45 # v2
         with:
           php-version: ${{ env.PHP_VERSION }}
           coverage: none
       - run: composer install --no-interaction --prefer-dist --no-progress
+      - name: ShellCheck
+        run: shellcheck scripts/*.sh tests/integration/*.sh
       - name: PHP syntax
         run: find wp-content/mu-plugins/longevity-core wp-content/themes/longevity-starter scripts tests/php -name '*.php' -print0 | xargs -0 -n1 php -l
       - run: composer phpcs
@@ -64,13 +78,22 @@ jobs:
         run: composer test
       - name: Composer locked audit
         run: composer audit --locked
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: php-quality-evidence
+          path: reports/php-quality/
+          if-no-files-found: error
 
   quality-frontend:
     name: Frontend quality
     needs: clean-build
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Initialize evidence directory
+        run: mkdir -p reports/frontend-quality && printf 'job=quality-frontend\ncommit=%s\n' "$GITHUB_SHA" > reports/frontend-quality/job.txt
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -78,25 +101,41 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm audit --audit-level=high
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: frontend-quality-evidence
+          path: reports/frontend-quality/
+          if-no-files-found: error
 
   content-and-config:
     name: Content and configuration
     needs: clean-build
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Initialize evidence directory
+        run: mkdir -p reports/content-config && printf 'job=content-and-config\ncommit=%s\n' "$GITHUB_SHA" > reports/content-config/job.txt
       - run: cp .env.ci .env
-      - run: ./scripts/validate.sh
+      - run: bash scripts/validate.sh
       - run: python3 scripts/validate-content.py
       - run: python3 scripts/validate-internal-links.py
       - run: python3 scripts/validate-freshness.py
       - run: docker compose config --quiet
-      - run: ./scripts/verify-manifest.sh
+      - run: bash scripts/verify-manifest.sh
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: content-config-evidence
+          path: reports/content-config/
+          if-no-files-found: error
 
   wordpress-integration:
     name: WordPress integration
     needs: [quality-php, content-and-config]
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - run: cp .env.ci .env
@@ -104,13 +143,12 @@ jobs:
         run: docker compose up -d db wordpress
       - name: Bootstrap and smoke test
         run: |
-          docker compose run --rm --entrypoint sh wpcli /scripts/bootstrap.sh
-          ./scripts/smoke-test.sh
+          bash scripts/ci-setup.sh
+          bash scripts/smoke-test.sh
       - name: Integration contracts
         run: |
           for script in tests/integration/*.sh; do
-            [ -x "$script" ] || chmod +x "$script"
-            "$script"
+            bash "$script"
           done
       - name: Capture Docker logs
         if: failure()
@@ -122,7 +160,7 @@ jobs:
           path: |
             docker-integration.log
             reports/
-          if-no-files-found: ignore
+          if-no-files-found: error
       - if: always()
         run: docker compose down -v
 
@@ -130,6 +168,7 @@ jobs:
     name: Playwright Chromium
     needs: [quality-frontend, wordpress-integration]
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
@@ -138,20 +177,21 @@ jobs:
           cache: npm
       - run: cp .env.ci .env && npm ci
       - run: docker compose up -d db wordpress
-      - run: docker compose run --rm --entrypoint sh wpcli /scripts/bootstrap.sh
+      - run: bash scripts/ci-setup.sh
       - run: npx playwright install --with-deps chromium
       - name: Core, routes, SEO, contact, a11y and security contracts
         env:
           WP_SITE_URL: http://localhost:8080
-        run: npm run test:e2e:all -- --project=chromium
+        run: npm run test:e2e:functional -- --project=chromium
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()
         with:
           name: playwright-chromium-evidence
           path: |
-            playwright-report/
+            reports/playwright/
             test-results/
-          if-no-files-found: ignore
+            reports/ci-setup/
+          if-no-files-found: error
       - if: always()
         run: docker compose down -v
 
@@ -159,6 +199,7 @@ jobs:
     name: Critical Firefox and WebKit
     needs: [quality-frontend, wordpress-integration]
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
@@ -167,7 +208,7 @@ jobs:
           cache: npm
       - run: cp .env.ci .env && npm ci
       - run: docker compose up -d db wordpress
-      - run: docker compose run --rm --entrypoint sh wpcli /scripts/bootstrap.sh
+      - run: bash scripts/ci-setup.sh
       - run: npx playwright install --with-deps firefox webkit
       - env:
           WP_SITE_URL: http://localhost:8080
@@ -177,9 +218,10 @@ jobs:
         with:
           name: playwright-cross-browser-evidence
           path: |
-            playwright-report/
+            reports/playwright/
             test-results/
-          if-no-files-found: ignore
+            reports/ci-setup/
+          if-no-files-found: error
       - if: always()
         run: docker compose down -v
 
@@ -187,11 +229,12 @@ jobs:
     name: Linux visual regression
     needs: [quality-frontend, wordpress-integration]
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - run: cp .env.ci .env
       - run: docker compose up -d db wordpress
-      - run: docker compose run --rm --entrypoint sh wpcli /scripts/bootstrap.sh
+      - run: bash scripts/ci-setup.sh
       - name: Run visual suite in version-pinned Playwright image
         run: |
           docker run --rm --network host \
@@ -207,7 +250,8 @@ jobs:
             reports/playwright/
             reports/playwright-artifacts/
             test-results/
-          if-no-files-found: ignore
+            reports/ci-setup/
+          if-no-files-found: error
       - if: always()
         run: docker compose down -v
 
@@ -215,6 +259,7 @@ jobs:
     name: Lighthouse mobile
     needs: [quality-frontend, wordpress-integration]
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
@@ -223,7 +268,7 @@ jobs:
           cache: npm
       - run: cp .env.ci .env && npm ci
       - run: docker compose up -d db wordpress
-      - run: docker compose run --rm --entrypoint sh wpcli /scripts/bootstrap.sh
+      - run: bash scripts/ci-setup.sh
       - env:
           WP_SITE_URL: http://localhost:8080
         run: npm run test:lighthouse
@@ -231,8 +276,10 @@ jobs:
         if: always()
         with:
           name: lighthouse-evidence
-          path: .lighthouseci/
-          if-no-files-found: ignore
+          path: |
+            reports/lighthouse/
+            reports/ci-setup/
+          if-no-files-found: error
       - if: always()
         run: docker compose down -v
 
@@ -240,6 +287,7 @@ jobs:
     name: Lighthouse desktop
     needs: [quality-frontend, wordpress-integration]
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
@@ -248,7 +296,7 @@ jobs:
           cache: npm
       - run: cp .env.ci .env && npm ci
       - run: docker compose up -d db wordpress
-      - run: docker compose run --rm --entrypoint sh wpcli /scripts/bootstrap.sh
+      - run: bash scripts/ci-setup.sh
       - env:
           WP_SITE_URL: http://localhost:8080
         run: npm run test:lighthouse:desktop
@@ -256,8 +304,10 @@ jobs:
         if: always()
         with:
           name: lighthouse-desktop-evidence
-          path: reports/lighthouse/desktop/
-          if-no-files-found: ignore
+          path: |
+            reports/lighthouse/desktop/
+            reports/ci-setup/
+          if-no-files-found: error
       - if: always()
         run: docker compose down -v
 
@@ -269,22 +319,33 @@ jobs:
       security-events: write
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Initialize evidence directory
+        run: mkdir -p reports/codeql && printf 'job=codeql\ncommit=%s\n' "$GITHUB_SHA" > reports/codeql/job.txt
       - uses: github/codeql-action/init@d03f4cc0498d5a63039d157eb274d9c2fc50f17a # v3.37.1
         with:
           languages: javascript, python, php
           queries: security-and-quality
       - uses: github/codeql-action/analyze@d03f4cc0498d5a63039d157eb274d9c2fc50f17a # v3.37.1
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: codeql-evidence
+          path: reports/codeql/
+          if-no-files-found: error
 
   security-supply-chain:
     name: Supply-chain and secret guards
     needs: clean-build
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
+      - name: Initialize evidence directory
+        run: mkdir -p reports/supply-chain && printf 'job=security-supply-chain\ncommit=%s\n' "$GITHUB_SHA" > reports/supply-chain/job.txt
       - uses: shivammathur/setup-php@b604ade2a87db23f8871b7182e69ec5e75effb45 # v2
         with:
           php-version: ${{ env.PHP_VERSION }}
@@ -315,21 +376,32 @@ jobs:
         if: always()
         with:
           name: supply-chain-evidence
-          path: reports/sbom.spdx.json
-          if-no-files-found: ignore
+          path: |
+            reports/sbom.spdx.json
+            reports/supply-chain/
+          if-no-files-found: error
 
   dependency-review:
     name: Dependency review
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: read
       pull-requests: read
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Initialize evidence directory
+        run: mkdir -p reports/dependency-review && printf 'job=dependency-review\ncommit=%s\n' "$GITHUB_SHA" > reports/dependency-review/job.txt
       - uses: actions/dependency-review-action@2031cfc080254a8a887f58cffee85186f0e49e48 # v4
         with:
           fail-on-severity: high
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: dependency-review-evidence
+          path: reports/dependency-review/
+          if-no-files-found: error
 
   release-evidence:
     name: Release evidence index
@@ -347,9 +419,17 @@ jobs:
       - lighthouse-desktop
       - codeql
       - security-supply-chain
+      - dependency-review
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      RELEASE_EVIDENCE_AGGREGATE: '1'
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        if: always()
+        with:
+          path: reports/upstream
       - name: Record upstream job outcomes
         run: |
           mkdir -p reports
@@ -366,10 +446,11 @@ jobs:
             "lighthouse-mobile": "${{ needs.lighthouse-mobile.result }}",
             "lighthouse-desktop": "${{ needs.lighthouse-desktop.result }}",
             "codeql": "${{ needs.codeql.result }}",
-            "security-supply-chain": "${{ needs.security-supply-chain.result }}"
+            "security-supply-chain": "${{ needs.security-supply-chain.result }}",
+            "dependency-review": "${{ needs.dependency-review.result }}"
           }
           JSON
-      - run: ./scripts/generate-release-evidence.sh "${{ github.sha }}"
+      - run: bash scripts/generate-release-evidence.sh "${{ github.sha }}"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()
         with:

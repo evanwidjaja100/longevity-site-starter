@@ -1,6 +1,6 @@
 <?php
 /**
- * Public rankings/testing components extracted from Public_Components.
+ * Public rankings/testing components.
  *
  * @package LongevityCore
  */

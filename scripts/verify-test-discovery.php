@@ -1,26 +1,41 @@
 <?php
-/** Verify that security-critical PHPUnit suites are discoverable. */
+/** Verify that security-critical PHPUnit suites are discoverable by PHPUnit itself. */
 $required = array(
 	'ArchitectureTest', 'MetaAuthorizationTest', 'ReviewerCredentialsTest',
-	'ApprovalSnapshotTest', 'TestRecordApprovalTest', 'RestPublicBoundaryTest', 'PublicationGatesTest', 'FreshnessTest',
+	'ApprovalSnapshotTest', 'TestRecordApprovalTest', 'RestPublicBoundaryTest',
+	'PublicationGatesTest', 'FreshnessTest', 'RegressionPublicationBypassTest',
 );
-$files = glob( dirname( __DIR__ ) . '/tests/php/*Test.php' ) ?: array();
-$classes = array();
-$methods = 0;
-foreach ( $files as $file ) {
-	$source = (string) file_get_contents( $file );
-	if ( preg_match_all( '/final\s+class\s+([A-Za-z0-9_]+Test)\s+extends\s+TestCase/', $source, $matches ) ) {
-		$classes = array_merge( $classes, $matches[1] );
+
+$phpunit = dirname( __DIR__ ) . '/vendor/bin/phpunit';
+if ( ! is_file( $phpunit ) ) {
+	fwrite( STDERR, "PHPUnit is unavailable; install locked Composer dependencies before discovery.\n" );
+	exit( 1 );
+}
+
+$output = array();
+$status = 0;
+exec( escapeshellarg( $phpunit ) . ' --list-tests --testsuite ' . escapeshellarg( 'Longevity Core' ) . ' --no-coverage 2>&1', $output, $status );
+if ( 0 !== $status ) {
+	fwrite( STDERR, "PHPUnit test discovery failed:\n" . implode( PHP_EOL, $output ) . PHP_EOL );
+	exit( 1 );
+}
+
+$listed = implode( PHP_EOL, $output );
+$missing = array();
+foreach ( $required as $class ) {
+	if ( false === strpos( $listed, $class . '::' ) ) {
+		$missing[] = $class;
 	}
-	$methods += preg_match_all( '/function\s+test_[A-Za-z0-9_]+\s*\(/', $source );
 }
-$missing = array_values( array_diff( $required, $classes ) );
 if ( $missing ) {
-	fwrite( STDERR, 'Missing required test classes: ' . implode( ', ', $missing ) . PHP_EOL );
+	fwrite( STDERR, 'Missing required PHPUnit suites: ' . implode( ', ', $missing ) . PHP_EOL );
 	exit( 1 );
 }
+
+preg_match_all( '/^\s*-\s+.+::.+$/m', $listed, $tests );
+$methods = count( $tests[0] );
 if ( $methods < 50 ) {
-	fwrite( STDERR, "Only {$methods} test methods were discovered; expected at least 50." . PHP_EOL );
+	fwrite( STDERR, "Only {$methods} PHPUnit tests were discovered; expected at least 50.\n" );
 	exit( 1 );
 }
-echo sprintf( "Discovered %d test classes and %d test methods; all critical suites are present.\n", count( array_unique( $classes ) ), $methods );
+echo sprintf( "PHPUnit discovered %d test cases; all critical suites are present.\n", $methods );

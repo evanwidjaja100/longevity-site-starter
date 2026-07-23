@@ -16,55 +16,172 @@ final class Approval_Service {
 
 	/** Register material-change invalidation hooks. */
 	public static function init(): void {
+		register_shutdown_function( array( Publication_Lock::class, 'release_all' ) );
 		add_action( 'post_updated', array( self::class, 'on_post_updated' ), 20, 3 );
 		add_action( 'updated_post_meta', array( self::class, 'on_meta_changed' ), 20, 4 );
 		add_action( 'added_post_meta', array( self::class, 'on_meta_changed' ), 20, 4 );
 		add_action( 'deleted_post_meta', array( self::class, 'on_meta_deleted' ), 20, 4 );
+
+		// R2.4 — transitive dependency cascade
+		add_action( 'added_post_meta', array( self::class, 'on_claim_post_id_set' ), 20, 4 );
+		add_action( 'updated_post_meta', array( self::class, 'on_claim_post_id_set' ), 20, 4 );
+		add_action( 'save_post_lel_claim', array( self::class, 'on_save_dependency' ), 20, 3 );
+		add_action( 'save_post_lel_source', array( self::class, 'on_save_dependency' ), 20, 3 );
+		add_action( 'save_post_lel_test_record', array( self::class, 'on_save_dependency' ), 20, 3 );
+		add_action( 'save_post_lel_protocol', array( self::class, 'on_save_dependency' ), 20, 3 );
+		add_action( 'save_post_lel_affiliate', array( self::class, 'on_save_dependency' ), 20, 3 );
+		add_action( 'updated_user_meta', array( self::class, 'on_credential_changed' ), 20, 4 );
+		add_action( 'added_user_meta', array( self::class, 'on_credential_changed' ), 20, 4 );
+	}
+
+	/** Cascade invalidation when a dependency post is saved (created or updated). */
+	public static function on_save_dependency( int $post_id, \WP_Post $post, bool $update ): void {
+		unset( $update );
+		if ( self::$mutating || ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) || wp_is_post_revision( $post_id ) ) {
+			return;
+		}
+		$type       = $post->post_type;
+		$parent_ids = array();
+		if ( 'lel_claim' === $type ) {
+			$pid = (int) get_post_meta( $post_id, 'post_id', true );
+			if ( $pid > 0 ) {
+				$parent_ids[] = $pid;
+				Dependency_Index::register( 'lel_claim', $post_id, $pid );
+			}
+		} elseif ( 'lel_source' === $type ) {
+			// Use indexed lookup instead of unbounded meta query.
+			$parent_ids = Dependency_Index::find_parents( 'lel_source', $post_id );
+			if ( empty( $parent_ids ) ) {
+				// Fallback for pre-index data: bounded query.
+				$claims = get_posts( array( 'post_type' => 'lel_claim', 'fields' => 'ids', 'posts_per_page' => 200, 'meta_key' => 'source_id', 'meta_value' => $post_id ) );
+				foreach ( $claims as $claim_id ) {
+					$pid = (int) get_post_meta( $claim_id, 'post_id', true );
+					if ( $pid > 0 ) {
+						$parent_ids[] = $pid;
+						Dependency_Index::register( 'lel_source', $post_id, $pid );
+					}
+				}
+			}
+		} elseif ( 'lel_test_record' === $type ) {
+			$parent_ids = Dependency_Index::find_parents( 'lel_test_record', $post_id );
+			if ( empty( $parent_ids ) ) {
+				$posts = get_posts( array( 'post_type' => array( 'post', 'review' ), 'fields' => 'ids', 'posts_per_page' => 200, 'meta_key' => 'test_record_id', 'meta_value' => $post_id ) );
+				foreach ( $posts as $pid ) {
+					Dependency_Index::register( 'lel_test_record', $post_id, (int) $pid );
+				}
+				$parent_ids = $posts;
+			}
+		} elseif ( 'lel_protocol' === $type ) {
+			$parent_ids = Dependency_Index::find_parents( 'lel_protocol', $post_id );
+			if ( empty( $parent_ids ) ) {
+				$records = get_posts( array( 'post_type' => 'lel_test_record', 'fields' => 'ids', 'posts_per_page' => 200, 'meta_key' => 'protocol_id', 'meta_value' => $post_id ) );
+				foreach ( $records as $record_id ) {
+					$child_posts = get_posts( array( 'post_type' => array( 'post', 'review' ), 'fields' => 'ids', 'posts_per_page' => 200, 'meta_key' => 'test_record_id', 'meta_value' => $record_id ) );
+					foreach ( $child_posts as $pid ) {
+						$parent_ids[] = (int) $pid;
+						Dependency_Index::register( 'lel_protocol', $post_id, (int) $pid );
+					}
+				}
+			}
+		} elseif ( 'lel_affiliate' === $type ) {
+			// Use precomputed meta flag instead of full content scan.
+			$parent_ids = Dependency_Index::find_parents( 'lel_affiliate', $post_id );
+			if ( empty( $parent_ids ) ) {
+				$posts = get_posts( array( 'post_type' => array( 'post', 'review' ), 'post_status' => 'any', 'posts_per_page' => 200, 'meta_key' => '_lel_has_affiliate_links', 'meta_value' => '1' ) );
+				foreach ( $posts as $candidate_id ) {
+					$parent_ids[] = (int) $candidate_id;
+					Dependency_Index::register( 'lel_affiliate', $post_id, (int) $candidate_id );
+				}
+			}
+		}
+		$actor = function_exists( 'get_current_user_id' ) ? get_current_user_id() : 0;
+		$parent_ids = array_unique( array_filter( array_map( 'intval', $parent_ids ) ) );
+		if ( ! empty( $parent_ids ) ) {
+			Invalidation_Queue::enqueue( $parent_ids, 'dependency_changed:' . $type, $actor );
+		}
+	}
+
+	/** Cascade when claim post_id meta is first set (post-insert gap). */
+	public static function on_claim_post_id_set( int $meta_id, int $post_id, string $meta_key, $meta_value ): void {
+		unset( $meta_id );
+		if ( self::$mutating || 'post_id' !== $meta_key || 'lel_claim' !== get_post_type( $post_id ) ) {
+			return;
+		}
+		$pid   = (int) $meta_value;
+		$actor = function_exists( 'get_current_user_id' ) ? get_current_user_id() : 0;
+		if ( $pid > 0 ) {
+			self::invalidate_all( $pid, 'dependency_changed:claim_post_id', $actor );
+		}
+	}
+
+	/** Cascade invalidation when reviewer credentials change. */
+	public static function on_credential_changed( int $meta_id, int $user_id, string $meta_key, $meta_value ): void {
+		unset( $meta_id, $meta_value );
+		if ( self::$mutating || ! in_array( $meta_key, array( 'credential_verification_status', 'credential_verified_by_user_id' ), true ) ) {
+			return;
+		}
+		// Use indexed lookup instead of unbounded meta query.
+		$parent_ids = Dependency_Index::find_parents( 'credential', $user_id );
+		if ( empty( $parent_ids ) ) {
+			// Fallback for pre-index data: bounded query.
+			$posts = get_posts( array( 'post_type' => array( 'post', 'review' ), 'fields' => 'ids', 'posts_per_page' => 200, 'meta_key' => 'medical_reviewer_user_id', 'meta_value' => $user_id ) );
+			foreach ( $posts as $pid ) {
+				Dependency_Index::register( 'credential', $user_id, (int) $pid );
+			}
+			$parent_ids = array_map( 'intval', $posts );
+		}
+		$actor = function_exists( 'get_current_user_id' ) ? get_current_user_id() : 0;
+		if ( ! empty( $parent_ids ) ) {
+			Invalidation_Queue::enqueue( $parent_ids, 'dependency_changed:credential:' . $meta_key, $actor );
+		}
 	}
 
 	/** Create an immutable approval bound to current fingerprints. */
 	public static function approve( int $post_id, string $approval_type, int $actor_id, array $approval_payload = array() ): ?array {
-		if ( ! self::actor_can_approve( $post_id, $approval_type, $actor_id ) ) {
-			Audit_Log::record( 'metadata_write_denied', 'post', $post_id, array( 'approval_type' => $approval_type ), $actor_id, 'workflow' );
+		if ( ! Publication_Lock::acquire( $post_id ) ) {
+			Audit_Log::record( 'approval_rejected', 'post', $post_id, array( 'approval_type' => $approval_type, 'reason' => 'publication_lock_unavailable' ), $actor_id, 'workflow' );
 			return null;
 		}
-		if ( ! self::state_is_approvable( $post_id, $approval_type ) ) {
-			Audit_Log::record( 'approval_rejected', 'post', $post_id, array( 'approval_type' => $approval_type, 'reason' => 'invalid_or_incomplete_state' ), $actor_id, 'workflow' );
-			return null;
+		try {
+			if ( ! self::actor_can_approve( $post_id, $approval_type, $actor_id ) ) {
+				Audit_Log::record( 'metadata_write_denied', 'post', $post_id, array( 'approval_type' => $approval_type ), $actor_id, 'workflow' );
+				return null;
+			}
+			if ( ! self::state_is_approvable( $post_id, $approval_type ) ) {
+				Audit_Log::record( 'approval_rejected', 'post', $post_id, array( 'approval_type' => $approval_type, 'reason' => 'invalid_or_incomplete_state' ), $actor_id, 'workflow' );
+				return null;
+			}
+			$fingerprint = Approval_Fingerprint::build( $post_id, $approval_type );
+			$current     = Approval_Repository::current( $post_id, $approval_type );
+			$record      = array(
+				'post_id'                => $post_id,
+				'approval_type'          => $approval_type,
+				'approval_status'        => 'approved',
+				'revision_id'            => function_exists( 'wp_get_post_revisions' ) ? self::latest_revision_id( $post_id ) : null,
+				'content_hash'           => $fingerprint['content_hash'],
+				'governed_meta_hash'     => $fingerprint['governed_meta_hash'],
+				'dependency_hash'        => $fingerprint['dependency_hash'],
+				'combined_hash'          => $fingerprint['combined_hash'],
+				'approver_user_id'       => $actor_id,
+				'approved_at'            => gmdate( 'Y-m-d H:i:s' ),
+				'schema_version'         => Approval_Fingerprint::SCHEMA_VERSION,
+				'payload_json'           => (string) wp_json_encode( array( 'approval' => self::sanitize_payload( $approval_payload ), 'fingerprint' => $fingerprint['payload'] ), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ),
+				'invalidated_at'         => null,
+				'invalidated_by_user_id' => null,
+				'invalidation_reason'    => null,
+				'supersedes_approval_id' => $current ? (int) $current['id'] : null,
+			);
+			$id = Approval_Repository::insert( $record );
+			if ( $id <= 0 ) {
+				return null;
+			}
+			$record['id'] = $id;
+			self::project_legacy_status( $post_id, $approval_type, $actor_id );
+			Audit_Log::record( 'approval_completed', 'post', $post_id, array( 'approval_type' => $approval_type, 'approval_id' => $id, 'combined_hash' => $fingerprint['combined_hash'] ), $actor_id, 'workflow' );
+			return $record;
+		} finally {
+			Publication_Lock::release( $post_id );
 		}
-		$fingerprint = Approval_Fingerprint::build( $post_id, $approval_type );
-		$current     = Approval_Repository::current( $post_id, $approval_type );
-		$record      = array(
-			'post_id'                 => $post_id,
-			'approval_type'           => $approval_type,
-			'approval_status'         => 'approved',
-			'revision_id'             => function_exists( 'wp_get_post_revisions' ) ? self::latest_revision_id( $post_id ) : null,
-			'content_hash'            => $fingerprint['content_hash'],
-			'governed_meta_hash'      => $fingerprint['governed_meta_hash'],
-			'dependency_hash'         => $fingerprint['dependency_hash'],
-			'combined_hash'           => $fingerprint['combined_hash'],
-			'approver_user_id'        => $actor_id,
-			'approved_at'             => gmdate( 'Y-m-d H:i:s' ),
-			'schema_version'          => Approval_Fingerprint::SCHEMA_VERSION,
-			'payload_json'            => (string) wp_json_encode( array( 'approval' => self::sanitize_payload( $approval_payload ), 'fingerprint' => $fingerprint['payload'] ), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ),
-			'invalidated_at'          => null,
-			'invalidated_by_user_id'  => null,
-			'invalidation_reason'     => null,
-			'supersedes_approval_id'  => $current ? (int) $current['id'] : null,
-		);
-		$id = Approval_Repository::insert( $record );
-		if ( $id <= 0 ) {
-			return null;
-		}
-		$record['id'] = $id;
-		self::project_legacy_status( $post_id, $approval_type, $actor_id );
-		Audit_Log::record( 'approval_completed', 'post', $post_id, array( 'approval_type' => $approval_type, 'approval_id' => $id, 'combined_hash' => $fingerprint['combined_hash'] ), $actor_id, 'workflow' );
-		return $record;
-	}
-
-	/** Current snapshot. */
-	public static function current( int $post_id, string $approval_type ): ?array {
-		return Approval_Repository::current( $post_id, $approval_type );
 	}
 
 	/** Whether the current snapshot still matches all material state. */
@@ -73,13 +190,34 @@ final class Approval_Service {
 		if ( ! $current ) {
 			return false;
 		}
+		if ( function_exists( 'wp_get_post_revisions' ) && null !== ( $current['revision_id'] ?? null ) && (int) $current['revision_id'] !== (int) self::latest_revision_id( $post_id ) ) {
+			return false;
+		}
 		$fingerprint = Approval_Fingerprint::build( $post_id, $approval_type );
+		return hash_equals( (string) $current['combined_hash'], (string) $fingerprint['combined_hash'] );
+	}
+
+	/** Whether the current snapshot matches the complete prospective request state. */
+	public static function is_current_for_state( int $post_id, string $approval_type, array $prospective ): bool {
+		$current = Approval_Repository::current( $post_id, $approval_type );
+		if ( ! $current ) {
+			return false;
+		}
+		if ( function_exists( 'wp_get_post_revisions' ) && null !== ( $current['revision_id'] ?? null ) && (int) $current['revision_id'] !== (int) self::latest_revision_id( $post_id ) ) {
+			return false;
+		}
+		$fingerprint = Approval_Fingerprint::build( $post_id, $approval_type, $prospective );
 		return hash_equals( (string) $current['combined_hash'], (string) $fingerprint['combined_hash'] );
 	}
 
 	/** Invalidate an approval type and project an explicit stale state. */
 	public static function invalidate( int $post_id, string $approval_type, string $reason, int $actor_id = 0 ): void {
 		if ( self::$mutating ) {
+			return;
+		}
+		if ( ! Publication_Lock::acquire( $post_id ) ) {
+			// Enqueue for retry instead of silently dropping.
+			Invalidation_Queue::enqueue( array( $post_id ), $reason . ':lock_retry', $actor_id );
 			return;
 		}
 		self::$mutating = true;
@@ -94,6 +232,38 @@ final class Approval_Service {
 			}
 		} finally {
 			self::$mutating = false;
+			Publication_Lock::release( $post_id );
+		}
+	}
+
+	/**
+	 * Direct synchronous invalidation of all approval types for a single post.
+	 * Called by the invalidation queue processor. Bypasses queue to avoid recursion.
+	 *
+	 * @param int    $post_id  Post to invalidate.
+	 * @param string $reason   Invalidation reason.
+	 * @param int    $actor_id Actor ID.
+	 * @throws \RuntimeException When lock cannot be acquired after retry.
+	 */
+	public static function invalidate_direct( int $post_id, string $reason, int $actor_id = 0 ): void {
+		if ( ! Publication_Lock::acquire( $post_id ) ) {
+			throw new \RuntimeException( sprintf( 'Could not acquire publication lock for post %d.', $post_id ) );
+		}
+		self::$mutating = true;
+		try {
+			foreach ( array( 'fact_check', 'medical', 'testing', 'commercial', 'editorial' ) as $type ) {
+				$changed = Approval_Repository::invalidate( $post_id, $type, $reason, $actor_id );
+				if ( $changed > 0 ) {
+					$status_key = self::status_key( $type );
+					if ( $status_key ) {
+						update_post_meta( $post_id, $status_key, 'stale' );
+					}
+				}
+			}
+			Audit_Log::record( 'approval_invalidated', 'post', $post_id, array( 'reason' => $reason, 'source' => 'queue' ), $actor_id, 'system' );
+		} finally {
+			self::$mutating = false;
+			Publication_Lock::release( $post_id );
 		}
 	}
 
@@ -112,7 +282,15 @@ final class Approval_Service {
 	/** Invalidate only when governed metadata changes. */
 	public static function on_meta_changed( int $meta_id, int $post_id, string $meta_key, $meta_value ): void {
 		unset( $meta_id, $meta_value );
-		if ( self::$mutating || ! isset( Meta_Registry::definitions()[ $meta_key ] ) ) {
+		if ( self::$mutating ) {
+			return;
+		}
+		$defs = Meta_Registry::definitions();
+		if ( empty( $defs ) ) {
+			self::invalidate_all( $post_id, 'governed_meta_changed:registry_unavailable', function_exists( 'get_current_user_id' ) ? get_current_user_id() : 0 );
+			return;
+		}
+		if ( ! isset( $defs[ $meta_key ] ) ) {
 			return;
 		}
 		$policy = Meta_Authorization::policy_for( $meta_key );
@@ -235,11 +413,9 @@ final class Approval_Service {
 		}
 	}
 
-	/** Invalidate every approval type. */
+	/** Invalidate every approval type via the async queue. */
 	private static function invalidate_all( int $post_id, string $reason, int $actor_id ): void {
-		foreach ( array( 'fact_check', 'medical', 'testing', 'commercial', 'editorial' ) as $type ) {
-			self::invalidate( $post_id, $type, $reason, $actor_id );
-		}
+		Invalidation_Queue::enqueue( array( $post_id ), $reason, $actor_id );
 	}
 
 	/** Legacy status key. */

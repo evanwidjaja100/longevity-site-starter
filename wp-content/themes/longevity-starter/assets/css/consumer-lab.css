@@ -590,21 +590,42 @@
 }
 
 @media (width <= 700px) {
+	html {
+		overflow-x: clip;
+	}
+
+	body {
+		overflow-x: clip;
+	}
+
 	.longevity-quick-strip nav {
 		padding-inline: 1rem;
 	}
 
 	.longevity-header-row {
+		flex-wrap: wrap !important;
 		min-height: 4rem;
+	}
+
+	.longevity-header-row > .wp-block-group,
+	.longevity-brand-lockup,
+	.longevity-primary-nav,
+	.longevity-footer-grid > * {
+		min-width: 0;
+	}
+
+	.longevity-header-actions {
+		flex: 1 1 100%;
+		flex-wrap: wrap;
+		gap: 0.25rem;
+		justify-content: flex-end;
+		max-width: 100%;
+		min-width: 0;
 	}
 
 	.longevity-brand-lockup .wp-block-site-title {
 		font-size: 0.9rem;
 		max-width: 8rem;
-	}
-
-	.longevity-header-actions {
-		gap: 0.25rem;
 	}
 
 	.longevity-search-trigger span:last-child {
@@ -706,6 +727,10 @@
 
 	.longevity-footer-intro {
 		grid-column: auto;
+	}
+
+	.longevity-footer-intro h2 {
+		max-width: 100%;
 	}
 
 	.longevity-ranking-filters {

@@ -34,14 +34,30 @@ final class RestApiTest extends TestCase {
 		$GLOBALS['lel_test_rest_routes'] = array();
 		Rest_API::register_routes();
 
-		self::assertCount( 3, $GLOBALS['lel_test_rest_routes'] );
+		self::assertCount( 4, $GLOBALS['lel_test_rest_routes'] );
 
 		$namespaces = array_column( $GLOBALS['lel_test_rest_routes'], 'namespace' );
-		self::assertSame( array( 'longevity/v1', 'longevity/v1', 'longevity/v1' ), $namespaces );
+		self::assertSame( array( 'longevity/v1', 'longevity/v1', 'longevity/v1', 'longevity/v1' ), $namespaces );
 
 		$routes = array_column( $GLOBALS['lel_test_rest_routes'], 'route' );
 		self::assertContains( '/health', $routes );
 		self::assertContains( '/readiness/(?P<id>\d+)', $routes );
 		self::assertContains( '/system-readiness', $routes );
+		self::assertContains( '/csp-report', $routes );
+	}
+
+	/**
+	 * API contract test: documented response shape matches implementation.
+	 * Docs state: GET /wp-json/longevity/v1/health returns {"status":"ok"}
+	 */
+	public function test_health_contract_matches_documentation(): void {
+		$response = Rest_API::health();
+		$data     = $response->get_data();
+
+		// Contract: exactly one key 'status' with value 'ok'.
+		self::assertSame( array( 'status' => 'ok' ), $data );
+		self::assertArrayNotHasKey( 'version', $data );
+		self::assertArrayNotHasKey( 'timestamp', $data );
+		self::assertSame( 200, $response->get_status() );
 	}
 }

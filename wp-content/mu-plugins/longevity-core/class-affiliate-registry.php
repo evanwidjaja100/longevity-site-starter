@@ -40,16 +40,7 @@ final class Affiliate_Registry {
 					'type'              => 'boolean' === $rule ? 'boolean' : ( 'absint' === $rule ? 'integer' : 'string' ),
 					'single'            => true,
 					'show_in_rest'      => false,
-					'sanitize_callback' => static function ( $value ) use ( $rule ) {
-						if ( 'boolean' === $rule ) {
-							return (bool) $value;
-						}
-						if ( 'status' === $rule ) {
-							$value = sanitize_key( (string) $value );
-							return in_array( $value, array( 'active', 'paused', 'expired', 'terminated' ), true ) ? $value : 'paused';
-						}
-						return Meta_Registry::sanitize_value( $rule, $value );
-					},
+				'sanitize_callback' => static fn( $value ) => Meta_Registry::sanitize_value( $rule, $value ),
 					'auth_callback'     => static fn() => current_user_can( 'manage_affiliate_relationships' ),
 				)
 			);
@@ -58,7 +49,17 @@ final class Affiliate_Registry {
 
 	/** Whether content contains an affiliate shortcode or sponsored link marker. */
 	public static function content_has_affiliate_link( string $content ): bool {
-		return has_shortcode( $content, 'affiliate_link' ) || false !== stripos( $content, 'rel="sponsored' ) || false !== stripos( $content, "rel='sponsored" );
+		if ( has_shortcode( $content, 'affiliate_link' ) ) {
+			return true;
+		}
+		if ( preg_match_all( '/<a\b[^>]*>/i', $content, $tag_matches ) ) {
+			foreach ( $tag_matches[0] as $tag ) {
+				if ( self::tag_has_sponsored_rel( $tag ) ) {
+					return true;
+				}
+			}
+		}
+		return false;
 	}
 
 	/** Verify every affiliate destination present in content against an active registry record. */
@@ -97,10 +98,28 @@ final class Affiliate_Registry {
 				}
 			}
 		}
-		if ( preg_match_all( '/<a\b(?=[^>]*\brel=["\'][^"\']*sponsored[^"\']*["\'])(?=[^>]*\bhref=["\']([^"\']+)["\'])[^>]*>/i', $content, $matches ) ) {
-			$urls = array_merge( $urls, $matches[1] );
+		// Match anchors with rel containing 'sponsored' in any token order, case-insensitive.
+		if ( preg_match_all( '/<a\b[^>]*>/i', $content, $tag_matches ) ) {
+			foreach ( $tag_matches[0] as $tag ) {
+				if ( ! self::tag_has_sponsored_rel( $tag ) ) {
+					continue;
+				}
+				if ( preg_match( '/\bhref=["\']([^"\']+)["\']/i', $tag, $href_match ) ) {
+					$urls[] = $href_match[1];
+				}
+			}
 		}
 		return array_slice( array_values( array_unique( array_filter( array_map( 'esc_url_raw', $urls ) ) ) ), 0, 100 );
+	}
+
+	/** Whether an anchor tag's rel attribute contains 'sponsored' as a token (case-insensitive, any order). */
+	private static function tag_has_sponsored_rel( string $tag ): bool {
+		if ( ! preg_match( '/\brel=["\']([^"\']*)["\']|\brel=([^\s>]+)/i', $tag, $rel_match ) ) {
+			return false;
+		}
+		$rel_value = isset( $rel_match[1] ) && '' !== $rel_match[1] ? $rel_match[1] : ( $rel_match[2] ?? '' );
+		$tokens    = preg_split( '/[\s]+/', strtolower( trim( $rel_value ) ) ) ?: array();
+		return in_array( 'sponsored', $tokens, true );
 	}
 
 	/** Find an eligible merchant registry record by normalized destination. */

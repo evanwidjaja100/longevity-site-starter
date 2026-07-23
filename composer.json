@@ -25,13 +25,15 @@
     ],
     "test": [
       "@test:discovery",
-      "@phpunit"
+      "@phpunit",
+      "@test:routes"
     ],
     "phpcs": "phpcs -q",
     "phpcbf": "phpcbf",
     "phpstan": "phpstan analyse --no-progress",
     "phpunit": "phpunit --colors=always",
     "test:discovery": "php scripts/verify-test-discovery.php",
+    "test:routes": "php tests/php/RoutesTest.php",
     "test:fallback": "php tests/php/run-unit-tests.php"
   }
 }
