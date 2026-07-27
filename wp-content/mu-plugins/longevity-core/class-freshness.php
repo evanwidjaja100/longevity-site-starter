@@ -155,8 +155,12 @@ final class Freshness {
 		$types = is_array( $post_type ) ? $post_type : array( $post_type );
 		$types_in = implode( ',', array_fill( 0, count( $types ), '%s' ) );
 		$statuses = is_array( $post_status ) ? $post_status : array( $post_status );
-		$status_in = implode( ',', array_fill( 0, count( $statuses ), '%s' ) );
-		$where = 'p.post_type IN (' . $types_in . ') AND p.post_status IN (' . $status_in . ')';
+		if ( in_array( 'any', $statuses, true ) ) {
+			$where = 'p.post_type IN (' . $types_in . ')';
+		} else {
+			$status_in = implode( ',', array_fill( 0, count( $statuses ), '%s' ) );
+			$where = 'p.post_type IN (' . $types_in . ') AND p.post_status IN (' . $status_in . ')';
+		}
 		$join = '';
 		$params = array_merge( $types, $statuses );
 		$relation = isset( $meta_query['relation'] ) && 'OR' === strtoupper( (string) $meta_query['relation'] ) ? ' OR ' : ' AND ';

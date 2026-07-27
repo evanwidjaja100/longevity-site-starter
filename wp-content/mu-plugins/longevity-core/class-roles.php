@@ -74,6 +74,7 @@ final class Roles {
 			if ( ! $role ) {
 				continue;
 			}
+			$managed = array_keys( $caps );
 			foreach ( $caps as $cap => $grant ) {
 				$has = $role->has_cap( $cap );
 				if ( $grant && ! $has ) {
@@ -88,6 +89,17 @@ final class Roles {
 					}
 				} else {
 					++$unchanged;
+				}
+			}
+			// Remove any managed custom caps the role has that are no longer in the matrix.
+			$all_caps = $role->get_cap( 'level_10' );
+			$role_caps = array_keys( (array) $role->roles[ $role_name ]['capabilities'] ?? array() );
+			foreach ( $role_caps as $cap ) {
+				if ( in_array( $cap, self::ALL_CUSTOM_CAPS, true ) && ! in_array( $cap, $managed, true ) ) {
+					$removed[] = $role_name . ':' . $cap;
+					if ( ! $dry_run ) {
+						$role->remove_cap( $cap );
+					}
 				}
 			}
 		}

@@ -205,6 +205,13 @@ final class System_Readiness {
 	/** Invalidation queue depth and age. */
 	private static function queue_check(): array {
 		$stats = Invalidation_Queue::stats();
+		if ( ! empty( $stats['table_missing'] ) ) {
+			return array(
+				'status'  => 'error',
+				'message' => 'Invalidation queue table is missing; migrations may not have run.',
+				'queue'   => $stats,
+			);
+		}
 		if ( $stats['failed'] > 0 ) {
 			return array(
 				'status'  => 'degraded',

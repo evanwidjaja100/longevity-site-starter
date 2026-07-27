@@ -229,9 +229,8 @@ final class Invalidation_Queue {
 	 */
 	public static function stats(): array {
 		global $wpdb;
-		$empty = array( 'pending' => 0, 'completed' => 0, 'failed' => 0, 'oldest_pending_age_seconds' => 0 );
 		if ( ! self::exists() ) {
-			return $empty;
+			return array( 'pending' => 0, 'completed' => 0, 'failed' => 0, 'oldest_pending_age_seconds' => 0, 'table_missing' => true );
 		}
 		$table = self::table_name();
 		$pending   = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table} WHERE status = 'pending'" );

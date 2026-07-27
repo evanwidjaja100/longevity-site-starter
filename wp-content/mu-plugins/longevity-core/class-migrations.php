@@ -53,6 +53,7 @@ final class Migrations {
 		try {
 			for ( $version = $current + 1; $version <= self::CURRENT_VERSION; ++$version ) {
 				self::run_version( $version );
+				self::validate_postconditions( $version );
 				update_option( 'lel_data_version', $version, false );
 				delete_option( 'lel_data_migration_error' );
 				delete_option( 'lel_migration_cursor_' . $version );
@@ -112,8 +113,20 @@ final class Migrations {
 		return is_array( $error ) ? $error : null;
 	}
 
-	/** Acquire the global migration lock. */
+	/** Acquire the global migration lock atomically via MySQL GET_LOCK. */
 	private static function acquire_lock( bool $force = false ): bool {
+		global $wpdb;
+		if ( isset( $wpdb ) && method_exists( $wpdb, 'query' ) ) {
+			$result = $wpdb->query( "SELECT GET_LOCK('lel_migration', 0)" );
+			if ( 1 === (int) $result ) {
+				update_option( 'lel_migration_lock', array(
+					'owner'       => function_exists( 'getmypid' ) ? getmypid() : 0,
+					'acquired_at' => time(),
+					'expires_at'  => time() + self::LOCK_TTL,
+				), false );
+				return true;
+			}
+		}
 		$lock = get_option( 'lel_migration_lock', null );
 		if ( is_array( $lock ) && isset( $lock['expires_at'] ) && (int) $lock['expires_at'] > time() && ! $force ) {
 			return false;
@@ -131,6 +144,10 @@ final class Migrations {
 
 	/** Release the global migration lock. */
 	private static function release_lock(): void {
+		global $wpdb;
+		if ( isset( $wpdb ) && method_exists( $wpdb, 'query' ) ) {
+			$wpdb->query( "SELECT RELEASE_LOCK('lel_migration')" );
+		}
 		delete_option( 'lel_migration_lock' );
 	}
 
@@ -199,6 +216,30 @@ final class Migrations {
 				throw new \RuntimeException( 'Failed to enforce audit-chain fork constraint; the audit table may contain a fork and requires manual remediation.' );
 			}
 			add_option( 'lel_audit_schema_version', Audit_Log::SCHEMA_VERSION, '', false );
+		}
+	}
+
+	/** Validate schema postconditions after each migration version. */
+	private static function validate_postconditions( int $version ): void {
+		if ( 3 === $version ) {
+			if ( ! Audit_Log::exists() ) {
+				throw new \RuntimeException( 'Migration 3 postcondition failed: audit table missing.' );
+			}
+		}
+		if ( 8 === $version ) {
+			if ( ! Audit_Log::ensure_fork_constraint() ) {
+				throw new \RuntimeException( 'Migration 8 postcondition failed: fork constraint missing.' );
+			}
+		}
+		if ( 9 === $version ) {
+			if ( ! Invalidation_Queue::exists() ) {
+				throw new \RuntimeException( 'Migration 9 postcondition failed: invalidation queue table missing.' );
+			}
+		}
+		if ( 10 === $version ) {
+			if ( ! Audit_Log::ensure_fork_constraint() ) {
+				throw new \RuntimeException( 'Migration 10 postcondition failed: fork constraint missing.' );
+			}
 		}
 	}
 
