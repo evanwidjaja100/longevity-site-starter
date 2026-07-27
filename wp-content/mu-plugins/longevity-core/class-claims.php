@@ -106,6 +106,7 @@ final class Claims {
 			'status'            => 'verified',
 		);
 		$hash = hash( 'sha256', Approval_Fingerprint::canonical_json( $payload ) );
+		Meta_Authorization::enter_trusted_scope();
 		self::$tracking = true;
 		try {
 			update_post_meta( $post_id, 'verification_status', 'verified' );
@@ -115,8 +116,15 @@ final class Claims {
 			update_post_meta( $post_id, 'verification_snapshot_hash', $hash );
 		} finally {
 			self::$tracking = false;
+			Meta_Authorization::exit_trusted_scope();
 		}
-		Audit_Log::record( 'claim_verified', 'claim', $post_id, array( 'snapshot_hash' => $hash ), $actor_id, 'workflow' );
+		try {
+			Audit_Log::record( 'claim_verified', 'claim', $post_id, array( 'snapshot_hash' => $hash ), $actor_id, 'workflow', true );
+		} catch ( \Throwable $error ) {
+			update_post_meta( $post_id, 'verification_status', 'stale' );
+			Audit_Log::record( 'metadata_write_denied', 'claim', $post_id, array( 'field' => 'verification_status', 'reason' => 'audit_write_failed' ), $actor_id, 'workflow' );
+			return false;
+		}
 		return true;
 	}
 
@@ -130,6 +138,7 @@ final class Claims {
 		if ( $actor <= 0 ) {
 			return;
 		}
+		Meta_Authorization::enter_trusted_scope();
 		self::$tracking = true;
 		try {
 			if ( 'verification_status' === $meta_key && 'verified' === (string) $meta_value ) {
@@ -144,7 +153,12 @@ final class Claims {
 					update_post_meta( $post_id, 'verified_at', gmdate( DATE_ATOM ) );
 					update_post_meta( $post_id, 'verification_date', Date_Validator::today() );
 					update_post_meta( $post_id, 'verification_snapshot_hash', hash( 'sha256', Approval_Fingerprint::canonical_json( $payload ) ) );
-					Audit_Log::record( 'claim_verified', 'claim', $post_id, array( 'snapshot_hash' => hash( 'sha256', Approval_Fingerprint::canonical_json( $payload ) ) ), $actor, 'workflow' );
+					try {
+						Audit_Log::record( 'claim_verified', 'claim', $post_id, array( 'snapshot_hash' => hash( 'sha256', Approval_Fingerprint::canonical_json( $payload ) ) ), $actor, 'workflow', true );
+					} catch ( \Throwable $error ) {
+						update_post_meta( $post_id, 'verification_status', 'stale' );
+						Audit_Log::record( 'metadata_write_denied', 'claim', $post_id, array( 'field' => 'verification_status', 'reason' => 'audit_write_failed' ), $actor, 'workflow' );
+					}
 				} else {
 					update_post_meta( $post_id, 'verification_status', 'stale' );
 					Audit_Log::record( 'metadata_write_denied', 'claim', $post_id, array( 'field' => 'verification_status', 'reason' => 'direct_write_bypass' ), $actor, 'workflow' );
@@ -162,6 +176,7 @@ final class Claims {
 			}
 		} finally {
 			self::$tracking = false;
+			Meta_Authorization::exit_trusted_scope();
 		}
 	}
 

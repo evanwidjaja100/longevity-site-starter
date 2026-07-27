@@ -134,8 +134,17 @@ final class Corrections {
 			update_post_meta( $post_id, 'completion_snapshot_by', $actor_id );
 			update_post_meta( $post_id, 'completion_snapshot_at', gmdate( DATE_ATOM ) );
 		}
-		update_post_meta( $post_id, 'correction_status', $new_status );
-		Audit_Log::record( 'correction_transition', 'correction', $post_id, array( 'from' => $current, 'to' => $new_status, 'actor' => $actor_id ), $actor_id, 'workflow' );
+		Meta_Authorization::enter_trusted_scope();
+		try {
+			update_post_meta( $post_id, 'correction_status', $new_status );
+			Audit_Log::record( 'correction_transition', 'correction', $post_id, array( 'from' => $current, 'to' => $new_status, 'actor' => $actor_id ), $actor_id, 'workflow', true );
+		} catch ( \Throwable $error ) {
+			update_post_meta( $post_id, 'correction_status', $current );
+			Audit_Log::record( 'correction_transition', 'correction', $post_id, array( 'from' => $new_status, 'to' => $current, 'actor' => $actor_id, 'reason' => 'audit_write_failed' ), $actor_id, 'workflow' );
+			Meta_Authorization::exit_trusted_scope();
+			return false;
+		}
+		Meta_Authorization::exit_trusted_scope();
 		return true;
 	}
 

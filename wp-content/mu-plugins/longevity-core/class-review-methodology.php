@@ -161,16 +161,23 @@ final class Review_Methodology {
 		if ( '' === $hash ) {
 			return false;
 		}
+		Meta_Authorization::enter_trusted_scope();
 		self::$mutating_approval = true;
 		try {
 			update_post_meta( $record_id, 'approval_status', 'approved' );
 			update_post_meta( $record_id, 'approved_by', $actor_id );
 			update_post_meta( $record_id, 'approval_date', Date_Validator::today() );
 			update_post_meta( $record_id, 'approval_snapshot_hash', $hash );
-			$audit_id = Audit_Log::record( 'test_record_approved', 'post', $record_id, array( 'snapshot_hash' => $hash ), $actor_id, 'workflow' );
+			$audit_id = Audit_Log::record( 'test_record_approved', 'post', $record_id, array( 'snapshot_hash' => $hash ), $actor_id, 'workflow', true );
 			update_post_meta( $record_id, 'approval_snapshot_id', $audit_id );
+		} catch ( \Throwable $error ) {
+			update_post_meta( $record_id, 'approval_status', 'pending' );
+			Audit_Log::record( 'test_approval_denied', 'post', $record_id, array( 'reason' => 'audit_write_failed' ), $actor_id, 'workflow' );
+			Meta_Authorization::exit_trusted_scope();
+			return false;
 		} finally {
 			self::$mutating_approval = false;
+			Meta_Authorization::exit_trusted_scope();
 		}
 		return true;
 	}
@@ -185,16 +192,23 @@ final class Review_Methodology {
 		if ( '' === $hash ) {
 			return false;
 		}
+		Meta_Authorization::enter_trusted_scope();
 		self::$mutating_approval = true;
 		try {
 			update_post_meta( $protocol_post_id, 'approval_status', 'approved' );
 			update_post_meta( $protocol_post_id, 'protocol_reviewer_user_id', $actor_id );
 			update_post_meta( $protocol_post_id, 'approval_date', Date_Validator::today() );
 			update_post_meta( $protocol_post_id, 'approval_snapshot_hash', $hash );
-			$audit_id = Audit_Log::record( 'test_protocol_approved', 'post', $protocol_post_id, array( 'snapshot_hash' => $hash ), $actor_id, 'workflow' );
+			$audit_id = Audit_Log::record( 'test_protocol_approved', 'post', $protocol_post_id, array( 'snapshot_hash' => $hash ), $actor_id, 'workflow', true );
 			update_post_meta( $protocol_post_id, 'approval_snapshot_id', $audit_id );
+		} catch ( \Throwable $error ) {
+			update_post_meta( $protocol_post_id, 'approval_status', 'pending' );
+			Audit_Log::record( 'test_approval_denied', 'post', $protocol_post_id, array( 'reason' => 'audit_write_failed' ), $actor_id, 'workflow' );
+			Meta_Authorization::exit_trusted_scope();
+			return false;
 		} finally {
 			self::$mutating_approval = false;
+			Meta_Authorization::exit_trusted_scope();
 		}
 		return true;
 	}

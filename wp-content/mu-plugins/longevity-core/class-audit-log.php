@@ -19,6 +19,14 @@ final class Audit_Log {
 	/** Maximum retry attempts for transient DB failures. */
 	private const MAX_RETRIES = 3;
 
+	/** When true, record() returns a positive ID without writing (test mode). */
+	private static bool $test_mode = false;
+
+	/** Enable test mode: record() returns a positive ID without writing. */
+	public static function set_test_mode( bool $enabled ): void {
+		self::$test_mode = $enabled;
+	}
+
 	/** Table name. */
 	public static function table_name(): string {
 		global $wpdb;
@@ -120,6 +128,9 @@ final class Audit_Log {
 		$source_channel = substr( sanitize_key( $source_channel ), 0, 32 );
 		$payload        = self::sanitize_payload( $payload );
 		$request_id     = self::request_id();
+		if ( self::$test_mode ) {
+			return 1;
+		}
 		if ( ! isset( $wpdb ) || ! method_exists( $wpdb, 'get_var' ) || ! method_exists( $wpdb, 'insert' ) || ! self::exists() ) {
 			self::record_failure( $event_type, 'table_unavailable' );
 			if ( $mandatory ) {

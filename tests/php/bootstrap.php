@@ -255,6 +255,9 @@ require_once LONGEVITY_CORE_PATH . 'class-invalidation-queue.php';
 require_once LONGEVITY_CORE_PATH . 'class-system-readiness.php';
 require_once LONGEVITY_CORE_PATH . 'class-metrics.php';
 
+// Enable Audit_Log test mode: record() returns positive ID without DB writes.
+Longevity\Core\Audit_Log::set_test_mode( true );
+
 
 // --- Additional WP function stubs for test files ---
 
