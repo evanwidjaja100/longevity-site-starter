@@ -21,12 +21,16 @@ test('analytics queue exists and accepts events', async ({ page }) => {
   });
   expect(queueReady).toBe(true);
 
-  const pushed = await page.evaluate(() => {
+  const result = await page.evaluate(() => {
+    const before = window.longevityAnalytics.length;
     window.longevityTrack('search_open', { placement: 'header' });
-    return window.longevityAnalytics;
+    return { before, after: window.longevityAnalytics.length, last: window.longevityAnalytics[window.longevityAnalytics.length - 1] };
   });
-  expect(pushed.length).toBeGreaterThanOrEqual(1);
-  expect(pushed[0].event).toBe('search_open');
+  expect(result.after).toBe(result.before + 1);
+  expect(result.last.event).toBe('search_open');
+  expect(result.last.placement).toBe('header');
+  const allowedKeys = ['event', 'placement', 'content_id', 'content_group'];
+  expect(Object.keys(result.last).every((k) => allowedKeys.includes(k))).toBe(true);
 });
 
 test('analytics rejects unknown events', async ({ page }) => {
@@ -55,12 +59,22 @@ test('consent defaults to false', async ({ page }) => {
   expect(consent.advertising).toBe(false);
 });
 
-test('data-lel-event click triggers analytics push', async ({ page }) => {
+test('data-lel-event click triggers exactly one analytics push', async ({ page }) => {
   await page.goto('/about/');
   const before = await page.evaluate(() => window.longevityAnalytics.length);
   await page.locator('[data-lel-event]').first().click({ force: true });
   const after = await page.evaluate(() => window.longevityAnalytics.length);
-  expect(after).toBeGreaterThanOrEqual(before);
+  expect(after).toBe(before + 1);
+});
+
+test('analytics payload omits empty allowlisted fields', async ({ page }) => {
+  await page.goto('/');
+  const pushed = await page.evaluate(() => {
+    window.longevityTrack('search_open', { placement: '' });
+    return window.longevityAnalytics[window.longevityAnalytics.length - 1];
+  });
+  expect(pushed.event).toBe('search_open');
+  expect(Object.prototype.hasOwnProperty.call(pushed, 'placement')).toBe(false);
 });
 
 test('search_open event is wired on search button', async ({ page }) => {

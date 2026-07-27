@@ -269,6 +269,8 @@ final class Bootstrap {
 			"default-src 'self'",
 			"script-src 'self' 'nonce-{$nonce}'",
 			"style-src 'self' 'nonce-{$nonce}'",
+			// WordPress core and block markup rely on inline style attributes.
+			"style-src-attr 'unsafe-inline'",
 			"img-src 'self' data: https:",
 			"font-src 'self' data:",
 			"connect-src 'self'",

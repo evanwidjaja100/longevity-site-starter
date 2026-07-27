@@ -3,8 +3,8 @@
  * Title: Study appraisal worksheet
  * Slug: longevity-starter/study-appraisal-worksheet
  * Categories: featured
- * Inserter: true
- * Description: Evaluate individual studies against methodological criteria.
+ * Inserter: false
+ * Description: Evaluate individual studies against methodological criteria. Quarantined from the inserter: ratings and notes must come from a real appraisal, never sample values.
  * @package LongevityStarter
  */
 
@@ -14,6 +14,6 @@
 <!-- wp:heading {"level":3,"fontSize":"large"} --><h3 class="wp-block-heading has-large-font-size">Study appraisal worksheet</h3><!-- /wp:heading -->
 <!-- wp:paragraph {"fontSize":"small"} --><p class="has-small-font-size">Each study cited in this article was assessed against the criteria below. This worksheet documents how we evaluated methodological quality, relevance, and risk of bias.</p><!-- /wp:paragraph -->
 <!-- wp:table {"className":"is-style-stripes"} -->
-<figure class="wp-block-table is-style-stripes"><table><thead><tr><th>Criteria</th><th>Question</th><th>Rating</th><th>Notes</th></tr></thead><tbody><tr><td>Design</td><td>Does the study design match the claim type?</td><td>Adequate</td><td>RCT for efficacy claim</td></tr><tr><td>Sample</td><td>Is the sample size adequate and appropriate?</td><td>Adequate</td><td>n=250, powered for primary outcome</td></tr><tr><td>Bias</td><td>Were adequate blinding and randomisation used?</td><td>Some concerns</td><td>Open-label, no placebo</td></tr><tr><td>Duration</td><td>Is the follow-up period sufficient?</td><td>Limited</td><td>8 weeks; longer needed for durability</td></tr><tr><td>Sponsorship</td><td>Is there a funding or sponsorship concern?</td><td>Low risk</td><td>Government grant, no industry funding</td></tr><tr><td>Relevance</td><td>Does the population match the guide scope?</td><td>Partial</td><td>Healthy adults; guide covers older adults</td></tr></tbody></table></figure>
+<figure class="wp-block-table is-style-stripes"><table><thead><tr><th>Criteria</th><th>Question</th><th>Rating</th><th>Notes</th></tr></thead><tbody><tr><td>Design</td><td>Does the study design match the claim type?</td><td>[TBD]</td><td>[TBD]</td></tr><tr><td>Sample</td><td>Is the sample size adequate and appropriate?</td><td>[TBD]</td><td>[TBD]</td></tr><tr><td>Bias</td><td>Were adequate blinding and randomisation used?</td><td>[TBD]</td><td>[TBD]</td></tr><tr><td>Duration</td><td>Is the follow-up period sufficient?</td><td>[TBD]</td><td>[TBD]</td></tr><tr><td>Sponsorship</td><td>Is there a funding or sponsorship concern?</td><td>[TBD]</td><td>[TBD]</td></tr><tr><td>Relevance</td><td>Does the population match the guide scope?</td><td>[TBD]</td><td>[TBD]</td></tr></tbody></table></figure>
 <!-- /wp:table -->
 </div><!-- /wp:group -->

@@ -94,10 +94,8 @@ final class SEO {
 		}
 	}
 
-	public static function output_canonical(): void {
-		if ( self::provider_active() ) {
-			return;
-		}
+	/** Resolve one canonical URL for the current request; shared by canonical and social output. */
+	public static function canonical_url(): string {
 		$url = '';
 		if ( is_singular() ) {
 			$post_id = get_queried_object_id();
@@ -109,9 +107,10 @@ final class SEO {
 				if ( $key ) {
 					$url = (string) Routes::category_url( $key );
 				}
-			}
-			if ( '' === $url ) {
-				$url = (string) get_term_link( $term );
+				if ( '' === $url ) {
+					$link = get_term_link( $term );
+					$url  = is_wp_error( $link ) ? '' : (string) $link;
+				}
 			}
 		} elseif ( is_home() || is_front_page() ) {
 			$url = home_url( '/' );
@@ -120,6 +119,14 @@ final class SEO {
 		} elseif ( is_post_type_archive() ) {
 			$url = (string) get_post_type_archive_link( get_query_var( 'post_type' ) ?: 'review' );
 		}
+		return $url;
+	}
+
+	public static function output_canonical(): void {
+		if ( self::provider_active() ) {
+			return;
+		}
+		$url = self::canonical_url();
 		if ( '' !== $url ) {
 			echo '<link rel="canonical" href="' . esc_url( $url ) . '">' . "\n";
 		}
@@ -151,7 +158,10 @@ final class SEO {
 		}
 		$post_id     = is_singular() ? get_queried_object_id() : 0;
 		$title       = $post_id ? get_the_title( $post_id ) : wp_get_document_title();
-		$url         = $post_id ? get_permalink( $post_id ) : home_url( '/' );
+		$url         = self::canonical_url();
+		if ( '' === $url ) {
+			$url = $post_id ? (string) get_permalink( $post_id ) : home_url( '/' );
+		}
 		$description = $post_id ? self::resolve_description( $post_id ) : (string) get_bloginfo( 'description' );
 		$type        = is_singular( array( 'post', 'review' ) ) ? 'article' : 'website';
 		$image       = $post_id ? wp_get_attachment_image_url( get_post_thumbnail_id( $post_id ), 'full' ) : '';

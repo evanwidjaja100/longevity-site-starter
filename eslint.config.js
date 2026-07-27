@@ -11,7 +11,8 @@ export default [
         window: 'readonly',
         document: 'readonly',
         CustomEvent: 'readonly',
-        HTMLDetailsElement: 'readonly'
+        HTMLDetailsElement: 'readonly',
+        HTMLSelectElement: 'readonly'
       }
     },
     rules: { 'no-console': 'off' }

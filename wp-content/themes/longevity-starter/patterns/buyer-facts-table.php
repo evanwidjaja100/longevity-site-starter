@@ -3,8 +3,8 @@
  * Title: Buyer facts table
  * Slug: longevity-starter/buyer-facts-table
  * Categories: featured
- * Inserter: true
- * Description: Structured product comparison with key decision factors.
+ * Inserter: false
+ * Description: Structured product comparison with key decision factors. Quarantined from the inserter: all cells must be filled from verified product data, never sample values.
  * @package LongevityStarter
  */
 
@@ -14,6 +14,6 @@
 <!-- wp:heading {"level":3,"fontSize":"large"} --><h3 class="wp-block-heading has-large-font-size">Buyer facts</h3><!-- /wp:heading -->
 <!-- wp:paragraph {"fontSize":"small"} --><p class="has-small-font-size">Key facts to consider before purchasing. Prices, features, and availability were checked on the date shown and may change.</p><!-- /wp:paragraph -->
 <!-- wp:table {"className":"is-style-stripes"} -->
-<figure class="wp-block-table is-style-stripes"><table><thead><tr><th>Feature</th><th>Product A</th><th>Product B</th><th>Product C</th></tr></thead><tbody><tr><td>Price</td><td>$49.99</td><td>$89.00</td><td>$129.95</td></tr><tr><td>Key metric</td><td>Value option</td><td>Best overall</td><td>Premium choice</td></tr><tr><td>Evidence grade</td><td>B — Moderate</td><td>A — Strong</td><td>B — Moderate</td></tr><tr><td>Testing completed</td><td>Yes</td><td>Yes</td><td>Yes</td></tr><tr><td>Subscription needed</td><td>No</td><td>Optional</td><td>Required</td></tr><tr><td>Return period</td><td>30 days</td><td>60 days</td><td>30 days</td></tr><tr><td>Medical review</td><td>Recorded</td><td>Recorded</td><td>Recorded</td></tr></tbody></table></figure>
+<figure class="wp-block-table is-style-stripes"><table><thead><tr><th>Feature</th><th>[Product name]</th><th>[Product name]</th><th>[Product name]</th></tr></thead><tbody><tr><td>Price</td><td>[TBD]</td><td>[TBD]</td><td>[TBD]</td></tr><tr><td>Key metric</td><td>[TBD]</td><td>[TBD]</td><td>[TBD]</td></tr><tr><td>Evidence grade</td><td>[TBD]</td><td>[TBD]</td><td>[TBD]</td></tr><tr><td>Testing completed</td><td>[TBD]</td><td>[TBD]</td><td>[TBD]</td></tr><tr><td>Subscription needed</td><td>[TBD]</td><td>[TBD]</td><td>[TBD]</td></tr><tr><td>Return period</td><td>[TBD]</td><td>[TBD]</td><td>[TBD]</td></tr><tr><td>Medical review</td><td>[TBD]</td><td>[TBD]</td><td>[TBD]</td></tr></tbody></table></figure>
 <!-- /wp:table -->
 </div><!-- /wp:group -->

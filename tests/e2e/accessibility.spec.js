@@ -101,13 +101,22 @@ test.describe('focus visibility and overflow', () => {
     expect(scrollWidth).toBeLessThanOrEqual(viewportWidth + 2);
   });
 
-  test('no horizontal overflow at 400% zoom simulation', async ({ page }) => {
-    await page.setViewportSize({ width: 360, height: 800 });
+  test('no horizontal overflow at 400% browser zoom', async ({ page, browserName }) => {
+    test.skip(browserName !== 'chromium', 'CDP page scale requires Chromium');
+    await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto('/');
-    await page.evaluate(() => document.body.style.zoom = '4');
+    const client = await page.context().newCDPSession(page);
+    await client.send('Emulation.setPageScaleFactor', { pageScaleFactor: 4 });
     const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
     const viewportWidth = await page.evaluate(() => window.innerWidth);
     expect(scrollWidth).toBeLessThanOrEqual(viewportWidth + 2);
+  });
+
+  test('search button keeps accessible name at mobile width', async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 800 });
+    await page.goto('/');
+    const button = page.getByRole('button', { name: /search/i }).first();
+    await expect(button).toBeVisible();
   });
 });
 

@@ -21,9 +21,10 @@
     };
     const safe = { event: name };
     allowedParameters.forEach((key) => {
-      if (Object.prototype.hasOwnProperty.call(candidates, key)) {
-         safe[key] = String(candidates[key] || '').replace(/[\r\n\t]/g, ' ').slice(0, 120);
-      }
+      if (!Object.prototype.hasOwnProperty.call(candidates, key)) return;
+      const value = String(candidates[key] ?? '').replace(/[\r\n\t]/g, ' ').slice(0, 120);
+      if (value === '') return;
+      safe[key] = value;
     });
 
     window.longevityAnalytics.push(safe);
