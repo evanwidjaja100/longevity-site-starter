@@ -79,12 +79,34 @@ final class Claims {
 		return user_can( $user_id, 'edit_claims' );
 	}
 
+	/** Validate that a source reference points to an existing, well-formed source record. */
+	private static function validate_source( string $source_id, string $source_url, string $identifier ): bool {
+		if ( '' !== $source_url || '' !== $identifier ) {
+			return true;
+		}
+		$source_post_id = (int) $source_id;
+		if ( $source_post_id <= 0 ) {
+			return false;
+		}
+		$source = get_post( $source_post_id );
+		if ( ! $source || 'lel_source' !== $source->post_type ) {
+			return false;
+		}
+		$required = array( 'source_title', 'source_authors', 'publication_date', 'accessed_date' );
+		foreach ( $required as $field ) {
+			if ( '' === trim( (string) get_post_meta( $source_post_id, $field, true ) ) ) {
+				return false;
+			}
+		}
+		return true;
+	}
+
 	/** Verify the exact current claim snapshot through an explicit workflow service. */
 	public static function verify( int $post_id, int $actor_id ): bool {
 		$prepared_by = (int) get_post_meta( $post_id, 'prepared_by', true );
-		// SoD is based on the immutable preparer; legacy claims fall back to last editor (fail-closed).
-		$preparer = $prepared_by > 0 ? $prepared_by : (int) get_post_meta( $post_id, 'last_edited_by', true );
-		if ( 'lel_claim' !== get_post_type( $post_id ) || $actor_id <= 0 || ! user_can( $actor_id, 'verify_claims' ) || $preparer === $actor_id ) {
+		$last_edited_by = (int) get_post_meta( $post_id, 'last_edited_by', true );
+		$preparer = $prepared_by > 0 ? $prepared_by : $last_edited_by;
+		if ( 'lel_claim' !== get_post_type( $post_id ) || $actor_id <= 0 || ! user_can( $actor_id, 'verify_claims' ) || $preparer === $actor_id || $last_edited_by === $actor_id ) {
 			Audit_Log::record( 'metadata_write_denied', 'claim', $post_id, array( 'field' => 'verification_status' ), $actor_id, 'workflow' );
 			return false;
 		}
@@ -95,6 +117,10 @@ final class Claims {
 		$identifier = trim( (string) get_post_meta( $post_id, 'source_identifier', true ) );
 		if ( '' === $claim_id || '' === $claim_text || ( '' === $source_id && '' === $source_url && '' === $identifier ) ) {
 			Audit_Log::record( 'claim_verification_rejected', 'claim', $post_id, array( 'reason' => 'required_fields_missing' ), $actor_id, 'workflow' );
+			return false;
+		}
+		if ( ! self::validate_source( $source_id, $source_url, $identifier ) ) {
+			Audit_Log::record( 'claim_verification_rejected', 'claim', $post_id, array( 'reason' => 'invalid_source' ), $actor_id, 'workflow' );
 			return false;
 		}
 		$payload = array(
