@@ -26,4 +26,33 @@ final class ContactPrivacyTest extends TestCase {
 		self::assertStringContainsString( ' inert', $html );
 		self::assertStringContainsString( 'tabindex="-1"', $html );
 	}
+
+	public function test_contact_form_declares_autocomplete_hints(): void {
+		$_SERVER['REMOTE_ADDR'] = '198.51.100.10';
+		$html = Public_Contact::render_contact_form();
+		self::assertStringContainsString( 'autocomplete="name"', $html );
+		self::assertStringContainsString( 'autocomplete="email"', $html );
+	}
+
+	public function test_success_feedback_uses_status_role(): void {
+		$_GET = array( 'submitted' => '1' );
+		$html = Public_Contact::render_contact_feedback();
+		self::assertStringContainsString( 'role="status"', $html );
+		self::assertStringContainsString( 'has been received', $html );
+		$_GET = array();
+	}
+
+	public function test_error_feedback_is_allowlisted_and_uses_alert_role(): void {
+		$_GET = array( 'error' => 'rate_limited' );
+		$html = Public_Contact::render_contact_feedback();
+		self::assertStringContainsString( 'role="alert"', $html );
+		self::assertStringContainsString( 'Too many submissions', $html );
+
+		$_GET = array( 'error' => 'save_failed<script>' );
+		self::assertSame( '', Public_Contact::render_contact_feedback() );
+
+		$_GET = array( 'error' => 'unknown_key' );
+		self::assertSame( '', Public_Contact::render_contact_feedback() );
+		$_GET = array();
+	}
 }

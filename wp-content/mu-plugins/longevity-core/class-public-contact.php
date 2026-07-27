@@ -17,7 +17,12 @@ class Public_Contact {
 	/** Register privacy-preserving retention. */
 	public static function init(): void {
 		add_action( 'init', array( self::class, 'schedule_retention' ), 30 );
-		add_action( self::RETENTION_HOOK, array( self::class, 'run_retention_cleanup' ) );
+		add_action(
+			self::RETENTION_HOOK,
+			static function (): void {
+				self::run_retention_cleanup();
+			}
+		);
 	}
 	/**
 	 * Resolve the client IP address.
@@ -53,29 +58,60 @@ class Public_Contact {
 		return 'v' . $version . '_' . hash_hmac( 'sha256', $ip, $secret . '|contact|' . $version );
 	}
 
+	/** Allowlisted user-facing error messages keyed by error code. */
+	private static function feedback_messages(): array {
+		return array(
+			'security'         => __( 'Your session expired. Please reload the page and try again.', 'longevity-core' ),
+			'rejected'         => __( 'Your submission could not be accepted.', 'longevity-core' ),
+			'rate_limited'     => __( 'Too many submissions from this network. Please try again later.', 'longevity-core' ),
+			'required'         => __( 'Please complete every required field.', 'longevity-core' ),
+			'invalid_email'    => __( 'Please enter a valid email address.', 'longevity-core' ),
+			'name_too_long'    => __( 'The name provided is too long.', 'longevity-core' ),
+			'email_too_long'   => __( 'The email address provided is too long.', 'longevity-core' ),
+			'message_too_long' => __( 'The message provided is too long.', 'longevity-core' ),
+			'invalid_chars'    => __( 'The submission contains characters that are not allowed.', 'longevity-core' ),
+			'save_failed'      => __( 'Your message could not be saved. Please try again later.', 'longevity-core' ),
+		);
+	}
+
+	/** Render allowlisted success or error feedback from redirect query args. */
+	public static function render_contact_feedback(): string {
+		// Read-only display of allowlisted feedback; no state change, nonce not applicable.
+		if ( isset( $_GET['submitted'] ) && '1' === sanitize_text_field( wp_unslash( $_GET['submitted'] ) ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			return '<p class="longevity-contact-feedback longevity-contact-success" role="status">' . esc_html__( 'Thank you. Your message has been received.', 'longevity-core' ) . '</p>';
+		}
+		$error = isset( $_GET['error'] ) ? sanitize_key( wp_unslash( $_GET['error'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		$map   = self::feedback_messages();
+		if ( '' !== $error && isset( $map[ $error ] ) ) {
+			return '<p class="longevity-contact-feedback longevity-contact-error" role="alert">' . esc_html( $map[ $error ] ) . '</p>';
+		}
+		return '';
+	}
+
 	/** Render a contact form with abuse protection. */
 	public static function render_contact_form(): string {
 		$identifier = self::rate_limit_identifier( self::get_client_ip() );
-		$blocked    = get_transient( 'lel_contact_block_' . $identifier );
+		$feedback   = self::render_contact_feedback();
 
-		if ( $blocked ) {
-			return '<aside class="longevity-contact-blocked" role="alert"><p>' . esc_html__( 'Too many submissions from this IP address. Please try again later.', 'longevity-core' ) . '</p></aside>';
+		if ( self::current_rate_count( 'lel_contact_count_' . $identifier ) > 5 ) {
+			return $feedback . '<aside class="longevity-contact-blocked" role="alert"><p>' . esc_html__( 'Too many submissions from this network. Please try again later.', 'longevity-core' ) . '</p></aside>';
 		}
 
 		wp_enqueue_script( 'longevity-contact-form', LONGEVITY_CORE_URL . 'assets/contact-form.js', array(), LONGEVITY_CORE_VERSION, true );
 
 		$nonce = wp_create_nonce( 'longevity_contact' );
 
-		$html = '<form class="longevity-contact-form" method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '">';
+		$html = $feedback;
+		$html .= '<form class="longevity-contact-form" method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '">';
 		$html .= '<input type="hidden" name="action" value="longevity_contact_submit">';
 		$html .= '<input type="hidden" name="_wpnonce" value="' . esc_attr( $nonce ) . '">';
 		$html .= '<div class="longevity-honeypot" aria-hidden="true" inert><label for="longevity-website">' . esc_html__( 'Website', 'longevity-core' ) . '</label><input type="text" name="longevity_website" id="longevity-website" tabindex="-1" autocomplete="off"></div>';
 
 		$html .= '<p><label for="longevity-contact-name">' . esc_html__( 'Name', 'longevity-core' ) . ' <span class="required">*</span></label>';
-		$html .= '<input type="text" name="longevity_contact_name" id="longevity-contact-name" required maxlength="100"></p>';
+		$html .= '<input type="text" name="longevity_contact_name" id="longevity-contact-name" required maxlength="100" autocomplete="name"></p>';
 
 		$html .= '<p><label for="longevity-contact-email">' . esc_html__( 'Email', 'longevity-core' ) . ' <span class="required">*</span></label>';
-		$html .= '<input type="email" name="longevity_contact_email" id="longevity-contact-email" required maxlength="254"></p>';
+		$html .= '<input type="email" name="longevity_contact_email" id="longevity-contact-email" required maxlength="254" autocomplete="email"></p>';
 
 		$html .= '<p><label for="longevity-contact-subject">' . esc_html__( 'Subject', 'longevity-core' ) . ' <span class="required">*</span></label>';
 		$html .= '<select name="longevity_contact_subject" id="longevity-contact-subject" required>';
@@ -110,13 +146,15 @@ class Public_Contact {
 		}
 	}
 
-	/** Permanently remove contact records after the configured retention period. Processes multiple batches within a runtime cap. */
+	/** Permanently remove contact records after the configured retention period. Legal-held messages are never age-deleted. Processes multiple batches within a runtime cap. */
 	public static function run_retention_cleanup(): int {
 		$retention_days = min( 365, max( 1, (int) get_option( 'lel_contact_retention_days', 90 ) ) );
 		$cutoff         = gmdate( 'Y-m-d H:i:s', time() - ( $retention_days * DAY_IN_SECONDS ) );
 		$runtime_cap    = 25; // seconds
 		$start          = time();
 		$total_deleted  = 0;
+
+		self::purge_expired_rate_rows();
 
 		while ( true ) {
 			$messages = get_posts(
@@ -126,6 +164,7 @@ class Public_Contact {
 					'posts_per_page' => 100,
 					'fields'         => 'ids',
 					'date_query'     => array( array( 'before' => $cutoff, 'inclusive' => true, 'column' => 'post_date_gmt' ) ),
+					'meta_query'     => array( array( 'key' => 'contact_legal_hold', 'compare' => 'NOT EXISTS' ) ), // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query
 					'no_found_rows'  => true,
 				)
 			);
@@ -153,31 +192,18 @@ class Public_Contact {
 	/**
 	 * Atomically increment a rate-limit counter.
 	 *
-	 * Uses wp_cache_incr/wp_cache_add when a persistent object cache is available
-	 * (atomic under concurrency). Falls back to a dedicated DB table with
-	 * INSERT ... ON DUPLICATE KEY UPDATE for environments without object cache.
+	 * Uses the dedicated lel_rate_limits table with INSERT ... ON DUPLICATE KEY
+	 * UPDATE so limiting stays correct with no persistent object cache and
+	 * under concurrent requests. Object cache is intentionally not consulted.
 	 *
-	 * @param string $key Transient-style key identifying the rate bucket.
+	 * @param string $key Key identifying the rate bucket.
 	 * @return int The new count after increment.
 	 */
 	private static function atomic_rate_increment( string $key ): int {
-		$ttl = HOUR_IN_SECONDS;
-
-		// Attempt atomic object-cache increment first.
-		$added = wp_cache_add( $key, 1, 'longevity_rate', $ttl );
-		if ( $added ) {
-			return 1;
-		}
-		$incremented = wp_cache_incr( $key, 1, 'longevity_rate' );
-		if ( false !== $incremented && is_numeric( $incremented ) ) {
-			return (int) $incremented;
-		}
-
-		// Fallback: dedicated DB table with atomic upsert.
 		global $wpdb;
+		$ttl   = HOUR_IN_SECONDS;
 		$table = $wpdb->prefix . 'lel_rate_limits';
 
-		// Ensure table exists (lightweight; idempotent via dbDelta in install).
 		if ( $table !== $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table ) ) ) {
 			self::install_rate_table();
 		}
@@ -185,14 +211,33 @@ class Public_Contact {
 		$expires_at = gmdate( 'Y-m-d H:i:s', time() + $ttl );
 		$wpdb->query(
 			$wpdb->prepare(
-				"INSERT INTO {$table} (rate_key, hit_count, expires_at) VALUES (%s, 1, %s) ON DUPLICATE KEY UPDATE hit_count = IF(expires_at < NOW(), 1, hit_count + 1), expires_at = IF(expires_at < NOW(), VALUES(expires_at), expires_at)",
+				"INSERT INTO {$table} (rate_key, hit_count, expires_at) VALUES (%s, 1, %s) ON DUPLICATE KEY UPDATE hit_count = IF(expires_at < UTC_TIMESTAMP(), 1, hit_count + 1), expires_at = IF(expires_at < UTC_TIMESTAMP(), VALUES(expires_at), expires_at)",
 				$key,
 				$expires_at
 			)
 		);
 
-		$count = $wpdb->get_var( $wpdb->prepare( "SELECT hit_count FROM {$table} WHERE rate_key = %s AND expires_at >= NOW()", $key ) );
-		return max( 1, (int) $count );
+		return max( 1, self::current_rate_count( $key ) );
+	}
+
+	/** Read the current unexpired count for a rate bucket without incrementing. */
+	public static function current_rate_count( string $key ): int {
+		global $wpdb;
+		$table = $wpdb->prefix . 'lel_rate_limits';
+		if ( $table !== $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table ) ) ) {
+			return 0;
+		}
+		return (int) $wpdb->get_var( $wpdb->prepare( "SELECT hit_count FROM {$table} WHERE rate_key = %s AND expires_at >= UTC_TIMESTAMP()", $key ) );
+	}
+
+	/** Delete expired rate-limit rows. */
+	public static function purge_expired_rate_rows(): int {
+		global $wpdb;
+		$table = $wpdb->prefix . 'lel_rate_limits';
+		if ( $table !== $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table ) ) ) {
+			return 0;
+		}
+		return (int) $wpdb->query( "DELETE FROM {$table} WHERE expires_at < UTC_TIMESTAMP()" );
 	}
 
 	/** Create the rate-limit table (additive, idempotent). */
@@ -216,13 +261,12 @@ class Public_Contact {
 	/**
 	 * Fail a submission safely without leaking internal details.
 	 *
-	 * Redirects back to the contact form with a user-scoped transient notice.
-	 * Does not use wp_die() which can expose WordPress admin markup.
+	 * Uses a 303 See Other redirect (the only valid way to answer a POST with
+	 * a redirect to a GET view). The error key is allowlisted at render time.
 	 */
-	private static function fail_submission( string $error_key, int $http_code = 400 ): void {
-		set_transient( 'lel_contact_error_' . $error_key, true, MINUTE_IN_SECONDS );
+	private static function fail_submission( string $error_key ): void {
 		$redirect = home_url( '/contact/?error=' . rawurlencode( $error_key ) );
-		wp_safe_redirect( $redirect, $http_code );
+		wp_safe_redirect( $redirect, 303 );
 		exit;
 	}
 
@@ -230,20 +274,19 @@ class Public_Contact {
 	public static function handle_contact_submission(): void {
 		$nonce = sanitize_text_field( wp_unslash( $_POST['_wpnonce'] ?? '' ) );
 		if ( ! wp_verify_nonce( $nonce, 'longevity_contact' ) ) {
-			self::fail_submission( 'security', 403 );
+			self::fail_submission( 'security' );
 		}
 
 		$honeypot = sanitize_text_field( wp_unslash( $_POST['longevity_website'] ?? '' ) );
 		if ( '' !== $honeypot ) {
-			self::fail_submission( 'rejected', 400 );
+			self::fail_submission( 'rejected' );
 		}
 
 		$identifier = self::rate_limit_identifier( self::get_client_ip() );
 		$key        = 'lel_contact_count_' . $identifier;
 		$count      = self::atomic_rate_increment( $key );
 		if ( $count > 5 ) {
-			set_transient( 'lel_contact_block_' . $identifier, '1', HOUR_IN_SECONDS );
-			self::fail_submission( 'rate_limited', 429 );
+			self::fail_submission( 'rate_limited' );
 		}
 
 		$name    = sanitize_text_field( wp_unslash( $_POST['longevity_contact_name'] ?? '' ) );
@@ -252,24 +295,24 @@ class Public_Contact {
 		$message = sanitize_textarea_field( wp_unslash( $_POST['longevity_contact_message'] ?? '' ) );
 
 		if ( '' === $name || '' === $email || '' === $subject || '' === $message || ! in_array( $subject, self::SUBJECTS, true ) ) {
-			self::fail_submission( 'required', 400 );
+			self::fail_submission( 'required' );
 		}
 		if ( ! is_email( $email ) ) {
-			self::fail_submission( 'invalid_email', 400 );
+			self::fail_submission( 'invalid_email' );
 		}
 		// Server-side length enforcement matching form constraints.
 		if ( mb_strlen( $name ) > 100 ) {
-			self::fail_submission( 'name_too_long', 400 );
+			self::fail_submission( 'name_too_long' );
 		}
 		if ( mb_strlen( $email ) > 254 ) {
-			self::fail_submission( 'email_too_long', 400 );
+			self::fail_submission( 'email_too_long' );
 		}
 		if ( mb_strlen( $message ) > 5000 ) {
-			self::fail_submission( 'message_too_long', 400 );
+			self::fail_submission( 'message_too_long' );
 		}
 		// Prevent header injection: reject CR/LF in name and email.
 		if ( preg_match( '/[\r\n]/', $name ) || preg_match( '/[\r\n]/', $email ) ) {
-			self::fail_submission( 'invalid_chars', 400 );
+			self::fail_submission( 'invalid_chars' );
 		}
 
 		$post_id = wp_insert_post(
@@ -283,7 +326,7 @@ class Public_Contact {
 		);
 
 		if ( is_wp_error( $post_id ) ) {
-			self::fail_submission( 'save_failed', 500 );
+			self::fail_submission( 'save_failed' );
 		}
 
 		update_post_meta( $post_id, 'contact_subject', $subject );
@@ -310,7 +353,7 @@ class Public_Contact {
 		}
 
 		$redirect = home_url( '/contact/?submitted=1' );
-		wp_safe_redirect( $redirect );
+		wp_safe_redirect( $redirect, 303 );
 		exit;
 	}
 }
