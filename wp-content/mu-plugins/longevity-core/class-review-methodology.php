@@ -161,12 +161,19 @@ final class Review_Methodology {
 		if ( '' === $hash ) {
 			return false;
 		}
+		$protocol_info = self::approved_protocol_exists(
+			(string) get_post_meta( $record_id, 'protocol_id', true ),
+			(string) get_post_meta( $record_id, 'protocol_version', true ),
+			(string) get_post_meta( $record_id, 'test_end_date', true )
+		);
 		Meta_Authorization::enter_trusted_scope();
 		self::$mutating_approval = true;
 		try {
 			update_post_meta( $record_id, 'approval_status', 'approved' );
 			update_post_meta( $record_id, 'approved_by', $actor_id );
 			update_post_meta( $record_id, 'approval_date', Date_Validator::today() );
+			update_post_meta( $record_id, 'protocol_post_id', $protocol_info['protocol_post_id'] ?? 0 );
+			update_post_meta( $record_id, 'protocol_approval_hash', $protocol_info['protocol_approval_hash'] ?? '' );
 			update_post_meta( $record_id, 'approval_snapshot_hash', $hash );
 			$audit_id = Audit_Log::record( 'test_record_approved', 'post', $record_id, array( 'snapshot_hash' => $hash ), $actor_id, 'workflow', true );
 			update_post_meta( $record_id, 'approval_snapshot_id', $audit_id );
@@ -248,11 +255,13 @@ final class Review_Methodology {
 			}
 			$data[ $key ] = get_post_meta( $record_id, $key, true );
 		}
-		$data['protocol_approved'] = self::approved_protocol_exists(
+		$protocol_info = self::approved_protocol_exists(
 			(string) get_post_meta( $record_id, 'protocol_id', true ),
 			(string) get_post_meta( $record_id, 'protocol_version', true ),
 			(string) get_post_meta( $record_id, 'test_end_date', true )
 		);
+		$data['protocol_post_id'] = $protocol_info['protocol_post_id'] ?? 0;
+		$data['protocol_approval_hash'] = $protocol_info['protocol_approval_hash'] ?? '';
 		return hash( 'sha256', Approval_Fingerprint::canonical_json( $data ) );
 	}
 
@@ -315,7 +324,7 @@ final class Review_Methodology {
 	/** Registered test-record fields, kept in one exact inventory. */
 	private static function test_record_fields(): array {
 		return array(
-			'product_name' => 'text', 'unit_identifier' => 'text', 'acquisition_method' => 'acquisition', 'tester_user_ids' => 'csv_ids', 'test_start_date' => 'date', 'test_end_date' => 'date', 'protocol_id' => 'text', 'protocol_version' => 'version', 'raw_observations' => 'textarea', 'public_test_results' => 'public_results', 'measurement_equipment' => 'textarea', 'failures' => 'textarea', 'deviations' => 'textarea', 'comparison_devices' => 'textarea', 'environment' => 'textarea', 'evidence_references' => 'textarea', 'conflicts' => 'textarea', 'approval_status' => 'text', 'submitted_by' => 'absint', 'submitted_at' => 'datetime', 'approved_by' => 'absint', 'approval_date' => 'date', 'approval_snapshot_id' => 'absint', 'approval_snapshot_hash' => 'text',
+			'product_name' => 'text', 'unit_identifier' => 'text', 'acquisition_method' => 'acquisition', 'tester_user_ids' => 'csv_ids', 'test_start_date' => 'date', 'test_end_date' => 'date', 'protocol_id' => 'text', 'protocol_version' => 'version', 'protocol_post_id' => 'absint', 'protocol_approval_hash' => 'text', 'raw_observations' => 'textarea', 'public_test_results' => 'public_results', 'measurement_equipment' => 'textarea', 'failures' => 'textarea', 'deviations' => 'textarea', 'comparison_devices' => 'textarea', 'environment' => 'textarea', 'evidence_references' => 'textarea', 'conflicts' => 'textarea', 'approval_status' => 'text', 'submitted_by' => 'absint', 'submitted_at' => 'datetime', 'approved_by' => 'absint', 'approval_date' => 'date', 'approval_snapshot_id' => 'absint', 'approval_snapshot_hash' => 'text',
 		);
 	}
 
@@ -329,6 +338,15 @@ final class Review_Methodology {
 		}
 		$stored_hash = (string) get_post_meta( $record_id, 'approval_snapshot_hash', true );
 		if ( '' === $stored_hash || ! hash_equals( $stored_hash, self::test_record_fingerprint( $record_id ) ) ) {
+			return false;
+		}
+		$stored_protocol_post_id = (int) get_post_meta( $record_id, 'protocol_post_id', true );
+		$stored_protocol_hash    = (string) get_post_meta( $record_id, 'protocol_approval_hash', true );
+		if ( $stored_protocol_post_id <= 0 || '' === $stored_protocol_hash ) {
+			return false;
+		}
+		$current_protocol_hash = (string) get_post_meta( $stored_protocol_post_id, 'approval_snapshot_hash', true );
+		if ( '' === $current_protocol_hash || ! hash_equals( $stored_protocol_hash, $current_protocol_hash ) ) {
 			return false;
 		}
 		$approved_by = (int) get_post_meta( $record_id, 'approved_by', true );
@@ -362,15 +380,15 @@ final class Review_Methodology {
 			return false;
 		}
 
-		return self::approved_protocol_exists(
+		return ! empty( self::approved_protocol_exists(
 			(string) get_post_meta( $record_id, 'protocol_id', true ),
 			$protocol_version,
 			$end
-		);
+		) );
 	}
 
 	/** Verify that the record points to an approved protocol version effective during testing. */
-	private static function approved_protocol_exists( string $protocol_id, string $protocol_version, string $test_end_date ): bool {
+	private static function approved_protocol_exists( string $protocol_id, string $protocol_version, string $test_end_date ): array {
 		$protocols = get_posts(
 			array(
 				'post_type'      => 'lel_protocol',
@@ -385,7 +403,7 @@ final class Review_Methodology {
 			)
 		);
 		if ( empty( $protocols ) ) {
-			return false;
+			return array();
 		}
 
 		$protocol_id_post = (int) $protocols[0];
@@ -393,14 +411,17 @@ final class Review_Methodology {
 		$reviewer_id      = (int) get_post_meta( $protocol_id_post, 'protocol_reviewer_user_id', true );
 		$protocol_post    = get_post( $protocol_id_post );
 		if ( '' === $stored_hash || ! hash_equals( $stored_hash, self::protocol_fingerprint( $protocol_id_post ) ) || $reviewer_id <= 0 || ( $protocol_post && (int) $protocol_post->post_author === $reviewer_id ) ) {
-			return false;
+			return array();
 		}
 		$effective        = (string) get_post_meta( $protocol_id_post, 'effective_date', true );
 		$retired          = (string) get_post_meta( $protocol_id_post, 'retired_date', true );
 		if ( ! Date_Validator::is_valid( $effective ) || ! Date_Validator::is_valid( $test_end_date ) || Date_Validator::compare( $effective, $test_end_date ) > 0 ) {
-			return false;
+			return array();
 		}
-		return '' === $retired || ( Date_Validator::is_valid( $retired ) && Date_Validator::compare( $retired, $test_end_date ) >= 0 );
+		if ( '' !== $retired && ( ! Date_Validator::is_valid( $retired ) || Date_Validator::compare( $retired, $test_end_date ) >= 0 ) ) {
+			return array();
+		}
+		return array( 'protocol_post_id' => $protocol_id_post, 'protocol_approval_hash' => $stored_hash );
 	}
 
 	/** Register private meta consistently. */

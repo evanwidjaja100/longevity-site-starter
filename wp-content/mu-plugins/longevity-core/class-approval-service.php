@@ -249,7 +249,7 @@ final class Approval_Service {
 	}
 
 	/** Invalidate snapshots when post content materially changes. */
-	public static function invalidate_direct( int $post_id, string $reason, int $actor_id = 0 ): void {
+	public static function invalidate_direct( int $post_id, string $reason, int $actor_id = 0, bool $check_current = false ): void {
 		if ( ! Publication_Lock::acquire( $post_id ) ) {
 			throw new \RuntimeException( sprintf( 'Could not acquire publication lock for post %d.', $post_id ) );
 		}
@@ -258,6 +258,9 @@ final class Approval_Service {
 			Meta_Authorization::enter_trusted_scope();
 			try {
 				foreach ( array( 'fact_check', 'medical', 'testing', 'commercial', 'editorial' ) as $type ) {
+					if ( $check_current && self::is_current( $post_id, $type ) ) {
+						continue;
+					}
 					$changed = Approval_Repository::invalidate( $post_id, $type, $reason, $actor_id );
 					if ( $changed > 0 ) {
 						$status_key = self::status_key( $type );
@@ -284,7 +287,7 @@ final class Approval_Service {
 		$before = array( $post_before->post_title, $post_before->post_excerpt, $post_before->post_content, $post_before->post_author );
 		$after  = array( $post_after->post_title, $post_after->post_excerpt, $post_after->post_content, $post_after->post_author );
 		if ( $before !== $after ) {
-			self::invalidate_all( $post_id, 'content_changed', function_exists( 'get_current_user_id' ) ? get_current_user_id() : 0 );
+			self::invalidate_direct( $post_id, 'content_changed', function_exists( 'get_current_user_id' ) ? get_current_user_id() : 0, false );
 		}
 	}
 

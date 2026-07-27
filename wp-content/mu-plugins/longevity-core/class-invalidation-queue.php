@@ -179,7 +179,7 @@ final class Invalidation_Queue {
 			$actor   = (int) $job['actor_id'];
 
 			try {
-				Approval_Service::invalidate_direct( $post_id, $reason, $actor );
+				Approval_Service::invalidate_direct( $post_id, $reason, $actor, true );
 				$wpdb->query(
 					$wpdb->prepare(
 						"UPDATE {$table} SET status = 'completed', processed_at = NOW() WHERE id = %d",
