@@ -27,4 +27,3 @@ This policy is governed by our [AI-Assisted Work Policy](/editorial-policy/).
 
 ---
 
-**Last reviewed:** [date]

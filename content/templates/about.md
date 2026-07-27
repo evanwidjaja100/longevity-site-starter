@@ -21,4 +21,3 @@ We are not a medical practice. We do not provide individual health advice, diagn
 
 ---
 
-**Last reviewed:** [date]

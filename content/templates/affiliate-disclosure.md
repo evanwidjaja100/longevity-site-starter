@@ -20,4 +20,3 @@ We do not accept payment for positive coverage. Sponsored content, if any, is cl
 
 ---
 
-**Last reviewed:** [date]

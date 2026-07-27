@@ -32,6 +32,7 @@ final class Roles {
 		'verify_reviewer_credentials',
 		'view_operational_readiness',
 		'view_governance_audit',
+		'approve_trust_pages',
 	);
 
 	/** @var array<int, string> */
@@ -113,14 +114,14 @@ final class Roles {
 	}
 
 	/** Current capability matrix version for drift detection. */
-	public const MATRIX_VERSION = '2.0.0';
+	public const MATRIX_VERSION = '2.1.0';
 
 	/** The approved capability matrix: role => cap => granted. */
 	private static function desired_capability_matrix(): array {
 		$matrix = array(
 			'administrator' => array_fill_keys( self::ALL_CUSTOM_CAPS, true ),
 			'editor'        => array_fill_keys( self::EDITORIAL_MANAGER_CAPS, true ),
-			'lel_managing_editor' => array_fill_keys( array_merge( self::EDITORIAL_MANAGER_CAPS, array( 'approve_publication_override', 'manage_test_protocols', 'manage_affiliate_registry', 'approve_test_records', 'manage_affiliate_relationships', 'view_operational_readiness', 'view_governance_audit' ) ), true ),
+			'lel_managing_editor' => array_fill_keys( array_merge( self::EDITORIAL_MANAGER_CAPS, array( 'approve_publication_override', 'manage_test_protocols', 'manage_affiliate_registry', 'approve_test_records', 'manage_affiliate_relationships', 'view_operational_readiness', 'view_governance_audit', 'approve_trust_pages' ) ), true ),
 			'lel_writer' => array(
 				'read' => true, 'edit_posts' => true, 'delete_posts' => true, 'upload_files' => true,
 				'submit_for_fact_check' => true, 'submit_for_medical_review' => true, 'edit_claims' => true,

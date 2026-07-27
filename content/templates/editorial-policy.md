@@ -43,4 +43,3 @@ All content has a scheduled review date. Materially overdue content is flagged a
 
 ---
 
-**Last reviewed:** [date]

@@ -2,10 +2,13 @@
 /**
  * Populate trust policy pages with content from template markdown files.
  *
- * Reads content/templates/*.md and updates the corresponding WordPress page.
- * Also sets required metadata (review dates, etc.)
+ * Git templates are ONE-TIME SEEDS. WordPress is the operational source of
+ * truth for trust pages. This script refuses to overwrite a page that is
+ * published or carries a current trust-page approval unless --force is
+ * passed after a reviewed diff. It never changes public review dates;
+ * those come from named human trust-page approvals.
  *
- * Usage: wp eval-file scripts/populate-trust-pages.php [--dry-run]
+ * Usage: wp eval-file scripts/populate-trust-pages.php [--dry-run] [--force]
  *
  * @package LongevityCore
  */
@@ -21,6 +24,7 @@ if ( get_current_user_id() <= 0 || ! current_user_can( 'approve_publication' ) )
 }
 
 $dry_run = in_array( '--dry-run', $args ?? array(), true );
+$force   = in_array( '--force', $args ?? array(), true );
 
 $template_dir = '/project-content/templates';
 
@@ -59,6 +63,12 @@ $errors[] = "Template not found: {$filename}";
 		continue;
 	}
 
+	if ( Trust_Pages::has_placeholders( $markdown ) ) {
+		$errors[] = "Placeholder markers remain in template: {$filename}";
+		\WP_CLI::warning( "Template {$filename} still contains placeholder markers ([date], TODO, etc.). Fix the template before seeding." );
+		continue;
+	}
+
 	$posts = get_posts(
 		array(
 			'name'           => $slug,
@@ -75,10 +85,21 @@ $errors[] = "Template not found: {$filename}";
 		continue;
 	}
 
+	$protected = 'publish' === $post->post_status || Trust_Pages::is_approved( (int) $post->ID );
+	if ( $protected && ! $force ) {
+		\WP_CLI::warning( "Skipping /{$slug}/: page is published or carries a current trust approval. Re-run with --force after reviewing the diff." );
+		continue;
+	}
+
 	$html = convert_markdown_to_blocks( $markdown );
 
+	if ( $html === (string) $post->post_content ) {
+		\WP_CLI::line( "Unchanged /{$slug}/ (ID {$post->ID}); skipping." );
+		continue;
+	}
+
 	if ( $dry_run ) {
-		\WP_CLI::line( "[DRY RUN] Would update /{$slug}/ (ID {$post->ID}) with content from {$filename}" );
+		\WP_CLI::line( "[DRY RUN] Would update /{$slug}/ (ID {$post->ID}) with content from {$filename}" . ( $protected ? ' (FORCED overwrite of approved/published page)' : '' ) );
 		++$updated;
 		continue;
 	}
@@ -97,10 +118,7 @@ $errors[] = "Template not found: {$filename}";
 		continue;
 	}
 
-	update_post_meta( $post->ID, 'last_material_update', gmdate( 'Y-m-d' ) );
-	update_post_meta( $post->ID, 'next_content_review_date', gmdate( 'Y-m-d', strtotime( '+12 months' ) ) );
-
-	\WP_CLI::line( "Updated /{$slug}/ (ID {$post->ID}) with content from {$filename}" );
+	\WP_CLI::line( "Updated /{$slug}/ (ID {$post->ID}) with content from {$filename}. A named human trust-page approval is required before publication." );
 	++$updated;
 }
 

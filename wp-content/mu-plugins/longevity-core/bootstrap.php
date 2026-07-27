@@ -44,6 +44,7 @@ $longevity_core_files = array(
 	'class-public-contact.php',
 		'class-public-content.php',
 		'class-public-trust.php',
+		'class-trust-pages.php',
 		'class-public-rankings.php',
 		'class-blocks.php',
 	'class-admin-assets.php',
@@ -103,6 +104,7 @@ final class Bootstrap {
 		Public_Contact::init();
 		Content_Discovery::init();
 		Public_Content::init();
+		Trust_Pages::init();
 		Blocks::init();
 		longevity_admin_assets_init();
 		Admin_UI::init();

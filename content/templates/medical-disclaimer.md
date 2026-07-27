@@ -18,4 +18,3 @@ Reading or using this site does not create a doctor-patient relationship between
 
 ---
 
-**Last reviewed:** [date]

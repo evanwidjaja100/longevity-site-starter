@@ -353,6 +353,9 @@ final class Approval_Service {
 		if ( 'editorial' === $type ) {
 			return user_can( $actor_id, 'approve_publication' );
 		}
+		if ( 'trust_page' === $type ) {
+			return user_can( $actor_id, 'approve_trust_pages' );
+		}
 		return false;
 	}
 
@@ -391,6 +394,13 @@ final class Approval_Service {
 			$next = (string) get_post_meta( $post_id, 'next_content_review_date', true );
 			return Date_Validator::is_valid( $next ) && Date_Validator::after( $next, $today );
 		}
+		if ( 'trust_page' === $type ) {
+			$post = get_post( $post_id );
+			return $post
+				&& Trust_Pages::is_trust_page( $post_id )
+				&& '' !== trim( (string) $post->post_content )
+				&& ! Trust_Pages::has_placeholders( (string) $post->post_content );
+		}
 		return false;
 	}
 
@@ -420,6 +430,10 @@ final class Approval_Service {
 						break;
 					case 'editorial':
 						update_post_meta( $post_id, 'editorial_approval_status', 'ready' );
+						break;
+					case 'trust_page':
+						update_post_meta( $post_id, 'trust_reviewed_by', $actor_id );
+						update_post_meta( $post_id, 'trust_last_reviewed_date', $today );
 						break;
 				}
 			} finally {

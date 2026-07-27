@@ -35,4 +35,3 @@ The registry is organised by content item. Each content page lists its sources i
 
 ---
 
-**Last reviewed:** [date]

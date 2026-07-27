@@ -14,4 +14,3 @@ If you believe you have found an error in our content, see our [Corrections page
 
 ---
 
-**Last reviewed:** [date]

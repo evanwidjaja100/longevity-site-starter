@@ -36,4 +36,3 @@ Key studies cited in our content are appraised using a standard worksheet coveri
 
 ---
 
-**Last reviewed:** [date]

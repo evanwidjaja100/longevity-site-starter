@@ -38,4 +38,3 @@ These terms may be updated. Continued use after changes constitutes acceptance.
 
 ---
 
-**Last reviewed:** [date]

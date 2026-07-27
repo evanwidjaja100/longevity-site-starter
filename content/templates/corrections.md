@@ -27,4 +27,3 @@ To report a potential error, use the [contact form](/contact/) and include the p
 
 ---
 
-**Last reviewed:** [date]

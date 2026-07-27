@@ -241,6 +241,7 @@ require_once LONGEVITY_CORE_PATH . 'class-public-contact.php';
 require_once LONGEVITY_CORE_PATH . 'class-public-content.php';
 require_once LONGEVITY_CORE_PATH . 'class-public-nav.php';
 require_once LONGEVITY_CORE_PATH . 'class-public-trust.php';
+require_once LONGEVITY_CORE_PATH . 'class-trust-pages.php';
 require_once LONGEVITY_CORE_PATH . 'class-public-rankings.php';
 require_once LONGEVITY_CORE_PATH . 'class-admin-ui.php';
 require_once LONGEVITY_CORE_PATH . 'class-content-discovery.php';

@@ -33,6 +33,5 @@ To exercise these rights, [contact us](/contact/).
 
 ---
 
-**Last reviewed:** [date]
 <!-- Production Readiness v2 implementation note — HUMAN LEGAL REVIEW REQUIRED:
 Confirm that the final privacy notice accurately describes the deployed contact-subject allowlist, HMAC-derived rate-limiting identifiers, trusted-proxy behavior, contact-record retention/deletion period, mail provider, analytics configuration, data-subject request procedure, and sensitive-submission incident process. This note is not approved legal wording and must be removed or replaced by an authorized legal/privacy owner before publication. -->

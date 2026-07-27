@@ -37,4 +37,3 @@ All test results are published. Negative, null, and borderline results are repor
 
 ---
 
-**Last reviewed:** [date]
