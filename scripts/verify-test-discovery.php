@@ -15,6 +15,11 @@ $required = array(
 	'PublicationGatesTest',
 	'FreshnessTest',
 	'RegressionPublicationBypassTest',
+	'ClaimVerificationTest',
+	'ProtocolApprovalTest',
+	'AffiliateLifecycleTest',
+	'ContactPrivacyTest',
+	'TrustPagesTest',
 );
 
 $phpunit = dirname( __DIR__ ) . '/vendor/phpunit/phpunit/phpunit';
@@ -57,9 +62,9 @@ if ( $missing ) {
 
 preg_match_all( '/^\s*-\s+.+::.+$/m', $listed, $tests );
 $methods = count( $tests[0] );
-if ( $methods < 50 ) {
+if ( $methods < 100 ) {
 	// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fwrite
-	fwrite( STDERR, "Only {$methods} PHPUnit tests were discovered; expected at least 50.\n" );
+	fwrite( STDERR, "Only {$methods} PHPUnit tests were discovered; expected at least 100.\n" );
 	exit( 1 );
 }
 // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped

@@ -6,7 +6,7 @@ test('analytics config is injected on public pages', async ({ page }) => {
     const el = document.getElementById('longevity-analytics-config');
     return el ? JSON.parse(el.textContent) : null;
   });
-  expect(config).toBeDefined();
+  expect(config).not.toBeNull();
   expect(config).toHaveProperty('contentGroup');
   expect(config).toHaveProperty('eventSchemas');
   expect(Array.isArray(config.eventSchemas.search_open)).toBe(true);

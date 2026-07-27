@@ -79,7 +79,7 @@ test.describe('runtime internal link crawl', () => {
         linkCount++;
         let linkResponse;
         let status;
-        let finalUrl = normalized;
+        let finalUrl;
 
         try {
           linkResponse = await page.request.get(url.pathname + url.search, { maxRedirects: 5, timeout: 10000 });

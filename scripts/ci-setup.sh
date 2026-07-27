@@ -41,6 +41,7 @@ done
 [[ "$ready" -eq 1 ]] || { echo 'ERROR: WordPress did not become HTTP-ready within the CI budget.' >&2; exit 1; }
 
 docker compose run --rm --entrypoint sh wpcli /scripts/bootstrap.sh
+docker compose run --rm wpcli longevity migrate --allow-root
 docker compose run --rm --entrypoint sh wpcli /scripts/create-test-fixtures.sh
 
 for route in / /test-evidence-guide/ /reviews/; do

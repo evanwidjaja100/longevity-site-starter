@@ -12,13 +12,14 @@ export default [
         document: 'readonly',
         CustomEvent: 'readonly',
         HTMLDetailsElement: 'readonly',
-        HTMLSelectElement: 'readonly'
+        HTMLSelectElement: 'readonly',
+        HTMLElement: 'readonly'
       }
     },
     rules: { 'no-console': 'off' }
   },
   {
-    files: ['tests/e2e/**/*.js'],
+    files: ['tests/e2e/**/*.js', 'playwright.config.js'],
     languageOptions: {
       ecmaVersion: 2022,
       sourceType: 'module',

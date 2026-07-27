@@ -51,7 +51,15 @@ jobs:
         run: composer test -- --coverage-clover=coverage.xml --coverage-text
       - name: Check coverage threshold
         run: |
-          COVERAGE=$(php -r '$d=simplexml_load_file("coverage.xml"); echo (float)$d->project->metrics["percentcoveredstatements"];')
+          COVERAGE=$(php -r '
+            $doc = @simplexml_load_file("coverage.xml");
+            if ( ! $doc || ! isset($doc->project->metrics) ) { fwrite(STDERR, "coverage.xml missing or unreadable\n"); exit(1); }
+            $m = $doc->project->metrics;
+            $total = (int) $m["statements"];
+            $covered = (int) $m["coveredstatements"];
+            if ( $total <= 0 ) { fwrite(STDERR, "coverage data is empty: zero total statements\n"); exit(1); }
+            echo round($covered / $total * 100, 2);
+          ')
           echo "Coverage: ${COVERAGE}%"
           THRESHOLD=${COVERAGE_THRESHOLD:-30}
           if (( $(echo "$COVERAGE < $THRESHOLD" | bc -l) )); then
@@ -91,7 +99,15 @@ jobs:
         run: composer test -- --coverage-clover=coverage.xml --coverage-text
       - name: Check coverage threshold
         run: |
-          COVERAGE=$(php -r '$d=simplexml_load_file("coverage.xml"); echo (float)$d->project->metrics["percentcoveredstatements"];')
+          COVERAGE=$(php -r '
+            $doc = @simplexml_load_file("coverage.xml");
+            if ( ! $doc || ! isset($doc->project->metrics) ) { fwrite(STDERR, "coverage.xml missing or unreadable\n"); exit(1); }
+            $m = $doc->project->metrics;
+            $total = (int) $m["statements"];
+            $covered = (int) $m["coveredstatements"];
+            if ( $total <= 0 ) { fwrite(STDERR, "coverage data is empty: zero total statements\n"); exit(1); }
+            echo round($covered / $total * 100, 2);
+          ')
           echo "Coverage: ${COVERAGE}%"
           THRESHOLD=${COVERAGE_THRESHOLD:-30}
           if (( $(echo "$COVERAGE < $THRESHOLD" | bc -l) )); then
@@ -216,6 +232,37 @@ jobs:
       - if: always()
         run: docker compose down -v
 
+  accessibility:
+    name: Accessibility (axe-core)
+    needs: [quality-frontend, wordpress-integration]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: bash scripts/ci-generate-env.sh && npm ci
+      - run: docker compose up -d db wordpress
+      - run: bash scripts/ci-setup.sh
+      - run: npx playwright install --with-deps chromium
+      - name: WCAG 2.1 AA accessibility suite
+        env:
+          WP_SITE_URL: http://localhost:8080
+        run: npm run test:a11y -- --project=chromium
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: accessibility-evidence
+          path: |
+            reports/playwright/
+            test-results/
+            reports/ci-setup/
+          if-no-files-found: error
+      - if: always()
+        run: docker compose down -v
+
   playwright-cross-browser:
     name: Critical Firefox and WebKit
     needs: [quality-frontend, wordpress-integration]
@@ -332,6 +379,21 @@ jobs:
       - if: always()
         run: docker compose down -v
 
+  release-artifact:
+    name: First-party release artifact
+    needs: [quality-php, quality-frontend, content-and-config]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Build first-party release artifact
+        run: bash scripts/build-release-artifact.sh "$GITHUB_SHA"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: release-artifact
+          path: build/release/
+          if-no-files-found: error
+
   codeql:
     name: CodeQL
     runs-on: ubuntu-latest
@@ -434,10 +496,12 @@ jobs:
       - content-and-config
       - wordpress-integration
       - playwright-chromium
+      - accessibility
       - playwright-cross-browser
       - visual-linux
       - lighthouse-mobile
       - lighthouse-desktop
+      - release-artifact
       - codeql
       - security-supply-chain
       - dependency-review
@@ -462,10 +526,12 @@ jobs:
             "content-and-config": "${{ needs.content-and-config.result }}",
             "wordpress-integration": "${{ needs.wordpress-integration.result }}",
             "playwright-chromium": "${{ needs.playwright-chromium.result }}",
+            "accessibility": "${{ needs.accessibility.result }}",
             "playwright-cross-browser": "${{ needs.playwright-cross-browser.result }}",
             "visual-linux": "${{ needs.visual-linux.result }}",
             "lighthouse-mobile": "${{ needs.lighthouse-mobile.result }}",
             "lighthouse-desktop": "${{ needs.lighthouse-desktop.result }}",
+            "release-artifact": "${{ needs.release-artifact.result }}",
             "codeql": "${{ needs.codeql.result }}",
             "security-supply-chain": "${{ needs.security-supply-chain.result }}",
             "dependency-review": "${{ needs.dependency-review.result }}"
