@@ -23,6 +23,8 @@ final class Corrections {
 	public static function init(): void {
 		add_action( 'init', array( self::class, 'register_meta' ), 12 );
 		add_filter( 'update_post_metadata', array( self::class, 'prevent_direct_status_write' ), 10, 4 );
+		add_filter( 'add_post_metadata', array( self::class, 'prevent_direct_status_add' ), 10, 5 );
+		add_filter( 'delete_post_metadata', array( self::class, 'prevent_direct_status_delete' ), 10, 5 );
 	}
 
 	/** Block direct writes to correction_status. Use transition() instead. */
@@ -39,6 +41,24 @@ final class Corrections {
 	/** Check if a status transition is valid. */
 	public static function transition_is_allowed( string $from, string $to ): bool {
 		return in_array( $to, self::VALID_TRANSITIONS[ $from ] ?? array(), true );
+	}
+
+	/** Block direct add of correction_status. Use transition() instead. */
+	public static function prevent_direct_status_add( ?bool $check, int $object_id, string $meta_key, $meta_value, bool $unique ): ?bool {
+		unset( $unique );
+		if ( 'correction_status' === $meta_key && 'lel_correction' === get_post_type( $object_id ) ) {
+			return false;
+		}
+		return $check;
+	}
+
+	/** Block direct delete of correction_status. Use transition() instead. */
+	public static function prevent_direct_status_delete( ?bool $check, int $object_id, string $meta_key, $meta_value, ?int $object_id_ref = null ): ?bool {
+		unset( $meta_value, $object_id_ref );
+		if ( 'correction_status' === $meta_key && 'lel_correction' === get_post_type( $object_id ) ) {
+			return false;
+		}
+		return $check;
 	}
 
 	/** Return the list of allowed next statuses. */
@@ -87,6 +107,10 @@ final class Corrections {
 
 	/** Transition a correction to a new status with validation. */
 	public static function transition( int $post_id, string $new_status, int $actor_id ): bool {
+		if ( $actor_id <= 0 || ! function_exists( 'user_can' ) || ! user_can( $actor_id, 'manage_corrections' ) ) {
+			Audit_Log::record( 'correction_transition', 'correction', $post_id, array( 'to' => $new_status, 'actor' => $actor_id, 'reason' => 'unauthorized' ), $actor_id, 'workflow' );
+			return false;
+		}
 		$current = (string) get_post_meta( $post_id, 'correction_status', true );
 		if ( '' === $current ) {
 			$current = 'reported';
@@ -138,6 +162,13 @@ final class Corrections {
 		try {
 			update_post_meta( $post_id, 'correction_status', $new_status );
 			Audit_Log::record( 'correction_transition', 'correction', $post_id, array( 'from' => $current, 'to' => $new_status, 'actor' => $actor_id ), $actor_id, 'workflow', true );
+			if ( 'complete' === $new_status ) {
+				$parent_id = (int) get_post_meta( $post_id, 'corrected_post_id', true );
+				if ( $parent_id > 0 ) {
+					Approval_Service::invalidate_direct( $parent_id, 'correction_completed', $actor_id, false );
+					Rankings::invalidate();
+				}
+			}
 		} catch ( \Throwable $error ) {
 			update_post_meta( $post_id, 'correction_status', $current );
 			Audit_Log::record( 'correction_transition', 'correction', $post_id, array( 'from' => $new_status, 'to' => $current, 'actor' => $actor_id, 'reason' => 'audit_write_failed' ), $actor_id, 'workflow' );
