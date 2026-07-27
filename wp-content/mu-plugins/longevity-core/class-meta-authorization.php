@@ -14,6 +14,15 @@ final class Meta_Authorization {
 	/** Trusted channels used only by migrations and first-party workflow services. */
 	private const TRUSTED_CHANNELS = array( 'system', 'migration', 'workflow' );
 
+	/** Workflow state fields that only first-party services may write. */
+	private const WORKFLOW_STATE_FIELDS = array(
+		'fact_check_status', 'medical_review_status', 'medical_review_attested',
+		'testing_status', 'affiliate_disclosure_status', 'editorial_approval_status',
+	);
+
+	/** Depth counter for the trusted scope. */
+	private static int $trusted_depth = 0;
+
 	/** Return the declared policy for a registered field. */
 	public static function policy_for( string $meta_key ): string {
 		$definitions = Meta_Registry::definitions();
@@ -33,8 +42,8 @@ final class Meta_Authorization {
 			return false;
 		}
 		// Completion state is created only by first-party approval services.
-		// REST may edit supporting fields but cannot forge final workflow state.
-		if ( 'rest' === $channel && in_array( $meta_key, array( 'fact_check_status', 'medical_review_status', 'medical_review_attested', 'testing_status', 'affiliate_disclosure_status', 'editorial_approval_status' ), true ) ) {
+		// REST and generic channels cannot forge final workflow state.
+		if ( in_array( $channel, array( 'rest', 'generic' ), true ) && in_array( $meta_key, self::WORKFLOW_STATE_FIELDS, true ) ) {
 			return false;
 		}
 
@@ -74,6 +83,107 @@ final class Meta_Authorization {
 			}
 		}
 		return $editable;
+	}
+
+	/** Enter a trusted scope, allowing workflow/migration services to bypass authorization. */
+	public static function enter_trusted_scope(): void {
+		++self::$trusted_depth;
+	}
+
+	/** Exit a trusted scope. */
+	public static function exit_trusted_scope(): void {
+		self::$trusted_depth = max( 0, self::$trusted_depth - 1 );
+	}
+
+	/** Whether the current execution is within a trusted scope. */
+	public static function in_trusted_scope(): bool {
+		return self::$trusted_depth > 0;
+	}
+
+	/**
+	 * Persistence-layer guard for add_post_metadata.
+	 * Denies writes to governed keys unless the actor is authorized or in a trusted scope.
+	 */
+	public static function guard_add( ?bool $check, int $object_id, string $meta_key, $meta_value, bool $unique ): ?bool {
+		unset( $meta_value, $unique );
+		if ( self::in_trusted_scope() ) {
+			return $check;
+		}
+		$definitions = Meta_Registry::definitions();
+		if ( ! isset( $definitions[ $meta_key ] ) ) {
+			return $check;
+		}
+		$post_type = function_exists( 'get_post_type' ) ? get_post_type( $object_id ) : '';
+		if ( ! in_array( $post_type, $definitions[ $meta_key ]['post_types'], true ) ) {
+			return $check;
+		}
+		$user_id = function_exists( 'get_current_user_id' ) ? get_current_user_id() : 0;
+		if ( ! self::can_write( $meta_key, $object_id, (int) $user_id, 'generic' ) ) {
+			self::audit_denial( 'add', $meta_key, $object_id, $user_id );
+			return false;
+		}
+		return $check;
+	}
+
+	/**
+	 * Persistence-layer guard for update_post_metadata.
+	 * Denies writes to governed keys unless the actor is authorized or in a trusted scope.
+	 */
+	public static function guard_update( ?bool $check, int $object_id, string $meta_key, $meta_value, $prev_value ): ?bool {
+		unset( $meta_value, $prev_value );
+		if ( self::in_trusted_scope() ) {
+			return $check;
+		}
+		$definitions = Meta_Registry::definitions();
+		if ( ! isset( $definitions[ $meta_key ] ) ) {
+			return $check;
+		}
+		$post_type = function_exists( 'get_post_type' ) ? get_post_type( $object_id ) : '';
+		if ( ! in_array( $post_type, $definitions[ $meta_key ]['post_types'], true ) ) {
+			return $check;
+		}
+		$user_id = function_exists( 'get_current_user_id' ) ? get_current_user_id() : 0;
+		if ( ! self::can_write( $meta_key, $object_id, (int) $user_id, 'generic' ) ) {
+			self::audit_denial( 'update', $meta_key, $object_id, $user_id );
+			return false;
+		}
+		return $check;
+	}
+
+	/**
+	 * Persistence-layer guard for delete_post_metadata.
+	 * Denies deletions of governed keys unless the actor is authorized or in a trusted scope.
+	 */
+	public static function guard_delete( ?bool $check, int $object_id, string $meta_key, $meta_value, ?int $object_id_ref = null ): ?bool {
+		unset( $meta_value, $object_id_ref );
+		if ( self::in_trusted_scope() ) {
+			return $check;
+		}
+		$definitions = Meta_Registry::definitions();
+		if ( ! isset( $definitions[ $meta_key ] ) ) {
+			return $check;
+		}
+		$post_type = function_exists( 'get_post_type' ) ? get_post_type( $object_id ) : '';
+		if ( ! in_array( $post_type, $definitions[ $meta_key ]['post_types'], true ) ) {
+			return $check;
+		}
+		$user_id = function_exists( 'get_current_user_id' ) ? get_current_user_id() : 0;
+		if ( ! self::can_write( $meta_key, $object_id, (int) $user_id, 'generic' ) ) {
+			self::audit_denial( 'delete', $meta_key, $object_id, $user_id );
+			return false;
+		}
+		return $check;
+	}
+
+	/** Audit a denied write without exposing sensitive attempted values. */
+	private static function audit_denial( string $operation, string $meta_key, int $object_id, int $user_id ): void {
+		if ( class_exists( Audit_Log::class ) ) {
+			Audit_Log::record( 'metadata_write_denied', 'post', $object_id, array(
+				'operation' => $operation,
+				'meta_key'  => substr( sanitize_key( $meta_key ), 0, 64 ),
+				'actor'     => $user_id,
+			), $user_id, 'persistence' );
+		}
 	}
 
 	/** Wrapper that is testable without relying on the current user. */

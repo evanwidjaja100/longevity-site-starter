@@ -233,7 +233,12 @@ final class Approval_Service {
 			if ( $changed > 0 ) {
 				$status_key = self::status_key( $approval_type );
 				if ( $status_key ) {
-					update_post_meta( $post_id, $status_key, 'stale' );
+					Meta_Authorization::enter_trusted_scope();
+					try {
+						update_post_meta( $post_id, $status_key, 'stale' );
+					} finally {
+						Meta_Authorization::exit_trusted_scope();
+					}
 				}
 				Audit_Log::record( 'approval_invalidated', 'post', $post_id, array( 'approval_type' => $approval_type, 'reason' => $reason ), $actor_id, 'system' );
 			}
@@ -243,29 +248,26 @@ final class Approval_Service {
 		}
 	}
 
-	/**
-	 * Direct synchronous invalidation of all approval types for a single post.
-	 * Called by the invalidation queue processor. Bypasses queue to avoid recursion.
-	 *
-	 * @param int    $post_id  Post to invalidate.
-	 * @param string $reason   Invalidation reason.
-	 * @param int    $actor_id Actor ID.
-	 * @throws \RuntimeException When lock cannot be acquired after retry.
-	 */
+	/** Invalidate snapshots when post content materially changes. */
 	public static function invalidate_direct( int $post_id, string $reason, int $actor_id = 0 ): void {
 		if ( ! Publication_Lock::acquire( $post_id ) ) {
 			throw new \RuntimeException( sprintf( 'Could not acquire publication lock for post %d.', $post_id ) );
 		}
 		self::$mutating = true;
 		try {
-			foreach ( array( 'fact_check', 'medical', 'testing', 'commercial', 'editorial' ) as $type ) {
-				$changed = Approval_Repository::invalidate( $post_id, $type, $reason, $actor_id );
-				if ( $changed > 0 ) {
-					$status_key = self::status_key( $type );
-					if ( $status_key ) {
-						update_post_meta( $post_id, $status_key, 'stale' );
+			Meta_Authorization::enter_trusted_scope();
+			try {
+				foreach ( array( 'fact_check', 'medical', 'testing', 'commercial', 'editorial' ) as $type ) {
+					$changed = Approval_Repository::invalidate( $post_id, $type, $reason, $actor_id );
+					if ( $changed > 0 ) {
+						$status_key = self::status_key( $type );
+						if ( $status_key ) {
+							update_post_meta( $post_id, $status_key, 'stale' );
+						}
 					}
 				}
+			} finally {
+				Meta_Authorization::exit_trusted_scope();
 			}
 			Audit_Log::record( 'approval_invalidated', 'post', $post_id, array( 'reason' => $reason, 'source' => 'queue' ), $actor_id, 'system' );
 		} finally {
@@ -394,26 +396,31 @@ final class Approval_Service {
 		self::$mutating = true;
 		try {
 			$today = Date_Validator::today();
-			switch ( $type ) {
-				case 'medical':
-					update_post_meta( $post_id, 'medical_review_status', 'complete' );
-					update_post_meta( $post_id, 'medical_review_attested', true );
-					update_post_meta( $post_id, 'medical_review_date', $today );
-					break;
-				case 'fact_check':
-					update_post_meta( $post_id, 'fact_check_status', 'complete' );
-					update_post_meta( $post_id, 'fact_checked_by', $actor_id );
-					update_post_meta( $post_id, 'fact_checked_date', $today );
-					break;
-				case 'testing':
-					update_post_meta( $post_id, 'testing_status', 'approved' );
-					break;
-				case 'commercial':
-					update_post_meta( $post_id, 'affiliate_disclosure_status', 'approved' );
-					break;
-				case 'editorial':
-					update_post_meta( $post_id, 'editorial_approval_status', 'ready' );
-					break;
+			Meta_Authorization::enter_trusted_scope();
+			try {
+				switch ( $type ) {
+					case 'medical':
+						update_post_meta( $post_id, 'medical_review_status', 'complete' );
+						update_post_meta( $post_id, 'medical_review_attested', true );
+						update_post_meta( $post_id, 'medical_review_date', $today );
+						break;
+					case 'fact_check':
+						update_post_meta( $post_id, 'fact_check_status', 'complete' );
+						update_post_meta( $post_id, 'fact_checked_by', $actor_id );
+						update_post_meta( $post_id, 'fact_checked_date', $today );
+						break;
+					case 'testing':
+						update_post_meta( $post_id, 'testing_status', 'approved' );
+						break;
+					case 'commercial':
+						update_post_meta( $post_id, 'affiliate_disclosure_status', 'approved' );
+						break;
+					case 'editorial':
+						update_post_meta( $post_id, 'editorial_approval_status', 'ready' );
+						break;
+				}
+			} finally {
+				Meta_Authorization::exit_trusted_scope();
 			}
 		} finally {
 			self::$mutating = false;

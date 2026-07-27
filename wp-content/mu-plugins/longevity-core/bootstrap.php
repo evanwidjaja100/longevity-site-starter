@@ -86,6 +86,9 @@ final class Bootstrap {
 		SEO::init();
 		Roles::init();
 		Meta_Registry::init();
+		add_filter( 'add_post_metadata', array( Meta_Authorization::class, 'guard_add' ), 5, 5 );
+		add_filter( 'update_post_metadata', array( Meta_Authorization::class, 'guard_update' ), 5, 5 );
+		add_filter( 'delete_post_metadata', array( Meta_Authorization::class, 'guard_delete' ), 5, 5 );
 		Claims::init();
 		Affiliate_Registry::init();
 		Review_Methodology::init();

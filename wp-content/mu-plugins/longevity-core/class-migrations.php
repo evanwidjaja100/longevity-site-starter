@@ -49,6 +49,7 @@ final class Migrations {
 			return array( 'success' => false, 'migrated' => array(), 'error' => sprintf( 'Migration lock held by PID %s (expires %s). Use --force to override.', $lock['owner'] ?? 'unknown', gmdate( DATE_W3C, (int) ( $lock['expires_at'] ?? 0 ) ) ) );
 		}
 		$migrated = array();
+		Meta_Authorization::enter_trusted_scope();
 		try {
 			for ( $version = $current + 1; $version <= self::CURRENT_VERSION; ++$version ) {
 				self::run_version( $version );
@@ -65,6 +66,7 @@ final class Migrations {
 			Logger::error( 'migration_failed', array( 'version' => $failed_version, 'message' => $error->getMessage() ) );
 			return array( 'success' => false, 'migrated' => $migrated, 'error' => sprintf( 'Migration %d failed: %s', $failed_version, $error->getMessage() ) );
 		} finally {
+			Meta_Authorization::exit_trusted_scope();
 			self::release_lock();
 		}
 		return array( 'success' => true, 'migrated' => $migrated, 'error' => '' );
