@@ -125,3 +125,20 @@ Previous phases completed Route Consolidation, Production-Grade Bootstrap, SEO/n
 - PR2-9: **human/external gate outstanding** — private staging, workflow exercise, backup/rollback drill, external controls, CSP, and launch sign-off.
 
 **Public production launch remains NO-GO until all PR2 P0 gates pass in the authoritative repository and human approvals are recorded.**
+
+### Phase babaooey_2 — Production Readiness PR 00-15 (2026-07-27)
+
+All 15 PRs from `babaooey_2.md` are implemented in code on `improvement/production-readiness-v2`:
+PR 00-09 (metadata authorization, fail-closed audit, atomic migrations, invalidation,
+scoring/claims/corrections/projection), PR 10 (DB-only contact limiter), PR 11 (trust-page
+approval snapshots), PR 12 (a11y/SEO/analytics/CSP + pattern quarantine), PR 13 (honest CI
+coverage, required a11y job, first-party release artifact, 0 npm advisories), PR 14-15
+(managed-host-only runbooks, Redis/VPS retirement, evidence reconciliation).
+
+- Evidence and go/no-go: `docs/testing/production-readiness-v2-evidence-reconciliation.md`
+- Release artifact: `scripts/build-release-artifact.sh` (also CI job `release-artifact`)
+- Local verification: 129 PHPUnit tests / 485 assertions green, ESLint/Stylelint clean,
+  npm audit 0 vulnerabilities, manifest valid.
+- Launch remains **NO-GO** until human/external gates (staging, backups, approvals,
+  credentials rotation, branch protection, screen-reader sign-off) have named owners and
+  dated evidence.

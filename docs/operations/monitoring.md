@@ -92,10 +92,9 @@ For managed WordPress hosting, the host typically provides:
 - CDN cache hit ratio
 - TLS certificate auto-renewal and expiry alerts
 
-For self-hosted VPS, configure:
-- Prometheus + node_exporter + Blackbox exporter
-- Grafana dashboards for request rate, latency, error rate
-- Alertmanager for pager notifications on P0/P1 conditions
+The managed host is the only supported production target; the previous
+self-hosted VPS path is retired and must not be re-introduced without a
+new architecture decision record.
 
 ## Metrics and alerting
 

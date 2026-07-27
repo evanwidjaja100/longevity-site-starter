@@ -8,7 +8,7 @@ Longevity Evidence Lab is a WordPress-based evidence and consumer-testing public
 - **Longevity Core MU plugin:** content types, metadata, roles, publication gates, claim and source registries, medical review, test protocols, scoring, corrections, affiliate controls, schema, analytics, REST health checks, and WP-CLI utilities.
 - **Longevity Starter block theme:** accessible templates and trust components. It contains no authoritative editorial state.
 - **Structured repository content:** launch calendar, briefs, protocols, governance documents, and operational checklists.
-- **Docker development stack:** MySQL, WordPress, and WP-CLI. Production deployment can use a managed host or a hardened VPS without changing the content model.
+- **Docker development stack:** MySQL, WordPress, and WP-CLI. Docker is for local development and disposable CI only; production runs on a managed WordPress host without changing the content model.
 
 ## Trust boundary
 Only authenticated users with explicit capabilities may complete review states, change disclosures, approve tests, override gates, or publish. Public templates read approved state; they do not infer completion. No code fabricates reviewers, credentials, citations, measurements, or testing periods.

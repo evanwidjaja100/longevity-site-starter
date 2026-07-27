@@ -32,8 +32,6 @@ services:
     depends_on:
       db:
         condition: service_healthy
-      redis:
-        condition: service_started
     ports:
       - "${WORDPRESS_PORT:-8080}:80"
     environment:
@@ -55,11 +53,6 @@ services:
         define( 'AUTOSAVE_INTERVAL', 120 );
         define( 'WP_POST_REVISIONS', 30 );
         define( 'EMPTY_TRASH_DAYS', 14 );
-        define( 'WP_REDIS_HOST', '${WP_REDIS_HOST:-redis}' );
-        define( 'WP_REDIS_PORT', ${WP_REDIS_PORT:-6379} );
-        define( 'WP_REDIS_TIMEOUT', 1 );
-        define( 'WP_REDIS_READ_TIMEOUT', 1 );
-        define( 'WP_CACHE', true );
     volumes:
       - wordpress_data:/var/www/html
       - ./wp-content:/var/www/html/wp-content
@@ -70,21 +63,6 @@ services:
       timeout: 5s
       retries: 12
       start_period: 45s
-    security_opt:
-      - no-new-privileges:true
-
-  redis:
-    image: redis@sha256:b1addbe72465a718643cff9e60a58e6df1841e29d6d7d60c9a85d8d72f08d1a7 # redis:7-alpine
-    restart: unless-stopped
-    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ["CMD-SHELL", "redis-cli ping"]
-      interval: 10s
-      timeout: 3s
-      retries: 10
-      start_period: 10s
     security_opt:
       - no-new-privileges:true
 
@@ -172,4 +150,3 @@ services:
 volumes:
   db_data:
   wordpress_data:
-  redis_data:
