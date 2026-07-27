@@ -2,7 +2,7 @@ name: longevity-site
 
 services:
   db:
-    image: mysql:8.4
+    image: mysql@sha256:62fb722c78b24245ddff1796a0fcee4a49cc5b87e0aaaf20c92d1da9e0a2497b # mysql:8.0
     restart: unless-stopped
     environment:
       MYSQL_DATABASE: ${WORDPRESS_DB_NAME}
@@ -24,11 +24,16 @@ services:
       - no-new-privileges:true
 
   wordpress:
-    image: wordpress:7.0.1-php8.3-apache
+    build:
+      context: .
+      dockerfile: docker/development/Dockerfile
+    image: longevity-wordpress:dev
     restart: unless-stopped
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_started
     ports:
       - "${WORDPRESS_PORT:-8080}:80"
     environment:
@@ -50,6 +55,11 @@ services:
         define( 'AUTOSAVE_INTERVAL', 120 );
         define( 'WP_POST_REVISIONS', 30 );
         define( 'EMPTY_TRASH_DAYS', 14 );
+        define( 'WP_REDIS_HOST', '${WP_REDIS_HOST:-redis}' );
+        define( 'WP_REDIS_PORT', ${WP_REDIS_PORT:-6379} );
+        define( 'WP_REDIS_TIMEOUT', 1 );
+        define( 'WP_REDIS_READ_TIMEOUT', 1 );
+        define( 'WP_CACHE', true );
     volumes:
       - wordpress_data:/var/www/html
       - ./wp-content:/var/www/html/wp-content
@@ -63,8 +73,26 @@ services:
     security_opt:
       - no-new-privileges:true
 
+  redis:
+    image: redis@sha256:b1addbe72465a718643cff9e60a58e6df1841e29d6d7d60c9a85d8d72f08d1a7 # redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    security_opt:
+      - no-new-privileges:true
+
   wpcli:
-    image: wordpress:cli-php8.3
+    build:
+      context: .
+      dockerfile: docker/development/Dockerfile.wpcli
+    image: longevity-wpcli:dev
     depends_on:
       db:
         condition: service_healthy
@@ -91,11 +119,15 @@ services:
       - ./scripts:/scripts:ro
       - ./content:/project-content:ro
       - ./policies:/project-policies:ro
+      - ./docker/my.cnf:/root/.my.cnf:ro
     security_opt:
       - no-new-privileges:true
 
   wpcron:
-    image: wordpress:cli-php8.3
+    build:
+      context: .
+      dockerfile: docker/development/Dockerfile.wpcli
+    image: longevity-wpcli:dev
     profiles: ["cron"]
     depends_on:
       wordpress:
@@ -117,7 +149,7 @@ services:
       - no-new-privileges:true
 
   test-runner:
-    image: php:8.3-cli
+    image: php@sha256:2a3f699b6cb31e5638c5432e4d37d4047853ba6351a692c91e0a073af00a55cc # php:8.3-cli
     profiles: ["test"]
     working_dir: /workspace
     depends_on:
@@ -140,3 +172,4 @@ services:
 volumes:
   db_data:
   wordpress_data:
+  redis_data:

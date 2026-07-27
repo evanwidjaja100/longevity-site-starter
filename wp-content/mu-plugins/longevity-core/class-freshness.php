@@ -73,8 +73,8 @@ final class Freshness {
 			}
 			$report['eligible_total'] = Freshness_Repository::eligible_total();
 			$report['cycle_started_at'] = $cycle_started;
-			$report['cycle_scanned'] = self::count_scanned_since( $cycle_started );
-			$report['due_total'] = self::count_any_due( $today );
+			$report['cycle_scanned'] = self::count_by_meta_query( array( 'post', 'review' ), array( array( 'key' => '_lel_freshness_last_scanned_at', 'value' => $cycle_started, 'compare' => '>=', 'type' => 'DATETIME' ) ), array( 'publish', 'draft', 'pending', 'future', 'private' ) );
+			$report['due_total'] = self::count_by_meta_query( array( 'post', 'review' ), array( 'relation' => 'OR', array( 'key' => 'next_content_review_date', 'value' => $today, 'compare' => '<=', 'type' => 'DATE' ), array( 'key' => 'next_fact_check_date', 'value' => $today, 'compare' => '<=', 'type' => 'DATE' ), array( 'key' => 'next_medical_review_date', 'value' => $today, 'compare' => '<=', 'type' => 'DATE' ) ), array( 'publish', 'draft', 'pending', 'future', 'private' ) );
 			$report['remaining_estimate'] = max( 0, $report['eligible_total'] - $report['cycle_scanned'] );
 			$report['last_success_at'] = gmdate( DATE_W3C );
 			$report['cycle_complete'] = $report['eligible_total'] <= $report['cycle_scanned'];
@@ -99,9 +99,7 @@ final class Freshness {
 			$report['last_error_code'] = $error_code;
 			Audit_Log::record( 'freshness_cycle_failed', 'system', 0, array( 'error_class' => get_class( $error ), 'error_code' => $error_code ), 0, 'cron' );
 			update_option( 'lel_freshness_last_error', array( 'time' => gmdate( DATE_W3C ), 'code' => $error_code ), false );
-			if ( function_exists( 'error_log' ) ) {
-				error_log( 'Longevity Core freshness job failed: ' . $error->getMessage() );
-			}
+			Logger::error( 'freshness_cycle_failed', array( 'error_code' => $error_code, 'message' => $error->getMessage() ) );
 		} finally {
 			delete_transient( self::LOCK );
 		}
@@ -129,14 +127,16 @@ final class Freshness {
 	/** Return non-sensitive operational counts for admin and CLI. */
 	public static function status(): array {
 		$last = get_option( 'lel_last_freshness_report', array() );
+		$today = gmdate( 'Y-m-d' );
+		$pub_status = array( 'publish', 'draft', 'pending', 'future', 'private' );
 		return array(
 			'last_freshness_run'        => is_array( $last ) ? ( $last['run_at'] ?? __( 'Never', 'longevity-core' ) ) : __( 'Never', 'longevity-core' ),
-			'overdue_content_reviews'   => self::count_meta( array( 'post', 'review' ), '_lel_freshness_status', 'update_due' ),
-			'overdue_fact_checks'       => self::count_due_field( 'next_fact_check_date' ),
-			'overdue_medical_reviews'   => self::count_due_field( 'next_medical_review_date' ),
-			'pending_corrections'       => self::count_not_meta( 'lel_correction', 'correction_status', 'complete' ),
-			'unapproved_affiliates'     => self::count_not_meta( 'lel_affiliate', 'relationship_status', 'active' ),
-			'invalid_test_records'      => self::count_not_meta( 'lel_test_record', 'approval_status', 'approved' ),
+			'overdue_content_reviews'   => self::count_by_meta_query( array( 'post', 'review' ), array( 'key' => '_lel_freshness_status', 'value' => 'update_due' ) ),
+			'overdue_fact_checks'       => self::count_by_meta_query( array( 'post', 'review' ), array( array( 'key' => 'next_fact_check_date', 'value' => $today, 'compare' => '<', 'type' => 'DATE' ) ) ),
+			'overdue_medical_reviews'   => self::count_by_meta_query( array( 'post', 'review' ), array( array( 'key' => 'next_medical_review_date', 'value' => $today, 'compare' => '<', 'type' => 'DATE' ) ) ),
+			'pending_corrections'       => self::count_by_meta_query( 'lel_correction', array( 'relation' => 'OR', array( 'key' => 'correction_status', 'compare' => 'NOT EXISTS' ), array( 'key' => 'correction_status', 'value' => 'complete', 'compare' => '!=' ) ) ),
+			'unapproved_affiliates'     => self::count_by_meta_query( 'lel_affiliate', array( 'relation' => 'OR', array( 'key' => 'relationship_status', 'compare' => 'NOT EXISTS' ), array( 'key' => 'relationship_status', 'value' => 'active', 'compare' => '!=' ) ) ),
+			'invalid_test_records'      => self::count_by_meta_query( 'lel_test_record', array( 'relation' => 'OR', array( 'key' => 'approval_status', 'compare' => 'NOT EXISTS' ), array( 'key' => 'approval_status', 'value' => 'approved', 'compare' => '!=' ) ) ),
 			'repeated_emergency_overrides' => self::count_repeated_overrides(),
 			'failed_freshness_jobs'     => get_option( 'lel_freshness_last_error', false ) ? 1 : 0,
 			'last_batch_processed'      => is_array( $last ) ? (int) ( $last['processed'] ?? 0 ) : 0,
@@ -146,66 +146,41 @@ final class Freshness {
 		);
 	}
 
-	/** Count records with an exact meta value. */
-	private static function count_meta( $post_type, string $key, string $value ): int {
-		$query = new \WP_Query( array( 'post_type' => $post_type, 'post_status' => 'any', 'fields' => 'ids', 'posts_per_page' => 1, 'no_found_rows' => false, 'meta_key' => $key, 'meta_value' => $value ) );
-		return (int) $query->found_posts;
-	}
-
-	/** Count records whose state is absent or not equal to the approved value. */
-	private static function count_not_meta( string $post_type, string $key, string $value ): int {
-		$query = new \WP_Query(
-			array(
-				'post_type'      => $post_type,
-				'post_status'    => 'any',
-				'fields'         => 'ids',
-				'posts_per_page' => 1,
-				'no_found_rows'  => false,
-				'meta_query'     => array(
-					'relation' => 'OR',
-					array( 'key' => $key, 'compare' => 'NOT EXISTS' ),
-					array( 'key' => $key, 'value' => $value, 'compare' => '!=' ),
-				),
-			)
-		);
-		return (int) $query->found_posts;
-	}
-
-	/** Count overdue items for a specific lifecycle date in a bounded query. */
-	private static function count_due_field( string $field ): int {
-		$query = new \WP_Query(
-			array(
-				'post_type'      => array( 'post', 'review' ),
-				'post_status'    => 'any',
-				'fields'         => 'ids',
-				'posts_per_page' => 1,
-				'no_found_rows'  => false,
-				'meta_query'     => array(
-					array( 'key' => $field, 'value' => gmdate( 'Y-m-d' ), 'compare' => '<', 'type' => 'DATE' ),
-				),
-			)
-		);
-		return (int) $query->found_posts;
-	}
-
-	/** Count unique records with at least one lifecycle date due today or earlier. */
-	private static function count_any_due( string $today ): int {
-		$query = new \WP_Query(
-			array(
-				'post_type'      => array( 'post', 'review' ),
-				'post_status'    => array( 'publish', 'draft', 'pending', 'future', 'private' ),
-				'fields'         => 'ids',
-				'posts_per_page' => 1,
-				'no_found_rows'  => false,
-				'meta_query'     => array(
-					'relation' => 'OR',
-					array( 'key' => 'next_content_review_date', 'value' => $today, 'compare' => '<=', 'type' => 'DATE' ),
-					array( 'key' => 'next_fact_check_date', 'value' => $today, 'compare' => '<=', 'type' => 'DATE' ),
-					array( 'key' => 'next_medical_review_date', 'value' => $today, 'compare' => '<=', 'type' => 'DATE' ),
-				),
-			)
-		);
-		return (int) $query->found_posts;
+	/** Count records matching a meta query via direct SQL (avoids SQL_CALC_FOUND_ROWS). */
+	private static function count_by_meta_query( $post_type, array $meta_query, $post_status = 'any' ): int {
+		global $wpdb;
+		if ( ! isset( $wpdb ) || ! method_exists( $wpdb, 'get_var' ) ) {
+			return 0;
+		}
+		$types = is_array( $post_type ) ? $post_type : array( $post_type );
+		$types_in = implode( ',', array_fill( 0, count( $types ), '%s' ) );
+		$statuses = is_array( $post_status ) ? $post_status : array( $post_status );
+		$status_in = implode( ',', array_fill( 0, count( $statuses ), '%s' ) );
+		$where = 'p.post_type IN (' . $types_in . ') AND p.post_status IN (' . $status_in . ')';
+		$join = '';
+		$params = array_merge( $types, $statuses );
+		$relation = isset( $meta_query['relation'] ) && 'OR' === strtoupper( (string) $meta_query['relation'] ) ? ' OR ' : ' AND ';
+		$conditions = array();
+		foreach ( $meta_query as $clause ) {
+			if ( ! is_array( $clause ) || ! isset( $clause['key'] ) ) {
+				continue;
+			}
+			$alias = 'pm_' . md5( (string) $clause['key'] . (string) ($clause['value'] ?? '') );
+			$join .= ' INNER JOIN ' . $wpdb->postmeta . ' ' . $alias . ' ON p.ID = ' . $alias . '.post_id';
+			$cond = $alias . '.meta_key = %s';
+			$params[] = $clause['key'];
+			if ( isset( $clause['value'] ) ) {
+				$compare = isset( $clause['compare'] ) ? (string) $clause['compare'] : '=';
+				$cond .= ' AND ' . $alias . '.meta_value ' . $compare . ' %s';
+				$params[] = (string) $clause['value'];
+			}
+			$conditions[] = $cond;
+		}
+		if ( ! empty( $conditions ) ) {
+			$where .= ' AND (' . implode( $relation, $conditions ) . ')';
+		}
+		$sql = $wpdb->prepare( 'SELECT COUNT(DISTINCT p.ID) FROM ' . $wpdb->posts . ' p ' . $join . ' WHERE ' . $where, $params );
+		return (int) $wpdb->get_var( $sql );
 	}
 
 	/** Count posts with two or more append-only emergency override events. */
@@ -217,20 +192,5 @@ final class Freshness {
 		$table = Audit_Log::table_name();
 		$sql   = "SELECT COUNT(*) FROM (SELECT object_id FROM {$table} WHERE event_type = 'publication_override_used' AND object_type = 'post' GROUP BY object_id HAVING COUNT(*) >= 2) AS repeated";
 		return (int) $wpdb->get_var( $sql );
-	}
-
-	/** Count records scanned since the current cycle began. */
-	private static function count_scanned_since( string $cycle_started ): int {
-		$query = new \WP_Query(
-			array(
-				'post_type'      => array( 'post', 'review' ),
-				'post_status'    => array( 'publish', 'draft', 'pending', 'future', 'private' ),
-				'fields'         => 'ids',
-				'posts_per_page' => 1,
-				'no_found_rows'  => false,
-				'meta_query'     => array( array( 'key' => '_lel_freshness_last_scanned_at', 'value' => $cycle_started, 'compare' => '>=', 'type' => 'DATETIME' ) ),
-			)
-		);
-		return (int) $query->found_posts;
 	}
 }

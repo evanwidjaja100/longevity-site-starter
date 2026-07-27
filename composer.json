@@ -1,39 +1,39 @@
 {
-  "name": "longevity-evidence-lab/platform",
-  "description": "First-party quality tooling for the Longevity Evidence Lab WordPress platform.",
-  "type": "project",
-  "license": "proprietary",
-  "require-dev": {
-    "dealerdirect/phpcodesniffer-composer-installer": "^1.0",
-    "phpcompatibility/php-compatibility": "^9.3",
-    "phpcompatibility/phpcompatibility-wp": "^2.1",
-    "phpstan/phpstan": "^2.0",
-    "phpunit/phpunit": "^10.5",
-    "szepeviktor/phpstan-wordpress": "^2.0",
-    "wp-coding-standards/wpcs": "^3.0"
-  },
-  "config": {
-    "allow-plugins": {
-      "dealerdirect/phpcodesniffer-composer-installer": true
+    "name": "longevity-evidence-lab/platform",
+    "description": "First-party quality tooling for the Longevity Evidence Lab WordPress platform.",
+    "type": "project",
+    "license": "proprietary",
+    "require-dev": {
+        "dealerdirect/phpcodesniffer-composer-installer": "^1.0",
+        "phpcompatibility/php-compatibility": "^9.3",
+        "phpcompatibility/phpcompatibility-wp": "^2.1",
+        "phpstan/phpstan": "^2.0",
+        "phpunit/phpunit": "^10.5",
+        "szepeviktor/phpstan-wordpress": "^2.0",
+        "wp-coding-standards/wpcs": "^3.0"
     },
-    "sort-packages": true
-  },
-  "scripts": {
-    "lint": [
-      "@phpcs",
-      "@phpstan"
-    ],
-    "test": [
-      "@test:discovery",
-      "@phpunit",
-      "@test:routes"
-    ],
-    "phpcs": "phpcs -q",
-    "phpcbf": "phpcbf",
-    "phpstan": "phpstan analyse --no-progress",
-    "phpunit": "phpunit --colors=always",
-    "test:discovery": "php scripts/verify-test-discovery.php",
-    "test:routes": "php tests/php/RoutesTest.php",
-    "test:fallback": "php tests/php/run-unit-tests.php"
-  }
+    "config": {
+        "allow-plugins": {
+            "dealerdirect/phpcodesniffer-composer-installer": true
+        },
+        "sort-packages": true
+    },
+    "scripts": {
+        "lint": [
+            "@phpcs",
+            "@phpstan"
+        ],
+        "test": [
+            "@test:discovery",
+            "@phpunit",
+            "@test:routes"
+        ],
+        "phpcs": "@php vendor/squizlabs/php_codesniffer/bin/phpcs -q",
+        "phpcbf": "@php vendor/squizlabs/php_codesniffer/bin/phpcbf",
+        "phpstan": "@php vendor/phpstan/phpstan/phpstan analyse --no-progress",
+        "phpunit": "@php vendor/phpunit/phpunit/phpunit --colors=always",
+        "test:discovery": "php scripts/verify-test-discovery.php",
+        "test:routes": "php tests/php/RoutesTest.php",
+        "test:fallback": "php tests/php/run-unit-tests.php"
+    }
 }

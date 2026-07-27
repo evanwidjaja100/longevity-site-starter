@@ -1,0 +1,33 @@
+# Prometheus scrape configuration for Longevity Evidence Lab.
+#
+# Two supported collection modes (choose one):
+#
+# 1. Pull mode — scrape the authenticated REST endpoint. The endpoint requires
+#    the `view_operational_readiness` capability, so use an application-password
+#    or a reverse-proxy that injects credentials for the scrape target only.
+#
+# 2. Textfile mode (recommended for managed hosts) — run
+#      wp longevity metrics --file=/var/lib/node_exporter/textfile/longevity.prom
+#    from cron every minute and let node_exporter's textfile collector expose it.
+#
+# Load the alert rules from ops/monitoring/alert-rules.yml in your Prometheus
+# server config (rule_files) and point Alertmanager at scripts/alert-notify.sh
+# (or a native Alertmanager receiver).
+
+scrape_configs:
+  - job_name: longevity-rest
+    metrics_path: /wp-json/longevity/v1/metrics
+    scheme: https
+    scrape_interval: 60s
+    basic_auth:
+      username: metrics-scraper
+      password_file: /etc/prometheus/longevity_metrics_password
+    static_configs:
+      - targets:
+          - your-site-host
+
+  - job_name: longevity-textfile
+    scrape_interval: 60s
+    static_configs:
+      - targets:
+          - node-exporter-host:9100

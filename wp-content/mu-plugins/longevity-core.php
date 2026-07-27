@@ -5,6 +5,8 @@
  * Version: 3.0.0
  * Requires PHP: 8.1
  * Text Domain: longevity-core
+ *
+ * @package LongevityCore
  */
 
 defined( 'ABSPATH' ) || exit;

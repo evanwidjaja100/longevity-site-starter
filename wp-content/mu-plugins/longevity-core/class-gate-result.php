@@ -25,25 +25,22 @@ final class Gate_Result {
 	/** @var array<int, array<string, string>> */
 	private array $not_applicable = array();
 
-	/** Add a blocking result. */
-	public function block( string $code, string $message ): void {
-		$this->blocking[] = array( 'code' => $code, 'message' => $message );
+	private const BUCKETS = array(
+		'block' => 'blocking',
+		'warn'  => 'warnings',
+		'pass'  => 'passed',
+		'skip'  => 'not_applicable',
+	);
+
+	private function push( string $category, string $code, string $message ): void {
+		$prop = self::BUCKETS[ $category ];
+		$this->$prop[] = array( 'code' => $code, 'message' => $message );
 	}
 
-	/** Add a warning result. */
-	public function warn( string $code, string $message ): void {
-		$this->warnings[] = array( 'code' => $code, 'message' => $message );
-	}
-
-	/** Add a passed result. */
-	public function pass( string $code, string $message ): void {
-		$this->passed[] = array( 'code' => $code, 'message' => $message );
-	}
-
-	/** Add a non-applicable result. */
-	public function skip( string $code, string $message ): void {
-		$this->not_applicable[] = array( 'code' => $code, 'message' => $message );
-	}
+	public function block( string $code, string $message ): void { $this->push( 'block', $code, $message ); }
+	public function warn( string $code, string $message ): void { $this->push( 'warn', $code, $message ); }
+	public function pass( string $code, string $message ): void { $this->push( 'pass', $code, $message ); }
+	public function skip( string $code, string $message ): void { $this->push( 'skip', $code, $message ); }
 
 	/** Whether publication is blocked. */
 	public function is_blocked(): bool {

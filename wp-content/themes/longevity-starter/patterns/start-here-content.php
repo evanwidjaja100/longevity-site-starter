@@ -4,7 +4,10 @@
  * Slug: longevity-starter/start-here-content
  * Categories: text
  * Inserter: true
+ *
+ * @package LongevityStarter
  */
+
 ?>
 <!-- wp:html -->
 <section class="longevity-start-here"><h2>What this publication does</h2><p>We publish evidence guides and governed consumer test reports. Each article states its scope, methods, limitations, and commercial context. You can inspect the evidence behind every material claim and see what is uncertain as well as what is known.</p><h2>What we do not do</h2><p>We do not provide individualized medical advice, diagnose conditions, prescribe treatments, or guarantee outcomes. This publication is educational. Always consult a qualified health professional for personal medical decisions.</p><h2>Evidence grading vs. product testing</h2><p><strong>Evidence grading</strong> evaluates the strength of scientific research behind a health claim. <strong>Product testing</strong> measures specific units of a consumer product against a published protocol. A strong evidence grade does not mean a product has been tested. A tested product does not prove the health claim behind it. The two are separate.</p><h2>Uncertainty and limitations</h2><p>Every conclusion includes a confidence rating and a rationale. We show what evidence is missing, where populations differ, and where commercial factors could influence outcomes. Uncertain findings are not hidden.</p></section>

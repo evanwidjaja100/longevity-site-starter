@@ -47,13 +47,6 @@ final class Date_Validator {
 		return $left_date <=> $right_date;
 	}
 
-	/** Whether the first date occurs on or before the second. */
-	public static function on_or_before( string $left, string $right ): bool {
-		$left_date  = self::parse( $left );
-		$right_date = self::parse( $right );
-		return null !== $left_date && null !== $right_date && $left_date <= $right_date;
-	}
-
 	/** Whether a date is after another date. */
 	public static function after( string $left, string $right ): bool {
 		$left_date  = self::parse( $left );

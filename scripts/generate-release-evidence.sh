@@ -83,7 +83,7 @@ else
   fi
 fi
 
-for source in reports/playwright reports/playwright-artifacts reports/lighthouse reports/system-readiness.json reports/sbom.spdx.json; do
+for source in reports/playwright reports/playwright-artifacts reports/lighthouse reports/system-readiness.json reports/sbom.spdx.json reports/deploy reports/backup; do
   if [ -e "$source" ]; then
     cp -R "$source" "$DIR/" 2>/dev/null || true
   fi

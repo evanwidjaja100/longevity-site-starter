@@ -24,13 +24,29 @@ $content = '<!-- wp:heading {"level":1} --><h1 class="wp-block-heading">Contact<
 <!-- wp:separator --><hr class="wp-block-separator has-alpha-channel-opacity"/><!-- /wp:separator -->
 <!-- wp:paragraph --><p><strong>Last reviewed:</strong> ' . esc_html( $today ) . '</p><!-- /wp:paragraph -->';
 
-$posts = get_posts( array( 'name' => 'contact', 'post_type' => 'page', 'post_status' => 'any', 'posts_per_page' => 1, 'no_found_rows' => true ) );
+// phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited
+$posts = get_posts(
+	array(
+		'name'           => 'contact',
+		'post_type'      => 'page',
+		'post_status'    => 'any',
+		'posts_per_page' => 1,
+		'no_found_rows'  => true,
+	)
+);
+// phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited
 $post  = ! empty( $posts ) ? $posts[0] : null;
 if ( ! $post ) {
 	\WP_CLI::error( 'Contact page not found.' );
 }
 
-$result = wp_update_post( array( 'ID' => $post->ID, 'post_content' => $content ), true );
+$result = wp_update_post(
+	array(
+		'ID'           => $post->ID,
+		'post_content' => $content,
+	),
+	true
+);
 if ( is_wp_error( $result ) ) {
 	\WP_CLI::error( 'Failed to update contact page: ' . $result->get_error_message() );
 }

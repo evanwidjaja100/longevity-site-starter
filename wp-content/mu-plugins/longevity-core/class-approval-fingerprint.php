@@ -148,7 +148,7 @@ final class Approval_Fingerprint {
 
 	/** Snapshot claim and linked-source inputs used by every public approval. */
 	private static function claim_dependency_payload( int $post_id ): array {
-		$claims = get_posts( array( 'post_type' => 'lel_claim', 'post_status' => 'any', 'posts_per_page' => -1, 'orderby' => 'ID', 'order' => 'ASC', 'meta_key' => 'post_id', 'meta_value' => $post_id ) );
+		$claims = get_posts( array( 'post_type' => 'lel_claim', 'post_status' => 'any', 'posts_per_page' => 200, 'orderby' => 'ID', 'order' => 'ASC', 'meta_key' => 'post_id', 'meta_value' => $post_id ) );
 		$data   = array();
 		$fields = array( 'post_id', 'claim_id', 'claim_text', 'claim_category', 'claim_importance', 'claim_location', 'source_id', 'source_type', 'source_title', 'source_authors', 'source_url', 'source_identifier', 'publication_date', 'accessed_date', 'jurisdiction', 'population', 'intervention', 'comparator', 'outcome', 'evidence_design', 'evidence_grade', 'conflict_notes', 'evidence_notes', 'verified_by', 'verified_at', 'verification_date', 'verification_status', 'verification_snapshot_hash', 'recheck_date', 'superseded_by', 'archive_url' );
 		$source_fields = array( 'source_id', 'source_type', 'source_title', 'source_authors', 'source_url', 'source_identifier', 'publication_date', 'accessed_date', 'archive_url', 'rights_notes', 'source_notes', 'validation_status', 'recheck_date' );

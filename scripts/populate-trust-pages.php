@@ -25,27 +25,29 @@ $dry_run = in_array( '--dry-run', $args ?? array(), true );
 $template_dir = '/project-content/templates';
 
 $page_map = array(
-	'about.md'                      => 'about',
-	'editorial-policy.md'           => 'editorial-policy',
-	'evidence-methodology.md'       => 'evidence-methodology',
-	'testing-methodology.md'        => 'testing-methodology',
-	'medical-disclaimer.md'         => 'medical-disclaimer',
-	'affiliate-disclosure.md'       => 'affiliate-disclosure',
-	'corrections.md'                => 'corrections',
-	'privacy.md'                    => 'privacy',
-	'terms.md'                      => 'terms',
-	'contact.md'                    => 'contact',
+	'about.md'                       => 'about',
+	'editorial-policy.md'            => 'editorial-policy',
+	'evidence-methodology.md'        => 'evidence-methodology',
+	'testing-methodology.md'         => 'testing-methodology',
+	'medical-disclaimer.md'          => 'medical-disclaimer',
+	'affiliate-disclosure.md'        => 'affiliate-disclosure',
+	'corrections.md'                 => 'corrections',
+	'privacy.md'                     => 'privacy',
+	'terms.md'                       => 'terms',
+	'contact.md'                     => 'contact',
 	'ai-assisted-work-disclosure.md' => 'ai-assisted-work-disclosure',
 );
 
 $updated = 0;
+// phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited
 $errors  = array();
 
 foreach ( $page_map as $filename => $slug ) {
 	$filepath = $template_dir . '/' . $filename;
 
 	if ( ! file_exists( $filepath ) ) {
-		$errors[] = "Template not found: {$filename}";
+	// phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited
+$errors[] = "Template not found: {$filename}";
 		\WP_CLI::warning( "Template not found: {$filepath}" );
 		continue;
 	}
@@ -57,7 +59,15 @@ foreach ( $page_map as $filename => $slug ) {
 		continue;
 	}
 
-	$posts = get_posts( array( 'name' => $slug, 'post_type' => 'page', 'post_status' => 'any', 'posts_per_page' => 1, 'no_found_rows' => true ) );
+	$posts = get_posts(
+		array(
+			'name'           => $slug,
+			'post_type'      => 'page',
+			'post_status'    => 'any',
+			'posts_per_page' => 1,
+			'no_found_rows'  => true,
+		)
+	);
 	$post  = ! empty( $posts ) ? $posts[0] : null;
 	if ( ! $post ) {
 		$errors[] = "Page not found by slug: {$slug}";
@@ -74,11 +84,11 @@ foreach ( $page_map as $filename => $slug ) {
 	}
 
 	$result = wp_update_post(
-	array(
-		'ID'           => $post->ID,
-		'post_content' => $html,
-	),
-	true
+		array(
+			'ID'           => $post->ID,
+			'post_content' => $html,
+		),
+		true
 	);
 
 	if ( is_wp_error( $result ) ) {
@@ -103,10 +113,10 @@ if ( $errors ) {
  * Convert markdown content to basic WordPress block HTML.
  */
 function convert_markdown_to_blocks( string $markdown ): string {
-	$lines = explode( "\n", $markdown );
-	$blocks = array();
-	$in_list = false;
-	$list_tag = 'ul';
+	$lines      = explode( "\n", $markdown );
+	$blocks     = array();
+	$in_list    = false;
+	$list_tag   = 'ul';
 	$list_items = array();
 
 	foreach ( $lines as $line ) {
@@ -119,9 +129,9 @@ function convert_markdown_to_blocks( string $markdown ): string {
 
 		// Close any open list
 		if ( $in_list && ( '' === $trimmed || str_starts_with( $trimmed, '#' ) || str_starts_with( $trimmed, '|' ) ) ) {
-			$blocks[] = render_list( $list_tag, $list_items );
+			$blocks[]   = render_list( $list_tag, $list_items );
 			$list_items = array();
-			$in_list = false;
+			$in_list    = false;
 		}
 
 		if ( '' === $trimmed ) {
@@ -130,12 +140,12 @@ function convert_markdown_to_blocks( string $markdown ): string {
 
 		// Heading
 		if ( str_starts_with( $trimmed, '## ' ) ) {
-			$text = esc_html( trim( substr( $trimmed, 3 ) ) );
+			$text     = esc_html( trim( substr( $trimmed, 3 ) ) );
 			$blocks[] = '<!-- wp:heading --><h2 class="wp-block-heading">' . $text . '</h2><!-- /wp:heading -->';
 			continue;
 		}
 		if ( str_starts_with( $trimmed, '### ' ) ) {
-			$text = esc_html( trim( substr( $trimmed, 4 ) ) );
+			$text     = esc_html( trim( substr( $trimmed, 4 ) ) );
 			$blocks[] = '<!-- wp:heading {"level":3} --><h3 class="wp-block-heading">' . $text . '</h3><!-- /wp:heading -->';
 			continue;
 		}
@@ -165,19 +175,19 @@ function convert_markdown_to_blocks( string $markdown ): string {
 		// List item
 		if ( str_starts_with( $trimmed, '- ' ) || str_starts_with( $trimmed, '* ' ) ) {
 			if ( ! $in_list ) {
-				$in_list = true;
+				$in_list  = true;
 				$list_tag = 'ul';
 			}
-			$text = convert_inline_markdown( trim( substr( $trimmed, 2 ) ) );
+			$text         = convert_inline_markdown( trim( substr( $trimmed, 2 ) ) );
 			$list_items[] = $text;
 			continue;
 		}
 		if ( preg_match( '/^\d+[.)]\s/', $trimmed ) ) {
 			if ( ! $in_list ) {
-				$in_list = true;
+				$in_list  = true;
 				$list_tag = 'ol';
 			}
-			$text = convert_inline_markdown( preg_replace( '/^\d+[.)]\s/', '', $trimmed, 1 ) );
+			$text         = convert_inline_markdown( preg_replace( '/^\d+[.)]\s/', '', $trimmed, 1 ) );
 			$list_items[] = $text;
 			continue;
 		}
@@ -189,7 +199,7 @@ function convert_markdown_to_blocks( string $markdown ): string {
 		}
 
 		// Paragraph
-		$text = convert_inline_markdown( $trimmed );
+		$text     = convert_inline_markdown( $trimmed );
 		$blocks[] = '<!-- wp:paragraph --><p>' . $text . '</p><!-- /wp:paragraph -->';
 	}
 

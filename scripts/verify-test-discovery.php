@@ -1,26 +1,48 @@
 <?php
-/** Verify that security-critical PHPUnit suites are discoverable by PHPUnit itself. */
+/**
+ * Verify that security-critical PHPUnit suites are discoverable by PHPUnit itself.
+ *
+ * @package LongevityCore
+ */
+
 $required = array(
-	'ArchitectureTest', 'MetaAuthorizationTest', 'ReviewerCredentialsTest',
-	'ApprovalSnapshotTest', 'TestRecordApprovalTest', 'RestPublicBoundaryTest',
-	'PublicationGatesTest', 'FreshnessTest', 'RegressionPublicationBypassTest',
+	'ArchitectureTest',
+	'MetaAuthorizationTest',
+	'ReviewerCredentialsTest',
+	'ApprovalSnapshotTest',
+	'TestRecordApprovalTest',
+	'RestPublicBoundaryTest',
+	'PublicationGatesTest',
+	'FreshnessTest',
+	'RegressionPublicationBypassTest',
 );
 
-$phpunit = dirname( __DIR__ ) . '/vendor/bin/phpunit';
+$phpunit = dirname( __DIR__ ) . '/vendor/phpunit/phpunit/phpunit';
 if ( ! is_file( $phpunit ) ) {
+	// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fwrite
 	fwrite( STDERR, "PHPUnit is unavailable; install locked Composer dependencies before discovery.\n" );
 	exit( 1 );
 }
 
-$output = array();
-$status = 0;
-exec( escapeshellarg( $phpunit ) . ' --list-tests --testsuite ' . escapeshellarg( 'Longevity Core' ) . ' --no-coverage 2>&1', $output, $status );
-if ( 0 !== $status ) {
+$php     = PHP_BINARY;
+$command = sprintf(
+	'%s %s --list-tests --testsuite %s --no-coverage 2>&1',
+	escapeshellarg( $php ),
+	escapeshellarg( $phpunit ),
+	escapeshellarg( 'Longevity Core' )
+);
+
+$output    = array();
+$exit_code = 0;
+// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.system_calls_exec
+exec( $command, $output, $exit_code );
+if ( 0 !== $exit_code ) {
+	// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fwrite
 	fwrite( STDERR, "PHPUnit test discovery failed:\n" . implode( PHP_EOL, $output ) . PHP_EOL );
 	exit( 1 );
 }
 
-$listed = implode( PHP_EOL, $output );
+$listed  = implode( PHP_EOL, $output );
 $missing = array();
 foreach ( $required as $class ) {
 	if ( false === strpos( $listed, $class . '::' ) ) {
@@ -28,6 +50,7 @@ foreach ( $required as $class ) {
 	}
 }
 if ( $missing ) {
+	// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fwrite
 	fwrite( STDERR, 'Missing required PHPUnit suites: ' . implode( ', ', $missing ) . PHP_EOL );
 	exit( 1 );
 }
@@ -35,7 +58,9 @@ if ( $missing ) {
 preg_match_all( '/^\s*-\s+.+::.+$/m', $listed, $tests );
 $methods = count( $tests[0] );
 if ( $methods < 50 ) {
+	// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fwrite
 	fwrite( STDERR, "Only {$methods} PHPUnit tests were discovered; expected at least 50.\n" );
 	exit( 1 );
 }
-echo sprintf( "PHPUnit discovered %d test cases; all critical suites are present.\n", $methods );
+// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+printf( "PHPUnit discovered %d test cases; all critical suites are present.\n", $methods );

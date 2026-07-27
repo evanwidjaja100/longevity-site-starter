@@ -28,15 +28,39 @@ final class Shortcodes {
 		add_shortcode( 'longevity_contact_form', static fn() => Public_Contact::render_contact_form() );
 	}
 
-	/** Preserve the affiliate shortcode interface and registry enforcement. */
+	/**
+	 * Preserve the affiliate shortcode interface and registry enforcement.
+	 *
+	 * @param array $atts Shortcode attributes.
+	 */
 	public static function affiliate_link( array $atts ): string {
-		$atts = shortcode_atts( array( 'url' => '', 'label' => __( 'Check current price', 'longevity-core' ), 'placement' => 'article' ), $atts, 'affiliate_link' );
+		$atts = shortcode_atts(
+			array(
+				'url'       => '',
+				'label'     => __( 'Check current price', 'longevity-core' ),
+				'placement' => 'article',
+			),
+			$atts,
+			'affiliate_link'
+		);
 		return Affiliate_Registry::render_link( (string) $atts['url'], (string) $atts['label'], (string) $atts['placement'] );
 	}
 
-	/** Preserve the legacy review-box attributes. */
+	/**
+	 * Preserve the legacy review-box attributes.
+	 *
+	 * @param array $atts Shortcode attributes.
+	 */
 	public static function review_box( array $atts ): string {
-		$atts = shortcode_atts( array( 'score' => '', 'best_for' => '', 'tested' => '' ), $atts, 'review_box' );
+		$atts = shortcode_atts(
+			array(
+				'score'    => '',
+				'best_for' => '',
+				'tested'   => '',
+			),
+			$atts,
+			'review_box'
+		);
 		return Public_Trust::render_legacy_review_box( $atts );
 	}
 }

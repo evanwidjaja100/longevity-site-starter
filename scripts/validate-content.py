@@ -247,7 +247,7 @@ def validate_encoding_integrity() -> None:
 
 
 def validate_no_tracked_env() -> None:
-    allowed = {".env.example", ".env.ci"}
+    allowed = {".env.example", ".env.ci.template", ".env.production.example"}
     tracked: set[str] = set()
     if shutil.which("git") and (ROOT / ".git").exists():
         result = subprocess.run(

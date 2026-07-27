@@ -24,10 +24,10 @@ For the complete local workflow:
 
 - Docker Engine with the Docker Compose plugin
 - GNU Make
-- PHP 8.1 or later
+- PHP 8.3 or later
 - Python 3.10 or later
 - Composer 2
-- Node.js 20 or later and npm
+- Node.js 22 or later and npm
 
 Static validation can run without Docker. A dependency-free PHP unit fallback is included for environments without Composer.
 

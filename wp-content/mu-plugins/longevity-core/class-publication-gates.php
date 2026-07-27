@@ -78,7 +78,7 @@ final class Publication_Gates {
 		self::required_text_check( $result, $context, 'content_summary', 'missing_summary', __( 'Add a concise content summary or direct answer.', 'longevity-core' ) );
 		self::required_text_check( $result, $context, 'content_limitations', 'missing_limitations', __( 'Add a meaningful limitations and uncertainty section.', 'longevity-core' ) );
 		self::required_text_check( $result, $context, 'next_content_review_date', 'missing_next_review', __( 'Set the next content review date.', 'longevity-core' ) );
-		if ( ! empty( $context['next_content_review_date'] ) && ! self::is_future_date( (string) $context['next_content_review_date'], $today ) ) {
+		if ( ! empty( $context['next_content_review_date'] ) && ! self::is_date_relative( (string) $context['next_content_review_date'], $today, true ) ) {
 			$result->block( 'next_review_due', __( 'Set the next content review date to a valid future date.', 'longevity-core' ) );
 		}
 
@@ -122,10 +122,10 @@ final class Publication_Gates {
 			}
 			if ( empty( $context['fact_checked_by'] ) || empty( $context['fact_checked_date'] ) ) {
 				$result->block( 'fact_check_identity_missing', __( 'Record the fact checker and completion date.', 'longevity-core' ) );
-			} elseif ( ! self::is_nonfuture_date( (string) $context['fact_checked_date'], $today ) ) {
+			} elseif ( ! self::is_date_relative( (string) $context['fact_checked_date'], $today, false ) ) {
 				$result->block( 'fact_check_date_invalid', __( 'The fact-check completion date must be a valid date no later than today.', 'longevity-core' ) );
 			}
-			if ( ! self::is_future_date( (string) ( $context['next_fact_check_date'] ?? '' ), $today ) ) {
+			if ( ! self::is_date_relative( (string) ( $context['next_fact_check_date'] ?? '' ), $today, true ) ) {
 				$result->block( 'next_fact_check_due', __( 'Set the next fact-check date to a valid future date.', 'longevity-core' ) );
 			}
 			if ( empty( $context['claim_count'] ) ) {
@@ -156,10 +156,10 @@ final class Publication_Gates {
 					$result->block( 'medical_' . $field, sprintf( /* translators: %s: metadata field */ __( 'Complete required medical-review field: %s.', 'longevity-core' ), $field ) );
 				}
 			}
-			if ( ! empty( $context['medical_review_date'] ) && ! self::is_nonfuture_date( (string) $context['medical_review_date'], $today ) ) {
+			if ( ! empty( $context['medical_review_date'] ) && ! self::is_date_relative( (string) $context['medical_review_date'], $today, false ) ) {
 				$result->block( 'medical_review_date_invalid', __( 'The medical-review date must be a valid date no later than today.', 'longevity-core' ) );
 			}
-			if ( ! self::is_future_date( (string) ( $context['next_medical_review_date'] ?? '' ), $today ) ) {
+			if ( ! self::is_date_relative( (string) ( $context['next_medical_review_date'] ?? '' ), $today, true ) ) {
 				$result->block( 'next_medical_review_due', __( 'Set the next medical-review date to a valid future date.', 'longevity-core' ) );
 			}
 			if ( 'claim_ids' === ( $context['medical_review_scope'] ?? '' ) && empty( $context['medical_review_claim_ids'] ) ) {
@@ -195,7 +195,7 @@ final class Publication_Gates {
 			}
 			$testing_start = (string) ( $context['testing_start_date'] ?? '' );
 			$testing_end   = (string) ( $context['testing_end_date'] ?? '' );
-			if ( ! Date_Validator::is_valid( $testing_start ) || ! self::is_nonfuture_date( $testing_end, $today ) || Date_Validator::compare( $testing_end, $testing_start ) < 0 ) {
+			if ( ! Date_Validator::is_valid( $testing_start ) || ! self::is_date_relative( $testing_end, $today, false ) || Date_Validator::compare( $testing_end, $testing_start ) < 0 ) {
 				$result->block( 'testing_dates_invalid', __( 'Testing dates must be valid, completed, and ordered from start to end.', 'longevity-core' ) );
 			}
 			if ( empty( $context['test_record_valid'] ) ) {
@@ -260,7 +260,7 @@ final class Publication_Gates {
 				$result->block( 'price_date_missing', __( 'Add a checked date for regional price claims.', 'longevity-core' ) );
 			}
 			foreach ( array( 'price_checked_date', 'warranty_checked_date', 'return_policy_checked_date', 'privacy_policy_checked_date' ) as $checked_field ) {
-				if ( ! empty( $context[ $checked_field ] ) && ! self::is_nonfuture_date( (string) $context[ $checked_field ], $today ) ) {
+				if ( ! empty( $context[ $checked_field ] ) && ! self::is_date_relative( (string) $context[ $checked_field ], $today, false ) ) {
 					$result->block( $checked_field . '_invalid', __( 'Review fact-check dates must be valid dates no later than today.', 'longevity-core' ) );
 				}
 			}
@@ -272,7 +272,7 @@ final class Publication_Gates {
 			}
 			if ( empty( $context['evidence_cutoff_date'] ) ) {
 				$result->block( 'evidence_cutoff_missing', __( 'Record the evidence cutoff date.', 'longevity-core' ) );
-			} elseif ( ! self::is_nonfuture_date( (string) $context['evidence_cutoff_date'], $today ) ) {
+			} elseif ( ! self::is_date_relative( (string) $context['evidence_cutoff_date'], $today, false ) ) {
 				$result->block( 'evidence_cutoff_invalid', __( 'The evidence cutoff must be a valid date no later than today.', 'longevity-core' ) );
 			} else {
 				$result->pass( 'evidence_metadata_complete', __( 'Evidence grade metadata is present.', 'longevity-core' ) );
@@ -431,8 +431,8 @@ final class Publication_Gates {
 		Audit_Log::record( 'publication_blocked', 'post', $post_id, array( 'channel' => 'rest', 'blocking_codes' => implode( ',', $codes ) ), get_current_user_id(), 'rest' );
 		return new \WP_Error(
 			'lel_publication_blocked',
-			__( 'Publication readiness checks failed.', 'longevity-core' ),
-			array( 'status' => 400, 'readiness' => $result->to_array() )
+			__( 'Publication readiness checks failed. Contact an editor for details.', 'longevity-core' ),
+			array( 'status' => 400 )
 		);
 	}
 
@@ -495,14 +495,13 @@ final class Publication_Gates {
 		}
 	}
 
-	/** Whether a value is a valid date strictly after the supplied reference date. */
-	private static function is_future_date( string $value, string $today ): bool {
-		return Date_Validator::is_valid( $value ) && Date_Validator::after( $value, $today );
-	}
-
-	/** Whether a value is a valid date no later than the supplied reference date. */
-	private static function is_nonfuture_date( string $value, string $today ): bool {
-		return Date_Validator::is_valid( $value ) && Date_Validator::compare( $value, $today ) <= 0;
+	/** Whether a value is a valid date relative to the reference (future or non-future). */
+	private static function is_date_relative( string $value, string $today, bool $future ): bool {
+		if ( ! Date_Validator::is_valid( $value ) ) {
+			return false;
+		}
+		$cmp = Date_Validator::compare( $value, $today );
+		return $future ? $cmp > 0 : $cmp <= 0;
 	}
 
 	/** Include metadata that WordPress will write after the post data filter. */
@@ -621,7 +620,7 @@ final class Publication_Gates {
 			array(
 				'post_type'      => 'lel_claim',
 				'post_status'    => 'any',
-				'posts_per_page' => -1,
+				'posts_per_page' => 200,
 				'fields'         => 'ids',
 				'meta_key'       => 'post_id',
 				'meta_value'     => $post_id,

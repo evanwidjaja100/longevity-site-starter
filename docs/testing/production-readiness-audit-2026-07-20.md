@@ -1,8 +1,8 @@
 # Production-Readiness Audit Report
 
-**Date:** 20 July 2026  
-**Audit scope:** Section 18 (Final production-readiness checklist) of Reader Experience v3 plan  
-**Branch:** `improvement/reader-experience-v3`  
+**Date:** 20 July 2026
+**Audit scope:** Section 18 (Final production-readiness checklist) of Reader Experience v3 plan
+**Branch:** `improvement/reader-experience-v3`
 **Environment:** Docker WordPress 7.0.1-php8.3-apache, Chromium E2E
 
 ---

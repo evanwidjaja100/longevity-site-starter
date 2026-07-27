@@ -1,0 +1,52 @@
+groups:
+  - name: longevity-governance
+    rules:
+      - alert: LongevityAuditWriteFailures
+        expr: lel_audit_write_failures_total > 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Governance audit-log write failures detected"
+          description: "lel_audit_write_failures_total={{ $value }}. The append-only audit chain may be dropping mandatory events. Investigate DB availability and the audit table immediately."
+          runbook: "docs/operations/incident-response.md#audit-chain-integrity-failure"
+
+      - alert: LongevityPublicationLockExhaustion
+        expr: lel_publication_lock_failures_total > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Publication lock acquisition failures"
+          description: "lel_publication_lock_failures_total={{ $value }}. Approval and invalidation flows may be contending or GET_LOCK may be unsupported."
+          runbook: "docs/operations/incident-response.md#lock-exhaustion"
+
+      - alert: LongevityReadinessDegraded
+        expr: lel_readiness_overall < 1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "System readiness is not OK"
+          description: "lel_readiness_overall={{ $value }} (1 ok, 0.5 degraded, 0 blocked). Inspect per-check gauges lel_readiness_check to find the failing subsystem."
+          runbook: "docs/operations/incident-response.md"
+
+      - alert: LongevityReadinessBlocked
+        expr: lel_readiness_overall == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "System readiness is BLOCKED"
+          description: "A blocking readiness check failed (database, migrations, scoring model, approval/audit tables, or uploads)."
+          runbook: "docs/operations/incident-response.md#database-unavailable"
+
+      - alert: LongevityInvalidationFallbackFailures
+        expr: increase(lel_invalidation_fallback_failures_total[15m]) > 0
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Synchronous invalidation fallback failures"
+          description: "The invalidation queue table is likely absent and direct invalidation is failing. Ensure migrations have run."
+          runbook: "docs/operations/incident-response.md#invalidation-queue-stuck"

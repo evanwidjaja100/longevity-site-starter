@@ -55,11 +55,11 @@ async function run() {
   for (const route of ROUTES) {
     const url = BASE_URL + route.path;
     const page = await context.newPage();
-    
+
     try {
       const response = await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 15000 });
       await page.waitForTimeout(1000);
-      
+
       const statusCode = response ? response.status() : 0;
       const title = await page.title();
       const h1Count = await page.evaluate(() => document.querySelectorAll('h1').length);
@@ -72,7 +72,7 @@ async function run() {
       const robots = await getMeta(page, 'robots', 'name');
       const ogTitle = await getMeta(page, 'og:title', 'property');
       const ogDesc = await getMeta(page, 'og:description', 'property');
-      
+
       inventory.push({
         path: route.path,
         name: route.name,
@@ -115,7 +115,7 @@ async function run() {
   }
   writeFileSync('docs/testing/pre-v2-route-inventory.csv', lines.join('\n'), 'utf-8');
   console.log(`\nDone. ${inventory.length} routes. Inventory: docs/testing/pre-v2-route-inventory.csv`);
-  
+
   await browser.close();
 }
 

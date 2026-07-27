@@ -55,10 +55,11 @@ final class Audit_Log {
 			schema_version varchar(20) NOT NULL,
 			PRIMARY KEY  (id),
 			UNIQUE KEY sequence (sequence),
+			UNIQUE KEY previous_event_hash (previous_event_hash),
 			KEY object_time (object_type,object_id,occurred_at),
 			KEY actor_time (actor_user_id,occurred_at),
 			KEY event_type (event_type)
-		) {$charset};";
+		) ENGINE=InnoDB {$charset};";
 		dbDelta( $sql );
 
 		$seq_table = self::sequence_table_name();
@@ -66,11 +67,43 @@ final class Audit_Log {
 			id tinyint(1) unsigned NOT NULL DEFAULT 1,
 			current_value bigint(20) unsigned NOT NULL DEFAULT 0,
 			PRIMARY KEY  (id)
-		) {$charset};";
+		) ENGINE=InnoDB {$charset};";
 		dbDelta( $seq_sql );
 
 		// Ensure the singleton row exists.
 		$wpdb->query( "INSERT IGNORE INTO {$seq_table} (id, current_value) VALUES (1, 0)" );
+	}
+
+	/**
+	 * Ensure the fork-preventing constraints exist on an already-installed table.
+	 *
+	 * dbDelta does not reliably add UNIQUE keys to existing tables, so this
+	 * explicitly enforces InnoDB and the unique previous_event_hash index that
+	 * makes chain forks impossible (two events cannot share a predecessor).
+	 * Idempotent and safe to call repeatedly.
+	 *
+	 * @return bool True when the constraint is present after the call.
+	 */
+	public static function ensure_fork_constraint(): bool {
+		global $wpdb;
+		if ( ! isset( $wpdb ) || ! method_exists( $wpdb, 'query' ) || ! self::exists() ) {
+			return false;
+		}
+		$table = self::table_name();
+
+		// Enforce InnoDB (required for the FOR UPDATE row locking used by writes).
+		$engine = (string) $wpdb->get_var( $wpdb->prepare( 'SELECT ENGINE FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = %s', $table ) );
+		if ( '' !== $engine && 0 !== strcasecmp( $engine, 'InnoDB' ) ) {
+			$wpdb->query( "ALTER TABLE {$table} ENGINE=InnoDB" );
+		}
+
+		$has_index = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(1) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = %s AND INDEX_NAME = %s', $table, 'previous_event_hash' ) );
+		if ( $has_index > 0 ) {
+			return true;
+		}
+		$wpdb->query( "ALTER TABLE {$table} ADD UNIQUE KEY previous_event_hash (previous_event_hash)" );
+		$has_index = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(1) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = %s AND INDEX_NAME = %s', $table, 'previous_event_hash' ) );
+		return $has_index > 0;
 	}
 
 	/**
@@ -265,18 +298,12 @@ final class Audit_Log {
 	private static function record_failure( string $event_type, string $reason ): void {
 		$count = (int) get_option( 'lel_audit_write_failures', 0 );
 		update_option( 'lel_audit_write_failures', $count + 1, false );
-		if ( function_exists( 'error_log' ) ) {
-			error_log( sprintf( 'Longevity Core audit write failure: event=%s reason=%s', $event_type, substr( $reason, 0, 200 ) ) );
-		}
+		Logger::error( 'audit_write_failure', array( 'event_type' => $event_type, 'reason' => substr( $reason, 0, 200 ) ) );
 	}
 
 	/** Stable request correlation ID for the current request. */
 	private static function request_id(): string {
-		static $request_id = '';
-		if ( '' === $request_id ) {
-			$request_id = function_exists( 'wp_generate_uuid4' ) ? wp_generate_uuid4() : hash( 'sha256', microtime( true ) . ':' . mt_rand() );
-		}
-		return substr( $request_id, 0, 64 );
+		return Logger::request_id();
 	}
 
 	/** Sanitize and bound nested payloads. */

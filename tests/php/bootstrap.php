@@ -1,9 +1,9 @@
 <?php
 /** PHPUnit bootstrap with minimal WordPress stubs for pure service tests. */
 
-define( 'ABSPATH', __DIR__ . '/' );
-define( 'OBJECT', 'OBJECT' );
-define( 'ARRAY_A', 'ARRAY_A' );
+if ( ! defined( 'ABSPATH' ) ) { define( 'ABSPATH', __DIR__ . '/' ); }
+if ( ! defined( 'OBJECT' ) ) { define( 'OBJECT', 'OBJECT' ); }
+if ( ! defined( 'ARRAY_A' ) ) { define( 'ARRAY_A', 'ARRAY_A' ); }
 define( 'LONGEVITY_CORE_PATH', dirname( __DIR__, 2 ) . '/wp-content/mu-plugins/longevity-core/' );
 define( 'LONGEVITY_CORE_VERSION', '3.0.0' );
 define( 'LONGEVITY_CORE_URL', 'http://example.com/wp-content/mu-plugins/longevity-core/' );
@@ -70,6 +70,9 @@ if ( ! function_exists( 'get_option' ) ) {
 		if ( 'blog_public' === $option ) {
 			return 0;
 		}
+		if ( 'lel_data_version' === $option ) {
+			return 10;
+		}
 		return $default;
 	}
 }
@@ -132,6 +135,7 @@ if ( ! function_exists( 'get_the_title' ) ) {
 }
 
 if ( ! isset( $GLOBALS['wpdb'] ) ) {
+	/** @var \wpdb $wpdb */
 	$GLOBALS['wpdb'] = new class {
 		public string $prefix = 'wp_';
 		public int $insert_id = 0;
@@ -242,7 +246,14 @@ require_once LONGEVITY_CORE_PATH . 'class-admin-ui.php';
 require_once LONGEVITY_CORE_PATH . 'class-content-discovery.php';
 require_once LONGEVITY_CORE_PATH . 'class-rest-api.php';
 require_once LONGEVITY_CORE_PATH . 'class-corrections.php';
+require_once LONGEVITY_CORE_PATH . 'class-logger.php';
+require_once LONGEVITY_CORE_PATH . 'class-migrations.php';
 require_once LONGEVITY_CORE_PATH . 'class-freshness-repository.php';
+require_once LONGEVITY_CORE_PATH . 'class-publication-lock.php';
+require_once LONGEVITY_CORE_PATH . 'class-dependency-index.php';
+require_once LONGEVITY_CORE_PATH . 'class-invalidation-queue.php';
+require_once LONGEVITY_CORE_PATH . 'class-system-readiness.php';
+require_once LONGEVITY_CORE_PATH . 'class-metrics.php';
 
 
 // --- Additional WP function stubs for test files ---
@@ -454,7 +465,29 @@ if ( ! function_exists( 'get_post_field' ) ) {
 }
 
 
-if ( ! defined( 'DAY_IN_SECONDS' ) ) { define( 'DAY_IN_SECONDS', 86400 ); }
+	if ( ! function_exists( 'update_option' ) ) {
+		function update_option( string $option, $value, bool $autoload = false ): bool {
+			$GLOBALS['lel_test_options'][ $option ] = $value;
+			return true;
+		}
+	}
+	if ( ! function_exists( 'delete_option' ) ) {
+		function delete_option( string $option ): bool {
+			unset( $GLOBALS['lel_test_options'][ $option ] );
+			return true;
+		}
+	}
+	if ( ! function_exists( 'add_option' ) ) {
+		function add_option( string $option, $value = '', string $autoload = 'yes' ): bool {
+			$GLOBALS['lel_test_options'][ $option ] = $value;
+			return true;
+		}
+	}
+	if ( ! function_exists( 'wp_installing' ) ) {
+		function wp_installing(): bool { return false; }
+	}
+
+	if ( ! defined( 'DAY_IN_SECONDS' ) ) { define( 'DAY_IN_SECONDS', 86400 ); }
 if ( ! defined( 'HOUR_IN_SECONDS' ) ) { define( 'HOUR_IN_SECONDS', 3600 ); }
 if ( ! defined( 'MINUTE_IN_SECONDS' ) ) { define( 'MINUTE_IN_SECONDS', 60 ); }
 if ( ! function_exists( 'wp_json_encode' ) ) {
@@ -487,6 +520,11 @@ if ( ! function_exists( 'get_post_type' ) ) {
 if ( ! function_exists( 'register_rest_field' ) ) {
 	function register_rest_field( string $post_type, string $field, array $args ): void { $GLOBALS['lel_test_rest_fields'][] = compact( 'post_type', 'field', 'args' ); }
 }
+if ( ! function_exists( 'register_post_meta' ) ) {
+	function register_post_meta( string $post_type, string $meta_key, array $args = array() ): void {
+		$GLOBALS['lel_test_registered_meta'][ $post_type ][ $meta_key ] = $args;
+	}
+}
 if ( ! function_exists( 'delete_post_meta' ) ) {
 	function delete_post_meta( int $post_id, string $key ): bool { unset( $GLOBALS['lel_test_meta'][ $post_id ][ $key ] ); return true; }
 }
@@ -495,6 +533,11 @@ if ( ! function_exists( 'wp_salt' ) ) {
 }
 if ( ! function_exists( 'wp_generate_uuid4' ) ) {
 	function wp_generate_uuid4(): string { return '00000000-0000-4000-8000-000000000001'; }
+}
+if ( ! function_exists( 'wp_upload_dir' ) ) {
+	function wp_upload_dir( ?bool $upload_bases = null, ?bool $create_dir = null, ?bool $refresh_cache = null ): array {
+		return array( 'basedir' => '/tmp/wp-content/uploads', 'baseurl' => 'http://example.com/wp-content/uploads', 'path' => '/tmp/wp-content/uploads', 'url' => 'http://example.com/wp-content/uploads', 'error' => false );
+	}
 }
 
 // --- Minimal WP class stubs ---

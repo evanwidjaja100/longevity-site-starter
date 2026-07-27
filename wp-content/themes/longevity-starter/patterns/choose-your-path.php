@@ -4,7 +4,10 @@
  * Slug: longevity-starter/choose-your-path
  * Categories: featured, text
  * Inserter: true
+ *
+ * @package LongevityStarter
  */
+
 ?>
 <!-- wp:group {"align":"wide","className":"longevity-section","layout":{"type":"constrained"}} -->
 <div class="wp-block-group alignwide longevity-section"><!-- wp:paragraph {"className":"longevity-kicker"} --><p class="longevity-kicker">Choose your path</p><!-- /wp:paragraph --><!-- wp:heading --><h2 class="wp-block-heading">What brings you here today?</h2><!-- /wp:heading --><!-- wp:html -->

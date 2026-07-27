@@ -23,6 +23,7 @@ final class CLI {
 		\WP_CLI::add_command( 'longevity bootstrap', Bootstrap_Command::class );
 		\WP_CLI::add_command( 'longevity migrate', Migrate_Command::class );
 		\WP_CLI::add_command( 'longevity evidence', Evidence_Command::class );
+		\WP_CLI::add_command( 'longevity metrics', Metrics_Command::class );
 	}
 }
 
@@ -848,6 +849,8 @@ final class Freshness_Command {
 
 /** Database migration command — runs pending migrations under a global lock. */
 final class Migrate_Command {
+	use CSV_Command_Utilities;
+
 	/**
 	 * Run pending governance data migrations.
 	 *
@@ -868,6 +871,7 @@ final class Migrate_Command {
 	 */
 	public function __invoke( array $args, array $assoc_args ): void {
 		unset( $args );
+		$this->require_capability( 'manage_options' );
 
 		if ( isset( $assoc_args['status'] ) ) {
 			$current = (int) get_option( 'lel_data_version', 0 );
@@ -903,6 +907,8 @@ final class Migrate_Command {
 
 /** Structured external evidence management for operators. */
 final class Evidence_Command {
+	use CSV_Command_Utilities;
+
 	/** @var array<string, string> Valid evidence types mapped to their option keys. */
 	private const EVIDENCE_OPTIONS = array(
 		'backup'       => 'lel_last_backup_evidence',
@@ -942,6 +948,7 @@ final class Evidence_Command {
 	 */
 	public function set( array $args, array $assoc_args ): void {
 		unset( $args );
+		$this->require_capability( 'manage_options' );
 		$type   = (string) ( $assoc_args['type'] ?? '' );
 		$result = (string) ( $assoc_args['result'] ?? '' );
 
@@ -988,5 +995,43 @@ final class Evidence_Command {
 			$out[ $type ] = is_array( $decoded ) ? $decoded : ( '' !== $value ? array( 'legacy_value' => $value ) : null );
 		}
 		\WP_CLI::line( wp_json_encode( $out, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+	}
+}
+
+/** Emit observability metrics in Prometheus text format. */
+final class Metrics_Command {
+	use CSV_Command_Utilities;
+
+	/**
+	 * Render Prometheus-format metrics for scraping or the textfile collector.
+	 *
+	 * ## OPTIONS
+	 * [--file=<path>]
+	 * : Write metrics atomically to this path (for the node_exporter textfile
+	 *   collector). When omitted, metrics are printed to stdout.
+	 *
+	 * ## EXAMPLES
+	 *     wp longevity metrics
+	 *     wp longevity metrics --file=/var/lib/node_exporter/textfile/longevity.prom
+	 */
+	public function __invoke( array $args, array $assoc_args ): void {
+		unset( $args );
+		$this->require_capability( 'manage_options' );
+		$payload = Metrics::render();
+
+		$file = isset( $assoc_args['file'] ) ? (string) $assoc_args['file'] : '';
+		if ( '' === $file ) {
+			\WP_CLI::line( rtrim( $payload, "\n" ) );
+			return;
+		}
+
+		$tmp = $file . '.' . getmypid() . '.tmp';
+		if ( false === file_put_contents( $tmp, $payload ) || ! rename( $tmp, $file ) ) {
+			if ( file_exists( $tmp ) ) {
+				@unlink( $tmp );
+			}
+			\WP_CLI::error( sprintf( 'Unable to write metrics to %s.', $file ) );
+		}
+		\WP_CLI::success( sprintf( 'Metrics written to %s.', $file ) );
 	}
 }

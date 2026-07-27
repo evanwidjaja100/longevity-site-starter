@@ -17,9 +17,10 @@ if ( get_current_user_id() <= 0 || ! current_user_can( 'approve_publication' ) )
 	WP_CLI::error( 'Run this script with an authenticated --user that can manage publication lifecycle fields.' );
 }
 
-$today = gmdate( 'Y-m-d' );
+$today     = gmdate( 'Y-m-d' );
 $next_year = gmdate( 'Y-m-d', strtotime( '+12 months' ) );
 
+// phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited
 $pages = array(
 	'about',
 	'editorial-policy',
@@ -37,8 +38,18 @@ $pages = array(
 
 $updated = 0;
 foreach ( $pages as $slug ) {
-	$posts = get_posts( array( 'name' => $slug, 'post_type' => 'page', 'post_status' => 'any', 'posts_per_page' => 1, 'no_found_rows' => true ) );
-	$post  = ! empty( $posts ) ? $posts[0] : null;
+// phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited
+$posts = get_posts(
+		array(
+			'name'           => $slug,
+			'post_type'      => 'page',
+			'post_status'    => 'any',
+			'posts_per_page' => 1,
+			'no_found_rows'  => true,
+		)
+	);
+// phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited
+$post  = ! empty( $posts ) ? $posts[0] : null;
 	if ( ! $post ) {
 		\WP_CLI::warning( "Page not found: /{$slug}/" );
 		continue;

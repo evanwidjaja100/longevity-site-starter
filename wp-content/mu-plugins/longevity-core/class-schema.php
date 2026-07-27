@@ -26,7 +26,9 @@ final class Schema {
 			return;
 		}
 		$schema = array( '@context' => 'https://schema.org', '@graph' => $graph );
-		echo '<script type="application/ld+json">' . wp_json_encode( $schema, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ) . '</script>' . "\n";
+		$nonce  = method_exists( Bootstrap::class, 'csp_nonce' ) ? Bootstrap::csp_nonce() : '';
+		$nonce_attr = '' !== $nonce ? ' nonce="' . esc_attr( $nonce ) . '"' : '';
+		echo '<script type="application/ld+json"' . $nonce_attr . '>' . wp_json_encode( $schema, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ) . '</script>' . "\n";
 	}
 
 	/** Build a graph for the current request. */

@@ -213,16 +213,29 @@ class Public_Contact {
 		dbDelta( $sql );
 	}
 
+	/**
+	 * Fail a submission safely without leaking internal details.
+	 *
+	 * Redirects back to the contact form with a user-scoped transient notice.
+	 * Does not use wp_die() which can expose WordPress admin markup.
+	 */
+	private static function fail_submission( string $error_key, int $http_code = 400 ): void {
+		set_transient( 'lel_contact_error_' . $error_key, true, MINUTE_IN_SECONDS );
+		$redirect = home_url( '/contact/?error=' . rawurlencode( $error_key ) );
+		wp_safe_redirect( $redirect, $http_code );
+		exit;
+	}
+
 	/** Handle contact form submission. */
 	public static function handle_contact_submission(): void {
 		$nonce = sanitize_text_field( wp_unslash( $_POST['_wpnonce'] ?? '' ) );
 		if ( ! wp_verify_nonce( $nonce, 'longevity_contact' ) ) {
-			wp_die( esc_html__( 'Security check failed. Please try again.', 'longevity-core' ), 403 );
+			self::fail_submission( 'security', 403 );
 		}
 
 		$honeypot = sanitize_text_field( wp_unslash( $_POST['longevity_website'] ?? '' ) );
 		if ( '' !== $honeypot ) {
-			wp_die( esc_html__( 'Submission rejected.', 'longevity-core' ), 400 );
+			self::fail_submission( 'rejected', 400 );
 		}
 
 		$identifier = self::rate_limit_identifier( self::get_client_ip() );
@@ -230,7 +243,7 @@ class Public_Contact {
 		$count      = self::atomic_rate_increment( $key );
 		if ( $count > 5 ) {
 			set_transient( 'lel_contact_block_' . $identifier, '1', HOUR_IN_SECONDS );
-			wp_die( esc_html__( 'Too many submissions. Please try again later.', 'longevity-core' ), 429 );
+			self::fail_submission( 'rate_limited', 429 );
 		}
 
 		$name    = sanitize_text_field( wp_unslash( $_POST['longevity_contact_name'] ?? '' ) );
@@ -239,24 +252,24 @@ class Public_Contact {
 		$message = sanitize_textarea_field( wp_unslash( $_POST['longevity_contact_message'] ?? '' ) );
 
 		if ( '' === $name || '' === $email || '' === $subject || '' === $message || ! in_array( $subject, self::SUBJECTS, true ) ) {
-			wp_die( esc_html__( 'All required fields must be completed.', 'longevity-core' ), 400 );
+			self::fail_submission( 'required', 400 );
 		}
 		if ( ! is_email( $email ) ) {
-			wp_die( esc_html__( 'Please enter a valid email address.', 'longevity-core' ), 400 );
+			self::fail_submission( 'invalid_email', 400 );
 		}
 		// Server-side length enforcement matching form constraints.
 		if ( mb_strlen( $name ) > 100 ) {
-			wp_die( esc_html__( 'Name is too long.', 'longevity-core' ), 400 );
+			self::fail_submission( 'name_too_long', 400 );
 		}
 		if ( mb_strlen( $email ) > 254 ) {
-			wp_die( esc_html__( 'Email address is too long.', 'longevity-core' ), 400 );
+			self::fail_submission( 'email_too_long', 400 );
 		}
 		if ( mb_strlen( $message ) > 5000 ) {
-			wp_die( esc_html__( 'Message is too long.', 'longevity-core' ), 400 );
+			self::fail_submission( 'message_too_long', 400 );
 		}
 		// Prevent header injection: reject CR/LF in name and email.
 		if ( preg_match( '/[\r\n]/', $name ) || preg_match( '/[\r\n]/', $email ) ) {
-			wp_die( esc_html__( 'Submission contains invalid characters.', 'longevity-core' ), 400 );
+			self::fail_submission( 'invalid_chars', 400 );
 		}
 
 		$post_id = wp_insert_post(
@@ -270,7 +283,7 @@ class Public_Contact {
 		);
 
 		if ( is_wp_error( $post_id ) ) {
-			wp_die( esc_html__( 'Could not save your message. Please try again later.', 'longevity-core' ), 500 );
+			self::fail_submission( 'save_failed', 500 );
 		}
 
 		update_post_meta( $post_id, 'contact_subject', $subject );

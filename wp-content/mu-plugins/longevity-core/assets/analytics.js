@@ -10,8 +10,6 @@
     advertising: false
   };
 
-  const cleanValue = (value) => String(value || '').replace(/[\r\n\t]/g, ' ').slice(0, 120);
-
   const push = (name, parameters = {}) => {
     const allowedParameters = schemas[name];
     if (!Array.isArray(allowedParameters)) return;
@@ -24,7 +22,7 @@
     const safe = { event: name };
     allowedParameters.forEach((key) => {
       if (Object.prototype.hasOwnProperty.call(candidates, key)) {
-        safe[key] = cleanValue(candidates[key]);
+         safe[key] = String(candidates[key] || '').replace(/[\r\n\t]/g, ' ').slice(0, 120);
       }
     });
 

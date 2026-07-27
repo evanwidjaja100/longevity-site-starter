@@ -75,6 +75,9 @@ final class Invalidation_Queue {
 
 	/** Ensure the cron processor is scheduled. */
 	public static function schedule_processor(): void {
+		if ( ! Migrations::wordpress_ready() ) {
+			return;
+		}
 		if ( ! wp_next_scheduled( self::PROCESS_HOOK ) ) {
 			wp_schedule_event( time() + 60, 'lel_every_minute', self::PROCESS_HOOK );
 		}
@@ -91,8 +94,13 @@ final class Invalidation_Queue {
 		global $wpdb;
 		if ( empty( $parent_ids ) || ! self::exists() ) {
 			// Fallback: if table unavailable, execute synchronously for safety.
+			// Never let a lock failure bubble into save_post and abort the save.
 			foreach ( array_unique( $parent_ids ) as $pid ) {
-				Approval_Service::invalidate_direct( (int) $pid, $reason, $actor_id );
+				try {
+					Approval_Service::invalidate_direct( (int) $pid, $reason, $actor_id );
+				} catch ( \Throwable $error ) {
+					self::record_fallback_failure( (int) $pid, $error->getMessage() );
+				}
 			}
 			return;
 		}
@@ -126,6 +134,18 @@ final class Invalidation_Queue {
 		if ( ! wp_next_scheduled( self::PROCESS_HOOK ) ) {
 			wp_schedule_single_event( time() + 5, self::PROCESS_HOOK );
 		}
+	}
+
+	/** Record a synchronous fallback invalidation failure for observability. */
+	private static function record_fallback_failure( int $post_id, string $reason ): void {
+		$count = (int) get_option( 'lel_invalidation_fallback_failures', 0 );
+		update_option( 'lel_invalidation_fallback_failures', $count + 1, false );
+		Logger::warning( 'invalidation_fallback_failure', array( 'post_id' => $post_id, 'reason' => substr( $reason, 0, 200 ) ) );
+	}
+
+	/** Current synchronous fallback failure count. */
+	public static function fallback_failure_count(): int {
+		return (int) get_option( 'lel_invalidation_fallback_failures', 0 );
 	}
 
 	/**
@@ -178,7 +198,7 @@ final class Invalidation_Queue {
 							$job_id
 						)
 					);
-					error_log( sprintf( '[longevity-core] Invalidation job %d permanently failed for post %d: %s', $job_id, $post_id, $error ) );
+					Logger::error( 'invalidation_job_failed', array( 'job_id' => $job_id, 'post_id' => $post_id, 'error' => substr( (string) $error, 0, 200 ) ) );
 				} else {
 					$wpdb->query(
 						$wpdb->prepare(

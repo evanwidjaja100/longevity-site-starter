@@ -1,8 +1,8 @@
 # ADR-0015: Production Deployment Topology
 
-**Status:** Proposed  
-**Date:** 2026-07-23  
-**Deciders:** Engineering, Operations  
+**Status:** Proposed
+**Date:** 2026-07-23
+**Deciders:** Engineering, Operations
 
 ## Context
 
@@ -10,9 +10,9 @@ The production-readiness audit (PR-006) identified that no documented, reproduci
 
 ## Decision
 
-We support two production topologies:
+We support one production topology:
 
-### Topology A: Managed WordPress Host (Primary)
+### Managed WordPress Host
 
 - WordPress managed hosting (e.g., Cloudways, Kinsta, WP Engine)
 - MU plugin and theme deployed via Git-based deployment or SFTP artifact push
@@ -20,15 +20,6 @@ We support two production topologies:
 - Secrets managed via host control panel environment variables
 - CDN/WAF handles TLS termination, rate limiting, and static caching
 - External cron via host scheduler or systemd timer calling `wp cron event run --due-now`
-
-### Topology B: VPS with Docker (Secondary)
-
-- Single VPS or small cluster running Docker containers
-- Production image built from `docker/production/Dockerfile` (multi-stage, pinned base)
-- Secrets injected via environment variables from a secrets manager (Vault, SOPS, or cloud KMS)
-- Reverse proxy (Caddy/Traefik/nginx) handles TLS, HSTS, and rate limiting
-- Health probes: liveness at `/wp-json/longevity/v1/health`, readiness via protected internal endpoint
-- External one-shot cron invocation (systemd timer or K8s CronJob)
 
 ## Deployment Sequence
 

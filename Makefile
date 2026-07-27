@@ -1,12 +1,14 @@
 SHELL := /bin/sh
 
-.PHONY: validate quality test test-security test-php test-content test-integration test-e2e test-a11y test-cross-browser test-lighthouse test-all release-evidence deploy-check docker-config up down bootstrap smoke manifest clean
+.PHONY: validate validate-release quality lint test test-security test-php test-content test-integration test-e2e test-a11y test-cross-browser test-lighthouse test-all release-evidence deploy-check deploy rollback docker-config up down bootstrap smoke manifest clean
 
 validate:
 	bash scripts/validate.sh
 	bash scripts/verify-dependency-state.sh
-	bash scripts/verify-manifest.sh
 	php scripts/verify-test-discovery.php
+
+validate-release: validate
+	bash scripts/verify-manifest.sh
 
 quality:
 	composer validate --strict
@@ -15,6 +17,8 @@ quality:
 	composer phpcs
 	composer phpstan
 	npm run lint
+
+lint: quality
 
 test: test-php test-content
 
@@ -36,7 +40,7 @@ test-integration:
 	@for script in tests/integration/*.sh; do chmod +x "$$script"; "$$script"; done
 
 test-e2e:
-	npm run test:e2e:all -- --project=chromium
+	npm run test:e2e -- --project=chromium
 
 test-a11y:
 	npm run test:a11y -- --project=chromium
@@ -54,6 +58,12 @@ release-evidence:
 	bash scripts/generate-release-evidence.sh
 
 deploy-check: validate docker-config test-security
+
+deploy:
+	bash scripts/deploy.sh $(ENV_FILE) $(IMAGE_TAG)
+
+rollback:
+	bash scripts/rollback.sh $(ENV_FILE)
 
 docker-config:
 	docker compose config --quiet

@@ -247,7 +247,7 @@ class Public_Content {
 			$review_args = array(
 				'post_type'      => 'review',
 				'post_status'    => 'publish',
-				'posts_per_page' => -1,
+				'posts_per_page' => 1,
 				'fields'         => 'ids',
 				'category'       => $term->term_id,
 				'meta_query'     => array(

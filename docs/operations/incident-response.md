@@ -66,7 +66,10 @@ Store post-mortems in `operations/incident-response/<date>-<brief-description>.m
 |---|---|
 | Medical safety correction | `operations/runbooks/medical-safety-correction.md` |
 | Affiliate incident | `operations/runbooks/affiliate-incident.md` |
-| (Add new runbooks below) | |
+| Database unavailable | `operations/runbooks/database-unavailable.md` |
+| Freshness cron stuck | `operations/runbooks/freshness-cron-stuck.md` |
+| Audit chain integrity failure | `operations/runbooks/audit-chain-integrity-failure.md` |
+| Lock exhaustion | `operations/runbooks/lock-exhaustion.md` |
 
 ## Communication templates
 

@@ -1,8 +1,8 @@
 # Longevity Evidence Lab — AI Implementation Plan
 
-**Version:** 1.0  
-**Prepared:** 20 July 2026  
-**Target branch:** `improvement/reader-experience-v3`  
+**Version:** 1.0
+**Prepared:** 20 July 2026
+**Target branch:** `improvement/reader-experience-v3`
 **Primary objective:** Turn the existing governed WordPress publishing platform into a coherent, useful, trustworthy, accessible, and launch-ready reader product without weakening editorial or medical-safety controls.
 
 ---
@@ -304,7 +304,7 @@ Do not start Phase 9 publication work until Phases 1 and 2 are complete. Do not 
 
 ## RX-000 — Create the implementation branch and audit folder
 
-**Priority:** P0  
+**Priority:** P0
 **Risk:** Low
 
 ### Files to add
@@ -333,7 +333,7 @@ Do not start Phase 9 publication work until Phases 1 and 2 are complete. Do not 
 
 ## RX-001 — Capture route and navigation baseline
 
-**Priority:** P0  
+**Priority:** P0
 **Risk:** Low
 
 ### Inventory fields
@@ -382,7 +382,7 @@ Audit at minimum:
 
 ## RX-002 — Lock product decisions
 
-**Priority:** P0  
+**Priority:** P0
 **Risk:** Low
 
 Create a decision record in `docs/adr/` or `docs/implementation/reader-experience-v3-decisions.md` covering:
@@ -407,7 +407,7 @@ Create a decision record in `docs/adr/` or `docs/implementation/reader-experienc
 
 ## RX-101 — Centralize E2E route expectations
 
-**Priority:** P0  
+**Priority:** P0
 **Risk:** Medium
 
 ### Problem
@@ -465,7 +465,7 @@ The fixture generator may publish synthetic, non-medical page content for browse
 
 ## RX-102 — Correct redirect and canonical testing
 
-**Priority:** P0  
+**Priority:** P0
 **Risk:** Medium
 
 ### Files
@@ -497,7 +497,7 @@ The fixture generator may publish synthetic, non-medical page content for browse
 
 ## RX-103 — Add route-publication helpers
 
-**Priority:** P0  
+**Priority:** P0
 **Risk:** Medium
 
 ### Files
@@ -536,7 +536,7 @@ Do not equate “page exists” with “page is safe to link publicly.”
 
 ## RX-104 — Suppress unavailable navigation destinations
 
-**Priority:** P0  
+**Priority:** P0
 **Risk:** Medium
 
 ### Files
@@ -580,7 +580,7 @@ Reviews may be added later by Phase 6 inventory logic.
 
 ## RX-105 — Add runtime internal-link crawling
 
-**Priority:** P0  
+**Priority:** P0
 **Risk:** Medium
 
 ### Files
@@ -626,7 +626,7 @@ Static content validation is not enough because block templates, shortcodes, and
 
 ## RX-201 — Declare the canonical editorial calendar
 
-**Priority:** P0  
+**Priority:** P0
 **Risk:** Low
 
 ### Files
@@ -656,7 +656,7 @@ Static content validation is not enough because block templates, shortcodes, and
 
 ## RX-202 — Separate legacy briefs from launch briefs
 
-**Priority:** P0  
+**Priority:** P0
 **Risk:** Low
 
 ### Files
@@ -701,7 +701,7 @@ Each brief must include:
 
 ## RX-203 — Update content validation for source-of-truth rules
 
-**Priority:** P0  
+**Priority:** P0
 **Risk:** Medium
 
 ### Files
@@ -732,7 +732,7 @@ Each brief must include:
 
 ## RX-204 — Create an editorial status vocabulary
 
-**Priority:** P1  
+**Priority:** P1
 **Risk:** Medium
 
 Use a fixed allowlist, for example:
@@ -775,7 +775,7 @@ Do not use vague values such as “almost ready.”
 
 ## RX-301 — Redesign the homepage hero
 
-**Priority:** P1  
+**Priority:** P1
 **Risk:** Low
 
 ### File
@@ -784,19 +784,19 @@ Do not use vague values such as “almost ready.”
 
 ### Target copy structure
 
-**Eyebrow**  
+**Eyebrow**
 Independent health evidence and consumer testing
 
-**H1**  
+**H1**
 Understand what works, what is uncertain, and what is worth considering.
 
-**Supporting copy**  
+**Supporting copy**
 Explain that the publication examines claims and products with documented evidence, visible limitations, transparent methods, corrections, and editorial independence. Keep it to approximately two short sentences.
 
-**Primary CTA**  
+**Primary CTA**
 Start Here → `/start-here/`
 
-**Secondary CTA**  
+**Secondary CTA**
 Browse Topics → `/topics/`
 
 **Compact trust signals**
@@ -824,7 +824,7 @@ Browse Topics → `/topics/`
 
 ## RX-302 — Replace quick links with a focused header
 
-**Priority:** P1  
+**Priority:** P1
 **Risk:** Medium
 
 ### File
@@ -857,7 +857,7 @@ Browse Topics → `/topics/`
 
 ## RX-303 — Rebuild homepage information architecture
 
-**Priority:** P1  
+**Priority:** P1
 **Risk:** Medium
 
 ### Files
@@ -909,7 +909,7 @@ Implement a server-rendered block using WordPress sticky posts as the editorial 
 
 ## RX-304 — Create Consumer Lab prelaunch and live states
 
-**Priority:** P1  
+**Priority:** P1
 **Risk:** Medium
 
 ### Files
@@ -949,7 +949,7 @@ When at least one category meets the minimum eligible comparison threshold:
 
 ## RX-305 — Remove the public newsletter placeholder
 
-**Priority:** P1  
+**Priority:** P1
 **Risk:** Low
 
 ### Files
@@ -978,7 +978,7 @@ When at least one category meets the minimum eligible comparison threshold:
 
 ## RX-306 — Simplify the footer
 
-**Priority:** P1  
+**Priority:** P1
 **Risk:** Medium
 
 ### Recommended groups
@@ -1020,7 +1020,7 @@ Consumer Lab should not require a dedicated footer column before it has real inv
 
 ## RX-401 — Build a genuine Topics hub
 
-**Priority:** P1  
+**Priority:** P1
 **Risk:** Medium
 
 ### Files
@@ -1078,7 +1078,7 @@ Do not publish six empty category cards simply to fill a grid.
 
 ## RX-402 — Build a Guides archive
 
-**Priority:** P1  
+**Priority:** P1
 **Risk:** Medium
 
 ### Files
@@ -1108,7 +1108,7 @@ Do not publish six empty category cards simply to fill a grid.
 
 ## RX-403 — Rebuild Start Here as guided onboarding
 
-**Priority:** P1  
+**Priority:** P1
 **Risk:** Medium
 
 ### Files
@@ -1146,7 +1146,7 @@ Do not publish six empty category cards simply to fill a grid.
 
 ## RX-404 — Improve search and filters
 
-**Priority:** P1  
+**Priority:** P1
 **Risk:** Medium
 
 ### Files
@@ -1186,7 +1186,7 @@ Do not publish six empty category cards simply to fill a grid.
 
 ## RX-405 — Add question-led discovery copy
 
-**Priority:** P1  
+**Priority:** P1
 **Risk:** Low
 
 Update homepage, topic, Start Here, archive, and no-results copy to use real reader questions, for example:
@@ -1218,7 +1218,7 @@ The AI may draft wording, but medical claims and action guidance require human r
 
 ## RX-501 — Clarify overall conclusion confidence
 
-**Priority:** P1  
+**Priority:** P1
 **Risk:** Medium
 
 ### Files
@@ -1256,7 +1256,7 @@ Only use a grade on a card when the card explicitly states the scoped conclusion
 
 ## RX-502 — Add a public claim evidence matrix
 
-**Priority:** P1  
+**Priority:** P1
 **Risk:** High
 
 ### Files
@@ -1299,7 +1299,7 @@ Do not expose private notes, conflict notes intended for editors, reviewer email
 
 ## RX-503 — Improve source presentation
 
-**Priority:** P1  
+**Priority:** P1
 **Risk:** Medium
 
 ### Files
@@ -1337,7 +1337,7 @@ Do not expose private notes, conflict notes intended for editors, reviewer email
 
 ## RX-504 — Add manual editorial next-step relationships
 
-**Priority:** P1  
+**Priority:** P1
 **Risk:** Medium
 
 ### Files
@@ -1381,7 +1381,7 @@ Store an ordered, deduplicated list of public post IDs. Validate that:
 
 ## RX-505 — Improve article metadata hierarchy
 
-**Priority:** P1  
+**Priority:** P1
 **Risk:** Low
 
 ### Requirements
@@ -1405,7 +1405,7 @@ Medical-review labels must continue to require verified credentials, completed s
 
 ## RX-506 — Add original visual modules
 
-**Priority:** P1  
+**Priority:** P1
 **Risk:** Medium
 
 Define reusable block patterns for:
@@ -1446,7 +1446,7 @@ Define reusable block patterns for:
 
 ## RX-601 — Require meaningful comparison inventory
 
-**Priority:** P1  
+**Priority:** P1
 **Risk:** High
 
 ### Files
@@ -1479,7 +1479,7 @@ Individual eligible reports may be published before the threshold, but they must
 
 ## RX-602 — Reduce false precision and add ranking bands
 
-**Priority:** P2  
+**Priority:** P2
 **Risk:** High
 
 ### Files
@@ -1517,7 +1517,7 @@ Products whose scores differ by less than the threshold and have comparable conf
 
 ## RX-603 — Expand buyer-facts presentation
 
-**Priority:** P1  
+**Priority:** P1
 **Risk:** Medium
 
 ### Files
@@ -1559,7 +1559,7 @@ Display only verified values:
 
 ## RX-604 — Clarify test confidence and scope
 
-**Priority:** P1  
+**Priority:** P1
 **Risk:** Medium
 
 ### Requirements
@@ -1578,7 +1578,7 @@ Display only verified values:
 
 ## RX-605 — Add scoring sensitivity disclosure
 
-**Priority:** P2  
+**Priority:** P2
 **Risk:** High
 
 For categories where weighting choices materially change order, provide a concise sensitivity note or downloadable method output showing:
@@ -1608,7 +1608,7 @@ Do not present sensitivity output as statistical certainty unless the method sup
 
 ## RX-701 — Introduce CSS cascade layers
 
-**Priority:** P1  
+**Priority:** P1
 **Risk:** Medium
 
 ### Files
@@ -1642,7 +1642,7 @@ Do not present sensitivity output as statistical certainty unless the method sup
 
 ## RX-702 — Standardize component states
 
-**Priority:** P1  
+**Priority:** P1
 **Risk:** Medium
 
 Create consistent visual rules for:
@@ -1670,7 +1670,7 @@ Create consistent visual rules for:
 
 ## RX-703 — Establish a distinctive editorial visual language
 
-**Priority:** P2  
+**Priority:** P2
 **Risk:** Low
 
 ### Direction
@@ -1709,7 +1709,7 @@ Avoid:
 
 ## RX-704 — Create responsive and print design tokens
 
-**Priority:** P2  
+**Priority:** P2
 **Risk:** Low
 
 Document tokens for:
@@ -1745,7 +1745,7 @@ Document tokens for:
 
 ## RX-801 — Convert screenshots into true visual regression tests
 
-**Priority:** P0  
+**Priority:** P0
 **Risk:** Medium
 
 ### Files
@@ -1776,7 +1776,7 @@ Replace screenshot-only evidence with `expect(page).toHaveScreenshot()` or equiv
 
 ## RX-802 — Add cross-browser critical-path coverage
 
-**Priority:** P1  
+**Priority:** P1
 **Risk:** Medium
 
 Run the full suite in Chromium and a smaller critical suite in WebKit and Firefox covering:
@@ -1800,7 +1800,7 @@ Run the full suite in Chromium and a smaller critical suite in WebKit and Firefo
 
 ## RX-803 — Make Lighthouse mobile-first and repeatable
 
-**Priority:** P1  
+**Priority:** P1
 **Risk:** Medium
 
 ### File
@@ -1833,7 +1833,7 @@ Treat CI Lighthouse as regression detection, not a guarantee of real-user perfor
 
 ## RX-804 — Add a dedicated repository test container
 
-**Priority:** P1  
+**Priority:** P1
 **Risk:** Medium
 
 ### Problem
@@ -1861,7 +1861,7 @@ Document exact commands.
 
 ## RX-805 — Strengthen accessibility release checks
 
-**Priority:** P0  
+**Priority:** P0
 **Risk:** Medium
 
 ### Automated
@@ -1901,7 +1901,7 @@ Record checks for:
 
 ## RX-806 — Strengthen CI and supply-chain checks
 
-**Priority:** P1  
+**Priority:** P1
 **Risk:** High
 
 ### Add or verify
@@ -1926,7 +1926,7 @@ Record checks for:
 
 ## RX-807 — Validate production security headers and controls
 
-**Priority:** P1  
+**Priority:** P1
 **Risk:** High
 
 ### Application and infrastructure review
@@ -1959,7 +1959,7 @@ Record checks for:
 
 ## RX-808 — Define a release evidence bundle
 
-**Priority:** P0  
+**Priority:** P0
 **Risk:** Low
 
 Every release candidate must produce:
@@ -2004,7 +2004,7 @@ A release cannot be labelled production-ready when required evidence is missing,
 
 ## RX-901 — Prepare trust and policy pages
 
-**Priority:** P0  
+**Priority:** P0
 **Risk:** High editorial/legal
 
 AI may structure and format these pages but human owners must approve and publish:
@@ -2033,7 +2033,7 @@ AI may structure and format these pages but human owners must approve and publis
 
 ## RX-902 — Publish foundational content before commercial content
 
-**Priority:** P1  
+**Priority:** P1
 **Risk:** High editorial/medical
 
 Recommended first sequence:
@@ -2072,7 +2072,7 @@ Each article must include:
 
 ## RX-903 — Conduct real Consumer Lab testing
 
-**Priority:** P1 after foundation  
+**Priority:** P1 after foundation
 **Risk:** High
 
 Before a product report uses tested language:
@@ -2095,7 +2095,7 @@ A single report may be published as a report. It must not become a numbered rank
 
 ## RX-904 — Add content QA and lifecycle checks
 
-**Priority:** P1  
+**Priority:** P1
 **Risk:** Medium
 
 For each published page:
@@ -2126,7 +2126,7 @@ For each published page:
 
 ## RX-1001 — Define privacy-safe funnel events
 
-**Priority:** P2  
+**Priority:** P2
 **Risk:** Medium
 
 Use allowlisted events only, for example:
@@ -2161,7 +2161,7 @@ Use allowlisted events only, for example:
 
 ## RX-1002 — Define product and content KPIs
 
-**Priority:** P2  
+**Priority:** P2
 **Risk:** Low
 
 Track quality and utility, not only traffic:
@@ -2188,7 +2188,7 @@ Do not treat traffic, conversion, or revenue as guaranteed outcomes.
 
 ## RX-1003 — Run structured usability reviews
 
-**Priority:** P2  
+**Priority:** P2
 **Risk:** Low
 
 Test with readers representing:

@@ -1,0 +1,13 @@
+# syntax=docker/dockerfile:1
+# Development WP-CLI image with the Redis PHP extension for persistent
+# object caching. Extends the same digest-pinned base as the WordPress CLI image.
+# wordpress:7.0.1-php8.3-cli
+FROM wordpress@sha256:f8aeb68164c6a04f5dcc91da30d8ffa096b0f7fafb7a65f144c2dd62587caca0
+
+USER root
+
+RUN set -eux; \
+    apk add --no-cache autoconf build-base libzip-dev libressl-dev; \
+    pecl install redis; \
+    docker-php-ext-enable redis; \
+    rm -rf /tmp/pear /tmp/pear/temp

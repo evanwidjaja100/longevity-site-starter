@@ -10,6 +10,7 @@ namespace Longevity\Core;
 defined( 'ABSPATH' ) || exit;
 
 $longevity_core_files = array(
+	'class-logger.php',
 	'class-gate-result.php',
 	'class-date-validator.php',
 	'class-runtime-config.php',
@@ -37,6 +38,7 @@ $longevity_core_files = array(
 	'class-freshness-repository.php',
 	'class-freshness.php',
 	'class-system-readiness.php',
+	'class-metrics.php',
 	'class-content-discovery.php',
 	'class-public-nav.php',
 	'class-public-contact.php',
@@ -99,7 +101,7 @@ final class Bootstrap {
 		Content_Discovery::init();
 		Public_Content::init();
 		Blocks::init();
-		Admin_Assets::init();
+		longevity_admin_assets_init();
 		Admin_UI::init();
 		Shortcodes::init();
 		Schema::init();
@@ -114,6 +116,8 @@ final class Bootstrap {
 		add_filter( 'wp_robots', array( self::class, 'filter_noindex_placeholder_pages' ) );
 		add_action( 'template_redirect', array( Routes::class, 'redirect_legacy_category' ), 10 );
 		add_action( 'send_headers', array( self::class, 'send_security_headers' ) );
+		add_filter( 'wp_inline_script_attributes', array( self::class, 'add_csp_nonce_attribute' ), 10, 1 );
+		add_filter( 'wp_inline_style_attributes', array( self::class, 'add_csp_nonce_attribute' ), 10, 1 );
 		add_filter( 'render_block_core/navigation-link', array( self::class, 'filter_navigation_link' ), 10, 2 );
 
 		// Register custom cron interval for invalidation queue processing.
@@ -243,6 +247,12 @@ final class Bootstrap {
 		}
 		// Default: enforce only in production environment type.
 		return function_exists( 'wp_get_environment_type' ) && 'production' === wp_get_environment_type();
+	}
+
+	/** Attach the per-request CSP nonce to inline script/style tag attributes. */
+	public static function add_csp_nonce_attribute( array $attributes ): array {
+		$attributes['nonce'] = self::csp_nonce();
+		return $attributes;
 	}
 
 	/** Build a Content Security Policy with nonce-based script/style allowance. */

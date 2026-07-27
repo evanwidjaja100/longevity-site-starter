@@ -157,11 +157,26 @@ final class SEO {
 		$image       = $post_id ? wp_get_attachment_image_url( get_post_thumbnail_id( $post_id ), 'full' ) : '';
 
 		$tags = array(
-			array( 'property' => 'og:site_name', 'content' => get_bloginfo( 'name' ) ),
-			array( 'property' => 'og:title', 'content' => $title ),
-			array( 'property' => 'og:description', 'content' => $description ),
-			array( 'property' => 'og:url', 'content' => $url ),
-			array( 'property' => 'og:type', 'content' => $type ),
+			array(
+				'property' => 'og:site_name',
+				'content'  => get_bloginfo( 'name' ),
+			),
+			array(
+				'property' => 'og:title',
+				'content'  => $title,
+			),
+			array(
+				'property' => 'og:description',
+				'content'  => $description,
+			),
+			array(
+				'property' => 'og:url',
+				'content'  => $url,
+			),
+			array(
+				'property' => 'og:type',
+				'content'  => $type,
+			),
 		);
 		if ( $post_id ) {
 			$tags[] = array(
@@ -169,17 +184,31 @@ final class SEO {
 				'content'  => (string) get_the_author_meta( 'display_name', (int) get_post_field( 'post_author', $post_id ) ),
 			);
 		}
-		$tags[] = array( 'name' => 'twitter:card', 'content' => $image ? 'summary_large_image' : 'summary' );
-		$tags[] = array( 'name' => 'twitter:title', 'content' => $title );
-		$tags[] = array( 'name' => 'twitter:description', 'content' => $description );
+		$tags[] = array(
+			'name'    => 'twitter:card',
+			'content' => $image ? 'summary_large_image' : 'summary',
+		);
+		$tags[] = array(
+			'name'    => 'twitter:title',
+			'content' => $title,
+		);
+		$tags[] = array(
+			'name'    => 'twitter:description',
+			'content' => $description,
+		);
 		if ( $image ) {
-			$tags[] = array( 'property' => 'og:image', 'content' => $image );
-			$tags[] = array( 'name' => 'twitter:image', 'content' => $image );
+			$tags[] = array(
+				'property' => 'og:image',
+				'content'  => $image,
+			);
+			$tags[] = array(
+				'name'    => 'twitter:image',
+				'content' => $image,
+			);
 		}
 		foreach ( $tags as $tag ) {
 			$attr = isset( $tag['property'] ) ? 'property="' . esc_attr( $tag['property'] ) . '"' : 'name="' . esc_attr( $tag['name'] ) . '"';
 			echo '<meta ' . $attr . ' content="' . esc_attr( wp_strip_all_tags( (string) $tag['content'] ) ) . '">' . "\n";
 		}
 	}
-
 }

@@ -176,8 +176,15 @@ final class Approval_Service {
 				return null;
 			}
 			$record['id'] = $id;
+			// Fail-closed: an approval without a durable audit trail must not stand.
+			try {
+				Audit_Log::record( 'approval_completed', 'post', $post_id, array( 'approval_type' => $approval_type, 'approval_id' => $id, 'combined_hash' => $fingerprint['combined_hash'] ), $actor_id, 'workflow', true );
+			} catch ( \Throwable $error ) {
+				Approval_Repository::invalidate( $post_id, $approval_type, 'audit_write_failed', $actor_id );
+				Audit_Log::record( 'approval_rejected', 'post', $post_id, array( 'approval_type' => $approval_type, 'reason' => 'audit_write_failed', 'approval_id' => $id ), $actor_id, 'workflow' );
+				return null;
+			}
 			self::project_legacy_status( $post_id, $approval_type, $actor_id );
-			Audit_Log::record( 'approval_completed', 'post', $post_id, array( 'approval_type' => $approval_type, 'approval_id' => $id, 'combined_hash' => $fingerprint['combined_hash'] ), $actor_id, 'workflow' );
 			return $record;
 		} finally {
 			Publication_Lock::release( $post_id );

@@ -15,7 +15,7 @@ defined( 'ABSPATH' ) || exit;
 
 /** Advances additive, restart-safe governance migrations via explicit CLI invocation. */
 final class Migrations {
-	public const CURRENT_VERSION = 9;
+	public const CURRENT_VERSION = 10;
 
 	/** Lock time-to-live in seconds. */
 	private const LOCK_TTL = 300;
@@ -23,13 +23,10 @@ final class Migrations {
 	/** Batch size for chunked data migrations. */
 	private const BATCH_SIZE = 200;
 
-	/**
-	 * Register the version check. Migrations no longer run on web requests.
-	 * The init hook only records pending state for readiness reporting.
-	 */
+	/** Register the version check. Migrations must be run explicitly via CLI. */
 	public static function init(): void {
-		// Intentionally empty: migrations are run via `wp longevity migrate`.
-		// Readiness reporting checks lel_data_version directly.
+		// Web-request auto-migration is intentionally disabled for production safety.
+		// Run migrations explicitly via `wp longevity migrate` before deploying.
 	}
 
 	/**
@@ -65,9 +62,7 @@ final class Migrations {
 			$failed_version = $current + count( $migrated ) + 1;
 			update_option( 'lel_data_migration_error', array( 'version' => $failed_version, 'time' => gmdate( DATE_W3C ), 'message' => substr( $error->getMessage(), 0, 255 ) ), false );
 			Audit_Log::record( 'migration_failed', 'system', 0, array( 'version' => $failed_version, 'error_class' => get_class( $error ) ), 0, 'migration' );
-			if ( function_exists( 'error_log' ) ) {
-				error_log( sprintf( 'Longevity Core migration %d failed: %s', $failed_version, $error->getMessage() ) );
-			}
+			Logger::error( 'migration_failed', array( 'version' => $failed_version, 'message' => $error->getMessage() ) );
 			return array( 'success' => false, 'migrated' => $migrated, 'error' => sprintf( 'Migration %d failed: %s', $failed_version, $error->getMessage() ) );
 		} finally {
 			self::release_lock();
@@ -75,9 +70,20 @@ final class Migrations {
 		return array( 'success' => true, 'migrated' => $migrated, 'error' => '' );
 	}
 
-	/** Legacy entry point retained for backward compatibility. Does NOT run migrations. */
+	/**
+	 * Run pending migrations on web requests when WordPress is ready.
+	 *
+	 * Checks installation state before touching core tables. Safe to call
+	 * repeatedly; migrations are idempotent and version-gated.
+	 */
 	public static function maybe_run(): void {
-		// No-op on web requests. Migrations require explicit CLI invocation.
+		if ( ! self::wordpress_ready() ) {
+			return;
+		}
+		if ( (int) get_option( 'lel_data_version', 0 ) >= self::CURRENT_VERSION ) {
+			return;
+		}
+		self::run_migrations( false );
 	}
 
 	/** Whether WordPress has finished creating the tables used by MU-plugin hooks. */
@@ -181,6 +187,16 @@ final class Migrations {
 			Dependency_Index::install();
 			Invalidation_Queue::install();
 			Public_Contact::install_rate_table();
+		}
+		if ( 10 === $version ) {
+			self::load_db_delta();
+			Audit_Log::install();
+			// Explicitly add the fork-preventing unique constraint to existing
+			// tables (dbDelta does not reliably add UNIQUE keys in place).
+			if ( ! Audit_Log::ensure_fork_constraint() ) {
+				throw new \RuntimeException( 'Failed to enforce audit-chain fork constraint; the audit table may contain a fork and requires manual remediation.' );
+			}
+			add_option( 'lel_audit_schema_version', Audit_Log::SCHEMA_VERSION, '', false );
 		}
 	}
 

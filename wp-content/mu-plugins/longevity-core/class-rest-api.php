@@ -11,6 +11,12 @@ defined( 'ABSPATH' ) || exit;
 
 /** Provides health and editorial readiness endpoints. */
 final class Rest_API {
+	/** CSP report rate-limit window in seconds. */
+	private const CSP_REPORT_WINDOW = 300;
+
+	/** Maximum accepted CSP reports per window per client. */
+	private const CSP_REPORTS_PER_WINDOW = 60;
+
 	/** Register hooks. */
 	public static function init(): void {
 		add_action( 'rest_api_init', array( self::class, 'register_routes' ) );
@@ -56,6 +62,23 @@ final class Rest_API {
 				'callback'            => array( self::class, 'csp_report' ),
 			)
 		);
+		register_rest_route(
+			'longevity/v1',
+			'/metrics',
+			array(
+				'methods'             => \WP_REST_Server::READABLE,
+				'permission_callback' => static fn() => current_user_can( 'view_operational_readiness' ),
+				'callback'            => array( self::class, 'metrics' ),
+			)
+		);
+	}
+
+	/** Expose observability counters and readiness gauges in Prometheus text format. */
+	public static function metrics(): \WP_REST_Response {
+		$response = new \WP_REST_Response( Metrics::render(), 200 );
+		$response->header( 'Content-Type', 'text/plain; version=0.0.4; charset=utf-8' );
+		$response->header( 'Cache-Control', 'no-store, max-age=0' );
+		return $response;
 	}
 
 
@@ -128,8 +151,22 @@ final class Rest_API {
 	 *
 	 * Accepts application/csp-report JSON bodies from browsers.
 	 * Logs violations and increments a counter for observability.
+	 * Rate-limited per client IP so a flood cannot drive unbounded
+	 * option writes or log volume.
 	 */
 	public static function csp_report( \WP_REST_Request $request ): \WP_REST_Response {
+		$content_type = $request->get_header( 'Content-Type' );
+		if ( ! $content_type || ! str_starts_with( $content_type, 'application/csp-report' ) ) {
+			return new \WP_REST_Response( array( 'status' => 'ignored' ), 415 );
+		}
+
+		$rate_key = self::client_report_key();
+		$window   = (int) get_transient( $rate_key );
+		if ( $window >= self::CSP_REPORTS_PER_WINDOW ) {
+			return new \WP_REST_Response( array( 'status' => 'throttled' ), 429 );
+		}
+		set_transient( $rate_key, $window + 1, self::CSP_REPORT_WINDOW );
+
 		$body = $request->get_json_params();
 		if ( empty( $body ) ) {
 			$raw = $request->get_body();
@@ -145,12 +182,19 @@ final class Rest_API {
 		$blocked    = substr( sanitize_text_field( (string) ( $report['blocked-uri'] ?? $report['blockedURL'] ?? '' ) ), 0, 256 );
 		$doc_uri    = substr( sanitize_text_field( (string) ( $report['document-uri'] ?? $report['documentURL'] ?? '' ) ), 0, 256 );
 
-		error_log( sprintf( '[longevity-csp] Violation: directive=%s blocked=%s page=%s', $violated, $blocked, $doc_uri ) );
+		Logger::warning( 'csp_violation', array( 'directive' => $violated, 'blocked' => $blocked, 'page' => $doc_uri ) );
 
 		// Increment violation counter for readiness observability.
 		$count = (int) get_option( 'lel_csp_violation_count', 0 );
 		update_option( 'lel_csp_violation_count', $count + 1, false );
 
 		return new \WP_REST_Response( array( 'status' => 'recorded' ), 204 );
+	}
+
+	/** Bounded transient rate-limit key for the current client (pseudonymous, no raw IP stored). */
+	private static function client_report_key(): string {
+		$ip     = class_exists( Public_Contact::class ) ? Public_Contact::get_client_ip() : ( isset( $_SERVER['REMOTE_ADDR'] ) ? (string) $_SERVER['REMOTE_ADDR'] : '0.0.0.0' );
+		$secret = function_exists( 'wp_salt' ) ? wp_salt( 'auth' ) : ( defined( 'AUTH_SALT' ) ? AUTH_SALT : 'longevity-csp-fallback' );
+		return 'lel_csp_rl_' . substr( hash_hmac( 'sha256', $ip, $secret . '|csp-report' ), 0, 40 );
 	}
 }

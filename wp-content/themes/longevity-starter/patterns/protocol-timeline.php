@@ -5,7 +5,9 @@
  * Categories: featured
  * Inserter: true
  * Description: Ordered phases of a testing or review protocol.
+ * @package LongevityStarter
  */
+
 ?>
 <!-- wp:group {"className":"longevity-visual-module","style":{"spacing":{"padding":{"top":"var:preset|spacing|50","bottom":"var:preset|spacing|50","left":"var:preset|spacing|50","right":"var:preset|spacing|50"}},"border":{"width":"1px","radius":"var:preset|spacing|30"}},"borderColor":"border","backgroundColor":"surface"} -->
 <div class="wp-block-group longevity-visual-module has-border-color has-border-border-color has-surface-background-color" style="border-width:1px;border-radius:var(--wp--preset--spacing--30);padding-top:var(--wp--preset--spacing--50);padding-right:var(--wp--preset--spacing--50);padding-bottom:var(--wp--preset--spacing--50);padding-left:var(--wp--preset--spacing--50)">

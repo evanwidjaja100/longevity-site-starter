@@ -23,7 +23,7 @@ final class Claims {
 	/** Register private claim and source metadata. */
 	public static function register_meta(): void {
 		$claim_fields = array(
-			'claim_id', 'claim_text', 'claim_category', 'claim_importance', 'claim_location', 'source_id', 'source_type', 'source_title', 'source_authors', 'source_url', 'source_identifier', 'publication_date', 'accessed_date', 'jurisdiction', 'population', 'intervention', 'comparator', 'outcome', 'evidence_design', 'evidence_grade', 'conflict_notes', 'evidence_notes', 'verified_by', 'verified_at', 'verification_date', 'verification_status', 'verification_snapshot_hash', 'recheck_date', 'superseded_by', 'archive_url', 'last_edited_by', 'last_edited_at',
+			'claim_id', 'claim_text', 'claim_category', 'claim_importance', 'claim_location', 'source_id', 'source_type', 'source_title', 'source_authors', 'source_url', 'source_identifier', 'publication_date', 'accessed_date', 'jurisdiction', 'population', 'intervention', 'comparator', 'outcome', 'evidence_design', 'evidence_grade', 'conflict_notes', 'evidence_notes', 'verified_by', 'verified_at', 'verification_date', 'verification_status', 'verification_snapshot_hash', 'recheck_date', 'superseded_by', 'archive_url', 'prepared_by', 'prepared_at', 'last_edited_by', 'last_edited_at',
 		);
 
 		foreach ( $claim_fields as $field ) {
@@ -34,7 +34,7 @@ final class Claims {
 					'type'              => 'string',
 					'single'            => true,
 					'show_in_rest'      => false,
-					'sanitize_callback' => static fn( $value ) => self::sanitize_claim_field( $field, $value ),
+					'sanitize_callback' => static fn( $value ) => self::sanitize_field( $field, $value ),
 					'auth_callback'     => static fn( $allowed, $key, $post_id, $user_id ) => self::can_write_field( (string) $key, (int) $post_id, (int) $user_id ),
 				)
 			);
@@ -60,7 +60,7 @@ final class Claims {
 					'type'              => 'string',
 					'single'            => true,
 					'show_in_rest'      => false,
-					'sanitize_callback' => static fn( $value ) => self::sanitize_source_field( $field, $value ),
+					'sanitize_callback' => static fn( $value ) => self::sanitize_field( $field, $value ),
 					'auth_callback'     => static fn( $allowed, $key, $post_id, $user_id ) => user_can( (int) $user_id, 'edit_claims' ),
 				)
 			);
@@ -73,7 +73,7 @@ final class Claims {
 		if ( $user_id <= 0 ) {
 			return false;
 		}
-		if ( in_array( $field, array( 'last_edited_by', 'last_edited_at', 'verified_by', 'verified_at', 'verification_date', 'verification_snapshot_hash', 'verification_status' ), true ) ) {
+		if ( in_array( $field, array( 'prepared_by', 'prepared_at', 'last_edited_by', 'last_edited_at', 'verified_by', 'verified_at', 'verification_date', 'verification_snapshot_hash', 'verification_status' ), true ) ) {
 			return false;
 		}
 		return user_can( $user_id, 'edit_claims' );
@@ -81,7 +81,10 @@ final class Claims {
 
 	/** Verify the exact current claim snapshot through an explicit workflow service. */
 	public static function verify( int $post_id, int $actor_id ): bool {
-		if ( 'lel_claim' !== get_post_type( $post_id ) || $actor_id <= 0 || ! user_can( $actor_id, 'verify_claims' ) || (int) get_post_meta( $post_id, 'last_edited_by', true ) === $actor_id ) {
+		$prepared_by = (int) get_post_meta( $post_id, 'prepared_by', true );
+		// SoD is based on the immutable preparer; legacy claims fall back to last editor (fail-closed).
+		$preparer = $prepared_by > 0 ? $prepared_by : (int) get_post_meta( $post_id, 'last_edited_by', true );
+		if ( 'lel_claim' !== get_post_type( $post_id ) || $actor_id <= 0 || ! user_can( $actor_id, 'verify_claims' ) || $preparer === $actor_id ) {
 			Audit_Log::record( 'metadata_write_denied', 'claim', $post_id, array( 'field' => 'verification_status' ), $actor_id, 'workflow' );
 			return false;
 		}
@@ -146,7 +149,11 @@ final class Claims {
 					update_post_meta( $post_id, 'verification_status', 'stale' );
 					Audit_Log::record( 'metadata_write_denied', 'claim', $post_id, array( 'field' => 'verification_status', 'reason' => 'direct_write_bypass' ), $actor, 'workflow' );
 				}
-			} elseif ( ! in_array( $meta_key, array( 'last_edited_by', 'last_edited_at', 'verified_by', 'verified_at', 'verification_date', 'verification_snapshot_hash' ), true ) ) {
+			} elseif ( ! in_array( $meta_key, array( 'prepared_by', 'prepared_at', 'last_edited_by', 'last_edited_at', 'verified_by', 'verified_at', 'verification_date', 'verification_snapshot_hash' ), true ) ) {
+				if ( '' === (string) get_post_meta( $post_id, 'prepared_by', true ) ) {
+					update_post_meta( $post_id, 'prepared_by', $actor );
+					update_post_meta( $post_id, 'prepared_at', gmdate( DATE_ATOM ) );
+				}
 				update_post_meta( $post_id, 'last_edited_by', $actor );
 				update_post_meta( $post_id, 'last_edited_at', gmdate( DATE_ATOM ) );
 				if ( 'verification_status' !== $meta_key && 'verified' === get_post_meta( $post_id, 'verification_status', true ) ) {
@@ -269,10 +276,10 @@ final class Claims {
 		return $sources;
 	}
 
-	/** Sanitize claim metadata. */
-	private static function sanitize_claim_field( string $field, $value ): string {
+	/** Sanitize claim or source metadata by field name pattern. */
+	private static function sanitize_field( string $field, $value ): string {
 		$value = (string) $value;
-		if ( in_array( $field, array( 'source_url' ), true ) ) {
+		if ( str_contains( $field, 'url' ) ) {
 			return esc_url_raw( $value );
 		}
 		if ( str_ends_with( $field, '_date' ) || 'recheck_date' === $field ) {
@@ -281,23 +288,9 @@ final class Claims {
 		if ( 'evidence_grade' === $field ) {
 			return Meta_Registry::sanitize_value( 'evidence_grade', $value );
 		}
-		if ( in_array( $field, array( 'claim_text', 'conflict_notes', 'evidence_notes', 'population', 'intervention', 'comparator', 'outcome' ), true ) ) {
+		if ( in_array( $field, array( 'claim_text', 'conflict_notes', 'evidence_notes', 'population', 'intervention', 'comparator', 'outcome', 'rights_notes', 'source_notes' ), true ) ) {
 			return sanitize_textarea_field( $value );
 		}
 		return sanitize_text_field( $value );
-	}
-
-	/** Sanitize source metadata. */
-	private static function sanitize_source_field( string $field, $value ): string {
-		if ( str_contains( $field, 'url' ) ) {
-			return esc_url_raw( (string) $value );
-		}
-		if ( str_ends_with( $field, '_date' ) ) {
-			return Meta_Registry::sanitize_value( 'date', $value );
-		}
-		if ( in_array( $field, array( 'rights_notes', 'source_notes' ), true ) ) {
-			return sanitize_textarea_field( (string) $value );
-		}
-		return sanitize_text_field( (string) $value );
 	}
 }

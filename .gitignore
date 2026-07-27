@@ -1,8 +1,10 @@
 .env
 .env.local
 .env.*.local
+.env.ci
 !.env.example
-!.env.ci
+!.env.ci.template
+!.env.production.example
 vendor/
 node_modules/
 .phpunit.cache/

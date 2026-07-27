@@ -70,7 +70,14 @@ final class Reviewer_Credentials {
 		foreach ( $values as $key => $value ) {
 			update_user_meta( $reviewer_id, $key, $value );
 		}
-		Audit_Log::record( 'credential_verified', 'user', $reviewer_id, array( 'version' => self::VERSION ), $actor_id, 'admin' );
+		// Fail-closed: a verification without a durable audit trail must not stand.
+		try {
+			Audit_Log::record( 'credential_verified', 'user', $reviewer_id, array( 'version' => self::VERSION ), $actor_id, 'admin', true );
+		} catch ( \Throwable $error ) {
+			update_user_meta( $reviewer_id, 'credential_verification_status', 'unverified' );
+			Audit_Log::record( 'credential_verification_rejected', 'user', $reviewer_id, array( 'reason' => 'audit_write_failed' ), $actor_id, 'admin' );
+			return false;
+		}
 		return true;
 	}
 

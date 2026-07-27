@@ -43,38 +43,40 @@ python3 scripts/validate-internal-links.py
 python3 scripts/validate-freshness.py --no-fail
 bash tests/integration/environment-validation.sh
 
-if grep -RInE --exclude-dir=.git --exclude-dir=vendor --exclude-dir=node_modules --exclude-dir=tests --exclude='*.md' --exclude='validate.sh' --exclude='validate-env.sh' --exclude='validate-content.py' --exclude='.env.example' --exclude='.env.ci' --exclude='MANIFEST.sha256' '(https?://(www\.)?example\.com|replace-with-|change-me-use-|changeme|your[-_](password|secret|token))' .; then
-  echo 'ERROR: placeholder production domains or credentials found in tracked runtime files.' >&2
-  exit 1
+placeholder_matches=$(git grep -nI -E '(https?://(www\.)?example\.com|replace-with-|change-me-use-|changeme|your[-_](password|secret|token))' -- . 2>/dev/null || true)
+if [ -n "$placeholder_matches" ]; then
+	filtered=$(printf '%s\n' "$placeholder_matches" | grep -vE '\.md:|scripts/validate\.sh:|scripts/validate-env\.sh:|scripts/validate-content\.py:|scripts/ci-generate-env\.sh:|\.env\.example:|\.env\.ci\.template:|\.env\.production\.example:|MANIFEST\.sha256:|tests/')
+	if [ -n "$filtered" ]; then
+		echo 'ERROR: placeholder production domains or credentials found in tracked runtime files.' >&2
+		printf '%s\n' "$filtered" >&2
+		exit 1
+	fi
 fi
-trailing_files=$(find . \
-  \( -path './.git' -o -path './vendor' -o -path './node_modules' -o -path './reports' -o -path './docs/testing/artifacts' -o -path './wp-content/uploads' \) -prune -o \
-  -type f \( -name '*.php' -o -name '*.js' -o -name '*.mjs' -o -name '*.cjs' -o -name '*.css' -o -name '*.json' -o -name '*.md' -o -name '*.txt' -o -name '*.csv' -o -name '*.xml' -o -name '*.yml' -o -name '*.yaml' -o -name '*.sh' -o -name '*.py' -o -name '*.dist' -o -name '*.example' -o -name '*.ci' -o -name 'Makefile' -o -name '.gitignore' -o -name '.gitattributes' -o -name '.npmrc' \) -print0 \
-  | xargs -0 grep -Il '[[:blank:]]$' || true)
-if [ -n "$trailing_files" ]; then
-  echo 'ERROR: trailing whitespace found.' >&2
-  printf '%s\n' "$trailing_files"
+# Check only files tracked by Git. This excludes dependencies, generated
+# reports, local tooling, runtime files, and other untracked artifacts.
+trailing_matches=$(git grep -nI -E '[[:blank:]]+$' -- . || true)
+if [ -n "$trailing_matches" ]; then
+  echo 'ERROR: trailing whitespace found in tracked files.' >&2
+  printf '%s\n' "$trailing_matches"
   exit 1
 fi
 
 # Plugin/theme allowlist: fail if unapproved third-party code is present.
+# Uses git ls-files so only tracked entries are checked (runtime-generated
+# WordPress defaults like akismet/hello.php are not tracked and thus excluded).
 allowed_plugins='index.php'
 allowed_themes='index.php longevity-starter'
-for entry in wp-content/plugins/*; do
+for entry in $(git ls-files -- wp-content/plugins/ | cut -d/ -f1-3 | sort -u); do
   base=$(basename "$entry")
   case " $allowed_plugins " in *" $base "*) ;; *)
     echo "ERROR: plugin not in allowlist: $entry" >&2; exit 1 ;;
   esac
 done
-for entry in wp-content/themes/*; do
+for entry in $(git ls-files -- wp-content/themes/ | cut -d/ -f1-3 | sort -u); do
   base=$(basename "$entry")
   case " $allowed_themes " in *" $base "*) ;; *)
     echo "ERROR: theme not in allowlist: $entry" >&2; exit 1 ;;
   esac
 done
-
-if [ -f MANIFEST.sha256 ]; then
-  bash scripts/verify-manifest.sh
-fi
 
 echo 'Repository validation passed.'

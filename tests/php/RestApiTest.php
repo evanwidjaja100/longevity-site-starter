@@ -34,16 +34,17 @@ final class RestApiTest extends TestCase {
 		$GLOBALS['lel_test_rest_routes'] = array();
 		Rest_API::register_routes();
 
-		self::assertCount( 4, $GLOBALS['lel_test_rest_routes'] );
+		self::assertCount( 5, $GLOBALS['lel_test_rest_routes'] );
 
 		$namespaces = array_column( $GLOBALS['lel_test_rest_routes'], 'namespace' );
-		self::assertSame( array( 'longevity/v1', 'longevity/v1', 'longevity/v1', 'longevity/v1' ), $namespaces );
+		self::assertSame( array( 'longevity/v1', 'longevity/v1', 'longevity/v1', 'longevity/v1', 'longevity/v1' ), $namespaces );
 
 		$routes = array_column( $GLOBALS['lel_test_rest_routes'], 'route' );
 		self::assertContains( '/health', $routes );
 		self::assertContains( '/readiness/(?P<id>\d+)', $routes );
 		self::assertContains( '/system-readiness', $routes );
 		self::assertContains( '/csp-report', $routes );
+		self::assertContains( '/metrics', $routes );
 	}
 
 	/**
