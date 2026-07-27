@@ -228,7 +228,8 @@ final class Admin_UI {
 	/** Render a structured editor so operational staff never need to hand-write JSON. */
 	public static function render_public_test_results_editor( \WP_Post $post ): void {
 		wp_nonce_field( 'longevity_save_public_results', 'longevity_public_results_nonce' );
-		$rows = Review_Methodology::sanitize_public_results( get_post_meta( $post->ID, 'public_test_results', true ) );
+		$projection = Review_Methodology::sanitize_public_results( get_post_meta( $post->ID, 'public_test_results', true ) );
+		$rows = $projection['rows'];
 		if ( empty( $rows ) ) {
 			$rows[] = array( 'label' => '', 'observed_value' => '', 'unit' => '', 'reference_label' => '', 'reference_value' => '', 'status' => 'informational', 'note' => '', 'display_order' => 10 );
 		}

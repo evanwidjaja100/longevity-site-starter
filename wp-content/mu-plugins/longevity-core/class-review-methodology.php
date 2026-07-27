@@ -71,6 +71,14 @@ final class Review_Methodology {
 		}
 		$allowed_statuses = array( 'meets', 'partially_meets', 'does_not_meet', 'informational', 'not_applicable' );
 		$sanitized        = array();
+		$metadata         = array(
+			'deviations' => '',
+			'failures'   => '',
+		);
+		if ( is_array( $value ) ) {
+			$metadata['deviations'] = substr( sanitize_textarea_field( (string) ( $value['deviations'] ?? '' ) ), 0, 1000 );
+			$metadata['failures']   = substr( sanitize_textarea_field( (string) ( $value['failures'] ?? '' ) ), 0, 1000 );
+		}
 		foreach ( array_slice( $value, 0, 30 ) as $index => $row ) {
 			if ( ! is_array( $row ) ) {
 				continue;
@@ -93,7 +101,7 @@ final class Review_Methodology {
 			);
 		}
 		usort( $sanitized, static fn( $left, $right ) => $left['display_order'] <=> $right['display_order'] );
-		return $sanitized;
+		return array( 'rows' => $sanitized, 'deviations' => $metadata['deviations'], 'failures' => $metadata['failures'] );
 	}
 
 	/** Load and validate the review model from config. */
@@ -317,7 +325,7 @@ final class Review_Methodology {
 				return false;
 			}
 		}
-		if ( empty( self::sanitize_public_results( get_post_meta( $record_id, 'public_test_results', true ) ) ) ) {
+		if ( empty( self::sanitize_public_results( get_post_meta( $record_id, 'public_test_results', true ) )['rows'] ) ) {
 			return false;
 		}
 		$start = (string) get_post_meta( $record_id, 'test_start_date', true );

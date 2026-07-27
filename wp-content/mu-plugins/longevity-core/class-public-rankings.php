@@ -166,12 +166,13 @@ class Public_Rankings {
 		if ( ! Review_Methodology::valid_test_record( $record_id, $version ) ) {
 			return '';
 		}
-		$rows = Review_Methodology::sanitize_public_results( get_post_meta( $record_id, 'public_test_results', true ) );
+		$projection = Review_Methodology::sanitize_public_results( get_post_meta( $record_id, 'public_test_results', true ) );
+		$rows = $projection['rows'] ?? array();
 		if ( empty( $rows ) ) {
 			return '';
 		}
-		$deviations = trim( (string) get_post_meta( $record_id, 'deviations', true ) );
-		$failures   = trim( (string) get_post_meta( $record_id, 'failures', true ) );
+		$deviations = trim( (string) ( $projection['deviations'] ?? '' ) );
+		$failures   = trim( (string) ( $projection['failures'] ?? '' ) );
 		$labels = array( 'meets' => __( 'Meets reference', 'longevity-core' ), 'partially_meets' => __( 'Partially meets', 'longevity-core' ), 'does_not_meet' => __( 'Does not meet', 'longevity-core' ), 'informational' => __( 'Informational', 'longevity-core' ), 'not_applicable' => __( 'Not applicable', 'longevity-core' ) );
 		$html = '<section class="longevity-test-results" aria-labelledby="lel-test-results"><div class="longevity-section-header"><div><p class="longevity-kicker">Recorded observations</p><h2 id="lel-test-results">Structured test results</h2></div><p>' . esc_html( sprintf( __( 'These are product-unit observations recorded under protocol version %s. They are not clinical validation or health recommendations. Private notes and identifiers are not exposed.', 'longevity-core' ), $version ) ) . '</p></div><div class="longevity-table-wrap"><table><thead><tr><th scope="col">' . esc_html__( 'Metric', 'longevity-core' ) . '</th><th scope="col">' . esc_html__( 'Observed', 'longevity-core' ) . '</th><th scope="col">' . esc_html__( 'Reference', 'longevity-core' ) . '</th><th scope="col">' . esc_html__( 'Result', 'longevity-core' ) . '</th><th scope="col">' . esc_html__( 'Interpretation', 'longevity-core' ) . '</th></tr></thead><tbody>';
 		foreach ( $rows as $row ) {
