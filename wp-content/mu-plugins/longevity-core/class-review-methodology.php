@@ -101,6 +101,32 @@ final class Review_Methodology {
 		return Runtime_Config::scoring_model();
 	}
 
+	/** Installed scoring model version string. */
+	public static function model_version(): string {
+		return (string) ( self::model()['version'] ?? '' );
+	}
+
+	/** Validate that a review's score version matches the installed model. */
+	public static function score_version_matches( string $version ): bool {
+		$model_version = self::model_version();
+		return '' !== $model_version && hash_equals( $model_version, $version );
+	}
+
+	/** Validate that review dimensions match the approved protocol's scoring dimensions. */
+	public static function dimensions_match_protocol( int $record_id, array $dimensions ): bool {
+		$protocol_post_id = (int) get_post_meta( $record_id, 'protocol_post_id', true );
+		if ( $protocol_post_id <= 0 ) {
+			return false;
+		}
+		$protocol_dimensions = self::sanitize_dimensions( get_post_meta( $protocol_post_id, 'scoring_dimensions', true ) );
+		if ( empty( $protocol_dimensions ) ) {
+			return false;
+		}
+		$protocol_keys = array_column( $protocol_dimensions, 'name' );
+		$review_keys   = array_column( $dimensions, 'name' );
+		return $protocol_keys === $review_keys;
+	}
+
 	/** Minimum score difference required for a meaningful ranking distinction. */
 	public static function minimum_meaningful_difference(): float {
 		$model = self::model();

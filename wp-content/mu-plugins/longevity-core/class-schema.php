@@ -181,7 +181,10 @@ final class Schema {
 		$record_id  = (int) get_post_meta( $post_id, 'test_record_id', true );
 		$dimensions = get_post_meta( $post_id, 'review_score_dimensions', true );
 		$disclosure = (string) get_post_meta( $post_id, 'affiliate_disclosure_status', true );
-		if ( ! Runtime_Config::scoring_model_status()['valid'] || ! Approval_Service::is_current( $post_id, 'testing' ) || ! Rankings::is_eligible( $post_id ) || '' === $model || $score <= 0 || '' === $version || '' === $confidence || ! in_array( $test_state, array( 'complete', 'approved' ), true ) || ! Review_Methodology::valid_test_record( $record_id, (string) get_post_meta( $post_id, 'testing_protocol_version', true ) ) ) {
+		if ( ! Runtime_Config::scoring_model_status()['valid'] || ! Review_Methodology::score_version_matches( $version ) || ! Approval_Service::is_current( $post_id, 'testing' ) || ! Rankings::is_eligible( $post_id ) || '' === $model || $score <= 0 || '' === $version || '' === $confidence || ! in_array( $test_state, array( 'complete', 'approved' ), true ) || ! Review_Methodology::valid_test_record( $record_id, (string) get_post_meta( $post_id, 'testing_protocol_version', true ) ) ) {
+			return null;
+		}
+		if ( ! Review_Methodology::dimensions_match_protocol( $record_id, is_array( $dimensions ) ? $dimensions : array() ) ) {
 			return null;
 		}
 		if ( ! in_array( get_post_meta( $post_id, 'commercial_relationship', true ), array( '', 'none' ), true ) && ! in_array( $disclosure, array( 'approved', 'complete' ), true ) ) {

@@ -233,6 +233,9 @@ final class Publication_Gates {
 			if ( $score > 0 && empty( $context['review_score_version'] ) ) {
 				$result->block( 'score_version_missing', __( 'Record the scoring-model version for any review score.', 'longevity-core' ) );
 			}
+			if ( $score > 0 && ! empty( $context['review_score_version'] ) && ! Review_Methodology::score_version_matches( (string) $context['review_score_version'] ) ) {
+				$result->block( 'score_version_mismatch', __( 'The recorded scoring-model version does not match the installed model.', 'longevity-core' ) );
+			}
 			if ( $score > 0 && empty( $context['review_score_confidence'] ) ) {
 				$result->block( 'score_confidence_missing', __( 'Record confidence separately from the review score.', 'longevity-core' ) );
 			}
