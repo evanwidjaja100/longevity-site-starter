@@ -2,6 +2,9 @@
 # Local/CI WP-CLI image. Production is managed-host-only; this pinned base
 # does not define or claim the host's runtime image.
 # wordpress:7.0.1-php8.3-cli
+# BASELINE NOTE (PR-01): the platform baseline is WordPress >= 7.0.2 / PHP >= 8.3.
+# This digest predates 7.0.2; preflight correctly fails on it. The release owner
+# must repin to the 7.0.2+ digest from a network-connected environment.
 FROM wordpress@sha256:f8aeb68164c6a04f5dcc91da30d8ffa096b0f7fafb7a65f144c2dd62587caca0
 
 USER root

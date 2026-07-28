@@ -6,6 +6,28 @@
 Confirm that the host supports MU plugins, custom post types, WP-CLI or an equivalent migration path, cron, HTTPS, backups, and required PHP extensions. Upload the first-party theme and complete `wp-content/mu-plugins/longevity-core.php` plus its directory. Do not install development dependencies in the public web root.
 
 Use host-provided caching, WAF, malware scanning, MFA, backups, and staging where reliable. Configure SMTP and DNS authentication externally. Verify that host security plugins do not block REST readiness responses, custom capabilities, cron freshness checks, or private operational post types.
+
+## Platform baseline
+
+| Component | Minimum | Enforced by |
+|---|---|---|
+| WordPress core | 7.0.2 (latest reviewed security release; verify against official WordPress sources at deployment time) | `Platform_Requirements::MIN_WORDPRESS`, `wp longevity preflight`, readiness |
+| PHP | 8.3 | `Platform_Requirements::MIN_PHP`, `composer.json`, CI |
+| MySQL | 8.0 (Oracle MySQL; MariaDB is not qualified) | `Platform_Requirements::MIN_MYSQL` |
+
+Preflight and readiness fail closed below these versions. Do not launch or keep serving production traffic on an unsupported baseline.
+
+Managed hosts typically apply WordPress core security updates independently of the application artifact. Confirm with the provider whether minor core security releases are auto-applied; if they are not, the operations owner runs the emergency procedure below.
+
+### Emergency core security update procedure
+
+1. On a WordPress core security release, the operations owner confirms the patched version from official WordPress sources.
+2. Apply the core update on the managed host (control plane or host support), staging first when time permits; for actively exploited issues the host may patch production directly.
+3. Run `wp longevity preflight` and the protected readiness endpoint; both must pass on the patched version.
+4. Run authenticated smoke checks (admin login, publish-gate evaluation on a draft, contact form, rankings render).
+5. Record version, date, operator, and evidence location in the operations log.
+6. Update `Platform_Requirements::MIN_WORDPRESS`, documentation, and local image pins in the next application release so the enforced floor tracks the patched version.
+
 ## Production Readiness v2 package requirements
 
 Deploy the complete `wp-content/mu-plugins/longevity-core/` directory, including `config/scoring/default-review-model.json`. Run additive migrations before accepting editorial writes. Verify the protected readiness endpoint as an authorized operator. Treat backup, restore, SMTP, WAF, cron, and branch-protection checks as external evidence; do not mark them green from application configuration alone.

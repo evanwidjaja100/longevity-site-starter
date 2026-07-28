@@ -121,7 +121,7 @@ Public content follows states: idea → research → drafting → editorial revi
 
 ## Code standards
 
-- **PHP**: WordPress Coding Standards (`phpcs.xml.dist`), PHPStan level 5 (`phpstan.neon.dist`). PHP 8.1+ (8.3 in CI).
+- **PHP**: WordPress Coding Standards (`phpcs.xml.dist`), PHPStan level 5 (`phpstan.neon.dist`). PHP 8.3+ (matching `Platform_Requirements::MIN_PHP` and CI).
 - **JS**: ESLint (`eslint.config.js`). ES modules (`"type": "module"` in `package.json`).
 - **CSS**: Stylelint (`.stylelintrc.json`).
 - **Shell**: ShellCheck. Scripts use `#!/bin/sh` or `#!/bin/bash`.

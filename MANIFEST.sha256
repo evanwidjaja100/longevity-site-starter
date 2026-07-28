@@ -10,13 +10,13 @@ f62e0dfd685dcd1bc596336b1364fc4a1e1cf6ba892b4a449ed98637da4fb6b5 *./.github/work
 92c2384c236c6a0c7c50e79a2075f19c260a6bec1869ce6bec7632892f0ae06b *./.gitignore
 cfa2d75ad28f3e20e39f11a15277753a396d2fea81caf1094bf9eb31a2bd1c7c *./.npmrc
 396a27c4750af851492403954b6f45b9c2e47351cb39271db8414d814cd26655 *./.stylelintrc.json
-8de73aa0fe21abacecc168f3a756bb408697d02164edc508b119b081b11a55a1 *./AGENTS.md
+16c88c9d65c3104cde16db2300c6e6f2ee151c77025bfc7b449cf957a8239017 *./AGENTS.md
 0ea49aabac398228480e719c9615cc3d699a3b20a61be5b317bcbc578b6c1fa6 *./CONTRIBUTING.md
 9447d2299312b00b25a3214d7fcaab49e6f16000ff1b8135b7a46f772da5f16d *./Makefile
 0bd836107a3f6a9dded936a4b050bbf63cf4c558574864cb35fc323f88593555 *./README.md
 fb83a00039993c7c8e055c3ea43980f4e3aa081f19ae65afd13b234e242171f5 *./compose.yaml
-adc8ce9a0316b1a685e863d57add92912f211c7e1fac99c45df9a75ce3368e25 *./composer.json
-b46fbadd7353fd92192f295b69d0da3543616798cc12abe56b0c3b30cf1782b5 *./composer.lock
+28e58d12ac53bd4320519f343ff3a9d1db6909f15d080c03447473e9c3a294a2 *./composer.json
+5b2377b9a63ada5f82ac2a87972cd50c64501430ec4c0141e009727ff4ad72a0 *./composer.lock
 af08fcf5d1cb826d1898a66f43770bc62c73a7ee410431d21e1fd5e6bb5c872e *./config/content-schema/editorial-meta.schema.json
 ac675a2d0876faba62fba397dc9706c01e07497d64c2ab68ebf5dc35fd022f68 *./config/environments/production.example.php
 24e3d4b74f3c630f15afda85cf1c444696b8c1519dcbfc2515624da59098095f *./config/release-required-jobs.json
@@ -119,8 +119,8 @@ a9c2aacf7ab2e207cde75c3d31f09e8b78d4a8b55cb50d892fdccf3b72b22363 *./content/temp
 4032a9e238a60ef0d95160cc2699790622bb319c04e2424bfc2b32278770e6c0 *./content/testing/consumer-apps-protocol.md
 3e1acaed45fa844fc077632daa87903617a35bca445f8158e9a02de91650c1b8 *./content/testing/home-equipment-protocol.md
 19866564b5dca1e0278458f641fae270bc59b6b74ed24e7e8c68631a24d3ecdb *./content/testing/wearables-protocol.md
-6cd9950ead2b28bb9c07d034726b7b1ea778e7e64249c81ba50cfc9a759144e9 *./docker/development/Dockerfile
-b166ef4389affa461c1ae60668610bbd71c29141a6c013b817139e8d987cd7a2 *./docker/development/Dockerfile.wpcli
+64dd0a59c7f773acb4f7b8439861bd55f30f6008bc78e4d80b181ecc1d166fd0 *./docker/development/Dockerfile
+f01bd35b6ed5784136e402ea1c81784f1620b4d9681fe3bae83e40e321433c9d *./docker/development/Dockerfile.wpcli
 e6261c89407e909391125c65987199789c75f57fa787774b24d3c6c55a2d6cdc *./docker/development/README.md
 0a3aa76c8b47f05cb67f55cd19c092d11d513e7c92ca758434563055930734c7 *./docker/my.cnf
 b7f4950159ead3ae45f64aa22a8448da55273ae1e1354c6985d056f4c2d26a5f *./docker/uploads.ini
@@ -166,7 +166,7 @@ d2a7d368585a68e85e6b34cb2b7baaf16d32413cbec30e302a1e6fa58960bfb8 *./docs/operati
 e3c751f038941ae186c91f73a4972619b0f2c71eed6e7a2e2ae3fcd1cb3ca97e *./docs/operations/dependency-governance.md
 90923c94e202e65892a9b582134fc8d72a63e5ac4a21092829b6a651116019fb *./docs/operations/incident-response.md
 5c2f2399236bb5d449b8807cd51ab1cd5302441ae3a80b53a6f8b095590f7401 *./docs/operations/local-development.md
-836b0d5feb9e380a3c0cc1edd66f10f4cf4c0d67ce0856425cb571e97d297d6e *./docs/operations/managed-wordpress-deployment.md
+88491f7bd03da4f0dfca02050fe7eaf607d72813de2ff70870e21892c251103a *./docs/operations/managed-wordpress-deployment.md
 57d9b6181d27d6604084a5eaec019e283de74d71defaf4422d842ad55d0bdc6e *./docs/operations/monitoring.md
 ebc90275c517b51bc3de63182ab4fb722ac4391a81caf4569e9cf9767d65eba2 *./docs/operations/performance-baselines.md
 51a7c556d6b746898099ea4c773694976c4566f143c85521a2b27ff438900e6b *./docs/operations/product-kpis.md
@@ -439,7 +439,7 @@ aadf0730f5105de62e85e806a323a6b506a3d1799e0df8c48ad0c881894594dc *./tests/php/Le
 cb7f5320214a0d44553016595fb0c7c74e8f9cff0d36376f91b091dc02666828 *./tests/php/MetaRegistryTest.php
 988406878622d32b33ee6df4a52ad64cefd8e1bc3b6152c545484b6fe90f0723 *./tests/php/MigrationsLockTest.php
 70cb7d9d37f3d45734d9e0f074088af7de411caa7e09d254d99a04e01c061417 *./tests/php/OverrideIntentTest.php
-284dd9ae7c1ba006e8216fbb2f10206472b0a045ab84dc2174611205a4cb38a7 *./tests/php/PreflightTest.php
+2ecf3826a3c640ef6da690f8c58037e1d396aeeefc94d3e42ec030845b017a9d *./tests/php/PreflightTest.php
 3dc5f7e61c75231831e970d5f2062f31bba438402c339b47f04db646a29bd400 *./tests/php/ProtocolApprovalTest.php
 a5d0a06ab3cd1053c5de11b5b92f24070b16a58f81b8f863928dc66d62a85e3b *./tests/php/PublicComponentsTest.php
 a1f5cfb3c1a4b902676de16cab49c953b7a748c1ccc5092fcd998cb6623a04bb *./tests/php/PublicationGatesTest.php
@@ -520,7 +520,7 @@ c27e0fdf058606e3f0e8094a093bb125a71655a8556e3af2a7ee0dea76a840f7 *./wp-content/m
 007c58a8c2b6079e5a92a7fbf1c69cc2798bdcef6227e33774edf04c26006906 *./wp-content/mu-plugins/longevity-core/class-migrations.php
 bd6f10b085fca31bc350deb2e163f5fcaf0d63671c20659bac477380d6394a4b *./wp-content/mu-plugins/longevity-core/class-notification-outbox.php
 00423713222c90ae94bf0c3b143b9434885b2e8a3fe8cb3265ce541c20a10c71 *./wp-content/mu-plugins/longevity-core/class-override-intent.php
-2be63ea4bf9ad3f2efdcbe4c94a1e16e8c7db01df6ac0d1a85dcfe3d56985bcb *./wp-content/mu-plugins/longevity-core/class-platform-requirements.php
+d85fba14162c11e8952bf46e3407df84fcfe46db715711ec5ef83498fc733c9e *./wp-content/mu-plugins/longevity-core/class-platform-requirements.php
 f7b00fc0a229387f9447d9afb9ba3e021655304aac690ebe654921ba81960c84 *./wp-content/mu-plugins/longevity-core/class-public-contact.php
 9a42a6ce9ff6de1d85896109b931bbc61d04ed75e0a590263270fe02235fb4ad *./wp-content/mu-plugins/longevity-core/class-public-content.php
 d689f8fb196be7e6776e935b2ff9707aeca0ee9719581429f662ab9093de1572 *./wp-content/mu-plugins/longevity-core/class-public-nav.php
