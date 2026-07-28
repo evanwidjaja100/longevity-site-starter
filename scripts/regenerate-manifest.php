@@ -1,39 +1,35 @@
 <?php
-// Simple manifest regeneration using git show
-$root = getcwd();
-$files = [];
-exec("git ls-files -z", $output, $ret);
-$raw = implode("", $output);
-$lines = explode("\0", $raw);
-foreach ($lines as $file) {
-    if (substr($file, 0, 2) === './') {
-        $file = substr($file, 2);
-    }
-    if ($file === "") continue;
-    if (preg_match('#^(MANIFEST\.sha256|\.env|\.env\.local|\.env\..*\.local|vendor/|node_modules/|reports/|\.phpunit\.cache/|coverage/|playwright-report/|test-results/|build/|wp-content/uploads/)#', $file)) continue;
-    if (preg_match('/\.(log|sql|sql\.gz|tgz|tar\.gz)$/', $file)) continue;
-    $files[] = $file;
-}
-sort($files);
+/**
+ * Manifest regeneration entry point.
+ *
+ * Delegates to the canonical scripts/regenerate-manifest.sh so only one
+ * implementation defines the release file set and hashing rules. Exits
+ * nonzero without writing MANIFEST.sha256 on any failure.
+ */
 
-$entries = [];
-$errors = 0;
-foreach ($files as $file) {
-    $cmd = "git show :" . escapeshellarg($file) . " 2>&1";
-    $content = shell_exec($cmd);
-    if ($content === null || $content === "") {
-        $errors++;
-        continue;
-    }
-    // Check if git returned an error message instead of file content
-    if (strpos($content, "fatal:") === 0 || strpos($content, "error:") === 0) {
-        $errors++;
-        continue;
-    }
-    $hash = hash("sha256", $content);
-    $entries[] = $hash . " *./" . $file;
+declare(strict_types=1);
+
+$root      = dirname(__DIR__);
+$canonical = $root . DIRECTORY_SEPARATOR . 'scripts' . DIRECTORY_SEPARATOR . 'regenerate-manifest.sh';
+
+if (! is_file($canonical)) {
+    fwrite(STDERR, "ERROR: canonical manifest script is missing.\n");
+    exit(1);
 }
 
-$manifest = implode("\n", $entries) . "\n";
-file_put_contents("MANIFEST.sha256", $manifest);
-echo "Manifest regenerated with " . count($entries) . " entries (" . $errors . " errors).\n";
+exec('git -C ' . escapeshellarg($root) . ' rev-parse --is-inside-work-tree 2>&1', $probe, $probeStatus);
+if ($probeStatus !== 0) {
+    fwrite(STDERR, "ERROR: not a Git checkout; refusing to write a manifest.\n");
+    exit(1);
+}
+
+$command = 'bash ' . escapeshellarg($canonical) . ' 2>&1';
+exec($command, $output, $status);
+foreach ($output as $line) {
+    echo $line, "\n";
+}
+if ($status !== 0) {
+    fwrite(STDERR, "ERROR: canonical manifest regeneration failed (exit {$status}).\n");
+    exit($status);
+}
+exit(0);

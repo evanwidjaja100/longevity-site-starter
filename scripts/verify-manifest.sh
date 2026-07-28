@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -eu
+set -euo pipefail
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$ROOT"
 [ -f MANIFEST.sha256 ] || { echo 'ERROR: MANIFEST.sha256 is missing.' >&2; exit 1; }
