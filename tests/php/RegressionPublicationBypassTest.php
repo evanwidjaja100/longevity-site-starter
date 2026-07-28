@@ -3,6 +3,8 @@
 use Longevity\Core\Approval_Fingerprint;
 use Longevity\Core\Approval_Repository;
 use Longevity\Core\Approval_Service;
+use Longevity\Core\Audit_Log;
+use Longevity\Core\Override_Intent;
 use Longevity\Core\Publication_Gates;
 use PHPUnit\Framework\TestCase;
 
@@ -55,6 +57,7 @@ final class RegressionPublicationBypassTest extends TestCase {
 			$GLOBALS['lel_test_page_statuses'][ $this->postId ],
 			$GLOBALS['lel_test_permalinks'][ $this->postId ],
 			$GLOBALS['lel_test_current_user_id'],
+			$GLOBALS['lel_test_current_user_caps'],
 			$GLOBALS['lel_test_meta'][ $this->postId ],
 			$GLOBALS['lel_test_user_caps'][ $this->editorId ],
 			$GLOBALS['lel_test_user_meta'][ $this->editorId ],
@@ -67,6 +70,44 @@ final class RegressionPublicationBypassTest extends TestCase {
 			$GLOBALS['lel_test_posts'],
 		);
 		$_POST = array();
+		Audit_Log::set_test_mode( true );
+	}
+
+	public function test_applied_override_cannot_be_replayed_after_content_returns_to_prior_status(): void {
+		$correlation = 'correlation-returned-status-1';
+		$GLOBALS['wpdb']->lel_test_set_rows( 'wp_lel_override_intents', array() );
+		$GLOBALS['lel_test_current_user_caps'] = array( 'approve_publication', 'approve_publication_override', 'edit_post' );
+		$GLOBALS['lel_test_page_statuses'][ $this->postId ] = 'draft';
+		$GLOBALS['lel_test_meta'][ $this->postId ]['content_summary'] = '';
+		Audit_Log::set_test_mode( true );
+		$this->approveEditorial();
+
+		$_POST = array(
+			'longevity_editorial_nonce'         => 'test_nonce_longevity_save_editorial',
+			'longevity_override_reason'         => 'Urgent editorial exception',
+			'longevity_override_correlation_id' => $correlation,
+		);
+		$data  = array(
+			'post_type'    => 'post',
+			'post_status'  => 'publish',
+			'post_title'   => 'Approved title',
+			'post_excerpt' => 'Approved excerpt',
+			'post_content' => 'Original approved content that passed editorial review.',
+			'post_author'  => (string) $this->editorId,
+		);
+
+		self::assertSame( 'publish', Publication_Gates::enforce_classic_publish( $data, array( 'ID' => $this->postId ) )['post_status'] );
+		Publication_Gates::finalize_override( 'publish', 'draft', $GLOBALS['lel_test_posts'][ $this->postId ] );
+		Publication_Gates::release_after_post_update( $this->postId );
+		self::assertSame( Override_Intent::STATE_APPLIED, Override_Intent::intent( $correlation )['state'] );
+
+		$GLOBALS['lel_test_page_statuses'][ $this->postId ] = 'draft';
+		$events_before = count( Audit_Log::test_events() );
+		$replay        = Publication_Gates::enforce_classic_publish( $data, array( 'ID' => $this->postId ) );
+
+		self::assertSame( 'draft', $replay['post_status'] );
+		self::assertSame( $events_before, count( Audit_Log::test_events() ) );
+		self::assertSame( Override_Intent::STATE_APPLIED, Override_Intent::intent( $correlation )['state'] );
 	}
 
 	private function approveEditorial(): void {

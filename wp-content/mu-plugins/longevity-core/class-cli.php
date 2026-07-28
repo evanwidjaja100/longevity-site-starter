@@ -20,10 +20,14 @@ final class CLI {
 		\WP_CLI::add_command( 'longevity sources', Sources_Command::class );
 		\WP_CLI::add_command( 'longevity readiness', Readiness_Command::class );
 		\WP_CLI::add_command( 'longevity freshness', Freshness_Command::class );
+		\WP_CLI::add_command( 'longevity dependency', Dependency_Command::class );
 		\WP_CLI::add_command( 'longevity bootstrap', Bootstrap_Command::class );
 		\WP_CLI::add_command( 'longevity migrate', Migrate_Command::class );
 		\WP_CLI::add_command( 'longevity evidence', Evidence_Command::class );
 		\WP_CLI::add_command( 'longevity metrics', Metrics_Command::class );
+		\WP_CLI::add_command( 'longevity preflight', Preflight_Command::class );
+		\WP_CLI::add_command( 'longevity legal-hold', Legal_Hold_Command::class );
+		\WP_CLI::add_command( 'longevity acceptance', Acceptance_Command::class );
 	}
 }
 
@@ -360,6 +364,42 @@ final class Sources_Command {
 			\WP_CLI::error( 'Source validation failed.' );
 		}
 		\WP_CLI::success( sprintf( 'Validated %d source row(s).', count( $rows ) ) );
+	}
+}
+
+/** Platform preflight CLI command. */
+final class Preflight_Command {
+	/**
+	 * Verify PHP, extensions, WordPress, MySQL, and WP-CLI before deployment.
+	 *
+	 * ## OPTIONS
+	 *
+	 * [--format=<format>]
+	 * : Output format: table or json. Default table.
+	 *
+	 * @param array $args       Positional arguments (unused).
+	 * @param array $assoc_args Associative arguments.
+	 */
+	public function __invoke( array $args, array $assoc_args ): void {
+		unset( $args );
+		$results = Platform_Requirements::check( true );
+
+		$failed = array_values( array_filter( $results, static fn( array $r ): bool => ! $r['satisfied'] ) );
+		$format = isset( $assoc_args['format'] ) ? (string) $assoc_args['format'] : 'table';
+		if ( 'json' === $format ) {
+			\WP_CLI::line( (string) wp_json_encode( array( 'satisfied' => ! $failed, 'results' => $results ), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+		} else {
+			foreach ( $results as $result ) {
+				\WP_CLI::line( sprintf( '%s  %-14s %s', $result['satisfied'] ? 'PASS' : 'FAIL', $result['requirement'], $result['detail'] ) );
+			}
+		}
+		if ( $failed ) {
+			\WP_CLI::error( sprintf( '%d platform requirement(s) unmet.', count( $failed ) ), false );
+			\WP_CLI::halt( 1 );
+		}
+		if ( 'json' !== $format ) {
+			\WP_CLI::success( 'All platform preflight checks passed.' );
+		}
 	}
 }
 
@@ -712,10 +752,10 @@ final class Bootstrap_Command {
 				'post_name'    => 'improve-sleep-before-buying-device',
 				'post_content' => '<!-- wp:paragraph --><p>Sleep trackers and smart devices promise better rest, but the fundamentals of sleep hygiene cost little and are backed by stronger evidence. This guide helps you decide whether to invest in fundamentals or a device.</p><!-- /wp:paragraph --><!-- wp:heading --><h2>Sleep fundamentals with strong evidence</h2><!-- /wp:heading --><!-- wp:list --><ul><li><strong>Consistent schedule:</strong> Going to bed and waking at the same time supports circadian alignment.</li><li><strong>Light management:</strong> Bright light exposure in the morning; dim, blue-reduced light in the evening.</li><li><strong>Temperature:</strong> A cool room (16–19°C) promotes sleep onset.</li><li><strong>Wind-down routine:</strong> 30 minutes of low-arousal activity before bed.</li><li><strong>Caffeine timing:</strong> Avoid caffeine within 8–10 hours of bedtime.</li></ul><!-- /wp:list --><!-- wp:heading --><h2>When to consider a device</h2><!-- /wp:heading --><!-- wp:paragraph --><p>After consistent application of fundamentals for 4–6 weeks, if sleep difficulties persist, a device that provides measurement and feedback may help identify patterns. Our decision tool below helps you assess whether you are ready to escalate.</p><!-- /wp:paragraph --><!-- wp:paragraph --><p><strong>Medical review note:</strong> This content includes safety boundaries and sleep-disorder red flags. Medical review is pending before publication.</p><!-- /wp:paragraph -->',
 			),
-			'LEL-006'     => array(
-				'post_type'    => 'post',
-				'post_title'   => 'How Accurate Are Consumer Sleep Trackers?',
-				'post_name'    => 'consumer-sleep-tracker-accuracy',
+		'LEL-006'     => array(
+			'post_type'    => 'review',
+			'post_title'   => 'How Accurate Are Consumer Sleep Trackers?',
+			'post_name'    => 'consumer-sleep-tracker-accuracy',
 				'post_content' => '<!-- wp:paragraph --><p>Consumer sleep trackers from brands like Oura, Fitbit, Apple, and Whoop claim to measure sleep stages, heart rate, and recovery. This page summarises the published evidence for what these devices can and cannot measure reliably.</p><!-- /wp:paragraph --><!-- wp:heading --><h2>Evidence matrix by metric</h2><!-- /wp:heading --><!-- wp:table --><figure class="wp-block-table"><table><thead><tr><th>Metric</th><th>Evidence level</th><th>Notes</th></tr></thead><tbody><tr><td>Heart rate (night)</td><td>B (Moderate)</td><td>Good agreement with ECG at group level; lower accuracy at individual level</td></tr><tr><td>Total sleep time</td><td>B (Moderate)</td><td>Generally reliable for longer sleep periods; less accurate with frequent awakenings</td></tr><tr><td>Sleep stages (NREM/REM)</td><td>C (Limited)</td><td>Limited agreement with polysomnography; misclassification of light sleep common</td></tr><tr><td>Sleep onset / offset</td><td>C (Limited)</td><td>Variable across devices; tends to overestimate sleep time</td></tr><tr><td>HRV</td><td>C (Limited)</td><td>Night-time HRV correlates with reference measures; daytime not well validated</td></tr></tbody></table></figure><!-- /wp:table --><!-- wp:heading --><h2>Key limitations</h2><!-- /wp:heading --><!-- wp:paragraph --><p>Consumer devices are not medical-grade. They can provide useful trend data but should not be used for diagnosis or clinical decision-making. Accuracy varies by device firmware version, user characteristics, and sleeping environment.</p><!-- /wp:paragraph --><p><strong>Medical review note:</strong> This content interprets accuracy data in clinical context. Medical review is pending before publication.</p><!-- /wp:paragraph -->',
 			),
 			'LEL-007'     => array(
@@ -776,10 +816,13 @@ final class Bootstrap_Command {
 	}
 
 	/**
-	 * Create editorial roles and capabilities idempotently.
+	 * Create editorial roles and reconcile capabilities to the approved matrix.
+	 *
+	 * Dry-run prints the drift diff without mutating and exits non-zero when
+	 * drift exists (usable as a CI/ops drift detector).
 	 *
 	 * ## OPTIONS
-	 * [--dry-run]     Preview changes without modifying the database.
+	 * [--dry-run]     Print capability drift without modifying the database; exit 1 on drift.
 	 *
 	 * ## EXAMPLES
 	 *     wp longevity bootstrap roles
@@ -788,12 +831,29 @@ final class Bootstrap_Command {
 	public function roles( array $args, array $assoc_args ): void {
 		unset( $args );
 		$dry_run = isset( $assoc_args['dry-run'] );
+		if ( ! $dry_run ) {
+			Roles::register();
+		}
+		$result = Roles::reconcile( $dry_run );
+		foreach ( $result['added'] as $entry ) {
+			\WP_CLI::line( ( $dry_run ? '[DRY RUN] would add: ' : 'added: ' ) . $entry );
+		}
+		foreach ( $result['removed'] as $entry ) {
+			\WP_CLI::line( ( $dry_run ? '[DRY RUN] would remove: ' : 'removed: ' ) . $entry );
+		}
+		foreach ( $result['missing_roles'] as $role_name ) {
+			\WP_CLI::warning( "Role missing: {$role_name}" . ( $dry_run ? ' (run without --dry-run to create it)' : '' ) );
+		}
+		$drift = count( $result['added'] ) + count( $result['removed'] );
 		if ( $dry_run ) {
-			\WP_CLI::line( '[DRY RUN] Would register editorial roles and assign capabilities.' );
+			if ( $drift > 0 || $result['missing_roles'] ) {
+				\WP_CLI::error( sprintf( 'Capability drift detected: %d change(s) pending.', $drift ), false );
+				\WP_CLI::halt( 1 );
+			}
+			\WP_CLI::success( 'No capability drift: roles match the approved matrix.' );
 			return;
 		}
-		Roles::register();
-		\WP_CLI::success( 'Editorial roles and capabilities registered.' );
+		\WP_CLI::success( sprintf( 'Editorial roles reconciled (matrix %s): %d added, %d removed, %d unchanged.', Roles::MATRIX_VERSION, count( $result['added'] ), count( $result['removed'] ), $result['unchanged'] ) );
 	}
 
 	/**
@@ -834,7 +894,7 @@ final class Freshness_Command {
 		if ( 'run' === $action ) {
 			$report = Freshness::run();
 			\WP_CLI::line( wp_json_encode( $report, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
-			if ( 'failed' === ( $report['status'] ?? '' ) ) {
+			if ( in_array( (string) ( $report['status'] ?? '' ), array( 'failed', 'lock_error' ), true ) ) {
 				\WP_CLI::halt( 1 );
 			}
 			\WP_CLI::success( 'Freshness audit completed without publishing or rewriting content.' );
@@ -847,6 +907,57 @@ final class Freshness_Command {
 	}
 }
 
+/**
+ * Dependency index maintenance.
+ *
+ * The backfill indexes claim, source, test-record, protocol, and reviewer
+ * credential relationships. Affiliate relationships are intentionally not
+ * indexed; they remain served by the flag-based fallback lookup.
+ */
+final class Dependency_Command {
+	/**
+	 * Backfill the dependency index from existing governed content.
+	 *
+	 * Resumable: progress is tracked with a keyset cursor, so re-running
+	 * continues where the last run stopped. Completion records the
+	 * lel_dependency_index_backfilled_at readiness marker.
+	 *
+	 * ## OPTIONS
+	 *
+	 * [--dry-run]
+	 * : Count relationships without writing anything.
+	 *
+	 * [--batch=<n>]
+	 * : Parents per page (10-500, default 200).
+	 *
+	 * @param array $args       Positional arguments (unused).
+	 * @param array $assoc_args Named arguments.
+	 */
+	public function backfill( array $args, array $assoc_args ): void {
+		unset( $args );
+		if ( ! current_user_can( 'approve_publication' ) ) {
+			\WP_CLI::error( 'This command requires approve_publication. Run WP-CLI with an authorized --user.' );
+		}
+		$dry_run = isset( $assoc_args['dry-run'] );
+		$batch   = isset( $assoc_args['batch'] ) ? (int) $assoc_args['batch'] : 200;
+		if ( ! Dependency_Index::exists() && ! $dry_run ) {
+			\WP_CLI::error( 'Dependency index table is missing. Run `wp longevity migrate run` first.', false );
+			\WP_CLI::halt( 1 );
+		}
+		$result = Dependency_Index::run_backfill( $dry_run, $batch );
+		\WP_CLI::line( wp_json_encode( $result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+		if ( ! $result['complete'] ) {
+			\WP_CLI::error( 'Backfill did not complete; re-run to resume from the saved cursor.', false );
+			\WP_CLI::halt( 1 );
+		}
+		if ( $dry_run ) {
+			\WP_CLI::success( sprintf( '[DRY RUN] Would index %d relationship(s) across %d parent(s).', $result['dependencies_indexed'], $result['parents_scanned'] ) );
+			return;
+		}
+		\WP_CLI::success( sprintf( 'Indexed %d relationship(s) across %d parent(s); readiness marker recorded.', $result['dependencies_indexed'], $result['parents_scanned'] ) );
+	}
+}
+
 /** Database migration command — runs pending migrations under a global lock. */
 final class Migrate_Command {
 	use CSV_Command_Utilities;
@@ -855,18 +966,24 @@ final class Migrate_Command {
 	 * Run pending governance data migrations.
 	 *
 	 * Migrations are idempotent, chunked, and resumable. They must be run
-	 * before promoting a new release to production traffic.
+	 * before promoting a new release to production traffic. Mutual exclusion
+	 * uses a MySQL advisory lock (GET_LOCK) that releases automatically when
+	 * the holding connection closes; contention, lock errors, and databases
+	 * without GET_LOCK support all refuse to run (fail-closed).
+	 *
+	 * Exit codes: 1 migration failure, 3 lock contention, 4 advisory locks
+	 * unsupported or lock error.
 	 *
 	 * ## OPTIONS
 	 * [--force]
-	 * : Override a stale migration lock.
+	 * : Deprecated; ignored. Advisory locks cannot go stale, so there is
+	 * nothing to override.
 	 *
 	 * [--status]
 	 * : Display current migration state without running migrations.
 	 *
 	 * ## EXAMPLES
 	 *     wp longevity migrate
-	 *     wp longevity migrate --force
 	 *     wp longevity migrate --status
 	 */
 	public function __invoke( array $args, array $assoc_args ): void {
@@ -886,8 +1003,10 @@ final class Migrate_Command {
 			return;
 		}
 
-		$force  = isset( $assoc_args['force'] );
-		$result = Migrations::run_migrations( $force );
+		if ( isset( $assoc_args['force'] ) ) {
+			\WP_CLI::warning( '--force is deprecated and ignored: the advisory lock releases automatically when its holder exits.' );
+		}
+		$result = Migrations::run_migrations();
 
 		if ( $result['migrated'] ) {
 			\WP_CLI::log( sprintf( 'Migrated version(s): %s', implode( ', ', $result['migrated'] ) ) );
@@ -899,30 +1018,36 @@ final class Migrate_Command {
 			} else {
 				\WP_CLI::success( sprintf( 'Migrations complete. Now at version %d.', Migrations::CURRENT_VERSION ) );
 			}
-		} else {
-			\WP_CLI::error( $result['error'] );
+			return;
 		}
+
+		if ( Advisory_Lock::CONTENDED === $result['lock_state'] ) {
+			\WP_CLI::error( $result['error'], false );
+			\WP_CLI::halt( 3 );
+		}
+		if ( in_array( $result['lock_state'], array( Advisory_Lock::UNSUPPORTED, Advisory_Lock::ERROR ), true ) ) {
+			\WP_CLI::error( $result['error'], false );
+			\WP_CLI::halt( 4 );
+		}
+		\WP_CLI::error( $result['error'] );
 	}
 }
 
-/** Structured external evidence management for operators. */
+/** Append-only external evidence management for operators. */
 final class Evidence_Command {
 	use CSV_Command_Utilities;
 
-	/** @var array<string, string> Valid evidence types mapped to their option keys. */
-	private const EVIDENCE_OPTIONS = array(
-		'backup'       => 'lel_last_backup_evidence',
-		'restore'      => 'lel_last_restore_drill_evidence',
-		'mail'         => 'lel_mail_transport_evidence',
-	);
-
 	/**
-	 * Set structured external readiness evidence.
+	 * Record a new immutable evidence entry.
+	 *
+	 * Evidence is append-only: corrections are new records, never edits.
+	 * Release-scoped types (e.g. release-artifact) require --release-sha and
+	 * --checksum so a generic pass can never stand in for a specific release.
 	 *
 	 * ## OPTIONS
 	 *
 	 * --type=<type>
-	 * : Evidence type (backup, restore, mail).
+	 * : Evidence type (backup, restore, mail, release-artifact).
 	 *
 	 * --result=<result>
 	 * : Result value (ok, pass, fail, error).
@@ -930,71 +1055,146 @@ final class Evidence_Command {
 	 * [--artifact=<ref>]
 	 * : Artifact reference (e.g. backup file path or ID).
 	 *
-	 * [--performed-at=<datetime>]
-	 * : ISO 8601 datetime when the action was performed. Defaults to now.
+	 * [--source-sha=<sha>]
+	 * : Source commit SHA the evidence attests to (required for release-scoped types).
+	 *
+	 * [--checksum=<hash>]
+	 * : Artifact checksum (required for release-scoped types).
+	 *
+	 * [--produced-at=<datetime>]
+	 * : Datetime when the action was performed. Defaults to now (UTC).
 	 *
 	 * [--expires-at=<datetime>]
-	 * : ISO 8601 datetime when this evidence expires.
+	 * : Datetime when this evidence expires.
 	 *
 	 * [--actor=<name>]
 	 * : Name or identifier of the operator performing the action.
 	 *
-	 * ## EXAMPLES
-	 *     wp longevity evidence set --type=backup --result=ok --artifact=s3://bucket/backup-2026-07-23.sql.gz --actor=ops-bot
-	 *     wp longevity evidence set --type=restore --result=ok --performed-at=2026-07-20T10:00:00Z --expires-at=2026-10-20T10:00:00Z
-	 *     wp longevity evidence list
+	 * [--environment=<environment>]
+	 * : Explicit WordPress environment identity. Defaults to the current environment.
 	 *
-	 * @subcommand set
+	 * [--supersedes=<id>]
+	 * : Earlier same-type evidence record corrected by this record.
+	 *
+	 * [--attachment=<path>]
+	 * : Local attachment path verified at record and verify time.
+	 *
+	 * [--attachment-sha256=<hash>]
+	 * : Exact SHA-256 for --attachment.
+	 *
+	 * ## EXAMPLES
+	 *     wp longevity evidence record --type=backup --result=ok --artifact=s3://bucket/backup-2026-07-23.sql.gz --actor=ops-bot
+	 *     wp longevity evidence record --type=release-artifact --result=pass --source-sha=<full-sha> --checksum=<sha256>
+	 *     wp longevity evidence list --type=backup
+	 *
+	 * @subcommand record
 	 */
-	public function set( array $args, array $assoc_args ): void {
+	public function record( array $args, array $assoc_args ): void {
 		unset( $args );
 		$this->require_capability( 'manage_options' );
-		$type   = (string) ( $assoc_args['type'] ?? '' );
-		$result = (string) ( $assoc_args['result'] ?? '' );
+		$type = (string) ( $assoc_args['type'] ?? '' );
 
-		if ( ! isset( self::EVIDENCE_OPTIONS[ $type ] ) ) {
-			\WP_CLI::error( sprintf( 'Invalid evidence type "%s". Valid types: %s', $type, implode( ', ', array_keys( self::EVIDENCE_OPTIONS ) ) ) );
-		}
-		if ( ! in_array( $result, array( 'ok', 'pass', 'fail', 'error' ), true ) ) {
-			\WP_CLI::error( 'Result must be one of: ok, pass, fail, error.' );
-		}
-
-		$environment = function_exists( 'wp_get_environment_type' ) ? wp_get_environment_type() : 'production';
-		$evidence    = array(
-			'type'         => $type,
-			'result'       => $result,
-			'artifact_ref' => sanitize_text_field( (string) ( $assoc_args['artifact'] ?? '' ) ),
-			'performed_at' => sanitize_text_field( (string) ( $assoc_args['performed-at'] ?? gmdate( DATE_W3C ) ) ),
-			'expires_at'   => sanitize_text_field( (string) ( $assoc_args['expires-at'] ?? '' ) ),
-			'actor'        => sanitize_text_field( (string) ( $assoc_args['actor'] ?? '' ) ),
-			'environment'  => $environment,
-			'release_id'   => sanitize_text_field( (string) ( $assoc_args['release-id'] ?? '' ) ),
+		$fields = array(
+			'result'              => (string) ( $assoc_args['result'] ?? '' ),
+			'artifact_ref'        => sanitize_text_field( (string) ( $assoc_args['artifact'] ?? '' ) ),
+			'release_sha'         => sanitize_text_field( (string) ( $assoc_args['source-sha'] ?? $assoc_args['release-sha'] ?? '' ) ),
+			'artifact_checksum'   => sanitize_text_field( (string) ( $assoc_args['checksum'] ?? '' ) ),
+			'produced_at'         => sanitize_text_field( (string) ( $assoc_args['produced-at'] ?? gmdate( 'Y-m-d H:i:s' ) ) ),
+			'expires_at'          => sanitize_text_field( (string) ( $assoc_args['expires-at'] ?? '' ) ),
+			'actor'               => sanitize_text_field( (string) ( $assoc_args['actor'] ?? '' ) ),
+			'environment'         => (string) ( $assoc_args['environment'] ?? ( function_exists( 'wp_get_environment_type' ) ? wp_get_environment_type() : '' ) ),
+			'supersedes_id'       => (int) ( $assoc_args['supersedes'] ?? 0 ),
+			'attachment_location' => (string) ( $assoc_args['attachment'] ?? '' ),
+			'attachment_sha256'   => sanitize_text_field( (string) ( $assoc_args['attachment-sha256'] ?? '' ) ),
+			'source_channel'      => 'cli',
 		);
 
-		$option = self::EVIDENCE_OPTIONS[ $type ];
-		update_option( $option, wp_json_encode( $evidence, JSON_UNESCAPED_SLASHES ), false );
+		$id = Evidence_Store::record( $type, $fields );
+		if ( $id instanceof \WP_Error ) {
+			\WP_CLI::error( $id->get_error_message() );
+		}
 
-		Audit_Log::record( 'evidence_recorded', 'system', 0, array( 'type' => $type, 'result' => $result ), function_exists( 'get_current_user_id' ) ? get_current_user_id() : 0, 'cli' );
-		\WP_CLI::success( sprintf( 'Evidence for "%s" recorded (result: %s).', $type, $result ) );
+		\WP_CLI::success( sprintf( 'Evidence #%d for "%s" recorded (result: %s).', (int) $id, $type, $fields['result'] ) );
 	}
 
 	/**
-	 * List current external evidence state.
+	 * List recorded evidence, newest first.
+	 *
+	 * ## OPTIONS
+	 *
+	 * [--type=<type>]
+	 * : Restrict to a single evidence type. Defaults to all types.
+	 *
+	 * [--limit=<n>]
+	 * : Maximum records per type. Default 10.
 	 *
 	 * ## EXAMPLES
 	 *     wp longevity evidence list
+	 *     wp longevity evidence list --type=backup --limit=25
 	 *
 	 * @subcommand list
 	 */
 	public function list( array $args, array $assoc_args ): void {
-		unset( $args, $assoc_args );
-		$out = array();
-		foreach ( self::EVIDENCE_OPTIONS as $type => $option ) {
-			$value   = get_option( $option, '' );
-			$decoded = is_string( $value ) ? json_decode( $value, true ) : null;
-			$out[ $type ] = is_array( $decoded ) ? $decoded : ( '' !== $value ? array( 'legacy_value' => $value ) : null );
+		unset( $args );
+		$this->require_capability( 'manage_options' );
+		$limit = max( 1, (int) ( $assoc_args['limit'] ?? 10 ) );
+		$types = isset( $assoc_args['type'] ) ? array( (string) $assoc_args['type'] ) : Evidence_Store::types();
+		$out   = array();
+		foreach ( $types as $type ) {
+			$out[ $type ] = Evidence_Store::all( $type, $limit );
 		}
 		\WP_CLI::line( wp_json_encode( $out, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+	}
+
+	/**
+	 * Show a single evidence record.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <id>
+	 * : Evidence record ID.
+	 *
+	 * ## EXAMPLES
+	 *     wp longevity evidence show 42
+	 *
+	 * @subcommand show
+	 */
+	public function show( array $args, array $assoc_args ): void {
+		unset( $assoc_args );
+		$this->require_capability( 'manage_options' );
+		$id  = (int) ( $args[0] ?? 0 );
+		$row = Evidence_Store::get( $id );
+		if ( null === $row ) {
+			\WP_CLI::error( sprintf( 'No evidence record with ID %d.', $id ) );
+		}
+		\WP_CLI::line( wp_json_encode( $row, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+	}
+
+	/**
+	 * Verify a record's content hash to detect tampering.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <id>
+	 * : Evidence record ID.
+	 *
+	 * ## EXAMPLES
+	 *     wp longevity evidence verify 42
+	 *
+	 * @subcommand verify
+	 */
+	public function verify( array $args, array $assoc_args ): void {
+		unset( $assoc_args );
+		$this->require_capability( 'manage_options' );
+		$id = (int) ( $args[0] ?? 0 );
+		if ( null === Evidence_Store::get( $id ) ) {
+			\WP_CLI::error( sprintf( 'No evidence record with ID %d.', $id ) );
+		}
+		if ( Evidence_Store::verify( $id ) ) {
+			\WP_CLI::success( sprintf( 'Evidence #%d hash is intact.', $id ) );
+			return;
+		}
+		\WP_CLI::error( sprintf( 'Evidence #%d hash does NOT match its content (tampering or corruption).', $id ) );
 	}
 }
 
@@ -1033,5 +1233,314 @@ final class Metrics_Command {
 			\WP_CLI::error( sprintf( 'Unable to write metrics to %s.', $file ) );
 		}
 		\WP_CLI::success( sprintf( 'Metrics written to %s.', $file ) );
+	}
+}
+
+/**
+ * Legal hold lifecycle for private contact records.
+ */
+final class Legal_Hold_Command {
+	/**
+	 * Place, release, list, or report legal holds.
+	 *
+	 * ## OPTIONS
+	 * <action>
+	 * : One of: place, release, list, report.
+	 *
+	 * [<post_id>]
+	 * : Contact message post ID (required for place/release).
+	 *
+	 * [--reason=<reason>]
+	 * : Human reason for the transition (required for place/release).
+	 *
+	 * [--case=<ref>]
+	 * : Optional case reference recorded in the audit trail.
+	 *
+	 * ## EXAMPLES
+	 *     wp longevity legal-hold place 123 --reason="Regulator request" --case=CASE-9
+	 *     wp longevity legal-hold release 123 --reason="Case closed" --case=CASE-9
+	 *     wp longevity legal-hold list
+	 *     wp longevity legal-hold report
+	 */
+	public function __invoke( array $args, array $assoc_args ): void {
+		if ( ! current_user_can( Legal_Hold::CAPABILITY ) ) {
+			\WP_CLI::error( sprintf( 'This command requires %s. Run WP-CLI with an authorized --user.', Legal_Hold::CAPABILITY ) );
+		}
+		$action = sanitize_key( (string) ( $args[0] ?? '' ) );
+
+		if ( 'list' === $action ) {
+			$held = Legal_Hold::held_message_ids();
+			\WP_CLI::line( wp_json_encode( array( 'held_post_ids' => $held, 'count' => count( $held ) ), JSON_PRETTY_PRINT ) );
+			return;
+		}
+		if ( 'report' === $action ) {
+			$report = Legal_Hold::legacy_report();
+			\WP_CLI::line( wp_json_encode( $report, JSON_PRETTY_PRINT ) );
+			if ( $report['count'] > 0 ) {
+				\WP_CLI::warning( 'Legacy contact_legal_hold keys remain quarantined pending human privacy review; they are never auto-released.' );
+			}
+			return;
+		}
+		if ( ! in_array( $action, array( 'place', 'release' ), true ) ) {
+			\WP_CLI::error( 'Use `wp longevity legal-hold place|release|list|report`.' );
+		}
+
+		$post_id = (int) ( $args[1] ?? 0 );
+		$reason  = trim( (string) ( $assoc_args['reason'] ?? '' ) );
+		$case    = trim( (string) ( $assoc_args['case'] ?? '' ) );
+		if ( $post_id < 1 ) {
+			\WP_CLI::error( 'A contact message post ID is required.' );
+		}
+		if ( '' === $reason ) {
+			\WP_CLI::error( 'A --reason is required for every legal hold transition.' );
+		}
+
+		$result = 'place' === $action
+			? Legal_Hold::place( $post_id, get_current_user_id(), $reason, $case, 'cli' )
+			: Legal_Hold::release( $post_id, get_current_user_id(), $reason, $case, 'cli' );
+		if ( is_wp_error( $result ) ) {
+			\WP_CLI::error( $result->get_error_message() );
+		}
+		\WP_CLI::success( sprintf( 'Legal hold %sd on post %d.', $action, $post_id ) );
+	}
+}
+
+/**
+ * Authenticated pre-launch acceptance sweep.
+ *
+ * Aggregates the code-side launch gates: platform preflight, migration
+ * currency, overall system readiness (which subsumes cron, queue, release
+ * evidence, and table postconditions), audit-chain integrity, schedules,
+ * role drift, and exact immutable artifact identity. It never manufactures
+ * editorial approvals or evidence grades.
+ */
+final class Acceptance_Command {
+	/**
+	 * Run the acceptance sweep.
+	 *
+	 * ## OPTIONS
+	 *
+	 * [--format=<format>]
+	 * : Output format: table or json. Default table.
+	 *
+	 * [--source-sha=<sha>]
+	 * : Exact candidate source commit SHA.
+	 *
+	 * [--artifact-checksum=<sha256>]
+	 * : Exact candidate release artifact SHA-256.
+	 *
+	 * @param array $args       Positional arguments (unused).
+	 * @param array $assoc_args Associative arguments.
+	 */
+	public function __invoke( array $args, array $assoc_args ): void {
+		unset( $args );
+		if ( ! current_user_can( 'manage_options' ) ) {
+			\WP_CLI::error( 'This command requires manage_options. Run WP-CLI with an authorized --user.' );
+		}
+
+		$checks   = array();
+		$checks[] = $this->artifact_identity_check(
+			strtolower( trim( (string) ( $assoc_args['source-sha'] ?? '' ) ) ),
+			strtolower( trim( (string) ( $assoc_args['artifact-checksum'] ?? '' ) ) )
+		);
+		$checks[] = $this->run_check( 'preflight', fn(): array => $this->preflight_check() );
+		$checks[] = $this->run_check( 'migrations', fn(): array => $this->migration_check() );
+
+		$report = System_Readiness::report();
+		$checks[] = array(
+			'name'   => 'system_readiness',
+			'status' => System_Readiness::normalize_status( (string) ( $report['status'] ?? '' ) ),
+			'detail' => $this->summarize_readiness( $report ),
+		);
+		foreach ( array( 'freshness', 'cron_heartbeat', 'worker_heartbeats', 'audit_write_failures', 'publication_lock', 'invalidation_queue', 'dependency_index', 'notification_outbox', 'mail_transport', 'last_backup', 'last_restore_drill', 'release_evidence' ) as $surface ) {
+			$sub      = isset( $report['checks'][ $surface ] ) && is_array( $report['checks'][ $surface ] ) ? $report['checks'][ $surface ] : array();
+			$checks[] = array(
+				'name'   => $surface,
+				'status' => System_Readiness::normalize_status( (string) ( $sub['status'] ?? '' ) ),
+				'detail' => (string) ( $sub['message'] ?? 'No status reported.' ),
+			);
+		}
+
+		$checks[] = $this->run_check( 'audit_chain', fn(): array => $this->audit_chain_check() );
+		foreach ( $this->worker_checks() as $worker_check ) {
+			$checks[] = $worker_check;
+		}
+		$checks[] = $this->run_check( 'role_matrix', fn(): array => $this->role_matrix_check() );
+		$checks[] = $this->run_check( 'synthetic_code_workflow', fn(): array => $this->synthetic_code_workflow_check() );
+		$checks[] = array( 'name' => 'synthetic_contact_delivery', 'status' => 'unknown_external', 'detail' => 'Requires an explicitly isolated synthetic contact route and mail sink/provider test; this command will not write contact data or send mail.' );
+		foreach ( $checks as $index => $check ) {
+			if ( ! isset( $check['status'] ) ) {
+				$checks[ $index ] = array( 'name' => 'malformed_check_' . $index, 'status' => 'error', 'detail' => 'Acceptance producer returned no status.' );
+				continue;
+			}
+			$checks[ $index ]['status'] = System_Readiness::normalize_status( (string) $check['status'] );
+		}
+
+		$blocked = array_values( array_filter( $checks, static fn( array $c ): bool => 'ok' !== $c['status'] ) );
+		$overall = $blocked ? 'blocked' : 'ok';
+
+		$format = isset( $assoc_args['format'] ) ? (string) $assoc_args['format'] : 'table';
+		if ( 'json' === $format ) {
+			\WP_CLI::line( (string) wp_json_encode( array( 'status' => $overall, 'checks' => $checks ), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+		} else {
+			foreach ( $checks as $check ) {
+				\WP_CLI::line( sprintf( '%-9s %-20s %s', strtoupper( $check['status'] ), $check['name'], $check['detail'] ) );
+			}
+		}
+
+		if ( 'blocked' === $overall ) {
+			\WP_CLI::error( sprintf( '%d acceptance check(s) blocked. Launch remains NO-GO.', count( $blocked ) ), false );
+			\WP_CLI::halt( 1 );
+		}
+		if ( 'json' !== $format ) {
+			\WP_CLI::success( 'Repository, runtime, and supplied external acceptance checks passed for the configured release identity.' );
+		}
+	}
+
+	/** Keep acceptance output machine-readable when an individual producer throws. */
+	private function run_check( string $name, callable $producer ): array {
+		try {
+			return $producer();
+		} catch ( \Throwable $error ) {
+			error_log( '[longevity-core] acceptance check failed: ' . $name . ': ' . $error->getMessage() );
+			return array( 'name' => $name, 'status' => 'error', 'detail' => 'Acceptance check failed internally.' );
+		}
+	}
+
+	/** Platform preflight: PHP, extensions, WordPress, MySQL, WP-CLI. */
+	private function preflight_check(): array {
+		$results = Platform_Requirements::check( true );
+		$unmet   = array_values( array_filter( $results, static fn( array $r ): bool => empty( $r['satisfied'] ) ) );
+		return array(
+			'name'   => 'preflight',
+			'status' => $unmet ? 'blocked' : 'ok',
+			'detail' => $unmet
+				? 'Unmet: ' . implode( ', ', array_map( static fn( array $r ): string => (string) $r['requirement'], $unmet ) ) . '.'
+				: 'PHP, extensions, WordPress, MySQL, and WP-CLI satisfied.',
+		);
+	}
+
+	/** Migration currency and postcondition proxy (no pending, no error, tables present). */
+	private function migration_check(): array {
+		$current = (int) get_option( 'lel_data_version', 0 );
+		if ( null !== Migrations::error_state() ) {
+			return array( 'name' => 'migrations', 'status' => 'blocked', 'detail' => 'A migration error is recorded.' );
+		}
+		if ( Migrations::is_pending() || $current < Migrations::CURRENT_VERSION ) {
+			return array( 'name' => 'migrations', 'status' => 'blocked', 'detail' => sprintf( 'Pending: at %d of %d.', $current, Migrations::CURRENT_VERSION ) );
+		}
+		$tables = array(
+			'approval snapshots'  => Approval_Repository::exists(),
+			'audit log'           => Audit_Log::exists(),
+			'invalidation queue'  => ! empty( Invalidation_Queue::stats()['table_missing'] ) ? false : true,
+			'dependency index'    => Dependency_Index::exists(),
+			'notification outbox' => Notification_Outbox::exists(),
+			'contact rate limit'  => Public_Contact::rate_table_exists(),
+			'external evidence'   => Evidence_Store::exists(),
+		);
+		$missing = array_keys( array_filter( $tables, static fn( bool $present ): bool => ! $present ) );
+		if ( $missing ) {
+			return array( 'name' => 'migrations', 'status' => 'blocked', 'detail' => 'Missing tables: ' . implode( ', ', $missing ) . '.' );
+		}
+		return array( 'name' => 'migrations', 'status' => 'ok', 'detail' => sprintf( 'At version %d with all governed tables present.', $current ) );
+	}
+
+	/** Audit hash-chain integrity. */
+	private function audit_chain_check(): array {
+		$result = Audit_Log::verify_chain();
+		if ( empty( $result['valid'] ) ) {
+			$errors = isset( $result['errors'] ) && is_array( $result['errors'] ) ? implode( ', ', array_slice( $result['errors'], 0, 3 ) ) : 'unknown';
+			return array( 'name' => 'audit_chain', 'status' => 'blocked', 'detail' => sprintf( 'Chain invalid after %d event(s): %s.', (int) ( $result['checked'] ?? 0 ), $errors ) );
+		}
+		return array( 'name' => 'audit_chain', 'status' => 'ok', 'detail' => sprintf( 'Verified %d audit event(s).', (int) ( $result['checked'] ?? 0 ) ) );
+	}
+
+	/** One-line summary of any non-ok readiness sub-checks. */
+	private function summarize_readiness( array $report ): string {
+		$overall = (string) ( $report['status'] ?? 'blocked' );
+		if ( 'ok' === $overall ) {
+			return 'All readiness checks ok.';
+		}
+		$flagged = array();
+		foreach ( (array) ( $report['checks'] ?? array() ) as $name => $check ) {
+			$status = is_array( $check ) ? (string) ( $check['status'] ?? '' ) : '';
+			if ( 'ok' !== $status ) {
+				$flagged[] = $name . '=' . $status;
+			}
+		}
+		return 'Non-ok: ' . implode( ', ', $flagged ) . '.';
+	}
+
+	/** Exact candidate identity must match immutable deployed configuration. */
+	private function artifact_identity_check( string $source_sha, string $artifact_checksum ): array {
+		if ( 1 !== preg_match( '/\A(?:[a-f0-9]{40}|[a-f0-9]{64})\z/', $source_sha )
+			|| 1 !== preg_match( '/\A[a-f0-9]{64}\z/', $artifact_checksum ) ) {
+			return array( 'name' => 'artifact_identity', 'status' => 'blocked', 'detail' => 'Exact candidate source SHA and artifact SHA-256 are required.' );
+		}
+		$runtime = Evidence_Store::runtime_release_identity();
+		if ( empty( $runtime['valid'] ) ) {
+			return array( 'name' => 'artifact_identity', 'status' => 'error', 'detail' => 'Immutable deployed release identity is missing or malformed.' );
+		}
+		if ( ! hash_equals( (string) $runtime['release_sha'], $source_sha )
+			|| ! hash_equals( (string) $runtime['artifact_checksum'], $artifact_checksum ) ) {
+			return array( 'name' => 'artifact_identity', 'status' => 'blocked', 'detail' => 'Candidate identity does not exactly match the deployed artifact.' );
+		}
+		return array( 'name' => 'artifact_identity', 'status' => 'ok', 'detail' => 'Candidate and deployed source/artifact identity match exactly.' );
+	}
+
+	/** Required recurring workers need independent schedules and recent heartbeats. */
+	private function worker_checks(): array {
+		$checks = array();
+		foreach ( Freshness::worker_statuses() as $worker => $state ) {
+			$checks[] = array(
+				'name'   => 'worker_' . $worker,
+				'status' => (string) ( $state['status'] ?? 'error' ),
+				'detail' => sprintf( 'hook=%s scheduled=%s heartbeat=%s', (string) ( $state['hook'] ?? '' ), ! empty( $state['scheduled'] ) ? 'yes' : 'no', '' !== (string) ( $state['heartbeat_at'] ?? '' ) ? (string) $state['heartbeat_at'] : 'missing' ),
+			);
+		}
+		return $checks;
+	}
+
+	/** Create/invalidate/projection probe with no grade, publication, or approval. */
+	private function synthetic_code_workflow_check(): array {
+		$token   = 'lel-acceptance-' . wp_generate_uuid4();
+		$post_id = wp_insert_post(
+			array(
+				'post_type'    => 'post',
+				'post_status'  => 'draft',
+				'post_title'   => '[LEL synthetic acceptance] ' . $token,
+				'post_content' => '<!-- wp:paragraph --><p>Synthetic acceptance fixture; never public.</p><!-- /wp:paragraph -->',
+				'meta_input'   => array( '_lel_acceptance_probe' => $token ),
+			),
+			true
+		);
+		if ( is_wp_error( $post_id ) || (int) $post_id < 1 ) {
+			return array( 'name' => 'synthetic_code_workflow', 'status' => 'blocked', 'detail' => 'Could not create an isolated draft fixture.' );
+		}
+		$post_id = (int) $post_id;
+		$result  = array( 'name' => 'synthetic_code_workflow', 'status' => 'ok', 'detail' => 'Draft creation, mandatory-audit invalidation, private projection, and cleanup succeeded.' );
+		try {
+			if ( array() !== Rest_API::public_projection( $post_id ) ) {
+				$result = array( 'name' => 'synthetic_code_workflow', 'status' => 'blocked', 'detail' => 'Draft fixture leaked into the public projection.' );
+			} elseif ( Approval_Service::invalidate_direct( $post_id, $token, get_current_user_id(), false, $token ) < 1 ) {
+				$result = array( 'name' => 'synthetic_code_workflow', 'status' => 'blocked', 'detail' => 'Synthetic invalidation lacked a durable audit event.' );
+			}
+		} finally {
+			if ( ! wp_delete_post( $post_id, true ) ) {
+				$result = array( 'name' => 'synthetic_code_workflow', 'status' => 'blocked', 'detail' => 'Synthetic fixture cleanup failed.' );
+			}
+		}
+		return $result;
+	}
+
+	/** Capability matrix version and role grants must have no drift. */
+	private function role_matrix_check(): array {
+		$drift   = Roles::reconcile( true );
+		$current = (string) get_option( 'lel_roles_reconciled_version', '' );
+		$changed = count( $drift['added'] ) + count( $drift['removed'] ) + count( $drift['missing_roles'] );
+		if ( Roles::MATRIX_VERSION !== $current || $changed > 0 ) {
+			return array( 'name' => 'role_matrix', 'status' => 'blocked', 'detail' => sprintf( 'Expected matrix %s; configured %s with %d drift item(s).', Roles::MATRIX_VERSION, '' === $current ? 'missing' : $current, $changed ) );
+		}
+		return array( 'name' => 'role_matrix', 'status' => 'ok', 'detail' => 'Role capabilities match matrix ' . Roles::MATRIX_VERSION . '.' );
 	}
 }

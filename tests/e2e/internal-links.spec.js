@@ -64,7 +64,7 @@ test.describe('runtime internal link crawl', () => {
 
         let url;
         try {
-          url = new URL(trimmed, 'http://localhost:8080');
+          url = new URL(trimmed, process.env.WP_SITE_URL || 'http://localhost:8080');
         } catch {
           continue;
         }
@@ -80,18 +80,44 @@ test.describe('runtime internal link crawl', () => {
         let linkResponse;
         let status;
         let finalUrl;
+        let redirectCount = 0;
 
         try {
-          linkResponse = await page.request.get(url.pathname + url.search, { maxRedirects: 5, timeout: 10000 });
+          linkResponse = await page.request.get(url.pathname + url.search, { maxRedirects: 0, timeout: 10000 });
           status = linkResponse.status();
-          const finalLocation = linkResponse.url();
-          finalUrl = normalizePath(new URL(finalLocation).pathname);
+          finalUrl = normalizePath(url.pathname);
+
+          if (status === 301 || status === 302 || status === 303 || status === 307 || status === 308) {
+            const location = linkResponse.headers()['location'];
+            if (location) {
+              redirectCount = 1;
+              const redirectUrl = new URL(location, process.env.WP_SITE_URL || 'http://localhost:8080');
+              finalUrl = normalizePath(redirectUrl.pathname);
+
+              const followResponse = await page.request.get(redirectUrl.pathname + redirectUrl.search, { maxRedirects: 5, timeout: 10000 });
+              status = followResponse.status();
+              const followLocation = followResponse.url();
+              finalUrl = normalizePath(new URL(followLocation).pathname);
+            }
+          } else {
+            const finalLocation = linkResponse.url();
+            finalUrl = normalizePath(new URL(finalLocation).pathname);
+          }
         } catch {
           results.push({ source: path, linkText: text, target: trimmed, status: 'error', redirects: 0 });
           continue;
         }
 
-        const redirectCount = linkResponse.headers()['location'] ? 1 : 0;
+        let noindex = false;
+        try {
+          const robotsResponse = await page.request.get(url.pathname + url.search, { maxRedirects: 0, timeout: 10000 });
+          const robotsMeta = robotsResponse.headers()['x-robots-tag'];
+          if (robotsMeta && robotsMeta.includes('noindex')) {
+            noindex = true;
+          }
+        } catch {
+          // ignore — can't check noindex on error
+        }
 
         results.push({
           source: path,
@@ -100,7 +126,12 @@ test.describe('runtime internal link crawl', () => {
           status,
           redirects: redirectCount,
           finalUrl,
+          noindex,
         });
+
+        if (noindex) {
+          console.warn(`WARNING: ${path} links to noindex destination ${trimmed}`);
+        }
 
         if (status === 404 || status === 410 || status === 500) {
           expect.soft(status, `Link on ${path} -> ${trimmed} returned ${status}`).not.toBe(404);
@@ -126,6 +157,13 @@ test.describe('runtime internal link crawl', () => {
       console.log(`\nRedirected links (${redirects.length}):`);
       for (const r of redirects) {
         console.log(`  ${r.source} -> ${r.target} -> ${r.finalUrl}`);
+      }
+    }
+    const noindexLinks = results.filter(r => r.noindex);
+    if (noindexLinks.length > 0) {
+      console.log(`\nNoindex destination warnings (${noindexLinks.length}):`);
+      for (const r of noindexLinks) {
+        console.log(`  ${r.source} -> ${r.target}`);
       }
     }
   });

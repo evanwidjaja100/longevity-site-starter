@@ -1,5 +1,8 @@
 # Monitoring
 
+**Owner:** Operations
+**Last reviewed:** 2026-07-28
+
 ## Application health endpoint (liveness)
 
 The longevity-core MU plugin exposes a public **liveness** endpoint:
@@ -92,16 +95,14 @@ For managed WordPress hosting, the host typically provides:
 - CDN cache hit ratio
 - TLS certificate auto-renewal and expiry alerts
 
-The managed host is the only supported production target; the previous
-self-hosted VPS path is retired and must not be re-introduced without a
-new architecture decision record.
+The managed host is the only supported production target. Any alternate
+topology requires a new architecture decision record before implementation.
 
 ## Metrics and alerting
 
-The plugin exposes Prometheus text-format (`0.0.4`) metrics through two collection modes:
+The plugin exposes Prometheus text-format (`0.0.4`) metrics for an external, authenticated collector:
 
-- **Pull (REST):** `GET /wp-json/longevity/v1/metrics` — gated by the `view_operational_readiness` capability. Scrape with authenticated Prometheus (see `ops/monitoring/prometheus-scrape.yml`, `basic_auth`). Returns `Content-Type: text/plain; version=0.0.4`.
-- **Push (textfile collector):** `wp longevity metrics --file=/var/lib/node_exporter/textfile/longevity.prom` — writes atomically (temp file + rename) for the node_exporter textfile collector. Requires `manage_options`. Run on a short cron interval. Omit `--file` to print to stdout.
+- **Pull (REST):** `GET /wp-json/longevity/v1/metrics` — gated by the `view_operational_readiness` capability. Scrape with an external authenticated collector (see `ops/monitoring/prometheus-scrape.yml`, `basic_auth`). Returns `Content-Type: text/plain; version=0.0.4`.
 
 Exposed series:
 

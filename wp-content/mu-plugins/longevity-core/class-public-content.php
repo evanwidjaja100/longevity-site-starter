@@ -111,7 +111,7 @@ class Public_Content {
 		$html = '<section class="longevity-related-content" aria-labelledby="' . esc_attr( $id ) . '"><h2 id="' . esc_attr( $id ) . '">' . esc_html__( 'Continue exploring', 'longevity-core' ) . '</h2><ul>';
 		foreach ( $posts as $related ) {
 			$guide_event = 'review' === $related->post_type ? 'ranking_report_open' : 'guide_open';
-			$guide_attr  = 'guide_open' === $guide_event ? 'data-lel-event="guide_open" data-guide-id="' . esc_attr( $related->ID ) . '" data-placement="related-content"' : '';
+			$guide_attr  = 'guide_open' === $guide_event ? 'data-lel-event="guide_open" data-guide-id="' . esc_attr( (string) $related->ID ) . '" data-placement="related-content"' : '';
 			$html .= '<li><a href="' . esc_url( get_permalink( $related ) ) . '" ' . $guide_attr . '>' . esc_html( get_the_title( $related ) ) . '</a> <span class="longevity-small">' . esc_html( 'review' === $related->post_type ? __( 'Consumer Lab review', 'longevity-core' ) : __( 'Evidence guide', 'longevity-core' ) ) . '</span></li>';
 		}
 		return $html . '</ul></section>';
@@ -265,7 +265,7 @@ class Public_Content {
 			}
 			$has_cards = true;
 
-			$html .= '<article class="longevity-topic-card"><h3><a href="' . esc_url( get_category_link( $term->term_id ) ) . '" data-lel-event="topic_open" data-topic="' . esc_attr( $topic['slug'] ?? $term->slug ) . '" data-placement="topic-directory">' . esc_html( $topic['label'] ) . '</a></h3><p class="longevity-topic-desc">' . esc_html( $topic['desc'] ) . '</p><p class="longevity-topic-example">' . esc_html( $topic['example'] ) . '</p><p class="longevity-topic-counts">';
+			$html .= '<article class="longevity-topic-card"><h3><a href="' . esc_url( get_category_link( $term->term_id ) ) . '" data-lel-event="topic_open" data-topic="' . esc_attr( $term->slug ) . '" data-placement="topic-directory">' . esc_html( $topic['label'] ) . '</a></h3><p class="longevity-topic-desc">' . esc_html( $topic['desc'] ) . '</p><p class="longevity-topic-example">' . esc_html( $topic['example'] ) . '</p><p class="longevity-topic-counts">';
 
 			$counts = array();
 			if ( $guide_count > 0 ) {
@@ -346,7 +346,7 @@ class Public_Content {
 		$html .= '</select></label>';
 		$html .= '<button class="wp-element-button" type="submit">' . esc_html__( 'Apply', 'longevity-core' ) . '</button>';
 		if ( $topic_slug || $sort ) {
-			$html .= ' <a class="longevity-clear-filters" href="' . esc_url( home_url( '/guides/' ) ) . '">' . esc_html__( 'Clear filters', 'longevity-core' ) . '</a>';
+			$html .= ' <a class="longevity-clear-filters" href="' . esc_url( Routes::public_page_url( 'guides' ) ?: home_url( '/guides/' ) ) . '">' . esc_html__( 'Clear filters', 'longevity-core' ) . '</a>';
 		}
 		$html .= '</form>';
 
@@ -387,7 +387,7 @@ class Public_Content {
 		} else {
 			$html .= '<div class="longevity-empty-state"><p>' . esc_html__( 'No guides match the selected filters.', 'longevity-core' ) . '</p>';
 			if ( $topic_slug ) {
-				$html .= ' <a href="' . esc_url( home_url( '/guides/' ) ) . '">' . esc_html__( 'Clear filters and browse all guides.', 'longevity-core' ) . '</a>';
+				$html .= ' <a href="' . esc_url( Routes::public_page_url( 'guides' ) ?: home_url( '/guides/' ) ) . '">' . esc_html__( 'Clear filters and browse all guides.', 'longevity-core' ) . '</a>';
 			}
 			$html .= '</div>';
 		}

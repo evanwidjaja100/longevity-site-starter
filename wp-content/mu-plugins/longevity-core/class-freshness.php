@@ -12,13 +12,53 @@ defined( 'ABSPATH' ) || exit;
 /** Identifies due records without rewriting, approving, or publishing content. */
 final class Freshness {
 	private const HOOK = 'lel_daily_freshness';
-	private const LOCK = 'lel_freshness_lock';
+	private const WORKERS = array(
+		'freshness'    => array( 'hook' => self::HOOK, 'max_age' => 172800 ),
+		'invalidation' => array( 'hook' => 'lel_invalidation_queue_process', 'max_age' => 300 ),
+		'outbox'       => array( 'hook' => 'lel_notification_outbox_send', 'max_age' => 7200 ),
+		'retention'    => array( 'hook' => 'lel_contact_retention_cleanup', 'max_age' => 172800 ),
+	);
 
 	/** Register cron and authenticated status hooks. */
 	public static function init(): void {
 		add_action( 'init', array( self::class, 'schedule' ), 30 );
-		add_action( self::HOOK, array( self::class, 'run' ) );
+		add_action( self::HOOK, array( self::class, 'run_scheduled' ) );
+		foreach ( self::WORKERS as $worker => $config ) {
+			if ( 'freshness' !== $worker ) {
+				add_action( $config['hook'], static fn() => self::record_worker_heartbeat( $worker ), PHP_INT_MAX );
+			}
+		}
 		add_action( 'admin_menu', array( self::class, 'register_status_page' ) );
+	}
+
+	/** Cron adapter that records success only after a completed freshness run. */
+	public static function run_scheduled(): void {
+		self::run();
+	}
+
+	/** Persist a namespaced worker heartbeat. */
+	public static function record_worker_heartbeat( string $worker ): void {
+		if ( isset( self::WORKERS[ $worker ] ) ) {
+			update_option( 'lel_worker_heartbeat_' . $worker, gmdate( DATE_W3C ), false );
+		}
+	}
+
+	/** Individual schedule/heartbeat states consumed by readiness and promotion acceptance. */
+	public static function worker_statuses(): array {
+		$statuses = array();
+		foreach ( self::WORKERS as $worker => $config ) {
+			$scheduled = false !== wp_next_scheduled( $config['hook'] );
+			$heartbeat = (string) get_option( 'lel_worker_heartbeat_' . $worker, '' );
+			$timestamp = '' === $heartbeat ? false : strtotime( $heartbeat );
+			$current   = false !== $timestamp && $timestamp >= time() - $config['max_age'];
+			$statuses[ $worker ] = array(
+				'status'       => $scheduled && $current ? 'ok' : 'blocked',
+				'hook'         => $config['hook'],
+				'scheduled'    => $scheduled,
+				'heartbeat_at' => $heartbeat,
+			);
+		}
+		return $statuses;
 	}
 
 	/** Schedule the daily bounded audit if it is not already scheduled. */
@@ -33,12 +73,17 @@ final class Freshness {
 
 	/** Run a bounded, locked scan and return a non-sensitive report. */
 	public static function run(): array {
-		$existing_lock = get_transient( self::LOCK );
-		if ( $existing_lock ) {
-			$lock_age = is_numeric( $existing_lock ) ? max( 0, time() - (int) $existing_lock ) : null;
-			return array( 'status' => 'locked', 'processed' => 0, 'due' => 0, 'lock_age' => $lock_age, 'last_error_code' => 'freshness_locked' );
+		$lock_name   = Advisory_Lock::namespaced_name( 'freshness_cycle' );
+		$lock_result = Advisory_Lock::acquire( $lock_name, 0 );
+		if ( Advisory_Lock::CONTENDED === $lock_result ) {
+			return array( 'status' => 'locked', 'processed' => 0, 'due' => 0, 'lock_age' => null, 'last_error_code' => 'freshness_locked' );
 		}
-		set_transient( self::LOCK, (string) time(), 15 * MINUTE_IN_SECONDS );
+		if ( Advisory_Lock::ACQUIRED !== $lock_result ) {
+			// Fail closed: never run an unlocked cycle on lock errors.
+			update_option( 'lel_freshness_lock_errors', (int) get_option( 'lel_freshness_lock_errors', 0 ) + 1, false );
+			Logger::warning( 'freshness_lock_error', array( 'lock_result' => $lock_result ) );
+			return array( 'status' => 'lock_error', 'processed' => 0, 'due' => 0, 'lock_age' => null, 'last_error_code' => 'freshness_lock_' . $lock_result );
+		}
 		$run_at = gmdate( DATE_W3C );
 		$report = array( 'status' => 'ok', 'processed' => 0, 'due' => 0, 'run_at' => $run_at, 'last_run_at' => $run_at, 'lock_age' => 0, 'last_error_code' => '' );
 		try {
@@ -64,7 +109,7 @@ final class Freshness {
 				if ( $due_fields ) {
 					++$report['due'];
 					update_post_meta( (int) $post_id, '_lel_freshness_status', 'update_due' );
-					update_post_meta( (int) $post_id, '_lel_freshness_due_fields', array_values( $due_fields ) );
+					update_post_meta( (int) $post_id, '_lel_freshness_due_fields', $due_fields );
 					Publication_Gates::log_event( (int) $post_id, 'freshness_update_due', array( 'checks' => count( $due_fields ) ) );
 				} else {
 					delete_post_meta( (int) $post_id, '_lel_freshness_status' );
@@ -91,6 +136,7 @@ final class Freshness {
 				}
 			}
 			update_option( 'lel_cron_heartbeat_at', gmdate( DATE_W3C ), false );
+			self::record_worker_heartbeat( 'freshness' );
 			update_option( 'lel_last_freshness_report', $report, false );
 			delete_option( 'lel_freshness_last_error' );
 		} catch ( \Throwable $error ) {
@@ -101,7 +147,7 @@ final class Freshness {
 			update_option( 'lel_freshness_last_error', array( 'time' => gmdate( DATE_W3C ), 'code' => $error_code ), false );
 			Logger::error( 'freshness_cycle_failed', array( 'error_code' => $error_code, 'message' => $error->getMessage() ) );
 		} finally {
-			delete_transient( self::LOCK );
+			Advisory_Lock::release( $lock_name );
 		}
 		return $report;
 	}
@@ -149,9 +195,6 @@ final class Freshness {
 	/** Count records matching a meta query via direct SQL (avoids SQL_CALC_FOUND_ROWS). */
 	private static function count_by_meta_query( $post_type, array $meta_query, $post_status = 'any' ): int {
 		global $wpdb;
-		if ( ! isset( $wpdb ) || ! method_exists( $wpdb, 'get_var' ) ) {
-			return 0;
-		}
 		$types = is_array( $post_type ) ? $post_type : array( $post_type );
 		$types_in = implode( ',', array_fill( 0, count( $types ), '%s' ) );
 		$statuses = is_array( $post_status ) ? $post_status : array( $post_status );

@@ -216,7 +216,7 @@ final class Routes {
 			return null;
 		}
 		$page = get_page_by_path( $slug, OBJECT, 'page' );
-		self::$page_id_cache[ $key ] = ( $page && isset( $page->ID ) ) ? (int) $page->ID : null;
+		self::$page_id_cache[ $key ] = $page ? (int) $page->ID : null;
 		return self::$page_id_cache[ $key ];
 	}
 
@@ -261,15 +261,15 @@ final class Routes {
 		}
 		$slug = self::canonical_slug( $key );
 		$term = get_term_by( 'slug', $slug, 'category' );
-		if ( ! ( $term && isset( $term->term_id ) ) ) {
+		if ( ! $term ) {
 			foreach ( self::legacy_slugs( $key ) as $legacy ) {
 				$term = get_term_by( 'slug', $legacy, 'category' );
-				if ( $term && isset( $term->term_id ) ) {
+				if ( $term ) {
 					break;
 				}
 			}
 		}
-		self::$category_id_cache[ $key ] = ( $term && isset( $term->term_id ) ) ? (int) $term->term_id : null;
+		self::$category_id_cache[ $key ] = $term ? (int) $term->term_id : null;
 		return self::$category_id_cache[ $key ];
 	}
 

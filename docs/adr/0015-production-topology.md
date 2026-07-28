@@ -1,6 +1,6 @@
 # ADR-0015: Production Deployment Topology
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-07-23
 **Deciders:** Engineering, Operations
 
@@ -19,14 +19,14 @@ We support one production topology:
 - Database managed by host; migrations run via SSH + WP-CLI before traffic promotion
 - Secrets managed via host control panel environment variables
 - CDN/WAF handles TLS termination, rate limiting, and static caching
-- External cron via host scheduler or systemd timer calling `wp cron event run --due-now`
+- External cron via the managed host scheduler calling `wp cron event run --due-now`
 
 ## Deployment Sequence
 
-1. Build immutable artifact (Docker image or tarball) from tagged release commit
+1. Build the deterministic runtime tarball from the exact release commit
 2. Push artifact to registry/storage
 3. Run `wp longevity migrate` against target database (with lock protection)
-4. Deploy new artifact (rolling update or blue-green)
+4. Activate the uploaded artifact through the managed host's staging/promotion mechanism
 5. Verify health endpoint returns `{"status":"ok"}`
 6. Promote traffic
 7. Monitor error rates for 15 minutes
@@ -41,9 +41,9 @@ We support one production topology:
 
 ## Secrets Injection
 
-- **Never** bake secrets into images or commit them to the repository
+- **Never** put secrets in the release artifact or commit them to the repository
 - Use environment variables at runtime: `WORDPRESS_DB_PASSWORD`, `AUTH_KEY`, `AUTH_SALT`, etc.
-- In Docker: use `--env-file` or Docker secrets
+- In local Docker development: use the gitignored `.env` file only with non-production secrets
 - In managed hosts: use host-provided environment variable configuration
 - Rotate credentials per the security checklist
 

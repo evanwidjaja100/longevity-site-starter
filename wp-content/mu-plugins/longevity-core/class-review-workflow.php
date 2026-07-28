@@ -54,7 +54,7 @@ final class Review_Workflow {
 				'orderby'        => 'modified',
 				'order'          => 'DESC',
 				'meta_key'       => 'medical_reviewer_user_id',
-				'meta_value'     => $user_id,
+				'meta_value'     => (string) $user_id,
 			)
 		);
 		$selected_id = isset( $_GET['post_id'] ) ? absint( $_GET['post_id'] ) : 0;

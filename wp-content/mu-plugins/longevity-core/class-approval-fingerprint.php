@@ -11,7 +11,7 @@ defined( 'ABSPATH' ) || exit;
 
 /** Produces stable SHA-256 fingerprints for reviewed content and dependencies. */
 final class Approval_Fingerprint {
-	public const SCHEMA_VERSION = '1.0.0';
+	public const SCHEMA_VERSION = '1.1.0';
 
 	/** Canonical JSON for hashing. */
 	public static function canonical_json( $value ): string {
@@ -148,16 +148,17 @@ final class Approval_Fingerprint {
 
 	/** Snapshot claim and linked-source inputs used by every public approval. */
 	private static function claim_dependency_payload( int $post_id ): array {
-		$claims = get_posts( array( 'post_type' => 'lel_claim', 'post_status' => 'any', 'posts_per_page' => 200, 'orderby' => 'ID', 'order' => 'ASC', 'meta_key' => 'post_id', 'meta_value' => $post_id ) );
+		// Complete retrieval: every linked claim participates in the fingerprint.
+		$claim_ids = Governed_Query::ids_by_meta( array( 'lel_claim' ), 'post_id', (string) $post_id );
 		$data   = array();
 		$fields = array( 'post_id', 'claim_id', 'claim_text', 'claim_category', 'claim_importance', 'claim_location', 'source_id', 'source_type', 'source_title', 'source_authors', 'source_url', 'source_identifier', 'publication_date', 'accessed_date', 'jurisdiction', 'population', 'intervention', 'comparator', 'outcome', 'evidence_design', 'evidence_grade', 'conflict_notes', 'evidence_notes', 'verified_by', 'verified_at', 'verification_date', 'verification_status', 'verification_snapshot_hash', 'recheck_date', 'superseded_by', 'archive_url' );
 		$source_fields = array( 'source_id', 'source_type', 'source_title', 'source_authors', 'source_url', 'source_identifier', 'publication_date', 'accessed_date', 'archive_url', 'rights_notes', 'source_notes', 'validation_status', 'recheck_date' );
-		foreach ( $claims as $claim ) {
-			$row = array( 'id' => (int) $claim->ID );
+		foreach ( $claim_ids as $claim_id ) {
+			$row = array( 'id' => (int) $claim_id );
 			foreach ( $fields as $field ) {
-				$row[ $field ] = get_post_meta( $claim->ID, $field, true );
+				$row[ $field ] = get_post_meta( $claim_id, $field, true );
 			}
-			$source_id = (int) get_post_meta( $claim->ID, 'source_id', true );
+			$source_id = (int) get_post_meta( $claim_id, 'source_id', true );
 			$source    = $source_id > 0 ? get_post( $source_id ) : null;
 			if ( $source ) {
 				$row['source_post'] = array(

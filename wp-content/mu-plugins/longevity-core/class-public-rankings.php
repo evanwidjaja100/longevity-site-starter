@@ -15,7 +15,7 @@ class Public_Rankings {
 	public static function render_ranking_directory(): string {
 		$groups = Rankings::directory();
 		if ( empty( $groups ) ) {
-			return '<section class="longevity-ranking-empty longevity-empty-state" aria-labelledby="lel-ranking-empty"><p class="longevity-kicker">Our testing program</p><h2 id="lel-ranking-empty">Protocols define how future testing is conducted</h2><p>A published protocol describes the observations, comparisons, conditions, and scoring model. It does not mean a product has been tested. Tested presentation appears only after the completed record is approved and version-matched.</p><p><a href="' . esc_url( home_url( '/testing-methodology/' ) ) . '">' . esc_html__( 'See how testing works', 'longevity-core' ) . '</a></p></section>';
+			return '<section class="longevity-ranking-empty longevity-empty-state" aria-labelledby="lel-ranking-empty"><p class="longevity-kicker">Our testing program</p><h2 id="lel-ranking-empty">Protocols define how future testing is conducted</h2><p>A published protocol describes the observations, comparisons, conditions, and scoring model. It does not mean a product has been tested. Tested presentation appears only after the completed record is approved and version-matched.</p><p><a href="' . esc_url( Routes::public_page_url( 'testing_methodology' ) ?: home_url( '/testing-methodology/' ) ) . '">' . esc_html__( 'See how testing works', 'longevity-core' ) . '</a></p></section>';
 		}
 		$minimum = Rankings::minimum_ranking_size();
 		$enough  = array_values( array_filter( $groups, static fn( $g ) => $g['count'] >= $minimum ) );

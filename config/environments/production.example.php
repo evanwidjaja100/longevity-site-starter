@@ -8,3 +8,6 @@ define( 'FORCE_SSL_ADMIN', true );
 define( 'DISALLOW_FILE_EDIT', true );
 define( 'DISALLOW_FILE_MODS', true );
 define( 'WP_AUTO_UPDATE_CORE', 'minor' );
+// Set these from the verified release-info file during managed-host deployment.
+define( 'LEL_RELEASE_SHA', 'REPLACE_WITH_FULL_GIT_SHA' );
+define( 'LEL_RELEASE_ARTIFACT_SHA256', 'REPLACE_WITH_ARTIFACT_SHA256' );

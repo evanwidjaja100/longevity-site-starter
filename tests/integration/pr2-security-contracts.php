@@ -34,7 +34,12 @@ $assert( ! Meta_Authorization::can_write( 'medical_review_required', $post_id, $
 $assert( ! Meta_Authorization::can_write( 'testing_required', $post_id, $writer->ID, 'rest' ), 'Writer can lower testing requirement through REST policy.' );
 $assert( ! Meta_Authorization::can_write( 'unknown_governance_field', $post_id, $writer->ID, 'rest' ), 'Unknown metadata policy did not deny.' );
 
-update_post_meta( $post_id, 'medical_review_required', true );
+Meta_Authorization::enter_trusted_scope();
+try {
+	update_post_meta( $post_id, 'medical_review_required', true );
+} finally {
+	Meta_Authorization::exit_trusted_scope();
+}
 wp_set_current_user( $writer->ID );
 $request = new WP_REST_Request( 'POST', '/wp/v2/posts/' . $post_id );
 $request->set_param( 'meta', array( 'medical_review_required' => false ) );

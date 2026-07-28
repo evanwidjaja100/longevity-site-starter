@@ -9,7 +9,7 @@ The publication requires a portable, auditable system that minimizes health-clai
 
 ## Decision
 
-Treat Docker as a development/staging reference while keeping first-party `wp-content` code free of container-specific assumptions.
+Treat Docker as a development and disposable-CI tool while keeping first-party `wp-content` code free of container-specific assumptions. Production delivery is only to a managed WordPress host under ADR-0015.
 
 ## Alternatives considered
 
@@ -17,7 +17,7 @@ Docker-only production and host-specific APIs.
 
 ## Consequences
 
-The same code can move between local, VPS, and managed WordPress environments; infrastructure features remain external.
+First-party code remains portable, while the supported production operating model stays intentionally singular and host-managed.
 
 ## Security implications
 

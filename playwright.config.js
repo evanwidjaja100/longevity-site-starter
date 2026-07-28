@@ -4,7 +4,11 @@ export default defineConfig({
   testDir: './tests/e2e',
   outputDir: './reports/playwright-artifacts',
   snapshotDir: './tests/e2e/snapshots',
-  reporter: [['list'], ['html', { outputFolder: './reports/playwright', open: 'never' }]],
+  reporter: [
+    ['list'],
+    ['html', { outputFolder: './reports/playwright', open: 'never' }],
+    ['junit', { outputFile: process.env.PLAYWRIGHT_JUNIT_OUTPUT_FILE || './reports/playwright-junit.xml' }],
+  ],
   forbidOnly: !!process.env.CI,
   retries: 0,
   use: {

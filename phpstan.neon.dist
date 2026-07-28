@@ -15,6 +15,5 @@ parameters:
   scanFiles:
     - wp-content/mu-plugins/longevity-core.php
     - tests/php/stubs/wp-cli-stub.php
-    - tests/php/stubs/wpdb-stub.php
   bootstrapFiles:
-    - tests/php/bootstrap.php
+    - tests/phpstan-bootstrap.php

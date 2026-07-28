@@ -1,0 +1,33 @@
+<?xml version="1.0"?>
+<!--
+    First-party PHP SAST configuration (Psalm taint analysis).
+
+    Scope: all first-party runtime PHP plus repository PHP scripts.
+    CI runs `psalm -taint-analysis` in the php-sast job; detection capability
+    is proven by scripts/verify-sast-detection.sh against a deliberate fixture.
+
+    Suppression policy: any inline Psalm suppression entry for a
+    taint issue MUST carry an inline comment with (1) reason, (2) owner,
+    (3) expiry date (YYYY-MM-DD), and is reviewed at each release. Expired
+    suppressions fail review. No blanket suppression of Tainted* issues.
+-->
+<psalm
+    errorLevel="4"
+    resolveFromConfigFile="true"
+    findUnusedCode="false"
+    findUnusedBaselineEntry="false"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns="https://getpsalm.org/schema/config"
+    xsi:schemaLocation="https://getpsalm.org/schema/config vendor/vimeo/psalm/config.xsd"
+>
+    <projectFiles>
+        <file name="wp-content/mu-plugins/longevity-core.php" />
+        <directory name="wp-content/mu-plugins/longevity-core" />
+        <directory name="wp-content/themes/longevity-starter" />
+        <directory name="scripts" />
+        <ignoreFiles>
+            <directory name="vendor" />
+            <directory name="tests" />
+        </ignoreFiles>
+    </projectFiles>
+</psalm>

@@ -92,8 +92,13 @@ function lel_fixture_post( string $type, string $slug, string $title, string $co
 
 /** Apply a metadata map. */
 function lel_fixture_meta( int $post_id, array $values ): void {
-	foreach ( $values as $key => $value ) {
-		update_post_meta( $post_id, $key, $value );
+	\Longevity\Core\Meta_Authorization::enter_trusted_scope();
+	try {
+		foreach ( $values as $key => $value ) {
+			update_post_meta( $post_id, $key, $value );
+		}
+	} finally {
+		\Longevity\Core\Meta_Authorization::exit_trusted_scope();
 	}
 }
 
@@ -118,6 +123,14 @@ function lel_fixture_public_meta( string $today, string $next_review ): array {
 /** Create or refresh a content approval through the same immutable service used in production. */
 function lel_fixture_approve( int $post_id, string $type, int $actor_id, array $payload = array() ): void {
 	if ( \Longevity\Core\Approval_Service::is_current( $post_id, $type ) ) {
+		$projection = array(
+			'editorial'  => array( 'editorial_approval_status' => 'ready' ),
+			'fact_check' => array( 'fact_check_status' => 'complete', 'fact_checked_by' => $actor_id, 'fact_checked_date' => gmdate( 'Y-m-d' ) ),
+			'medical'    => array( 'medical_review_status' => 'complete', 'medical_review_attested' => true, 'medical_review_date' => gmdate( 'Y-m-d' ) ),
+			'testing'    => array( 'testing_status' => 'approved' ),
+			'commercial' => array( 'affiliate_disclosure_status' => 'approved' ),
+		);
+		lel_fixture_meta( $post_id, $projection[ $type ] ?? array() );
 		return;
 	}
 	if ( ! \Longevity\Core\Approval_Service::approve( $post_id, $type, $actor_id, $payload ) ) {
@@ -368,7 +381,7 @@ lel_fixture_meta(
 			'test_record_id'             => $record_id,
 			'product_acquisition_method' => 'purchased',
 			'review_score'               => 3.8,
-			'review_score_version'       => '1.0',
+			'review_score_version'       => \Longevity\Core\Review_Methodology::model_version(),
 			'review_score_confidence'    => 'Low confidence',
 			'review_score_dimensions'    => $dimensions,
 			'best_for'                   => 'Testing the complete review interface.',
@@ -498,7 +511,7 @@ $shared_review_meta = array_merge(
 		'testing_methodology_url'    => 'https://example.invalid/test-method',
 		'testing_protocol_version'   => '1.0',
 		'product_acquisition_method' => 'purchased',
-		'review_score_version'       => '1.0',
+		'review_score_version'       => \Longevity\Core\Review_Methodology::model_version(),
 		'best_for'                   => 'Automated ranking-interface verification.',
 		'not_for'                    => 'Any real purchase or health decision.',
 		'comparison_set'             => 'Example Comparator TEST-2',

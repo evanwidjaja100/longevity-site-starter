@@ -17,15 +17,22 @@ $longevity_core_files = array(
 	'class-routes.php',
 	'class-content-types.php',
 	'class-roles.php',
+	'class-legal-hold.php',
 	'class-meta-registry.php',
+	'class-governed-query.php',
 	'class-meta-authorization.php',
 	'class-reviewer-credentials.php',
 	'class-audit-log.php',
+	'class-advisory-lock.php',
+	'class-platform-requirements.php',
 	'class-approval-fingerprint.php',
 	'class-approval-repository.php',
 	'class-publication-lock.php',
+	'class-override-intent.php',
 	'class-dependency-index.php',
 	'class-invalidation-queue.php',
+	'class-notification-outbox.php',
+	'class-evidence-store.php',
 	'class-approval-service.php',
 	'class-claims.php',
 	'class-affiliate-registry.php',
@@ -99,6 +106,7 @@ final class Bootstrap {
 		Review_Workflow::init();
 		Approval_Service::init();
 		Invalidation_Queue::init();
+		Notification_Outbox::init();
 		Migrations::init();
 		Freshness::init();
 		Public_Contact::init();
@@ -225,33 +233,26 @@ final class Bootstrap {
 		header( 'X-Content-Type-Options: nosniff' );
 		header( 'Referrer-Policy: strict-origin-when-cross-origin' );
 		header( 'Permissions-Policy: camera=(), microphone=(), geolocation=()' );
-		header( 'X-Frame-Options: SAMEORIGIN' );
+		header( 'X-Frame-Options: ' . self::framing_header() );
 		header( 'X-XSS-Protection: 0' );
 
 		$csp = self::content_security_policy();
 		if ( $csp ) {
-			$enforce = self::csp_enforce_mode();
-			if ( $enforce ) {
-				header( 'Content-Security-Policy: ' . $csp );
-			} else {
-				header( 'Content-Security-Policy-Report-Only: ' . $csp );
-			}
+			header( self::csp_header_name() . ': ' . $csp );
 		}
 	}
 
-	/** Whether CSP should be enforced (production) or report-only (staging/dev). */
-	private static function csp_enforce_mode(): bool {
-		// Environment variable override.
-		$env = getenv( 'LEL_CSP_ENFORCE' );
-		if ( false !== $env ) {
-			return in_array( strtolower( $env ), array( '1', 'true', 'yes' ), true );
-		}
-		// Constant override.
-		if ( defined( 'LEL_CSP_ENFORCE' ) ) {
-			return (bool) LEL_CSP_ENFORCE;
-		}
-		// Default: enforce only in production environment type.
-		return function_exists( 'wp_get_environment_type' ) && 'production' === wp_get_environment_type();
+	/** CSP header selected by explicit release configuration; invalid/missing values stay report-only. */
+	public static function csp_header_name(): string {
+		$mode = defined( 'LEL_CSP_MODE' ) ? constant( 'LEL_CSP_MODE' ) : getenv( 'LEL_CSP_MODE' );
+		return is_string( $mode ) && 'enforce' === strtolower( trim( $mode ) )
+			? 'Content-Security-Policy'
+			: 'Content-Security-Policy-Report-Only';
+	}
+
+	/** Legacy framing header matching frame-ancestors 'none'. */
+	public static function framing_header(): string {
+		return 'DENY';
 	}
 
 	/** Attach the per-request CSP nonce to inline script/style tag attributes. */

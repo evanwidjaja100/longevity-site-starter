@@ -40,9 +40,97 @@ final class SystemReadinessTest extends TestCase {
 		self::assertSame( 'ok', $report['checks']['approval_table']['status'] );
 	}
 
+	public function test_dependency_marker_cannot_hide_index_drift(): void {
+		$saved_rows    = $GLOBALS['wpdb']->lel_test_rows( 'wp_lel_dependencies' );
+		$saved_options = $GLOBALS['lel_test_options'] ?? array();
+		try {
+			$GLOBALS['wpdb']->lel_test_set_rows( 'wp_lel_dependencies', array( array( 'id' => 1, 'dependency_type' => 'lel_claim', 'dependency_id' => 1, 'parent_post_id' => 999 ) ) );
+			$GLOBALS['lel_test_options']['lel_dependency_index_backfilled_at'] = gmdate( DATE_W3C );
+			$GLOBALS['lel_test_options']['lel_dependency_index_generation']    = \Longevity\Core\Dependency_Index::DATA_GENERATION;
+			$GLOBALS['lel_test_options']['lel_dependency_index_schema_version'] = \Longevity\Core\Dependency_Index::SCHEMA_VERSION;
+
+			$check = System_Readiness::report()['checks']['dependency_index'];
+			self::assertSame( 'blocked', $check['status'] );
+			self::assertFalse( $check['drift']['valid'] );
+			self::assertSame( 1, $check['drift']['orphans'] );
+		} finally {
+			$GLOBALS['wpdb']->lel_test_set_rows( 'wp_lel_dependencies', $saved_rows );
+			$GLOBALS['lel_test_options'] = $saved_options;
+		}
+	}
+
 	public function test_report_overall_status_reflects_blocked_checks(): void {
-		// With no external evidence, the overall status should be degraded (not blocked).
 		$report = System_Readiness::report();
-		self::assertContains( $report['status'], array( 'ok', 'degraded' ) );
+		self::assertNotSame( 'ok', $report['status'], 'Missing external/runtime identity must never be promotion-ready.' );
+	}
+
+	public function test_unrecognized_check_status_blocks_overall(): void {
+		// A missing queue table makes queue_check emit a status outside the
+		// closed enum; that must fail closed to blocked, never fall through.
+		$saved = $GLOBALS['wpdb']->lel_test_rows( 'wp_lel_invalidation_queue' );
+		$GLOBALS['wpdb']->lel_test_drop_table( 'wp_lel_invalidation_queue' );
+		try {
+			$report = System_Readiness::report();
+		} finally {
+			$GLOBALS['wpdb']->lel_test_set_rows( 'wp_lel_invalidation_queue', $saved );
+		}
+		self::assertSame( 'blocked', $report['checks']['invalidation_queue']['status'] );
+		self::assertNotSame( 'ok', $report['status'] );
+	}
+
+	public function test_normalize_status_is_a_closed_fail_closed_enum(): void {
+		self::assertSame( 'ok', System_Readiness::normalize_status( 'ok' ) );
+		self::assertSame( 'degraded', System_Readiness::normalize_status( 'degraded' ) );
+		self::assertSame( 'unknown_external', System_Readiness::normalize_status( 'unknown_external' ) );
+		self::assertSame( 'blocked', System_Readiness::normalize_status( 'blocked' ) );
+		self::assertSame( 'error', System_Readiness::normalize_status( 'error' ) );
+		foreach ( array( 'unknown', 'OK', '', 'healthy', 'warn' ) as $unrecognized ) {
+			self::assertSame( 'error', System_Readiness::normalize_status( $unrecognized ), "'$unrecognized' must normalize to error" );
+		}
+	}
+
+	public function test_aggregation_is_max_severity(): void {
+		$ok       = array( 'status' => 'ok' );
+		$degraded = array( 'status' => 'degraded' );
+		$unknown  = array( 'status' => 'unknown_external' );
+		$blocked  = array( 'status' => 'blocked' );
+		$error    = array( 'status' => 'error' );
+		$garbage  = array( 'status' => 'not_registered' );
+		$missing  = array( 'message' => 'no status key at all' );
+
+		self::assertSame( 'ok', System_Readiness::aggregate( array( $ok, $ok ) ) );
+		self::assertSame( 'degraded', System_Readiness::aggregate( array( $ok, $degraded ) ) );
+		self::assertSame( 'unknown_external', System_Readiness::aggregate( array( $ok, $unknown ) ) );
+		self::assertSame( 'blocked', System_Readiness::aggregate( array( $ok, $degraded, $blocked ) ) );
+		self::assertSame( 'error', System_Readiness::aggregate( array( $ok, $blocked, $error ) ) );
+		self::assertSame( 'error', System_Readiness::aggregate( array( $ok, $garbage ) ) );
+		self::assertSame( 'error', System_Readiness::aggregate( array( $missing ) ) );
+		self::assertSame( 'error', System_Readiness::aggregate( array() ) );
+	}
+
+	public function test_metrics_expose_one_hot_state_per_check(): void {
+		$payload = \Longevity\Core\Metrics::render();
+		self::assertStringNotContainsString( 'lel_readiness_check{check=', $payload, 'changing-status-label gauge must be replaced' );
+		self::assertStringContainsString( '# TYPE lel_readiness_check_state gauge', $payload );
+
+		preg_match_all( '/^lel_readiness_check_state\{check="([^"]+)",state="([^"]+)"\} ([01])$/m', $payload, $matches, PREG_SET_ORDER );
+		self::assertNotEmpty( $matches );
+
+		$states_seen = array();
+		$sums        = array();
+		$per_check   = array();
+		foreach ( $matches as $m ) {
+			$states_seen[ $m[2] ]           = true;
+			$sums[ $m[1] ]                  = ( $sums[ $m[1] ] ?? 0 ) + (int) $m[3];
+			$per_check[ $m[1] ][ $m[2] ]    = true;
+		}
+		self::assertSame( System_Readiness::CHECK_STATES, array_keys( $per_check['database'] ), 'fixed state set emitted in stable order' );
+		foreach ( $sums as $check => $sum ) {
+			self::assertSame( 1, $sum, "check '$check' must be one-hot across states" );
+		}
+		self::assertSame( System_Readiness::CHECK_STATES, array_keys( $states_seen ) );
+		self::assertMatchesRegularExpression( '/^lel_build_info\{environment="[^"]+",source_sha="[^"]+",artifact_sha256="[^"]+"\} 1$/m', $payload );
+		preg_match_all( '/^lel_readiness_overall_state\{state="[^"]+"\} ([01])$/m', $payload, $overall );
+		self::assertSame( 1, array_sum( array_map( 'intval', $overall[1] ) ) );
 	}
 }

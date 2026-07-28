@@ -1,5 +1,8 @@
 # Security Controls Checklist
 
+**Owner:** Security engineering
+**Last reviewed:** 2026-07-28
+
 ## Application headers (applied in Bootstrap::send_security_headers)
 
 | Header | Value | Status |

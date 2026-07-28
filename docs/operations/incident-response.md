@@ -1,5 +1,8 @@
 # Incident Response
 
+**Owner:** Security and editorial operations
+**Last reviewed:** 2026-07-28
+
 ## Severity classification
 
 | Severity | Label | Examples | Response time |

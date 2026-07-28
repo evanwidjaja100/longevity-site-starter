@@ -1,5 +1,8 @@
 # Local Development
 
+**Owner:** Engineering
+**Last reviewed:** 2026-07-28
+
 1. Copy `.env.example` to `.env` and replace every placeholder.
 2. Run `./scripts/validate-env.sh .env`.
 3. Run `docker compose config --quiet`.

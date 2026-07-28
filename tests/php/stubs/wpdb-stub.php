@@ -11,7 +11,10 @@
 if ( ! class_exists( 'wpdb' ) ) {
 	class wpdb {
 		public string $prefix = 'wp_';
+		public string $posts = 'wp_posts';
+		public string $postmeta = 'wp_postmeta';
 		public int $insert_id = 0;
+		public string $last_error = '';
 		public string $siteid = '1';
 
 		public function insert( string $table, array $data, array $format = array() ): int { return 1; }
@@ -27,3 +30,10 @@ if ( ! class_exists( 'wpdb' ) ) {
 		public function esc_like( string $data ): string { return $data; }
 	}
 }
+
+/** @var wpdb $wpdb */
+$wpdb = new wpdb();
+
+define( 'LONGEVITY_CORE_PATH', '' );
+define( 'LONGEVITY_CORE_URL', '' );
+define( 'LONGEVITY_CORE_VERSION', '' );

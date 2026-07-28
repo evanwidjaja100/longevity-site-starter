@@ -27,11 +27,9 @@ final class Publication_Lock {
 			return true;
 		}
 
-		global $wpdb;
-		$name   = 'lel_publication_' . $post_id;
-		$locked = $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s, 5)', $name ) );
-		if ( '1' !== (string) $locked && 1 !== $locked ) {
-			self::record_failure( $post_id, (string) $locked );
+		$result = Advisory_Lock::acquire( self::name( $post_id ), 5 );
+		if ( Advisory_Lock::ACQUIRED !== $result ) {
+			self::record_failure( $post_id, 'acquire', $result );
 			return false;
 		}
 		self::$held[ $post_id ] = 1;
@@ -39,8 +37,14 @@ final class Publication_Lock {
 	}
 
 	/** Log and count a lock acquisition failure for observability. */
-	private static function record_failure( int $post_id, string $result ): void {
-		error_log( sprintf( '[longevity-core] Publication lock acquisition failed for post %d (GET_LOCK returned: %s)', $post_id, $result ) );
+	private static function record_failure( int $post_id, string $operation, string $result ): void {
+		Logger::error(
+			'publication_lock_' . $operation . '_failed',
+			array(
+				'post_id'    => $post_id,
+				'lock_state' => $result,
+			)
+		);
 		$count = (int) get_option( self::FAILURE_COUNTER_OPTION, 0 );
 		update_option( self::FAILURE_COUNTER_OPTION, $count + 1, false );
 	}
@@ -52,32 +56,26 @@ final class Publication_Lock {
 
 	/** Verify GET_LOCK support on this database server. */
 	public static function get_lock_supported(): bool {
-		global $wpdb;
-		if ( ! isset( $wpdb ) || ! method_exists( $wpdb, 'get_var' ) ) {
-			return false;
-		}
-		$test = $wpdb->get_var( "SELECT GET_LOCK('lel_lock_test', 1)" );
-		if ( '1' === (string) $test || 1 === $test ) {
-			$wpdb->get_var( "SELECT RELEASE_LOCK('lel_lock_test')" );
-			return true;
-		}
-		return false;
+		return Advisory_Lock::supported();
 	}
 
 	/** Release one re-entrant lock level. */
-	public static function release( int $post_id ): void {
+	public static function release( int $post_id ): bool {
 		if ( ! isset( self::$held[ $post_id ] ) ) {
-			return;
+			return true;
 		}
 		--self::$held[ $post_id ];
 		if ( self::$held[ $post_id ] > 0 ) {
-			return;
+			return true;
 		}
 		unset( self::$held[ $post_id ] );
 
-		global $wpdb;
-		$name = 'lel_publication_' . $post_id;
-		$wpdb->get_var( $wpdb->prepare( 'SELECT RELEASE_LOCK(%s)', $name ) );
+		$result = Advisory_Lock::release( self::name( $post_id ) );
+		if ( Advisory_Lock::RELEASED !== $result ) {
+			self::record_failure( $post_id, 'release', $result );
+			return false;
+		}
+		return true;
 	}
 
 	/** Release every lock left by an interrupted request. */
@@ -86,5 +84,10 @@ final class Publication_Lock {
 			self::$held[ $post_id ] = 1;
 			self::release( (int) $post_id );
 		}
+	}
+
+	/** Database- and site-scoped lock name for one publication record. */
+	private static function name( int $post_id ): string {
+		return Advisory_Lock::namespaced_name( 'publication_' . $post_id );
 	}
 }

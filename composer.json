@@ -3,6 +3,14 @@
     "description": "First-party quality tooling for the Longevity Evidence Lab WordPress platform.",
     "type": "project",
     "license": "proprietary",
+    "require": {
+        "php": ">=8.1",
+        "ext-filter": "*",
+        "ext-hash": "*",
+        "ext-json": "*",
+        "ext-mbstring": "*",
+        "ext-pcre": "*"
+    },
     "require-dev": {
         "dealerdirect/phpcodesniffer-composer-installer": "^1.0",
         "phpcompatibility/php-compatibility": "^9.3",
@@ -10,11 +18,15 @@
         "phpstan/phpstan": "^2.0",
         "phpunit/phpunit": "^10.5",
         "szepeviktor/phpstan-wordpress": "^2.0",
-        "wp-coding-standards/wpcs": "^3.0"
+        "vimeo/psalm": "6.16.1",
+        "wp-coding-standards/wpcs": "3.3.0"
     },
     "config": {
         "allow-plugins": {
             "dealerdirect/phpcodesniffer-composer-installer": true
+        },
+        "platform": {
+            "php": "8.3.16"
         },
         "sort-packages": true
     },
@@ -28,8 +40,8 @@
             "@phpunit",
             "@test:routes"
         ],
-        "phpcs": "@php vendor/squizlabs/php_codesniffer/bin/phpcs -q",
-        "phpcbf": "@php vendor/squizlabs/php_codesniffer/bin/phpcbf",
+        "phpcs": "@php -d error_reporting=8191 vendor/squizlabs/php_codesniffer/bin/phpcs -q --runtime-set ignore_warnings_on_exit 1",
+        "phpcbf": "@php -d error_reporting=8191 vendor/squizlabs/php_codesniffer/bin/phpcbf",
         "phpstan": "@php vendor/phpstan/phpstan/phpstan analyse --no-progress",
         "phpunit": "@php vendor/phpunit/phpunit/phpunit --colors=always",
         "test:discovery": "php scripts/verify-test-discovery.php",

@@ -38,8 +38,8 @@ Decision: **NO-GO** for public production launch until every human/external gate
 
 ## 3. Evidence NOT obtainable in this environment (requires CI/staging)
 
-- Docker-based integration contracts, Playwright (functional, accessibility, cross-browser, visual), Lighthouse: no Docker/browsers on this host. The CI lanes are defined and must pass on the candidate SHA in GitHub Actions.
-- Linux visual baselines: must be generated in the pinned Playwright image and human-reviewed before the visual lane is a required gate.
+- Docker-based integration contracts, Playwright (functional, accessibility, cross-browser), and Lighthouse must pass on the candidate SHA in GitHub Actions.
+- Linux visual baselines do not exist. The visual lane is non-mandatory and baseline-gated; it must not be reported as passing until snapshots are generated in the pinned Playwright image, human-reviewed, and committed. Required structural, axe accessibility, and critical cross-browser gates remain separate.
 - PHPCS full run: local PHP 8.5 crashes the PHPCompatibility sniff (environmental); CI pins PHP 8.3.
 - Pre-existing PHPStan findings (~51 project-wide, none introduced by PR 10–15 changes) remain to be triaged; new code is PHPStan-clean.
 - Real browser zoom, forced colors, screen reader (VoiceOver/NVDA/TalkBack) checks: staging + human testers.

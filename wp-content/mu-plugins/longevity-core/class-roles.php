@@ -33,6 +33,7 @@ final class Roles {
 		'view_operational_readiness',
 		'view_governance_audit',
 		'approve_trust_pages',
+		'lel_manage_legal_holds',
 	);
 
 	/** @var array<int, string> */
@@ -62,17 +63,19 @@ final class Roles {
 	 * Idempotent and safe to re-run.
 	 *
 	 * @param bool $dry_run When true, report changes without applying them.
-	 * @return array{added: list<string>, removed: list<string>, unchanged: int}
+	 * @return array{added: list<string>, removed: list<string>, unchanged: int, missing_roles: list<string>}
 	 */
 	public static function reconcile( bool $dry_run = false ): array {
-		$desired = self::desired_capability_matrix();
-		$added   = array();
-		$removed = array();
-		$unchanged = 0;
+		$desired       = self::desired_capability_matrix();
+		$added         = array();
+		$removed       = array();
+		$unchanged     = 0;
+		$missing_roles = array();
 
 		foreach ( $desired as $role_name => $caps ) {
 			$role = get_role( $role_name );
 			if ( ! $role ) {
+				$missing_roles[] = $role_name;
 				continue;
 			}
 			$managed = array_keys( $caps );
@@ -92,9 +95,8 @@ final class Roles {
 					++$unchanged;
 				}
 			}
-			// Remove any managed custom caps the role has that are no longer in the matrix.
-			$all_caps = $role->get_cap( 'level_10' );
-			$role_caps = array_keys( (array) $role->roles[ $role_name ]['capabilities'] ?? array() );
+			// Remove any managed custom caps the role holds that are no longer granted by the matrix.
+			$role_caps = array_keys( array_filter( (array) $role->capabilities ) );
 			foreach ( $role_caps as $cap ) {
 				if ( in_array( $cap, self::ALL_CUSTOM_CAPS, true ) && ! in_array( $cap, $managed, true ) ) {
 					$removed[] = $role_name . ':' . $cap;
@@ -106,15 +108,36 @@ final class Roles {
 		}
 
 		if ( ! $dry_run ) {
-			update_option( 'lel_roles_reconciled_at', gmdate( DATE_ATOM ), false );
-			update_option( 'lel_roles_reconciled_version', self::MATRIX_VERSION, false );
+			Audit_Log::record(
+				$missing_roles ? 'roles_reconciliation_incomplete' : 'roles_reconciled',
+				'system',
+				0,
+				array(
+					'matrix_version' => self::MATRIX_VERSION,
+					'added'          => $added,
+					'removed'        => $removed,
+					'missing_roles'  => $missing_roles,
+				),
+				get_current_user_id(),
+				'cli',
+				true
+			);
+			if ( ! $missing_roles ) {
+				update_option( 'lel_roles_reconciled_at', gmdate( DATE_ATOM ), false );
+				update_option( 'lel_roles_reconciled_version', self::MATRIX_VERSION, false );
+			}
 		}
 
-		return array( 'added' => $added, 'removed' => $removed, 'unchanged' => $unchanged );
+		return array(
+			'added'         => $added,
+			'removed'       => $removed,
+			'unchanged'     => $unchanged,
+			'missing_roles' => $missing_roles,
+		);
 	}
 
 	/** Current capability matrix version for drift detection. */
-	public const MATRIX_VERSION = '2.1.0';
+	public const MATRIX_VERSION = '2.2.0';
 
 	/** The approved capability matrix: role => cap => granted. */
 	private static function desired_capability_matrix(): array {

@@ -1,5 +1,8 @@
 # Security Hardening
 
+**Owner:** Security engineering
+**Last reviewed:** 2026-07-28
+
 This document covers application-layer hardening applied by the longevity-core MU plugin. Infrastructure-level controls (HTTPS, WAF, network segmentation) are managed at the hosting layer per the deployment model.
 
 ## Application headers (applied on every response)
@@ -53,13 +56,16 @@ All public renderers use `esc_html()`, `esc_attr()`, `esc_url()`, `esc_textarea(
 
 ## Supply-chain controls (CI)
 
-- **CodeQL**: JS/Python/PHP analysis on every push (`ci.yml`)
+- **CodeQL**: JavaScript and Python analysis on every push (`ci.yml`)
+- **Psalm**: taint analysis across all first-party runtime PHP and PHP scripts, with SARIF output and a controlled detection fixture
 - **trufflehog**: Secrets scan on every push
 - **Dependency review**: Block high-severity advisories on PRs
-- **Trivy**: Container image scan on compose config
-- **SBOM**: Anchore SPDX generation on push
+- **Trivy**: Infrastructure-configuration scan of the development Compose file
+- **SBOM**: lockfile-bound SPDX generation and license-policy enforcement on push
 - **Scheduled audit**: Weekly `composer audit --locked` and `npm audit --audit-level=high`
 - **Secret patterns**: Rejects tracked `.env` files, private-key patterns, and world-writable files
+
+Psalm is locked to the reviewed Composer version. Any inline suppression must remain narrowly scoped and include `reason="..." owner="@name" expires="YYYY-MM-DD"` on the same annotation; missing or expired ownership metadata fails CI. Any taint finding, scanner crash, missing SARIF, or failed controlled-detection proof blocks the PHP SAST job.
 
 ## Managed WordPress hardening
 

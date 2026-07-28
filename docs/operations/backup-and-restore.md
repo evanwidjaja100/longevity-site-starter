@@ -1,5 +1,8 @@
 # Backup and Restore
 
+**Owner:** Operations and security
+**Last reviewed:** 2026-07-28
+
 ## Backup strategy
 
 | Data | Frequency | Retention | Method |
@@ -37,7 +40,7 @@ For managed WordPress hosting, use the host's built-in backup system. For self-h
 5. **Monitoring**: Check backup completion daily. Alert if no successful backup in 48 hours
 
 ```bash
-# Example production-style backup (for reference — adapt to your orchestrator)
+# Example production-style backup (for reference — adapt to your managed provider)
 #!/bin/sh
 set -eu
 DEST="${BACKUP_DEST:-/backups}"

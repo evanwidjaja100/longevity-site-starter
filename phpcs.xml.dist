@@ -7,7 +7,16 @@
   <exclude-pattern>*/vendor/*</exclude-pattern>
   <arg name="extensions" value="php" />
   <arg value="sp" />
-  <rule ref="WordPress" />
+  <rule ref="WordPress">
+    <exclude-pattern>scripts/verify-release-evidence.php</exclude-pattern>
+    <exclude-pattern>scripts/write-release-evidence-metadata.php</exclude-pattern>
+    <exclude-pattern>scripts/generate-dependency-sbom.php</exclude-pattern>
+  </rule>
+  <rule ref="PSR12">
+    <include-pattern>scripts/verify-release-evidence.php</include-pattern>
+    <include-pattern>scripts/write-release-evidence-metadata.php</include-pattern>
+    <include-pattern>scripts/generate-dependency-sbom.php</include-pattern>
+  </rule>
   <rule ref="WordPress.WP.Capabilities">
     <properties><property name="custom_capabilities" value="approve_publication" /></properties>
   </rule>

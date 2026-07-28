@@ -1,5 +1,8 @@
 # Product and Content KPIs
 
+**Owner:** Product and editorial operations
+**Last reviewed:** 2026-07-28
+
 ## 1. Reader experience
 
 | KPI | Definition | Target | Measurement |

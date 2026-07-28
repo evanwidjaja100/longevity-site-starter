@@ -1,5 +1,8 @@
 # Usability Review Protocol
 
+**Owner:** Product research
+**Last reviewed:** 2026-07-28
+
 ## 1. Participants
 
 Recruit 5–8 participants representing:

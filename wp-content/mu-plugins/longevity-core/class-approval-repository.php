@@ -55,9 +55,6 @@ final class Approval_Repository {
 	/** Insert a snapshot. */
 	public static function insert( array $record ): int {
 		global $wpdb;
-		if ( ! isset( $wpdb ) || ! method_exists( $wpdb, 'insert' ) ) {
-			return 0;
-		}
 		$inserted = $wpdb->insert( self::table_name(), $record );
 		return false === $inserted ? 0 : (int) $wpdb->insert_id;
 	}
@@ -65,9 +62,6 @@ final class Approval_Repository {
 	/** Get the newest non-invalidated snapshot. */
 	public static function current( int $post_id, string $approval_type ): ?array {
 		global $wpdb;
-		if ( ! isset( $wpdb ) || ! method_exists( $wpdb, 'get_row' ) ) {
-			return null;
-		}
 		$table = self::table_name();
 		$sql   = $wpdb->prepare( "SELECT * FROM {$table} WHERE post_id = %d AND approval_type = %s AND approval_status = 'approved' AND invalidated_at IS NULL ORDER BY id DESC LIMIT 1", $post_id, $approval_type );
 		$row   = $wpdb->get_row( $sql, ARRAY_A );
@@ -77,9 +71,6 @@ final class Approval_Repository {
 	/** Invalidate every current snapshot of a type. */
 	public static function invalidate( int $post_id, string $approval_type, string $reason, int $actor_id ): int {
 		global $wpdb;
-		if ( ! isset( $wpdb ) || ! method_exists( $wpdb, 'query' ) ) {
-			return 0;
-		}
 		$table = self::table_name();
 		$sql   = $wpdb->prepare(
 			"UPDATE {$table} SET invalidated_at = %s, invalidated_by_user_id = %d, invalidation_reason = %s WHERE post_id = %d AND approval_type = %s AND invalidated_at IS NULL",
@@ -95,9 +86,6 @@ final class Approval_Repository {
 	/** Whether the table exists. */
 	public static function exists(): bool {
 		global $wpdb;
-		if ( ! isset( $wpdb ) || ! method_exists( $wpdb, 'get_var' ) ) {
-			return false;
-		}
 		$table = self::table_name();
 		return $table === $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table ) );
 	}

@@ -25,9 +25,13 @@ function lel_fail( string $message ): void {
 }
 
 // Ensure schema + fork constraint exist (idempotent).
+require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 Audit_Log::install();
 if ( ! Audit_Log::ensure_fork_constraint() ) {
 	lel_fail( 'fork constraint could not be ensured' );
+}
+if ( ! Audit_Log::ensure_idempotency_constraint() ) {
+	lel_fail( 'idempotency constraint could not be ensured' );
 }
 
 $table = Audit_Log::table_name();
@@ -38,6 +42,12 @@ $first_id  = Audit_Log::record( 'integration_probe', 'system', $object_id, array
 $second_id = Audit_Log::record( 'integration_probe', 'system', $object_id, array( 'n' => 2 ), 0, 'integration', true );
 if ( $first_id <= 0 || $second_id <= 0 ) {
 	lel_fail( 'mandatory append-only inserts did not return positive IDs' );
+}
+$delivery_key = 'audit-chain-invalidation:' . $object_id;
+$once_id      = Audit_Log::record( 'approval_invalidated', 'post', $object_id, array( 'reason' => 'integration' ), 0, 'integration', true, $delivery_key );
+$replay_id    = Audit_Log::record( 'approval_invalidated', 'post', $object_id, array( 'reason' => 'integration' ), 0, 'integration', true, $delivery_key );
+if ( $once_id <= 0 || $once_id !== $replay_id ) {
+	lel_fail( 'idempotent audit replay appended a duplicate event' );
 }
 
 // 2. Chain verifies clean.
@@ -116,5 +126,6 @@ echo wp_json_encode( array(
 	'clean_checked'    => $clean_checked,
 	'tamper_detected'  => true,
 	'fork_constraint'  => true,
+	'idempotent_replay' => true,
 ) ) . "\n";
 echo "Audit-chain deterministic integration assertions passed.\n";

@@ -1,3 +1,4 @@
+# Local development and disposable CI only; not a production topology.
 name: longevity-site
 
 services:

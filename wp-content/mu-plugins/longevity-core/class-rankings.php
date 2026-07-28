@@ -317,9 +317,7 @@ final class Rankings {
 			$current[]   = $post;
 			$prev_score  = $score;
 		}
-		if ( $current ) {
-			$bands[] = $current;
-		}
+		$bands[] = $current;
 		return $bands;
 	}
 

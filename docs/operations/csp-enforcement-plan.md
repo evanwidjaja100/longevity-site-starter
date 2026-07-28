@@ -1,100 +1,94 @@
 # CSP Enforcement Plan
 
-Current policy is `Content-Security-Policy-Report-Only` (set by `Bootstrap::send_security_headers()`). This document outlines the 30-day observation-to-enforcement timeline.
+**Owner:** Security engineering
+**Last reviewed:** 2026-07-28
 
-## Current policy directives
+## Repository capability (implemented)
 
-```
+`Bootstrap::send_security_headers()` sends one nonce-based policy. Framing is intentionally disabled by both mechanisms:
+
+- `frame-ancestors 'none'`
+- `X-Frame-Options: DENY`
+
+No same-origin framing requirement is known. A reviewed functional requirement and route test are required before weakening both headers together.
+
+The release configuration is `LEL_CSP_MODE`, set as a PHP constant or environment variable:
+
+| Value | Header |
+|---|---|
+| `enforce` | `Content-Security-Policy` |
+| `report-only`, missing, empty, or invalid | `Content-Security-Policy-Report-Only` |
+
+The safe default is always report-only; WordPress environment type does not implicitly enable enforcement. Roll back immediately by setting `LEL_CSP_MODE=report-only` and redeploying/restarting configuration. Do not use the retired boolean `LEL_CSP_ENFORCE` setting.
+
+Current application policy:
+
+```text
 default-src 'self';
-script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com;
-style-src 'self' 'unsafe-inline';
-img-src 'self' data: https://*.wp.com https://*.gravatar.com;
-font-src 'self';
+script-src 'self' 'nonce-<per-request nonce>';
+style-src 'self' 'nonce-<per-request nonce>';
+style-src-attr 'unsafe-inline';
+img-src 'self' data: https:;
+font-src 'self' data:;
+connect-src 'self';
 frame-ancestors 'none';
-report-uri https://longevityevidencelab.report-uri.com/r/d/csp/enforce;
+base-uri 'self';
+form-action 'self';
+report-uri <site REST URL>/longevity/v1/csp-report
 ```
 
-## Phase 1: Observation (days 1-30)
+The report endpoint has these application controls:
 
-### Action items
+- exact `application/csp-report` media type and an 8 KiB body limit;
+- bounded, flat `csp-report` JSON schema with a required directive;
+- malformed and oversized input rejected before database or log writes;
+- one atomic global budget counter in the existing `lel_rate_limits` table: 60 reports per 300-second window, failing closed when unavailable;
+- one bounded database budget key and at most one budget write per request;
+- a privacy-safe log sample on the first and every tenth accepted report, identified by a short fingerprint;
+- metrics updated in batches of ten rather than once per report; and
+- URL query, fragment, credentials, and path removed; HTTP(S) values retain only origin and other schemes retain only the scheme.
 
-1. **Configure report collection**
-   - Set up a CSP reporting endpoint (Report URI, Sentry, or self-hosted `report-uri` endpoint)
-   - Update the `report-uri` directive in `Bootstrap::send_security_headers()` to point to the configured collector
-   - Verify reports are arriving by triggering a controlled violation
+This code does **not** configure CDN/WAF limits, prove that the policy works on staging, approve third-party origins, or authorize enforcement.
 
-2. **Review reports weekly**
-   - Identify which resources are loaded from non-`'self'` origins
-   - For each reported violation, determine:
-     - Is it a first-party resource that should be loaded from `'self'`?
-     - Is it a third-party dependency that needs an explicit allowlist entry?
-     - Is it a false positive (browser extension, dev tools)?
+## Human staging observation (required)
 
-3. **Remove `'unsafe-eval'` from `script-src`**
-   - Audit all JS in the site for `eval()`, `Function()`, `setTimeout(string)`, etc.
-   - Longevity-core assets:
-     - `admin-governance.js`: no eval usage — safe to remove `'unsafe-eval'`
-     - `analytics.js`: no eval usage — safe
-     - `contact-form.js`: no eval usage — safe
-     - `site-ui.js`: no eval usage — safe
-   - Third-party scripts (GTM, GA4): these may use eval. Test thoroughly. If they break, add a `'strict-dynamic'` nonce-based approach
-   - Update the CSP directive to remove `'unsafe-eval'` and observe for 1 week of reports
+The security/platform owner must complete these steps for the exact release candidate and production-like environment:
 
-4. **Remove `'unsafe-inline'` from `script-src`**
-   - Move inline script config injection from `wp_add_inline_script` to JSON data attributes:
-     - `Analytics::enqueue()` currently uses `wp_add_inline_script('longevity-analytics', 'window.longevityAnalytics=' . wp_json_encode(...))`
-     - Replace with: `<script id="longevity-analytics-config" type="application/json">` read by `analytics.js` via `JSON.parse(document.getElementById('longevity-analytics-config')?.textContent)`
-   - For GTM, use the `gtag.js` nonce attribute approach: `wp_add_inline_script` accepts a `$position` parameter; inject after the script tag so it loads as a separate resource
-   - Update the CSP directive to remove `'unsafe-inline'` and observe for 1 week of reports
+1. Keep `LEL_CSP_MODE=report-only` for the approved observation window (target: 30 days, including a final clean 7 days).
+2. Configure an edge body cap no larger than 8 KiB and per-source/global rate limits at the CDN/WAF. The application global budget is defense in depth, not an edge substitute.
+3. Inventory every route and approved script, style, image, font, connection, worker, frame, and form target.
+4. Trigger a controlled violation and confirm sampled, redacted reports and alert delivery without raw secrets or personal data.
+5. Review unexplained first-party violations and either remove the dependency or record human approval for the minimum required origin.
+6. Run manual route, login, editor, contact, checkout/affiliate (if applicable), responsive, and accessibility coverage under enforcement on staging.
+7. Exercise rollback by returning staging to `report-only` without reverting code.
 
-### Expected timeline
+Retain this release evidence:
 
-| Week | Action | Check |
-|---|---|---|
-| 1 | Configure report collection, verify reports arriving | All violations recorded |
-| 2-3 | Remove `'unsafe-eval'`, observe violations | No new violations after initial fixes |
-| 4 | Remove `'unsafe-inline'`, move inline configs | No new violations after fixes |
+- policy SHA-256, observation start/end UTC, environment identity, source SHA, and release artifact checksum;
+- route/asset inventory and a redacted aggregate report summary;
+- edge-limit configuration evidence and high-volume test results;
+- unexplained/accepted violation decisions with owner and date;
+- staging enforcement and rollback results; and
+- security/platform approver name, approval time, and change ticket.
 
-## Phase 2: Enforcement (after day 30)
+## Enforcement approval gate (human-owned)
 
-When the following criteria are met:
+Repository capability is not enforcement approval. Set `LEL_CSP_MODE=enforce` only when all boxes are completed by named humans:
 
-- [ ] No unexpected violation reports in the final 7 days of observation
-- [ ] Both `'unsafe-eval'` and `'unsafe-inline'` removed from `script-src`
-- [ ] All third-party resources explicitly allowlisted
-- [ ] `frame-ancestors 'none'` confirmed (already set)
-- [ ] Report-only has collected at least 28 days of data without content breakage
+- [ ] Exact candidate observed in report-only for the approved window.
+- [ ] Final clean period has no unexplained first-party violations.
+- [ ] CDN/WAF body and rate limits are active and tested.
+- [ ] Third-party targets have security/privacy approval.
+- [ ] Production-like route and accessibility coverage passes under enforcement.
+- [ ] Policy hash and candidate checksums match the release evidence.
+- [ ] Rollback to report-only is tested.
+- [ ] Security/platform owner records enforcement approval and monitoring owner.
 
-Then switch from `Content-Security-Policy-Report-Only` to `Content-Security-Policy`:
-
-```php
-// In Bootstrap::send_security_headers()
-header( 'Content-Security-Policy: ' . self::csp_directives() );
-// Instead of:
-header( 'Content-Security-Policy-Report-Only: ' . self::csp_directives() );
-```
-
-## Pinning enforcement to the constant
-
-Add an environment-specific switch so that staging can keep Report-Only while production enforces:
-
-```php
-private static function csp_header_name(): string {
-    // Production enforces; all other environments keep report-only
-    return 'production' === wp_get_environment_type()
-        ? 'Content-Security-Policy'
-        : 'Content-Security-Policy-Report-Only';
-}
-```
-
-## Post-enforcement monitoring
-
-- Continue collecting violation reports for 30 more days
-- Set up alerting if violation volume spikes by > 50% from baseline
-- Review reports monthly for new third-party resources added by content updates
+After enforcement, review sampled aggregates daily for the first week and monthly thereafter. Alert thresholds must be set from the staging baseline; a sudden accepted, throttled, or edge-rejected volume increase requires investigation.
 
 ## Related
 
-- `wp-content/mu-plugins/longevity-core/bootstrap.php` — CSP header implementation
-- `docs/operations/security-hardening.md` — other security headers
-- `docs/operations/security-checklist.md` — CSP enforcement sign-off checkbox
+- `wp-content/mu-plugins/longevity-core/bootstrap.php`
+- `wp-content/mu-plugins/longevity-core/class-rest-api.php`
+- `docs/operations/security-hardening.md`
+- `docs/operations/security-checklist.md`

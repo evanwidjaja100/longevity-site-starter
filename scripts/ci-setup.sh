@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+ROOT=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$ROOT"
 
 env_value() {
@@ -31,7 +31,7 @@ mkdir -p reports/playwright reports/lighthouse reports/ci-setup
 docker compose up -d db wordpress
 
 ready=0
-for attempt in {1..40}; do
+for _ in {1..40}; do
   if curl --fail --silent --show-error --location --output /dev/null "$site_url/"; then
     ready=1
     break
@@ -41,7 +41,9 @@ done
 [[ "$ready" -eq 1 ]] || { echo 'ERROR: WordPress did not become HTTP-ready within the CI budget.' >&2; exit 1; }
 
 docker compose run --rm --entrypoint sh wpcli /scripts/bootstrap.sh
-docker compose run --rm wpcli longevity migrate --allow-root
+admin_user=$(docker compose run --rm wpcli wp user list --role=administrator --field=ID --allow-root | sed -n '/^[0-9][0-9]*$/ { p; q; }')
+[[ -n "$admin_user" ]] || { echo 'ERROR: No administrator user was discovered for migrations.' >&2; exit 1; }
+docker compose run --rm wpcli wp longevity migrate --user="$admin_user" --allow-root
 docker compose run --rm --entrypoint sh wpcli /scripts/create-test-fixtures.sh
 
 for route in / /test-evidence-guide/ /reviews/; do
@@ -49,9 +51,9 @@ for route in / /test-evidence-guide/ /reviews/; do
   [[ "$status" = 200 ]] || { echo "ERROR: expected fixture route $route to return 200, got $status." >&2; exit 1; }
 done
 
-published_guides=$(docker compose run --rm wpcli post list --post_type=post --post_status=publish --format=count --allow-root | tr -d '[:space:]')
-published_reviews=$(docker compose run --rm wpcli post list --post_type=review --post_status=publish --format=count --allow-root | tr -d '[:space:]')
-blocked_status=$(docker compose run --rm wpcli post get test-blocked-review --field=post_status --allow-root | tr -d '[:space:]')
+published_guides=$(docker compose run --rm wpcli wp post list --post_type=post --post_status=publish --format=count --allow-root | tr -d '[:space:]')
+published_reviews=$(docker compose run --rm wpcli wp post list --post_type=review --post_status=publish --format=count --allow-root | tr -d '[:space:]')
+blocked_status=$(docker compose run --rm wpcli wp post list --name=test-blocked-review --post_type=review --field=post_status --allow-root | tr -d '[:space:]')
 [[ "$published_guides" -ge 2 ]] || { echo "ERROR: expected at least 2 published synthetic guides, got $published_guides." >&2; exit 1; }
 [[ "$published_reviews" -ge 3 ]] || { echo "ERROR: expected at least 3 published synthetic reviews, got $published_reviews." >&2; exit 1; }
 [[ "$blocked_status" != publish ]] || { echo 'ERROR: incomplete synthetic review was published.' >&2; exit 1; }

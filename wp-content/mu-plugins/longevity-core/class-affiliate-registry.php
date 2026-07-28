@@ -117,7 +117,7 @@ final class Affiliate_Registry {
 		if ( ! preg_match( '/\brel=["\']([^"\']*)["\']|\brel=([^\s>]+)/i', $tag, $rel_match ) ) {
 			return false;
 		}
-		$rel_value = isset( $rel_match[1] ) && '' !== $rel_match[1] ? $rel_match[1] : ( $rel_match[2] ?? '' );
+		$rel_value = '' !== $rel_match[1] ? $rel_match[1] : ( $rel_match[2] ?? '' );
 		$tokens    = preg_split( '/[\s]+/', strtolower( trim( $rel_value ) ) ) ?: array();
 		return in_array( 'sponsored', $tokens, true );
 	}

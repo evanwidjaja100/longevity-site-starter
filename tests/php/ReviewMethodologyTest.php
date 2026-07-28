@@ -43,4 +43,12 @@ final class ReviewMethodologyTest extends TestCase {
 		$input = array_fill( 0, 40, array( 'label' => 'Metric', 'observed_value' => 'Value', 'status' => 'informational' ) );
 		self::assertCount( 30, Review_Methodology::sanitize_public_results( $input )['rows'] );
 	}
+
+	public function test_sanitizing_stored_public_results_is_idempotent(): void {
+		$stored = Review_Methodology::sanitize_public_results(
+			array( array( 'label' => 'Battery', 'observed_value' => '6.2', 'status' => 'meets' ) )
+		);
+
+		self::assertSame( $stored, Review_Methodology::sanitize_public_results( $stored ) );
+	}
 }

@@ -75,11 +75,10 @@ final class Review_Methodology {
 			'deviations' => '',
 			'failures'   => '',
 		);
-		if ( is_array( $value ) ) {
-			$metadata['deviations'] = substr( sanitize_textarea_field( (string) ( $value['deviations'] ?? '' ) ), 0, 1000 );
-			$metadata['failures']   = substr( sanitize_textarea_field( (string) ( $value['failures'] ?? '' ) ), 0, 1000 );
-		}
-		foreach ( array_slice( $value, 0, 30 ) as $index => $row ) {
+		$metadata['deviations'] = substr( sanitize_textarea_field( (string) ( $value['deviations'] ?? '' ) ), 0, 1000 );
+		$metadata['failures']   = substr( sanitize_textarea_field( (string) ( $value['failures'] ?? '' ) ), 0, 1000 );
+		$rows = isset( $value['rows'] ) && is_array( $value['rows'] ) ? $value['rows'] : $value;
+		foreach ( array_slice( $rows, 0, 30 ) as $index => $row ) {
 			if ( ! is_array( $row ) ) {
 				continue;
 			}

@@ -162,7 +162,7 @@ $post  = ! empty( $posts ) ? $posts[0] : null;
 	if ( $dry_run ) {
 		\WP_CLI::line( "[DRY RUN] Would update metadata for /{$article['post_name']}/ (ID {$post->ID})" );
 		foreach ( $article['meta'] as $key => $value ) {
-			\WP_CLI::line( "  → {$key}: " . ( is_bool( $value ) ? ( $value ? 'true' : 'false' ) : $value ) );
+			\WP_CLI::line( "  → {$key}: {$value}" );
 		}
 		++$updated;
 		continue;

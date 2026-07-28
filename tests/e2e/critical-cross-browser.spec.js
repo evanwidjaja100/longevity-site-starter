@@ -10,8 +10,8 @@ test.describe('critical cross-browser paths', () => {
   for (const route of criticalRoutes) {
     test(`header nav and skip link on ${route.key} (${route.path})`, async ({ page }) => {
       await page.goto(route.path);
-      await expect(page.getByRole('navigation')).toBeVisible();
-      await expect(page.getByRole('link', { name: 'Skip to main content' })).toBeVisible();
+      await expect(page.getByRole('navigation', { name: 'Primary navigation', exact: true })).toBeVisible();
+      await expect(page.getByRole('link', { name: 'Skip to content', exact: true })).toHaveCount(1);
       await expect(page.locator('#main-content')).toBeVisible();
     });
   }
@@ -19,55 +19,67 @@ test.describe('critical cross-browser paths', () => {
   test('mobile overlay opens and closes', async ({ page }) => {
     await page.setViewportSize({ width: 360, height: 800 });
     await page.goto('/');
-    const toggle = page.getByRole('button', { name: /menu|navigation/i }).first();
-    if (await toggle.isVisible()) {
-      await toggle.click();
-      await expect(page.getByRole('dialog').or(page.getByRole('navigation').nth(1))).toBeVisible({ timeout: 5000 });
-      const close = page.getByRole('button', { name: /close|dismiss/i }).first();
-      if (await close.isVisible()) {
-        await close.click();
-        await expect(page.getByRole('dialog')).not.toBeVisible();
-      }
-    }
+    const toggle = page.getByRole('button', { name: 'Open menu', exact: true });
+    const overlay = page.locator('.wp-block-navigation__responsive-container');
+    await expect(toggle).toBeVisible();
+    await toggle.click();
+    await expect(overlay).toHaveClass(/is-menu-open/);
+    const close = page.getByRole('button', { name: 'Close menu', exact: true });
+    await expect(close).toBeVisible();
+    await close.click();
+    await expect(overlay).not.toHaveClass(/is-menu-open/);
+    await expect(toggle).toBeFocused();
   });
 
   test('search dialog opens and has input', async ({ page }) => {
     await page.goto('/');
-    await page.getByRole('button', { name: /search/i }).first().click();
-    await expect(page.getByRole('dialog')).toBeVisible({ timeout: 5000 });
-    await expect(page.getByRole('searchbox').or(page.getByPlaceholder(/search/i))).toBeVisible();
+    const trigger = page.getByRole('button', { name: 'Search', exact: true });
+    const dialog = page.getByRole('dialog', { name: 'Find evidence guides and product reports', exact: true });
+    await trigger.click();
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByRole('searchbox', { name: 'Search terms', exact: true })).toBeFocused();
     await page.keyboard.press('Escape');
-    await expect(page.getByRole('dialog')).not.toBeVisible();
+    await expect(dialog).not.toBeVisible();
+    await expect(trigger).toBeFocused();
   });
 
   test('search filters interact', async ({ page }) => {
     await page.goto('/?s=evidence');
-    await page.getByRole('combobox', { name: /content type|type/i }).first().selectOption('review');
-    await page.getByRole('button', { name: /apply/i }).first().click();
+    await page.getByRole('combobox', { name: 'Content type', exact: true }).selectOption('review');
+    await page.getByRole('button', { name: 'Apply filters', exact: true }).click();
     await expect(page.locator('.longevity-result-count')).toBeVisible();
   });
 
   test('ranking filters interact', async ({ page }) => {
     await page.goto('/category/evidence-literacy/');
-    const sortSelect = page.getByRole('combobox', { name: /sort/i });
-    if (await sortSelect.isVisible()) {
-      await sortSelect.selectOption('confidence');
-      await page.getByRole('button', { name: /apply/i }).click();
-      await expect(page.getByRole('table')).toBeVisible();
-    }
+    const sortSelect = page.getByRole('combobox', { name: 'Sort rankings', exact: true });
+    await expect(sortSelect).toBeVisible();
+    await sortSelect.selectOption('confidence');
+    await page.getByRole('button', { name: 'Apply', exact: true }).click();
+    await expect(page.getByRole('table')).toBeVisible();
   });
 
-  test('skip link moves focus', async ({ page }) => {
+  test('skip link moves focus', async ({ page, browserName }) => {
     await page.goto('/');
-    await page.keyboard.press('Tab');
+    const skipLink = page.getByRole('link', { name: 'Skip to content', exact: true });
+    // Headless WebKit emulates Safari with full keyboard access disabled, which
+    // intentionally skips links in the Tab order; focus the native link as that
+    // browser setting would, then verify the same activation and target focus.
+    if (browserName === 'webkit') await skipLink.focus();
+    else await page.keyboard.press('Tab');
+    await expect(skipLink).toBeFocused();
+    await expect(skipLink).toBeVisible();
     await page.keyboard.press('Enter');
+    await expect(page).toHaveURL(/#main-content$/);
     await expect(page.locator('#main-content')).toBeFocused();
   });
 
   test('forms and focus are accessible', async ({ page }) => {
     await page.goto('/?s=evidence');
-    const searchInput = page.getByRole('searchbox').first();
-    await searchInput.focus();
+    await page.getByRole('button', { name: 'Search', exact: true }).click();
+    const searchInput = page
+      .getByRole('dialog', { name: 'Find evidence guides and product reports', exact: true })
+      .getByRole('searchbox', { name: 'Search terms', exact: true });
     await expect(searchInput).toBeFocused();
     await searchInput.fill('example');
     await page.keyboard.press('Enter');

@@ -19,7 +19,21 @@ $required = array(
 	'ProtocolApprovalTest',
 	'AffiliateLifecycleTest',
 	'ContactPrivacyTest',
+	'ContactPersistenceTest',
+	'LegalHoldTest',
+	'CspReportTest',
+	'EvidenceStoreTest',
 	'TrustPagesTest',
+	'AdvisoryLockTest',
+	'MigrationsLockTest',
+	'OverrideIntentTest',
+	'RolesTest',
+	'FingerprintCompletenessTest',
+	'InvalidationQueueTest',
+	'DependencyIndexTest',
+	'FreshnessLockTest',
+	'AuditLogTransactionTest',
+	'PreflightTest',
 );
 
 $phpunit = dirname( __DIR__ ) . '/vendor/phpunit/phpunit/phpunit';

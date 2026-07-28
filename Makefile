@@ -1,6 +1,6 @@
 SHELL := /bin/sh
 
-.PHONY: validate validate-release quality lint test test-security test-php test-content test-integration test-e2e test-a11y test-cross-browser test-lighthouse test-all release-evidence deploy-check deploy rollback docker-config up down bootstrap smoke manifest clean
+.PHONY: validate validate-release quality lint test test-security test-php test-content test-integration test-e2e test-a11y test-cross-browser test-lighthouse test-all release-artifact verify-release-artifact dependency-evidence release-evidence deploy-check docker-config up down bootstrap smoke manifest clean
 
 validate:
 	bash scripts/validate.sh
@@ -57,13 +57,18 @@ test-all: validate quality test-security test test-integration test-e2e test-cro
 release-evidence:
 	bash scripts/generate-release-evidence.sh
 
+release-artifact:
+	bash scripts/build-release-artifact.sh $(if $(SHA),$(SHA),HEAD)
+
+verify-release-artifact:
+	@test -n "$(SHA)" || { echo 'usage: make verify-release-artifact SHA=<full-commit-sha>'; exit 2; }
+	bash scripts/verify-release-artifact.sh "build/release/longevity-release-$(SHA).tar.gz" "$(SHA)"
+	bash scripts/verify-release-reproducibility.sh "$(SHA)"
+
+dependency-evidence:
+	php scripts/generate-dependency-sbom.php
+
 deploy-check: validate docker-config test-security
-
-deploy:
-	bash scripts/deploy.sh $(ENV_FILE) $(IMAGE_TAG)
-
-rollback:
-	bash scripts/rollback.sh $(ENV_FILE)
 
 docker-config:
 	docker compose config --quiet

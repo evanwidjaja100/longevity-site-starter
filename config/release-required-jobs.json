@@ -1,0 +1,21 @@
+{
+  "schema_version": 2,
+  "description": "Fail-closed release jobs and exact substantive reports. Every artifact also carries evidence.json with commit, run, job, result, tool versions, and report checksums.",
+  "required": [
+    {"job":"clean-build","artifact":"clean-build-evidence","events":["push","pull_request"],"reports":[{"path":"coverage.xml","format":"clover","schema":"clover-v1"}]},
+    {"job":"quality-php","artifact":"php-quality-evidence","events":["push","pull_request"],"reports":[{"path":"phpunit-junit.xml","format":"junit","schema":"junit-v1"},{"path":"phpcs-checkstyle.xml","format":"checkstyle","schema":"checkstyle-v1"}]},
+    {"job":"quality-frontend","artifact":"frontend-quality-evidence","events":["push","pull_request"],"reports":[{"path":"eslint.json","format":"json","schema":"eslint-v1"},{"path":"stylelint.json","format":"json","schema":"stylelint-v1"}]},
+    {"job":"content-and-config","artifact":"content-config-evidence","events":["push","pull_request"],"reports":[{"path":"validation.log","format":"text","schema":"command-log-v1"}]},
+    {"job":"wordpress-integration","artifact":"wordpress-integration-evidence","events":["push","pull_request"],"reports":[{"path":"integration.log","format":"text","schema":"command-log-v1"}]},
+    {"job":"playwright-chromium","artifact":"playwright-chromium-evidence","events":["push","pull_request"],"reports":[{"path":"playwright-junit.xml","format":"junit","schema":"junit-v1"}]},
+    {"job":"accessibility","artifact":"accessibility-evidence","events":["push","pull_request"],"reports":[{"path":"playwright-junit.xml","format":"junit","schema":"junit-v1"}]},
+    {"job":"playwright-cross-browser","artifact":"playwright-cross-browser-evidence","events":["push","pull_request"],"reports":[{"path":"playwright-junit.xml","format":"junit","schema":"junit-v1"}]},
+    {"job":"lighthouse-mobile","artifact":"lighthouse-evidence","events":["push","pull_request"],"reports":[{"path":"lighthouse.json","format":"json","schema":"lighthouse-v1"}]},
+    {"job":"lighthouse-desktop","artifact":"lighthouse-desktop-evidence","events":["push","pull_request"],"reports":[{"path":"lighthouse.json","format":"json","schema":"lighthouse-v1"}]},
+    {"job":"release-artifact","artifact":"release-artifact","events":["push","pull_request"],"reports":[{"path":"release-verification.json","format":"json","schema":"result-v1"},{"path":"reproducibility.json","format":"json","schema":"result-v1"},{"path":"release.tar.gz","format":"archive","schema":"lel-runtime-v1"},{"path":"release.tar.gz.sha256","format":"sha256","schema":"sha256sum-v1"}]},
+    {"job":"codeql","artifact":"codeql-evidence","events":["push","pull_request"],"reports":[{"path":"codeql.sarif","format":"sarif","schema":"sarif-2.1.0"}]},
+    {"job":"php-sast","artifact":"php-sast-evidence","events":["push","pull_request"],"reports":[{"path":"psalm.sarif","format":"sarif","schema":"sarif-2.1.0"},{"path":"detection-proof.json","format":"json","schema":"result-v1"}]},
+    {"job":"security-supply-chain","artifact":"supply-chain-evidence","events":["push","pull_request"],"reports":[{"path":"sbom.spdx.json","format":"spdx-json","schema":"spdx-2.x"},{"path":"licenses.json","format":"json","schema":"license-policy-v1"},{"path":"scan-metadata.json","format":"json","schema":"scan-metadata-v1"},{"path":"composer-audit.json","format":"json","schema":"composer-audit-v1"},{"path":"npm-audit.json","format":"json","schema":"npm-audit-v2"},{"path":"trufflehog.json","format":"json","schema":"trufflehog-v1"},{"path":"trivy.json","format":"json","schema":"trivy-v1"}]},
+    {"job":"dependency-review","artifact":"dependency-review-evidence","events":["pull_request"],"reports":[{"path":"dependency-review.json","format":"json","schema":"dependency-review-v1"}]}
+  ]
+}

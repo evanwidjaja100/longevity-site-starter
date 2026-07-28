@@ -83,9 +83,6 @@ def validate_legacy_map(errors: list[str]) -> int:
             continue
         order = int(cells[0])
         parsed_orders.append(order)
-        references = [int(value) for value in re.findall(r"Article(?:s)?\s+(\d+)|(?<=, )\d+", f"{cells[2]} {cells[3]}") for value in value if value]
-        # The expression above deliberately handles the first number after Article/Articles;
-        # collect remaining comma-separated values separately for clarity.
         references = [int(value) for value in re.findall(r"\b(?:Article(?:s)?\s+)?(\d+)\b", f"{cells[2]} {cells[3]}")]
         for reference in references:
             if reference < 1 or reference > 60:

@@ -72,7 +72,7 @@ final class SEO {
 		} elseif ( is_category() || is_tag() || is_tax() ) {
 			$term = get_queried_object();
 			if ( $term instanceof WP_Term ) {
-				$desc = term_description( $term );
+				$desc = term_description( $term->term_id );
 				if ( $desc ) {
 					$desc = wp_strip_all_tags( $desc );
 				}
