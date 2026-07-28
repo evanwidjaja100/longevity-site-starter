@@ -249,6 +249,7 @@ b867e094694d2ce6f5f7f07297042109b8f4e97d4eb1175111d50ee4b73daf15 *./operations/9
 d159b3c48b1a6c24875cfd32d47f156fea92385fd2f7c38724f2c04b1def48af *./operations/analytics-event-spec.md
 145b3b8ee3f2a5d8895cba055eac4fbf4a54e3d25c638a192759c7b5757f19ca *./operations/checklists/production-readiness.md
 28fb2c9663ff55c5c326476433ca5e09376cd6ac7e8b3c7430890ef50be6976b *./operations/corrections-to-original-plan.md
+8c71ba417e3524750d675d0310d237f0d04b5f14ddf2305770c336d48295d7ad *./operations/incident-response/2026-07-18-database-credential-exposure.md
 372558e8148f03a6781a96f874424aa9f39516e2f16084d73aaee8d8249434e0 *./operations/incident-response/README.md
 abd7e311d35f8955f5ef223ce48c2b2f3d56e5bdf622b8079d21e411425e8038 *./operations/kpi-definitions.md
 0f3555090508058261752bb2a24341ba18315ee916e897a49defcd262fec8557 *./operations/launch-checklist.md
