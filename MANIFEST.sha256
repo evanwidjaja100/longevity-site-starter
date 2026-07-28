@@ -518,7 +518,7 @@ b25e88b1f2c0a61fea364b22dd808476d17f545c8944d99c8299cf654f30e546 *./wp-content/m
 c27e0fdf058606e3f0e8094a093bb125a71655a8556e3af2a7ee0dea76a840f7 *./wp-content/mu-plugins/longevity-core/class-meta-registry.php
 0c6283302cc18b4d6c2877d1dd157c865a5c783439bfbc464f8dbb9e6c7ebc20 *./wp-content/mu-plugins/longevity-core/class-metrics.php
 007c58a8c2b6079e5a92a7fbf1c69cc2798bdcef6227e33774edf04c26006906 *./wp-content/mu-plugins/longevity-core/class-migrations.php
-33d4799f8330f60a20485aa83b910755725fef5f806e5318c504c90cc8142b85 *./wp-content/mu-plugins/longevity-core/class-notification-outbox.php
+bd6f10b085fca31bc350deb2e163f5fcaf0d63671c20659bac477380d6394a4b *./wp-content/mu-plugins/longevity-core/class-notification-outbox.php
 00423713222c90ae94bf0c3b143b9434885b2e8a3fe8cb3265ce541c20a10c71 *./wp-content/mu-plugins/longevity-core/class-override-intent.php
 2be63ea4bf9ad3f2efdcbe4c94a1e16e8c7db01df6ac0d1a85dcfe3d56985bcb *./wp-content/mu-plugins/longevity-core/class-platform-requirements.php
 f7b00fc0a229387f9447d9afb9ba3e021655304aac690ebe654921ba81960c84 *./wp-content/mu-plugins/longevity-core/class-public-contact.php

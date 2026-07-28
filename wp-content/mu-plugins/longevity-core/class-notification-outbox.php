@@ -233,6 +233,7 @@ final class Notification_Outbox {
 				'contact_admin_notification'
 			)
 		);
+		// @phpstan-ignore notIdentical.alwaysFalse (wpdb::query() mutates last_error; PHPStan cannot see writes to the magic property)
 		if ( false === $result || '' !== (string) $wpdb->last_error ) {
 			self::report_sql_failure( 'purge_for_object', array( 'object_id' => $object_id ) );
 			return false;
