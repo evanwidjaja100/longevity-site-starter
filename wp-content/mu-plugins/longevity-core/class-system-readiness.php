@@ -72,6 +72,7 @@ final class System_Readiness {
 			'approval_integrity'   => self::safely( static fn(): array => self::approval_integrity_check() ),
 			'audit_table'          => self::safely( static fn(): array => self::check( Audit_Log::exists(), 'ok', 'blocked', 'Governance audit table.' ) ),
 			'audit_write_failures' => self::safely( static fn(): array => self::audit_failure_check() ),
+			'credential_expiration' => self::safely( static fn(): array => self::credential_expiration_check() ),
 			'publication_lock'     => self::safely( static fn(): array => self::lock_check() ),
 			'invalidation_queue'   => self::safely( static fn(): array => self::queue_check() ),
 			'dependency_index'     => self::safely( static fn(): array => self::dependency_index_check() ),
@@ -150,6 +151,25 @@ final class System_Readiness {
 		return array(
 			'status'  => 'ok',
 			'message' => 'No audit write failures.',
+		);
+	}
+
+	/** Credential-expiration sweep health: overdue verified credentials must be expirable. */
+	private static function credential_expiration_check(): array {
+		$failures = (int) get_option( 'lel_credential_expiration_failures', 0 );
+		$last_run = (string) get_option( 'lel_credential_expiration_last_run', '' );
+		if ( $failures > 0 ) {
+			return array(
+				'status'        => 'degraded',
+				'message'       => sprintf( '%d verified credential(s) could not be expired in the last sweep.', $failures ),
+				'failure_count' => $failures,
+				'last_run'      => $last_run,
+			);
+		}
+		return array(
+			'status'   => 'ok',
+			'message'  => '' === $last_run ? 'Credential expiration sweep has not run yet.' : 'Credential expiration sweep healthy.',
+			'last_run' => $last_run,
 		);
 	}
 

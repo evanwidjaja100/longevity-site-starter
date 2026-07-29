@@ -104,6 +104,7 @@ final class Bootstrap {
 		Corrections::init();
 		Publication_Gates::init();
 		Review_Workflow::init();
+		Reviewer_Credentials::init();
 		Approval_Service::init();
 		Invalidation_Queue::init();
 		Notification_Outbox::init();

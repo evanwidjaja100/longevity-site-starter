@@ -1319,6 +1319,106 @@ if ( ! function_exists( 'delete_user_meta' ) ) {
 if ( ! function_exists( 'get_userdata' ) ) {
 	function get_userdata( int $user_id ) { return $GLOBALS['lel_test_users'][ $user_id ] ?? (object) array( 'ID' => $user_id, 'display_name' => 'User ' . $user_id ); }
 }
+if ( ! function_exists( 'get_users' ) ) {
+	function get_users( array $args = array() ) {
+		$meta = $GLOBALS['lel_test_user_meta'] ?? array();
+		$ids  = array_map( 'intval', array_keys( $meta ) );
+		sort( $ids, SORT_NUMERIC );
+
+		$clauses = array();
+		if ( isset( $args['meta_key'] ) ) {
+			$clauses[] = array(
+				'key'     => (string) $args['meta_key'],
+				'value'   => $args['meta_value'] ?? '',
+				'compare' => (string) ( $args['meta_compare'] ?? '=' ),
+				'type'    => (string) ( $args['meta_type'] ?? 'CHAR' ),
+			);
+		}
+		$relation = 'AND';
+		if ( isset( $args['meta_query'] ) && is_array( $args['meta_query'] ) ) {
+			foreach ( $args['meta_query'] as $key => $clause ) {
+				if ( 'relation' === $key ) {
+					$relation = 'OR' === strtoupper( (string) $clause ) ? 'OR' : 'AND';
+					continue;
+				}
+				if ( is_array( $clause ) && isset( $clause['key'] ) ) {
+					$clauses[] = array(
+						'key'     => (string) $clause['key'],
+						'value'   => $clause['value'] ?? '',
+						'compare' => (string) ( $clause['compare'] ?? '=' ),
+						'type'    => (string) ( $clause['type'] ?? 'CHAR' ),
+					);
+				}
+			}
+		}
+
+		$is_date  = static fn( string $v ): bool => (bool) preg_match( '/^\d{4}-\d{2}-\d{2}$/', $v );
+		$evaluate = static function ( int $id ) use ( $meta, $clauses, $relation, $is_date ): bool {
+			if ( empty( $clauses ) ) {
+				return true;
+			}
+			$results = array();
+			foreach ( $clauses as $clause ) {
+				$stored  = $meta[ $id ][ $clause['key'] ] ?? null;
+				$compare = strtoupper( (string) $clause['compare'] );
+				if ( 'EXISTS' === $compare ) {
+					$results[] = null !== $stored && '' !== $stored;
+					continue;
+				}
+				if ( 'NOT EXISTS' === $compare ) {
+					$results[] = null === $stored || '' === $stored;
+					continue;
+				}
+				if ( null === $stored ) {
+					$results[] = false;
+					continue;
+				}
+				$left  = (string) $stored;
+				$right = (string) $clause['value'];
+				if ( 'DATE' === strtoupper( (string) $clause['type'] )
+					&& in_array( $compare, array( '<', '<=', '>', '>=' ), true )
+					&& ( ! $is_date( $left ) || ! $is_date( $right ) ) ) {
+					$results[] = false;
+					continue;
+				}
+				switch ( $compare ) {
+					case '!=':
+						$results[] = $left !== $right;
+						break;
+					case '<':
+						$results[] = strcmp( $left, $right ) < 0;
+						break;
+					case '<=':
+						$results[] = strcmp( $left, $right ) <= 0;
+						break;
+					case '>':
+						$results[] = strcmp( $left, $right ) > 0;
+						break;
+					case '>=':
+						$results[] = strcmp( $left, $right ) >= 0;
+						break;
+					default:
+						$results[] = $left === $right;
+						break;
+				}
+			}
+			return 'OR' === $relation ? in_array( true, $results, true ) : ! in_array( false, $results, true );
+		};
+
+		$matched = array_values( array_filter( $ids, $evaluate ) );
+		if ( isset( $args['order'] ) && 'DESC' === strtoupper( (string) $args['order'] ) ) {
+			rsort( $matched, SORT_NUMERIC );
+		}
+		$number = (int) ( $args['number'] ?? 0 );
+		if ( $number > 0 ) {
+			$matched = array_slice( $matched, 0, $number );
+		}
+		if ( isset( $args['fields'] ) && 'ids' === $args['fields'] ) {
+			return $matched;
+		}
+		return array_map( static fn( int $id ) => get_userdata( $id ), $matched );
+	}
+}
 if ( ! function_exists( 'get_post_type' ) ) {
 	function get_post_type( $post ): string { $obj = get_post( $post ); return $obj ? (string) $obj->post_type : (string) ( $GLOBALS['lel_test_post_types'][ (int) $post ] ?? '' ); }
 }

@@ -14,6 +14,9 @@ final class Approval_Service {
 	/** @var bool Prevent recursive invalidation. */
 	private static bool $mutating = false;
 
+	/** @var bool Suppress the per-field credential hook during batched writes. */
+	private static bool $suppress_credential_hook = false;
+
 	/** Register material-change invalidation hooks. */
 	public static function init(): void {
 		register_shutdown_function( array( Publication_Lock::class, 'release_all' ) );
@@ -90,16 +93,26 @@ final class Approval_Service {
 		}
 	}
 
-	/** Cascade invalidation when reviewer credentials change. */
+	/** Toggle suppression of the per-field credential hook during batched writes. */
+	public static function suppress_credential_hook( bool $suppress ): void {
+		self::$suppress_credential_hook = $suppress;
+	}
+
+	/** Cascade invalidation when any verified reviewer-credential field changes. */
 	public static function on_credential_changed( int $meta_id, int $user_id, string $meta_key, $meta_value ): void {
 		unset( $meta_id, $meta_value );
-		if ( self::$mutating || ! in_array( $meta_key, array( 'credential_verification_status', 'credential_verified_by_user_id' ), true ) ) {
+		if ( self::$mutating || self::$suppress_credential_hook || ! in_array( $meta_key, Reviewer_Credentials::verified_fields(), true ) ) {
 			return;
 		}
-		$parent_ids = Dependency_Index::find_parents( 'credential', $user_id );
 		$actor = function_exists( 'get_current_user_id' ) ? get_current_user_id() : 0;
+		Reviewer_Credentials::detect_and_cascade( $user_id, 'meta:' . $meta_key, $actor );
+	}
+
+	/** Resolve the approvals that depend on a reviewer credential and enqueue them. */
+	public static function invalidate_dependents_of_credential( int $reviewer_id, string $reason, int $actor_id ): void {
+		$parent_ids = Dependency_Index::find_parents( 'credential', $reviewer_id );
 		if ( ! empty( $parent_ids ) ) {
-			self::enqueue_durably( $parent_ids, 'dependency_changed:credential:' . $meta_key, $actor );
+			self::enqueue_durably( $parent_ids, $reason, $actor_id );
 		}
 	}
 
