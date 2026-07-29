@@ -42,6 +42,40 @@ final class Runtime_Config {
 		return $status['valid'] ? $status['model'] : array();
 	}
 
+	/** The two supported explicit CSP delivery modes. */
+	public const CSP_MODES = array( 'report-only', 'enforce' );
+
+	/**
+	 * Resolve the explicit CSP release mode (single source of truth).
+	 *
+	 * The effective mode is always safe: anything other than an explicit,
+	 * supported "enforce" resolves to report-only. Callers that gate
+	 * production readiness must additionally require `configured` and
+	 * reject `retired_key`.
+	 *
+	 * @return array{mode: string, configured: bool, invalid: bool, retired_key: bool, source: string}
+	 */
+	public static function csp_mode_status(): array {
+		$raw    = null;
+		$source = 'unset';
+		if ( defined( 'LEL_CSP_MODE' ) ) {
+			$raw    = constant( 'LEL_CSP_MODE' );
+			$source = 'constant';
+		} elseif ( false !== getenv( 'LEL_CSP_MODE' ) ) {
+			$raw    = getenv( 'LEL_CSP_MODE' );
+			$source = 'environment';
+		}
+		$normalized = is_string( $raw ) ? strtolower( trim( $raw ) ) : '';
+		$configured = in_array( $normalized, self::CSP_MODES, true );
+		return array(
+			'mode'        => 'enforce' === $normalized ? 'enforce' : 'report-only',
+			'configured'  => $configured,
+			'invalid'     => null !== $raw && ! $configured,
+			'retired_key' => defined( 'LEL_CSP_ENFORCE' ) || false !== getenv( 'LEL_CSP_ENFORCE' ),
+			'source'      => $source,
+		);
+	}
+
 	/** Clear request cache for tests. */
 	public static function reset(): void {
 		self::$cache = array();

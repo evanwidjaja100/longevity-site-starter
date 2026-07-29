@@ -100,10 +100,23 @@ if [ "${WP_ENVIRONMENT_TYPE-}" != "local" ] && printf '%s' "${WP_SITE_URL-}" | g
   warnings=$((warnings + 1))
 fi
 
+if [ -n "${LEL_CSP_ENFORCE-}" ]; then
+  echo "ERROR: LEL_CSP_ENFORCE is retired and ignored at runtime. Use LEL_CSP_MODE=report-only|enforce." >&2
+  errors=$((errors + 1))
+fi
+
+if [ -n "${LEL_CSP_MODE-}" ]; then
+  case "$LEL_CSP_MODE" in
+    report-only|enforce) : ;;
+    *) echo "ERROR: LEL_CSP_MODE must be report-only or enforce." >&2; errors=$((errors + 1));;
+  esac
+fi
+
 if [ "${WP_ENVIRONMENT_TYPE-}" = "production" ]; then
   [ "${WP_DEBUG_DISPLAY-}" = "false" ] || { echo "ERROR: WP_DEBUG_DISPLAY must be false in production." >&2; errors=$((errors + 1)); }
   [ "${FORCE_SSL_ADMIN-}" = "true" ] || { echo "ERROR: FORCE_SSL_ADMIN must be true in production." >&2; errors=$((errors + 1)); }
   [ "${DISALLOW_FILE_MODS-}" = "true" ] || { echo "ERROR: DISALLOW_FILE_MODS must be true in production." >&2; errors=$((errors + 1)); }
+  [ -n "${LEL_CSP_MODE-}" ] || { echo "ERROR: LEL_CSP_MODE must be set explicitly in production (report-only or enforce)." >&2; errors=$((errors + 1)); }
 fi
 
 if [ "$errors" -gt 0 ]; then

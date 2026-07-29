@@ -6,7 +6,7 @@ if ( ! defined( 'OBJECT' ) ) { define( 'OBJECT', 'OBJECT' ); }
 if ( ! defined( 'ARRAY_A' ) ) { define( 'ARRAY_A', 'ARRAY_A' ); }
 $GLOBALS['wp_version'] = '7.0.1';
 if ( ! function_exists( 'wp_get_environment_type' ) ) {
-	function wp_get_environment_type(): string { return 'local'; }
+	function wp_get_environment_type(): string { return $GLOBALS['lel_test_environment_type'] ?? 'local'; }
 }
 define( 'LONGEVITY_CORE_PATH', dirname( __DIR__, 2 ) . '/wp-content/mu-plugins/longevity-core/' );
 define( 'LONGEVITY_CORE_VERSION', '3.0.0' );

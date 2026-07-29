@@ -246,8 +246,7 @@ final class Bootstrap {
 
 	/** CSP header selected by explicit release configuration; invalid/missing values stay report-only. */
 	public static function csp_header_name(): string {
-		$mode = defined( 'LEL_CSP_MODE' ) ? constant( 'LEL_CSP_MODE' ) : getenv( 'LEL_CSP_MODE' );
-		return is_string( $mode ) && 'enforce' === strtolower( trim( $mode ) )
+		return 'enforce' === Runtime_Config::csp_mode_status()['mode']
 			? 'Content-Security-Policy'
 			: 'Content-Security-Policy-Report-Only';
 	}

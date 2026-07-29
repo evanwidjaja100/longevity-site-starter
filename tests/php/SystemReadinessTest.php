@@ -4,6 +4,75 @@ use Longevity\Core\System_Readiness;
 use PHPUnit\Framework\TestCase;
 
 final class SystemReadinessTest extends TestCase {
+	protected function tearDown(): void {
+		putenv( 'LEL_CSP_MODE' );
+		putenv( 'LEL_CSP_ENFORCE' );
+		unset( $GLOBALS['lel_test_environment_type'] );
+	}
+
+	private static function csp_check(): array {
+		return System_Readiness::report()['checks']['csp_mode'];
+	}
+
+	public function test_csp_mode_check_defaults_ok_outside_production(): void {
+		$check = self::csp_check();
+		self::assertSame( 'ok', $check['status'] );
+		self::assertSame( 'report-only', $check['mode'] );
+	}
+
+	public function test_csp_mode_missing_blocks_production(): void {
+		$GLOBALS['lel_test_environment_type'] = 'production';
+		$check                                = self::csp_check();
+		self::assertSame( 'blocked', $check['status'] );
+		self::assertSame( 'report-only', $check['mode'] );
+	}
+
+	public function test_csp_report_only_blocks_production_launch_readiness(): void {
+		$GLOBALS['lel_test_environment_type'] = 'production';
+		putenv( 'LEL_CSP_MODE=report-only' );
+		$check = self::csp_check();
+		self::assertSame( 'blocked', $check['status'], 'Explicit report-only must still prevent final public-launch readiness in production.' );
+	}
+
+	public function test_csp_enforce_is_ready_in_production(): void {
+		$GLOBALS['lel_test_environment_type'] = 'production';
+		putenv( 'LEL_CSP_MODE=enforce' );
+		$check = self::csp_check();
+		self::assertSame( 'ok', $check['status'] );
+		self::assertSame( 'enforce', $check['mode'] );
+	}
+
+	public function test_csp_invalid_value_blocks_production_and_degrades_elsewhere(): void {
+		putenv( 'LEL_CSP_MODE=on' );
+		$GLOBALS['lel_test_environment_type'] = 'production';
+		self::assertSame( 'blocked', self::csp_check()['status'] );
+		$GLOBALS['lel_test_environment_type'] = 'staging';
+		self::assertSame( 'degraded', self::csp_check()['status'] );
+	}
+
+	public function test_csp_retired_key_blocks_everywhere(): void {
+		putenv( 'LEL_CSP_ENFORCE=1' );
+		putenv( 'LEL_CSP_MODE=enforce' );
+		self::assertSame( 'blocked', self::csp_check()['status'], 'The retired key must be rejected even alongside a valid explicit mode.' );
+	}
+
+	public function test_csp_report_only_is_acceptable_in_staging(): void {
+		$GLOBALS['lel_test_environment_type'] = 'staging';
+		putenv( 'LEL_CSP_MODE=report-only' );
+		self::assertSame( 'ok', self::csp_check()['status'], 'Private staging may run report-only during the observation window.' );
+	}
+
+	public function test_metrics_expose_effective_csp_mode_one_hot(): void {
+		putenv( 'LEL_CSP_MODE=enforce' );
+		$payload = \Longevity\Core\Metrics::render();
+		self::assertStringContainsString( 'lel_csp_mode_state{mode="enforce"} 1', $payload );
+		self::assertStringContainsString( 'lel_csp_mode_state{mode="report-only"} 0', $payload );
+		putenv( 'LEL_CSP_MODE' );
+		$payload = \Longevity\Core\Metrics::render();
+		self::assertStringContainsString( 'lel_csp_mode_state{mode="report-only"} 1', $payload );
+		self::assertStringContainsString( 'lel_csp_mode_explicit 0', $payload );
+	}
+
 	public function test_report_distinguishes_unknown_external_controls(): void {
 		$GLOBALS['lel_test_registered_meta'] = array();
 		$report = System_Readiness::report();

@@ -85,6 +85,16 @@ final class Metrics {
 		$lines[]          = '# TYPE lel_dependency_backfill_pending gauge';
 		$lines[]          = 'lel_dependency_backfill_pending ' . ( $backfill_pending ? 1 : 0 );
 
+		$csp     = Runtime_Config::csp_mode_status();
+		$lines[] = '# HELP lel_csp_mode_state Effective Content-Security-Policy delivery mode one-hot.';
+		$lines[] = '# TYPE lel_csp_mode_state gauge';
+		foreach ( Runtime_Config::CSP_MODES as $mode ) {
+			$lines[] = sprintf( 'lel_csp_mode_state{mode="%s"} %d', $mode, $csp['mode'] === $mode ? 1 : 0 );
+		}
+		$lines[] = '# HELP lel_csp_mode_explicit 1 when LEL_CSP_MODE is explicitly configured with a recognized value.';
+		$lines[] = '# TYPE lel_csp_mode_explicit gauge';
+		$lines[] = 'lel_csp_mode_explicit ' . ( $csp['configured'] ? 1 : 0 );
+
 		$identity    = class_exists( Evidence_Store::class ) ? Evidence_Store::runtime_release_identity() : array();
 		$environment = in_array( (string) ( $identity['environment'] ?? '' ), array( 'local', 'development', 'staging', 'production' ), true ) ? (string) $identity['environment'] : 'unknown';
 		$source_sha  = preg_match( '/\A(?:[a-f0-9]{40}|[a-f0-9]{64})\z/', (string) ( $identity['release_sha'] ?? '' ) ) ? (string) $identity['release_sha'] : 'unknown';

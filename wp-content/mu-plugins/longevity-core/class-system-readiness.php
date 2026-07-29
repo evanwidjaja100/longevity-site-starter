@@ -74,6 +74,7 @@ final class System_Readiness {
 			'audit_write_failures' => self::safely( static fn(): array => self::audit_failure_check() ),
 			'credential_expiration' => self::safely( static fn(): array => self::credential_expiration_check() ),
 			'publication_lock'     => self::safely( static fn(): array => self::lock_check() ),
+			'csp_mode'             => self::safely( static fn(): array => self::csp_mode_check() ),
 			'invalidation_queue'   => self::safely( static fn(): array => self::queue_check() ),
 			'dependency_index'     => self::safely( static fn(): array => self::dependency_index_check() ),
 			'rankings_projection'  => self::safely( static fn(): array => self::rankings_projection_check() ),
@@ -300,6 +301,53 @@ final class System_Readiness {
 			'status'  => is_writable( (string) $uploads['basedir'] ) ? 'ok' : 'blocked',
 			'message' => 'Required upload directory writability.',
 		);
+	}
+
+	/** CSP delivery mode must be an explicit, valid release decision; production launch requires enforce. */
+	private static function csp_mode_check(): array {
+		$csp         = Runtime_Config::csp_mode_status();
+		$environment = function_exists( 'wp_get_environment_type' ) ? wp_get_environment_type() : '';
+		$payload     = array(
+			'mode'        => $csp['mode'],
+			'configured'  => $csp['configured'],
+			'environment' => $environment,
+		);
+		if ( $csp['retired_key'] ) {
+			return array(
+				'status'  => 'blocked',
+				'message' => 'Retired LEL_CSP_ENFORCE configuration detected; it is ignored at runtime and must be replaced with LEL_CSP_MODE.',
+			) + $payload;
+		}
+		if ( 'production' === $environment ) {
+			if ( ! $csp['configured'] ) {
+				return array(
+					'status'  => 'blocked',
+					'message' => $csp['invalid']
+						? 'LEL_CSP_MODE is set to an unrecognized value; production requires an explicit report-only or enforce decision.'
+						: 'LEL_CSP_MODE is not configured; production requires an explicit CSP mode decision.',
+				) + $payload;
+			}
+			if ( 'enforce' !== $csp['mode'] ) {
+				return array(
+					'status'  => 'blocked',
+					'message' => 'CSP is in report-only mode; production launch requires enforce per docs/operations/csp-enforcement-plan.md.',
+				) + $payload;
+			}
+			return array(
+				'status'  => 'ok',
+				'message' => 'CSP is explicitly enforced in production.',
+			) + $payload;
+		}
+		if ( $csp['invalid'] ) {
+			return array(
+				'status'  => 'degraded',
+				'message' => 'LEL_CSP_MODE is set to an unrecognized value and fell back to report-only.',
+			) + $payload;
+		}
+		return array(
+			'status'  => 'ok',
+			'message' => 'CSP mode is acceptable outside production (report-only permitted).',
+		) + $payload;
 	}
 
 	/** Publication lock health: GET_LOCK support and failure count. */

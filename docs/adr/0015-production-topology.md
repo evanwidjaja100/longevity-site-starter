@@ -52,5 +52,5 @@ We support one production topology:
 - All deployments are reproducible from artifact + secrets
 - Rollback is safe because migrations are additive-only
 - `GET_LOCK` usage must be verified on managed hosts (some restrict it)
-- CSP enforcement mode is environment-configurable (`LEL_CSP_ENFORCE`)
+- CSP delivery mode is release-configurable via `LEL_CSP_MODE` (`report-only`|`enforce`; the boolean `LEL_CSP_ENFORCE` is retired); production launch readiness requires an explicit `enforce` decision
 - Rate limiting at the application layer is defense-in-depth; primary rate limiting belongs at CDN/WAF

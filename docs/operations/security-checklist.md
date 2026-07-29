@@ -69,7 +69,7 @@
 ## Manual sign-off
 
 - [ ] HTTPS and HSTS verified on production domain
-- [ ] CSP tested in report-only → no breakage → switch to enforce
+- [ ] CSP observed in report-only → no breakage → set `LEL_CSP_MODE=enforce` per `csp-enforcement-plan.md` (readiness `csp_mode` check blocks production launch until enforced)
 - [ ] Login rate limits configured
 - [ ] MFA enforced for admin accounts
 - [ ] Backup restore drill completed and documented
