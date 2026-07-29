@@ -37,14 +37,15 @@ class Public_Rankings {
 		if ( ! $term instanceof \WP_Term || 'category' !== $term->taxonomy ) {
 			return '';
 		}
-		$all     = Rankings::reviews( (int) $term->term_id, 'score', array(), 100 );
-		if ( empty( $all ) ) {
+		$eligible = Rankings::eligible_in_category( (int) $term->term_id );
+		if ( empty( $eligible ) ) {
 			return '';
 		}
+		$count   = count( $eligible );
 		$minimum = Rankings::minimum_ranking_size();
-		if ( count( $all ) < $minimum ) {
-			$html = '<section class="longevity-ranking-pre-launch" aria-labelledby="lel-ranking-pre"><div class="longevity-section-header"><div><p class="longevity-kicker">Consumer Lab ranking</p><h2 id="lel-ranking-pre">' . esc_html( $term->name ) . ' — reports only</h2></div><p>' . esc_html( sprintf( __( '%d eligible tested product found. A minimum of %d comparable reports is required before a numbered ranking is produced. Below are individual reports in the order they were last updated.', 'longevity-core' ), count( $all ), $minimum ) ) . '</p></div><ul class="longevity-report-list">';
-			foreach ( $all as $review ) {
+		if ( $count < $minimum ) {
+			$html = '<section class="longevity-ranking-pre-launch" aria-labelledby="lel-ranking-pre"><div class="longevity-section-header"><div><p class="longevity-kicker">Consumer Lab ranking</p><h2 id="lel-ranking-pre">' . esc_html( $term->name ) . ' — reports only</h2></div><p>' . esc_html( sprintf( __( '%d eligible tested product found. A minimum of %d comparable reports is required before a numbered ranking is produced. Below are individual reports in the order they were last updated.', 'longevity-core' ), $count, $minimum ) ) . '</p></div><ul class="longevity-report-list">';
+			foreach ( Rankings::reviews( (int) $term->term_id, 'updated', array(), $count ) as $review ) {
 				$html .= '<li><a href="' . esc_url( get_permalink( $review ) ) . '">' . esc_html( get_the_title( $review ) ) . '</a> <span class="longevity-small">' . esc_html( sprintf( __( 'Score: %s/5', 'longevity-core' ), number_format_i18n( (float) get_post_meta( $review->ID, 'review_score', true ), 1 ) ) ) . '</span></li>';
 			}
 			return $html . '</ul></section>';
@@ -52,9 +53,9 @@ class Public_Rankings {
 		$reviews = Rankings::reviews( (int) $term->term_id );
 		$sort       = Rankings::requested_sort();
 		$filters    = Rankings::requested_filters();
-		$confidence = array_values( array_unique( array_map( static fn( $post ) => (string) get_post_meta( $post->ID, 'review_score_confidence', true ), $all ) ) );
-		$subscriptions = array_values( array_unique( array_map( static fn( $post ) => (bool) get_post_meta( $post->ID, 'subscription_required', true ), $all ) ) );
-		$html = '<section class="longevity-ranking-list" aria-labelledby="lel-ranking-list-title"><div class="longevity-section-header"><div><p class="longevity-kicker">Consumer Lab ranking</p><h2 id="lel-ranking-list-title">' . esc_html( $term->name ) . ' product reports</h2></div><p>' . esc_html( sprintf( _n( '%d eligible tested product', '%d eligible tested products', count( $all ), 'longevity-core' ), count( $all ) ) ) . '</p></div>';
+		$confidence = array_values( array_unique( array_map( static fn( int $id ) => (string) get_post_meta( $id, 'review_score_confidence', true ), $eligible ) ) );
+		$subscriptions = array_values( array_unique( array_map( static fn( int $id ) => (bool) get_post_meta( $id, 'subscription_required', true ), $eligible ) ) );
+		$html = '<section class="longevity-ranking-list" aria-labelledby="lel-ranking-list-title"><div class="longevity-section-header"><div><p class="longevity-kicker">Consumer Lab ranking</p><h2 id="lel-ranking-list-title">' . esc_html( $term->name ) . ' product reports</h2></div><p>' . esc_html( sprintf( _n( '%d eligible tested product', '%d eligible tested products', $count, 'longevity-core' ), $count ) ) . '</p></div>';
 		$html .= '<form class="longevity-ranking-filters" method="get" action="' . esc_url( get_category_link( $term->term_id ) ) . '"><label>' . esc_html__( 'Sort rankings', 'longevity-core' ) . '<select name="ranking_sort" data-lel-event="ranking_sort" data-category="' . esc_attr( $term->slug ) . '">' . Public_Content::options( array( 'score' => __( 'Overall score', 'longevity-core' ), 'confidence' => __( 'Confidence', 'longevity-core' ), 'updated' => __( 'Recently updated', 'longevity-core' ), 'title' => __( 'Product name', 'longevity-core' ) ), $sort ) . '</select></label>';
 		if ( count( $confidence ) > 1 ) {
 			$options = array( '' => __( 'All confidence levels', 'longevity-core' ) );

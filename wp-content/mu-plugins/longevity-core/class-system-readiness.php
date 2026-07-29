@@ -76,6 +76,7 @@ final class System_Readiness {
 			'publication_lock'     => self::safely( static fn(): array => self::lock_check() ),
 			'invalidation_queue'   => self::safely( static fn(): array => self::queue_check() ),
 			'dependency_index'     => self::safely( static fn(): array => self::dependency_index_check() ),
+			'rankings_projection'  => self::safely( static fn(): array => self::rankings_projection_check() ),
 			'contact_rate_limiter' => self::safely( static fn(): array => self::check( Public_Contact::rate_table_exists(), 'ok', 'blocked', 'Contact rate-limit table (public submissions fail closed without it).' ) ),
 			'notification_outbox'  => self::safely( static fn(): array => self::notification_outbox_check() ),
 			'mail_transport'       => self::safely( static fn(): array => self::store_evidence( 'mail', 'lel_mail_transport_evidence', 'Mail transport evidence has not been supplied by an operator.' ) ),
@@ -344,6 +345,20 @@ final class System_Readiness {
 			'status'  => 'blocked',
 			'message' => 'Dependency index backfill is missing, stale, or drifted; run `wp longevity dependency backfill`.',
 			'drift'   => $drift,
+		);
+	}
+
+	/** Public ranking projection health: fails closed above the supported population ceiling. */
+	private static function rankings_projection_check(): array {
+		if ( Rankings::is_degraded() ) {
+			return array(
+				'status'  => 'blocked',
+				'message' => 'Public ranking population exceeded its supported ceiling; rankings are failing closed rather than returning a partial order. Reduce the eligible population or raise the documented ceiling after a capacity review.',
+			);
+		}
+		return array(
+			'status'  => 'ok',
+			'message' => 'Ranking projection is within its supported population ceiling.',
 		);
 	}
 

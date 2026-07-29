@@ -1577,6 +1577,37 @@ if ( ! function_exists( 'get_posts' ) ) {
 	}
 }
 
+if ( ! function_exists( 'add_filter' ) ) {
+	function add_filter( string $tag, $callback, int $priority = 10, int $accepted_args = 1 ): bool {
+		unset( $tag, $callback, $priority, $accepted_args );
+		return true;
+	}
+}
+if ( ! function_exists( 'remove_filter' ) ) {
+	function remove_filter( string $tag, $callback, int $priority = 10 ): bool {
+		unset( $tag, $callback, $priority );
+		return true;
+	}
+}
+if ( ! function_exists( 'wp_cache_get' ) ) {
+	function wp_cache_get( $key, string $group = '', bool $force = false, &$found = null ) {
+		unset( $key, $group, $force );
+		$found = false;
+		return false;
+	}
+}
+if ( ! function_exists( 'wp_cache_set' ) ) {
+	function wp_cache_set( $key, $value, string $group = '', int $expire = 0 ): bool {
+		unset( $key, $value, $group, $expire );
+		return true;
+	}
+}
+if ( ! function_exists( 'get_the_category' ) ) {
+	function get_the_category( int $post_id = 0 ): array {
+		return $GLOBALS['lel_test_post_categories'][ $post_id ] ?? array();
+	}
+}
+
 if ( ! class_exists( 'WP_Query' ) ) {
 	class WP_Query {
 		public array $query_vars = array();

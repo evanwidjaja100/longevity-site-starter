@@ -19,6 +19,26 @@ Commercial relationships cannot change score or ordering. Affiliate output conti
 
 Rankings work without JavaScript and remain crawlable, linkable, cacheable, and governed. Eligibility checks cost more than a raw meta query, so aggregates are bounded, object-cacheable, and invalidated when reviews, records, protocols, status, or terms change.
 
+## Completeness, ordering, and supported inventory
+
+The eligible population is evaluated in full. Prior implicit caps (a 500-review
+eligibility limit and a 100-review directory limit) are removed: they could hide
+a top-ranked review or undercount a category. Published review IDs are collected
+in deterministic ascending-ID keyset batches (default 200, filterable via
+`longevity_ranking_batch_size`), warming the per-batch metadata cache to avoid
+N+1 queries. Filtering and sorting run over the **complete** eligible population;
+the caller's limit is applied only after ordering, and full `WP_Post` objects are
+hydrated only for the final selected IDs. Directory and category counts aggregate
+from the complete eligible population.
+
+The expected supported inventory is **5,000 eligible reviews**
+(`longevity_max_ranked_reviews`). Above this documented ceiling the projection
+fails closed: it returns no ranking, records a bounded diagnostic
+(`rankings_population_ceiling_exceeded`, no private data), and the
+`rankings_projection` readiness check reports `blocked`. Partial rankings are
+never silently returned. Raising the ceiling requires a capacity review; a custom
+materialized ranking table would require its own ADR and migration design.
+
 ## Migration and reversal
 
 Migration version 2 adds version options only. Existing records remain valid and may add structured rows incrementally. Reversal consists of removing the four public blocks/service registration and leaving new metadata unused; no destructive rollback is required.

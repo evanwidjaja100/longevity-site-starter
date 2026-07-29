@@ -14,6 +14,8 @@ final class Rankings {
 	private const CACHE_GROUP      = 'longevity_rankings';
 	private const ELIGIBLE_CACHE   = 'lel_rankings_eligible';
 	private const RANKING_VERSION  = '2';
+	private const RANKING_BATCH_DEFAULT   = 200;
+	private const RANKING_CEILING_DEFAULT = 5000;
 	private const CONFIDENCE_ORDER = array(
 		'High confidence'     => 4,
 		'Moderate confidence' => 3,
@@ -102,22 +104,112 @@ final class Rankings {
 		if ( is_array( $cached ) && isset( $cached['signature'], $cached['ids'] ) && is_array( $cached['ids'] ) && hash_equals( $signature, (string) $cached['signature'] ) ) {
 			return self::live_revalidate( array_values( array_map( 'intval', $cached['ids'] ) ) );
 		}
-		$all_reviews = get_posts(
-			array(
-				'post_type'              => 'review',
-				'post_status'            => 'publish',
-				'posts_per_page'         => 500,
-				'fields'                 => 'ids',
-				'orderby'                => array( 'modified' => 'DESC', 'ID' => 'DESC' ),
-				'ignore_sticky_posts'    => true,
-				'no_found_rows'          => true,
-				'update_post_term_cache' => false,
-				'update_post_meta_cache' => false,
-			)
-		);
-		$eligible = array_values( array_filter( array_map( 'intval', $all_reviews ), static fn( int $id ) => self::is_eligible( $id ) ) );
+		$candidates = self::collect_published_review_ids();
+		if ( self::is_degraded() ) {
+			return array();
+		}
+		$eligible = array_values( array_filter( $candidates, static fn( int $id ) => self::is_eligible( $id ) ) );
 		set_transient( self::ELIGIBLE_CACHE, array( 'signature' => $signature, 'ids' => $eligible ), 6 * HOUR_IN_SECONDS );
 		return $eligible;
+	}
+
+	/**
+	 * Collect every published review ID in deterministic ascending-ID keyset
+	 * batches. Batches bound per-query memory and warm the metadata cache so
+	 * eligibility evaluation avoids N+1 queries. The complete population is
+	 * bounded only by an explicit, documented safety ceiling; exceeding it fails
+	 * the projection closed rather than silently truncating.
+	 *
+	 * @return list<int> Published review IDs (empty when the ceiling is breached).
+	 */
+	private static function collect_published_review_ids(): array {
+		$batch   = max( 1, min( 500, (int) apply_filters( 'longevity_ranking_batch_size', self::RANKING_BATCH_DEFAULT ) ) );
+		$ceiling = max( 1, (int) apply_filters( 'longevity_max_ranked_reviews', self::RANKING_CEILING_DEFAULT ) );
+		$ids     = array();
+		$after   = 0;
+		do {
+			$GLOBALS['lel_rankings_keyset_after'] = $after;
+			add_filter( 'posts_where', array( self::class, 'keyset_where' ) );
+			$page = get_posts(
+				array(
+					'post_type'              => 'review',
+					'post_status'            => 'publish',
+					'fields'                 => 'ids',
+					'posts_per_page'         => $batch,
+					'orderby'                => array( 'ID' => 'ASC' ),
+					'ignore_sticky_posts'    => true,
+					'no_found_rows'          => true,
+					'suppress_filters'       => false,
+					'update_post_term_cache' => false,
+					'update_post_meta_cache' => true,
+				)
+			);
+			remove_filter( 'posts_where', array( self::class, 'keyset_where' ) );
+			unset( $GLOBALS['lel_rankings_keyset_after'] );
+			$page    = array_values( array_map( 'intval', (array) $page ) );
+			$highest = $after;
+			foreach ( $page as $id ) {
+				$ids[]   = $id;
+				$highest = max( $highest, $id );
+			}
+			if ( count( $ids ) > $ceiling ) {
+				self::mark_degraded( count( $ids ), $ceiling );
+				return array();
+			}
+			if ( $highest <= $after ) {
+				break;
+			}
+			$after = $highest;
+		} while ( count( $page ) === $batch );
+		$ids = array_values( array_unique( $ids ) );
+		self::enforce_population_ceiling( $ids, $ceiling );
+		return self::is_degraded() ? array() : $ids;
+	}
+
+	/** Keyset WHERE clause bounding a collection batch to IDs above the cursor. */
+	public static function keyset_where( string $where ): string {
+		global $wpdb;
+		$after = (int) ( $GLOBALS['lel_rankings_keyset_after'] ?? 0 );
+		if ( $after > 0 && isset( $wpdb->posts ) ) {
+			$where .= $wpdb->prepare( " AND {$wpdb->posts}.ID > %d", $after );
+		}
+		return $where;
+	}
+
+	/**
+	 * Enforce the explicit population safety ceiling. Within the ceiling the
+	 * degraded flag is cleared and the population passes through unchanged;
+	 * above it the projection is marked degraded and fails closed to an empty set.
+	 *
+	 * @param list<int> $ids     Candidate population.
+	 * @param int       $ceiling Maximum supported population.
+	 * @return list<int> The population when within the ceiling, otherwise empty.
+	 */
+	public static function enforce_population_ceiling( array $ids, int $ceiling ): array {
+		if ( count( $ids ) > $ceiling ) {
+			self::mark_degraded( count( $ids ), $ceiling );
+			return array();
+		}
+		self::clear_degraded();
+		return array_values( $ids );
+	}
+
+	/** Record a bounded, privacy-safe diagnostic and mark rankings degraded. */
+	private static function mark_degraded( int $count, int $ceiling ): void {
+		update_option( 'lel_rankings_degraded', 1, false );
+		Logger::log( Logger::WARNING, 'rankings_population_ceiling_exceeded', array( 'population' => $count, 'ceiling' => $ceiling ) );
+	}
+
+	/** Clear the degraded flag once a projection completes within budget. */
+	private static function clear_degraded(): void {
+		if ( '' !== (string) get_option( 'lel_rankings_degraded', '' ) ) {
+			delete_option( 'lel_rankings_degraded' );
+		}
+	}
+
+	/** Whether the ranking projection is currently failing closed above its ceiling. */
+	public static function is_degraded(): bool {
+		return (bool) get_option( 'lel_rankings_degraded', false );
 	}
 
 	/**
@@ -292,50 +384,67 @@ final class Rankings {
 	 * @param int    $limit       Bounded result limit.
 	 */
 	public static function reviews( int $category_id = 0, string $sort = '', array $filters = array(), int $limit = 100 ): array {
-		$eligible = self::eligible_ids();
+		$eligible = self::eligible_in_category( $category_id );
 		if ( empty( $eligible ) ) {
 			return array();
 		}
-		$args = array(
-			'post_type'              => 'review',
-			'post_status'            => 'publish',
-			'post__in'               => $eligible,
-			'posts_per_page'         => min( 500, max( 1, count( $eligible ) ) ),
-			'orderby'                => array(
-				'modified' => 'DESC',
-				'ID'       => 'DESC',
-			),
-			'ignore_sticky_posts'    => true,
-			'no_found_rows'          => true,
-			'update_post_term_cache' => true,
-			'update_post_meta_cache' => true,
-		);
-		if ( 0 < $category_id ) {
-			$args['cat'] = $category_id;
-		}
-		$posts = get_posts( $args );
 		if ( array() === $filters ) {
 			$filters = self::requested_filters();
 		}
-		$posts = array_values(
-			array_filter(
-				$posts,
-				static function ( $post ) use ( $filters ): bool {
-					if ( isset( $filters['confidence'] ) && get_post_meta( $post->ID, 'review_score_confidence', true ) !== $filters['confidence'] ) {
-						return false;
-					}
-					if ( isset( $filters['subscription'] ) ) {
-						$required = (bool) get_post_meta( $post->ID, 'subscription_required', true );
-						if ( ( 'required' === $filters['subscription'] ) !== $required ) {
-							return false;
-						}
-					}
-					return true;
-				}
+		$ordered = self::order_and_limit( $eligible, '' === $sort ? self::requested_sort() : $sort, $filters, $limit );
+		return empty( $ordered ) ? array() : self::hydrate( $ordered );
+	}
+
+	/**
+	 * Complete eligible review IDs, optionally scoped to a single category. The
+	 * population is never capped here so callers can count or order the whole set.
+	 *
+	 * @param int $category_id Optional category term ID.
+	 * @return list<int> Complete eligible review IDs.
+	 */
+	public static function eligible_in_category( int $category_id = 0 ): array {
+		$eligible = self::eligible_ids();
+		if ( empty( $eligible ) || $category_id <= 0 ) {
+			return $eligible;
+		}
+		return array_values( array_filter( $eligible, static fn( int $id ): bool => self::in_category( $id, $category_id ) ) );
+	}
+
+	/** Whether a review belongs to the given category term. */
+	private static function in_category( int $post_id, int $category_id ): bool {
+		foreach ( get_the_category( $post_id ) as $term ) {
+			if ( (int) $term->term_id === $category_id ) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * Hydrate full WP_Post objects only for the final ordered IDs, preserving the
+	 * computed order regardless of the store's default ordering.
+	 *
+	 * @param list<int> $ids Ordered, already-limited review IDs.
+	 * @return array<int, \WP_Post> Hydrated posts in the supplied order.
+	 */
+	private static function hydrate( array $ids ): array {
+		$ids   = array_values( array_map( 'intval', $ids ) );
+		$posts = get_posts(
+			array(
+				'post_type'              => 'review',
+				'post_status'            => 'publish',
+				'post__in'               => $ids,
+				'orderby'                => 'post__in',
+				'posts_per_page'         => count( $ids ),
+				'ignore_sticky_posts'    => true,
+				'no_found_rows'          => true,
+				'update_post_term_cache' => true,
+				'update_post_meta_cache' => true,
 			)
 		);
-		$posts = array_slice( $posts, 0, min( 100, max( 1, $limit ) ) );
-		return self::sort( $posts, '' === $sort ? self::requested_sort() : $sort );
+		$order = array_flip( $ids );
+		usort( $posts, static fn( $left, $right ): int => ( $order[ (int) $left->ID ] ?? PHP_INT_MAX ) <=> ( $order[ (int) $right->ID ] ?? PHP_INT_MAX ) );
+		return $posts;
 	}
 
 	/**
@@ -345,31 +454,85 @@ final class Rankings {
 	 * @param string $sort  Allowlisted sort key.
 	 */
 	public static function sort( array $posts, string $sort = 'score' ): array {
-		$sort = in_array( $sort, array( 'score', 'confidence', 'updated', 'title' ), true ) ? $sort : 'score';
-		usort(
-			$posts,
-			static function ( $left, $right ) use ( $sort ): int {
-				$left_id    = (int) $left->ID;
-				$right_id   = (int) $right->ID;
-				$score      = (float) get_post_meta( $right_id, 'review_score', true ) <=> (float) get_post_meta( $left_id, 'review_score', true );
-				$confidence = ( self::CONFIDENCE_ORDER[ (string) get_post_meta( $right_id, 'review_score_confidence', true ) ] ?? 0 ) <=> ( self::CONFIDENCE_ORDER[ (string) get_post_meta( $left_id, 'review_score_confidence', true ) ] ?? 0 );
-				$updated    = strcmp( (string) get_post_meta( $right_id, 'last_material_update', true ), (string) get_post_meta( $left_id, 'last_material_update', true ) );
-				$title      = strcasecmp( get_the_title( $left_id ), get_the_title( $right_id ) );
-				$chains     = array(
-					'score'      => array( $score, $confidence, $updated, $title, $left_id <=> $right_id ),
-					'confidence' => array( $confidence, $score, $updated, $title, $left_id <=> $right_id ),
-					'updated'    => array( $updated, $score, $confidence, $title, $left_id <=> $right_id ),
-					'title'      => array( $title, $score, $confidence, $updated, $left_id <=> $right_id ),
-				);
-				foreach ( $chains[ $sort ] as $comparison ) {
-					if ( 0 !== $comparison ) {
-						return $comparison;
-					}
-				}
-				return 0;
-			}
-		);
+		$sort = self::normalize_sort( $sort );
+		usort( $posts, static fn( $left, $right ): int => self::compare_ids( (int) $left->ID, (int) $right->ID, $sort ) );
 		return $posts;
+	}
+
+	/**
+	 * Deterministically order bare review IDs using the same tie-breaking chain
+	 * as sort(). Used to order the complete filtered population before any limit.
+	 *
+	 * @param list<int> $ids  Review IDs.
+	 * @param string    $sort Allowlisted sort key.
+	 * @return list<int> Ordered IDs.
+	 */
+	public static function sort_ids( array $ids, string $sort = 'score' ): array {
+		$sort = self::normalize_sort( $sort );
+		$ids  = array_values( array_map( 'intval', $ids ) );
+		usort( $ids, static fn( int $left, int $right ): int => self::compare_ids( $left, $right, $sort ) );
+		return $ids;
+	}
+
+	/**
+	 * Filter the complete population, sort it, and only then apply the caller's
+	 * limit. Filtering and sorting always run over every candidate so a
+	 * top-ranked review can never be dropped by a pre-sort cap.
+	 *
+	 * @param list<int> $ids     Complete candidate review IDs.
+	 * @param string    $sort    Allowlisted sort key.
+	 * @param array     $filters Allowlisted filter values.
+	 * @param int       $limit   Caller's requested maximum, applied last.
+	 * @return list<int> Ordered, limited review IDs.
+	 */
+	public static function order_and_limit( array $ids, string $sort, array $filters, int $limit ): array {
+		$ids      = array_values( array_map( 'intval', $ids ) );
+		$filtered = array_values( array_filter( $ids, static fn( int $id ): bool => self::passes_filters( $id, $filters ) ) );
+		$ordered  = self::sort_ids( $filtered, $sort );
+		return array_slice( $ordered, 0, max( 1, $limit ) );
+	}
+
+	/** Whether a review's metadata satisfies the allowlisted filter values. */
+	private static function passes_filters( int $post_id, array $filters ): bool {
+		if ( isset( $filters['confidence'] ) && (string) get_post_meta( $post_id, 'review_score_confidence', true ) !== $filters['confidence'] ) {
+			return false;
+		}
+		if ( isset( $filters['subscription'] ) ) {
+			$required = (bool) get_post_meta( $post_id, 'subscription_required', true );
+			if ( ( 'required' === $filters['subscription'] ) !== $required ) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	/** Reduce an arbitrary sort request to an allowlisted key. */
+	private static function normalize_sort( string $sort ): string {
+		return in_array( $sort, array( 'score', 'confidence', 'updated', 'title' ), true ) ? $sort : 'score';
+	}
+
+	/**
+	 * Shared deterministic comparison used by every ranking sort. Returns a
+	 * negative, zero, or positive integer ordering $left_id relative to
+	 * $right_id for the requested sort key, always resolving ties by ascending ID.
+	 */
+	private static function compare_ids( int $left_id, int $right_id, string $sort ): int {
+		$score      = (float) get_post_meta( $right_id, 'review_score', true ) <=> (float) get_post_meta( $left_id, 'review_score', true );
+		$confidence = ( self::CONFIDENCE_ORDER[ (string) get_post_meta( $right_id, 'review_score_confidence', true ) ] ?? 0 ) <=> ( self::CONFIDENCE_ORDER[ (string) get_post_meta( $left_id, 'review_score_confidence', true ) ] ?? 0 );
+		$updated    = strcmp( (string) get_post_meta( $right_id, 'last_material_update', true ), (string) get_post_meta( $left_id, 'last_material_update', true ) );
+		$title      = strcasecmp( get_the_title( $left_id ), get_the_title( $right_id ) );
+		$chains     = array(
+			'score'      => array( $score, $confidence, $updated, $title, $left_id <=> $right_id ),
+			'confidence' => array( $confidence, $score, $updated, $title, $left_id <=> $right_id ),
+			'updated'    => array( $updated, $score, $confidence, $title, $left_id <=> $right_id ),
+			'title'      => array( $title, $score, $confidence, $updated, $left_id <=> $right_id ),
+		);
+		foreach ( $chains[ $sort ] as $comparison ) {
+			if ( 0 !== $comparison ) {
+				return $comparison;
+			}
+		}
+		return 0;
 	}
 
 	/** Minimum eligible comparable reports required for a public ranking category. */
@@ -416,25 +579,39 @@ final class Rankings {
 		if ( is_array( $cached ) ) {
 			return $cached;
 		}
+		$groups = self::aggregate_directory( self::eligible_ids() );
+		wp_cache_set( $cache_key, $groups, self::CACHE_GROUP, HOUR_IN_SECONDS );
+		return $groups;
+	}
+
+	/**
+	 * Group the complete eligible population into per-category aggregates. Counts,
+	 * latest-update, and top-score span every supplied review so directory and
+	 * minimum-inventory decisions never use a truncated subset.
+	 *
+	 * @param list<int> $ids Complete eligible review IDs.
+	 * @return list<array{term:\WP_Term,count:int,latest:string,highest_score:float}>
+	 */
+	public static function aggregate_directory( array $ids ): array {
 		$groups = array();
-		foreach ( self::reviews( 0, 'score', array(), 100 ) as $review ) {
-			foreach ( get_the_category( $review->ID ) as $term ) {
-				if ( ! isset( $groups[ $term->term_id ] ) ) {
-					$groups[ $term->term_id ] = array(
+		foreach ( array_map( 'intval', $ids ) as $id ) {
+			foreach ( get_the_category( $id ) as $term ) {
+				$term_id = (int) $term->term_id;
+				if ( ! isset( $groups[ $term_id ] ) ) {
+					$groups[ $term_id ] = array(
 						'term'          => $term,
 						'count'         => 0,
 						'latest'        => '',
 						'highest_score' => 0.0,
 					);
 				}
-				++$groups[ $term->term_id ]['count'];
-				$groups[ $term->term_id ]['latest']        = max( $groups[ $term->term_id ]['latest'], (string) get_post_meta( $review->ID, 'last_material_update', true ) );
-				$groups[ $term->term_id ]['highest_score'] = max( $groups[ $term->term_id ]['highest_score'], (float) get_post_meta( $review->ID, 'review_score', true ) );
+				++$groups[ $term_id ]['count'];
+				$groups[ $term_id ]['latest']        = max( $groups[ $term_id ]['latest'], (string) get_post_meta( $id, 'last_material_update', true ) );
+				$groups[ $term_id ]['highest_score'] = max( $groups[ $term_id ]['highest_score'], (float) get_post_meta( $id, 'review_score', true ) );
 			}
 		}
 		$groups = array_values( $groups );
-		usort( $groups, static fn( $left, $right ) => strcasecmp( $left['term']->name, $right['term']->name ) );
-		wp_cache_set( $cache_key, $groups, self::CACHE_GROUP, HOUR_IN_SECONDS );
+		usort( $groups, static fn( $left, $right ): int => strcasecmp( $left['term']->name, $right['term']->name ) );
 		return $groups;
 	}
 }
