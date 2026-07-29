@@ -356,6 +356,37 @@ final class Audit_Log {
 		return (int) get_option( 'lel_audit_write_failures', 0 );
 	}
 
+	/**
+	 * Locate a durably committed event by its raw idempotency key.
+	 *
+	 * Reconciliation uses this to confirm that a pending approval's mandatory
+	 * audit event actually committed. The raw key is hashed the same way
+	 * record() hashes it before storage.
+	 *
+	 * @return array{id:int, event_type:string, object_type:string, object_id:int}|null
+	 */
+	public static function event_for_idempotency_key( string $raw_key ): ?array {
+		global $wpdb;
+		if ( '' === $raw_key || ! isset( $wpdb ) || ! is_object( $wpdb ) || ! method_exists( $wpdb, 'get_row' ) || ! self::exists() ) {
+			return null;
+		}
+		$hashed = hash( 'sha256', $raw_key );
+		$table  = self::table_name();
+		$row    = $wpdb->get_row(
+			$wpdb->prepare( "SELECT id, event_type, object_type, object_id FROM {$table} WHERE idempotency_key = %s LIMIT 1", $hashed ),
+			ARRAY_A
+		);
+		if ( ! is_array( $row ) ) {
+			return null;
+		}
+		return array(
+			'id'          => (int) ( $row['id'] ?? 0 ),
+			'event_type'  => (string) ( $row['event_type'] ?? '' ),
+			'object_type' => (string) ( $row['object_type'] ?? '' ),
+			'object_id'   => (int) ( $row['object_id'] ?? 0 ),
+		);
+	}
+
 	/** Allocate the next sequence number atomically via the singleton row. */
 	private static function allocate_sequence( $wpdb ): int {
 		$seq_table = self::sequence_table_name();

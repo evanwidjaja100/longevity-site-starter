@@ -417,6 +417,7 @@ df814f740e0075a154d9c764fb1940c19e5ea27474dbd523dac9e1ee20c5ff52 *./tests/php/Ad
 2e6dd1d5a1a183e4e7d0c36015e26b2e922ecc80394459ea0f37e85eb3b60576 *./tests/php/AdvisoryLockTest.php
 67756e001e32196382992142cabb8069061125018c6c88449cbac3658f1fef64 *./tests/php/AffiliateLifecycleTest.php
 11bf681135201b0baaab02d70dcbb900deb321feff2150d9fa3433f7c0f0a6c1 *./tests/php/AffiliateRegistryTest.php
+cc2ff8c65888a848220ad19bb6a75842dfe49716053c40892f1671bdd4d98fd6 *./tests/php/ApprovalActivationAtomicityTest.php
 3e29d98d9a631be1eb9915ff67ed14655e163b32eab5631e05be689aaf18a192 *./tests/php/ApprovalFingerprintTest.php
 ab97ec0b72d7c22f71b2fe327f60a36304037cf4404dfb4699fecbe5967a019f *./tests/php/ApprovalSnapshotTest.php
 08e94530dc68f8e5b196d464a6fb5fec9c8392851d1debbf0506c3f7ebd75bc3 *./tests/php/ArchitectureTest.php
@@ -455,7 +456,7 @@ d633fdf056900f38b27b0406528359dc8581973b44c737dc5900088012e35fbc *./tests/php/Ro
 556f748401ec1b7f1f0e028e56ea7109fb7248f32305da289c4eb76f64aac437 *./tests/php/SystemReadinessTest.php
 328f3e09b8eea632865cb1b064dccadde8577c6d25a411e7e99b2ff2ec11d3ec *./tests/php/TestRecordApprovalTest.php
 6a1615511f1e69e033417f0b40fea90dd152d530371ddbd7c7ed56ad57e78e45 *./tests/php/TrustPagesTest.php
-4eb9b58060700d74b11f717aaf792e462f43a6ca3d646ebc5be8ff2a32345d72 *./tests/php/bootstrap.php
+6275890508f30f5eec5144199a72c9261b841442c4857a1e19a982de903ba92b *./tests/php/bootstrap.php
 8e58ce6e7287be689ba5c5911f763ada405a3356302fd5dcbf731b3208eeb95f *./tests/php/run-unit-tests.php
 6c4daca1adf2c0208567b38c36f07ec5afd62842915066523fd4fe78b44498ba *./tests/php/stubs/wp-cli-stub.php
 74f7ea35f9e5857b9ad81f05a178e751b67274ce4132df461cc0470025ff962a *./tests/php/stubs/wpdb-stub.php
@@ -495,12 +496,12 @@ d90f844877b669c32d807ad36bdcc0c045a4e4ca37860c854566afd68ccc7e68 *./wp-content/m
 23a6b04c8fc1c1a332a238ec33bb9be5fc51461f70722550b768011698e75a24 *./wp-content/mu-plugins/longevity-core/class-affiliate-registry.php
 1697b823d5cd578542b39d037fbcbb71e7166511a0f212d3fc345d61fd367cb2 *./wp-content/mu-plugins/longevity-core/class-analytics.php
 00b9d73bb18a677c4bf684950554c838c8f762bd7336a4605ab0e458a2e71f9f *./wp-content/mu-plugins/longevity-core/class-approval-fingerprint.php
-f1014b085d2f71db903c0425afcb53489513a15e7eb7dc535f319474c2afa6fd *./wp-content/mu-plugins/longevity-core/class-approval-repository.php
-630d6476ca278fa4a76a70874042a475ddd5b7cdd439c11baa2747ea8b17e226 *./wp-content/mu-plugins/longevity-core/class-approval-service.php
-a06e9aab80e4c48c917fdc25cf6710406006465ac394d42c2cd156c50e6da6b0 *./wp-content/mu-plugins/longevity-core/class-audit-log.php
+7f2392f1c2f3012ec7bbb8ddbce97233a093a1f481466af35376b67b948acd33 *./wp-content/mu-plugins/longevity-core/class-approval-repository.php
+5a4fb7ec191b5f6f12923d2859818f57430fa404867b64722d135b3d3d87c17b *./wp-content/mu-plugins/longevity-core/class-approval-service.php
+b920369d446a7a7e164385e0ede2a7db16fb480631892f39f7a1fa61e4d2f5b0 *./wp-content/mu-plugins/longevity-core/class-audit-log.php
 b25e88b1f2c0a61fea364b22dd808476d17f545c8944d99c8299cf654f30e546 *./wp-content/mu-plugins/longevity-core/class-blocks.php
 59fde74b53b9bba1d345269ba5d8f8104859cab326c64062f3935023840e43cd *./wp-content/mu-plugins/longevity-core/class-claims.php
-31277e81b2b95c5975a6fe5a28b251be8e6fe6ca09b06a32e1cf476463d6410b *./wp-content/mu-plugins/longevity-core/class-cli.php
+98d463456e960fd41e0add8d718cc0c79da2cf20e44b6269a95cae09dda23985 *./wp-content/mu-plugins/longevity-core/class-cli.php
 29250fb71cb86a95115ae88afd0f42de81171fb27058294fe5adbcbb71544e84 *./wp-content/mu-plugins/longevity-core/class-content-discovery.php
 3d71134fa99d1d0000722ab8ab5c0781b3aaa815c25f52027f35bb5b85f79f6f *./wp-content/mu-plugins/longevity-core/class-content-types.php
 6a0887c1a827fcecbde39cf4afd371e236955dc86a7594f4dbfb480b052fb06c *./wp-content/mu-plugins/longevity-core/class-corrections.php
@@ -517,7 +518,7 @@ b25e88b1f2c0a61fea364b22dd808476d17f545c8944d99c8299cf654f30e546 *./wp-content/m
 4a17d9adb6c6a7bd2ff52324c7e157c1ec1ab0162b80ae0c447c22b88cb60cc7 *./wp-content/mu-plugins/longevity-core/class-meta-authorization.php
 c27e0fdf058606e3f0e8094a093bb125a71655a8556e3af2a7ee0dea76a840f7 *./wp-content/mu-plugins/longevity-core/class-meta-registry.php
 0c6283302cc18b4d6c2877d1dd157c865a5c783439bfbc464f8dbb9e6c7ebc20 *./wp-content/mu-plugins/longevity-core/class-metrics.php
-007c58a8c2b6079e5a92a7fbf1c69cc2798bdcef6227e33774edf04c26006906 *./wp-content/mu-plugins/longevity-core/class-migrations.php
+4b7cc70682530d3f6b71204783e92baa0ca7d6d5721cc2538c409d9d7c189f47 *./wp-content/mu-plugins/longevity-core/class-migrations.php
 bd6f10b085fca31bc350deb2e163f5fcaf0d63671c20659bac477380d6394a4b *./wp-content/mu-plugins/longevity-core/class-notification-outbox.php
 00423713222c90ae94bf0c3b143b9434885b2e8a3fe8cb3265ce541c20a10c71 *./wp-content/mu-plugins/longevity-core/class-override-intent.php
 d85fba14162c11e8952bf46e3407df84fcfe46db715711ec5ef83498fc733c9e *./wp-content/mu-plugins/longevity-core/class-platform-requirements.php
@@ -539,7 +540,7 @@ b201e0f52ee5df0ac54240b098e074b260fb69905038441f11ca674e3b782649 *./wp-content/m
 56d0426c76b57d64559cc6c5978a4ff5fa2dda7105ebff893a6bffbcf1a20867 *./wp-content/mu-plugins/longevity-core/class-schema.php
 056909b0d08f97bbf6fa69fdcaf15b25721e0ce309bc3c75a303834ba58a8db2 *./wp-content/mu-plugins/longevity-core/class-seo.php
 ac2f73c3f636737f2eaf0b5a778e7c158048c99eb74b1ec2475e7a86cb636c0c *./wp-content/mu-plugins/longevity-core/class-shortcodes.php
-6cd3fae8353ec815c07ce9d600821456f6926fc4c837fdf7d6bd22f5bb9af64c *./wp-content/mu-plugins/longevity-core/class-system-readiness.php
+e68de6bafa1e9e0f8fce8e9dbddb89e52858620866a76f79c4073708a2a7a863 *./wp-content/mu-plugins/longevity-core/class-system-readiness.php
 d687714f57c44e08bc94536ac72161604c269dba859f93411de98be851e8fe74 *./wp-content/mu-plugins/longevity-core/class-trust-pages.php
 b51caa98c4030a206bdbee89fb72ae638331007c4f3b37b7e10173ee825fd038 *./wp-content/mu-plugins/longevity-core/config/scoring/default-review-model.json
 de4a727464eb9c1d4159f5a8ab83059392f722fe4c72f8b1ba5dd64ac2df0c82 *./wp-content/mu-plugins/longevity-core/config/scoring/review-model.schema.json

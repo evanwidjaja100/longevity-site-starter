@@ -15,7 +15,7 @@ defined( 'ABSPATH' ) || exit;
 
 /** Advances additive, restart-safe governance migrations via explicit CLI invocation. */
 final class Migrations {
-	public const CURRENT_VERSION = 16;
+	public const CURRENT_VERSION = 17;
 
 	/** Lock time-to-live in seconds. */
 	private const LOCK_TTL = 300;
@@ -322,6 +322,14 @@ final class Migrations {
 				throw new \RuntimeException( 'Migration 16 could not enforce governance integrity constraints.' );
 			}
 		}
+		if ( 17 === $version ) {
+			self::load_db_delta();
+			Approval_Repository::install();
+			if ( ! Approval_Repository::ensure_activation_columns() ) {
+				throw new \RuntimeException( 'Migration 17 could not add approval activation columns; the approval table requires manual remediation.' );
+			}
+			Approval_Repository::backfill_legacy_activation();
+		}
 	}
 
 	/** Validate schema postconditions after each migration version. */
@@ -381,6 +389,11 @@ final class Migrations {
 				'indexes' => array( 'PRIMARY' => true, 'type_id' => false, 'release_sha' => false ),
 			),
 		);
+		if ( 17 === $version ) {
+			$contracts['approval']['columns']                   = array_merge( $contracts['approval']['columns'], array( 'audit_event_id', 'activated_at', 'activation_error' ) );
+			$contracts['approval']['indexes']['approval_state'] = false;
+			$contracts['approval']['indexes']['approval_audit'] = false;
+		}
 		$names = array(
 			3  => array( 'approval', 'audit', 'audit_sequence' ),
 			8  => array( 'audit', 'audit_sequence' ),
@@ -392,6 +405,7 @@ final class Migrations {
 			14 => array( 'evidence' ),
 			15 => array( 'override' ),
 			16 => array_keys( $contracts ),
+			17 => array_keys( $contracts ),
 		)[ $version ] ?? array();
 
 		$result = array();

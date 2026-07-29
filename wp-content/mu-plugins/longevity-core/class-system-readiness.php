@@ -69,6 +69,7 @@ final class System_Readiness {
 			'worker_heartbeats'    => self::safely( static fn(): array => self::worker_heartbeat_check() ),
 			'uploads'              => self::safely( static fn(): array => self::uploads_check() ),
 			'approval_table'       => self::safely( static fn(): array => self::check( Approval_Repository::exists(), 'ok', 'blocked', 'Approval snapshot table.' ) ),
+			'approval_integrity'   => self::safely( static fn(): array => self::approval_integrity_check() ),
 			'audit_table'          => self::safely( static fn(): array => self::check( Audit_Log::exists(), 'ok', 'blocked', 'Governance audit table.' ) ),
 			'audit_write_failures' => self::safely( static fn(): array => self::audit_failure_check() ),
 			'publication_lock'     => self::safely( static fn(): array => self::lock_check() ),
@@ -149,6 +150,38 @@ final class System_Readiness {
 		return array(
 			'status'  => 'ok',
 			'message' => 'No audit write failures.',
+		);
+	}
+
+	/** Approval activation integrity: approved snapshots must carry durable mandatory-audit linkage. */
+	private static function approval_integrity_check(): array {
+		if ( ! Approval_Repository::exists() ) {
+			return array(
+				'status'  => 'blocked',
+				'message' => 'Approval snapshot table is missing; migrations may not have run.',
+			);
+		}
+		$orphaned = Approval_Repository::count_orphaned_approved();
+		if ( $orphaned > 0 ) {
+			return array(
+				'status'   => 'blocked',
+				'message'  => sprintf( '%d approved snapshot(s) lack mandatory-audit linkage; run `wp longevity approvals reconcile`.', $orphaned ),
+				'orphaned' => $orphaned,
+			);
+		}
+		$stale_pending = Approval_Repository::count_stale_pending( HOUR_IN_SECONDS );
+		if ( $stale_pending > 0 ) {
+			return array(
+				'status'        => 'degraded',
+				'message'       => sprintf( '%d snapshot(s) stuck awaiting audit confirmation; run `wp longevity approvals reconcile`.', $stale_pending ),
+				'stale_pending' => $stale_pending,
+				'pending'       => Approval_Repository::count_pending(),
+			);
+		}
+		return array(
+			'status'  => 'ok',
+			'message' => 'All approved snapshots carry durable mandatory-audit linkage.',
+			'pending' => Approval_Repository::count_pending(),
 		);
 	}
 

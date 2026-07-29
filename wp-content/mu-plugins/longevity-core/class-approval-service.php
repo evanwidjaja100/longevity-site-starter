@@ -142,10 +142,12 @@ final class Approval_Service {
 			}
 			$fingerprint = Approval_Fingerprint::build( $post_id, $approval_type );
 			$current     = Approval_Repository::current( $post_id, $approval_type );
+			// Insert quarantined: a snapshot is unusable until its mandatory audit
+			// event is durably confirmed and the row is atomically activated.
 			$record      = array(
 				'post_id'                => $post_id,
 				'approval_type'          => $approval_type,
-				'approval_status'        => 'approved',
+				'approval_status'        => 'pending_audit',
 				'revision_id'            => function_exists( 'wp_get_post_revisions' ) ? self::latest_revision_id( $post_id ) : null,
 				'content_hash'           => $fingerprint['content_hash'],
 				'governed_meta_hash'     => $fingerprint['governed_meta_hash'],
@@ -159,27 +161,127 @@ final class Approval_Service {
 				'invalidated_by_user_id' => null,
 				'invalidation_reason'    => null,
 				'supersedes_approval_id' => $current ? (int) $current['id'] : null,
+				'audit_event_id'         => null,
+				'activated_at'           => null,
+				'activation_error'       => null,
 			);
 			$id = Approval_Repository::insert( $record );
 			if ( $id <= 0 ) {
 				return null;
 			}
 			$record['id'] = $id;
+
 			// Fail-closed: an approval without a durable audit trail must not stand.
+			$audit_key      = self::mandatory_audit_key( $id, $approval_type, $fingerprint['combined_hash'] );
+			$audit_event_id = 0;
 			try {
-				Audit_Log::record( 'approval_completed', 'post', $post_id, array( 'approval_type' => $approval_type, 'approval_id' => $id, 'combined_hash' => $fingerprint['combined_hash'], 'synthetic_probe' => '1' === (string) get_post_meta( $post_id, '_lel_acceptance_probe', true ) ), $actor_id, 'workflow', true );
+				$audit_event_id = Audit_Log::record( 'approval_completed', 'post', $post_id, array( 'approval_type' => $approval_type, 'approval_id' => $id, 'combined_hash' => $fingerprint['combined_hash'], 'synthetic_probe' => '1' === (string) get_post_meta( $post_id, '_lel_acceptance_probe', true ) ), $actor_id, 'workflow', true, $audit_key );
 			} catch ( \Throwable $error ) {
+				// A known-failed audit (server did not commit) rejects the pending
+				// snapshot. An unknown COMMIT outcome quarantines the request and
+				// leaves the snapshot pending for reconciliation — never guessed.
 				if ( '' === Audit_Log::unhealthy_reason() ) {
-					self::invalidate_snapshots( $post_id, $approval_type, 'audit_write_failed', $actor_id );
+					Approval_Repository::reject_pending( $id, 'audit_write_failed' );
 					Audit_Log::record( 'approval_rejected', 'post', $post_id, array( 'approval_type' => $approval_type, 'reason' => 'audit_write_failed', 'approval_id' => $id ), $actor_id, 'workflow' );
 				}
 				return null;
 			}
+			if ( $audit_event_id <= 0 ) {
+				if ( '' === Audit_Log::unhealthy_reason() ) {
+					Approval_Repository::reject_pending( $id, 'audit_not_durable' );
+				}
+				return null;
+			}
+			// Atomic activation: the conditional update is the sole promotion gate.
+			if ( Approval_Repository::activate( $id, $fingerprint['combined_hash'], $audit_event_id ) < 1 ) {
+				Approval_Repository::note_activation_error( $id, 'activation_conditional_update_failed' );
+				Audit_Log::record( 'approval_activation_failed', 'post', $post_id, array( 'approval_type' => $approval_type, 'approval_id' => $id ), $actor_id, 'workflow' );
+				return null;
+			}
+			$record['approval_status']  = 'approved';
+			$record['audit_event_id']   = $audit_event_id;
+			$record['activated_at']     = gmdate( 'Y-m-d H:i:s' );
+			$record['activation_error'] = null;
+
+			// Only after confirmed activation may compatibility state be projected.
 			self::project_legacy_status( $post_id, $approval_type, $actor_id );
 			return $record;
 		} finally {
 			Publication_Lock::release( $post_id );
 		}
+	}
+
+	/**
+	 * Deterministic idempotency key for an approval's mandatory audit event.
+	 *
+	 * Derived from the snapshot ID, approval type, and combined fingerprint so
+	 * that a retry of the same approval reuses the same audit event and
+	 * reconciliation can locate the event for a pending snapshot.
+	 */
+	public static function mandatory_audit_key( int $snapshot_id, string $approval_type, string $combined_hash ): string {
+		return 'approval_completed:' . $snapshot_id . ':' . $approval_type . ':' . $combined_hash;
+	}
+
+	/**
+	 * Reconcile pending approval snapshots against the durable audit log.
+	 *
+	 * Bounded and idempotent: activates snapshots whose mandatory audit event is
+	 * confirmed and correctly linked, rejects snapshots that have no matching
+	 * event, and counts (never guesses) mismatched linkage as an integrity
+	 * error. Never prints private payloads.
+	 *
+	 * @return array{scanned:int, recoverable:int, rejectable:int, activated:int, rejected:int, orphaned:int, errors:int, dry_run:bool, complete:bool}
+	 */
+	public static function reconcile( bool $dry_run = true, int $batch = 200 ): array {
+		$batch       = max( 1, min( 500, $batch ) );
+		$after       = 0;
+		$scanned     = 0;
+		$recoverable = 0;
+		$rejectable  = 0;
+		$activated   = 0;
+		$rejected    = 0;
+		$errors      = 0;
+		do {
+			$rows = Approval_Repository::pending_batch( $after, $batch );
+			foreach ( $rows as $row ) {
+				++$scanned;
+				$id       = (int) ( $row['id'] ?? 0 );
+				$after    = max( $after, $id );
+				$type     = (string) ( $row['approval_type'] ?? '' );
+				$combined = (string) ( $row['combined_hash'] ?? '' );
+				$post_id  = (int) ( $row['post_id'] ?? 0 );
+				$event    = Audit_Log::event_for_idempotency_key( self::mandatory_audit_key( $id, $type, $combined ) );
+				if ( is_array( $event ) && (int) $event['id'] > 0 ) {
+					if ( 'approval_completed' !== (string) $event['event_type'] || (int) $event['object_id'] !== $post_id ) {
+						// Ambiguous or mismatched linkage: never guess. Leave pending
+						// and surface as an integrity error for human review.
+						++$errors;
+						continue;
+					}
+					++$recoverable;
+					if ( ! $dry_run && Approval_Repository::activate( $id, $combined, (int) $event['id'] ) > 0 ) {
+						++$activated;
+					}
+					continue;
+				}
+				++$rejectable;
+				if ( ! $dry_run && Approval_Repository::reject_pending( $id, 'reconcile_no_audit_event' ) > 0 ) {
+					++$rejected;
+				}
+			}
+		} while ( count( $rows ) === $batch );
+		$orphaned = Approval_Repository::count_orphaned_approved();
+		return array(
+			'scanned'     => $scanned,
+			'recoverable' => $recoverable,
+			'rejectable'  => $rejectable,
+			'activated'   => $activated,
+			'rejected'    => $rejected,
+			'orphaned'    => $orphaned,
+			'errors'      => $errors,
+			'dry_run'     => $dry_run,
+			'complete'    => 0 === $errors && 0 === $orphaned,
+		);
 	}
 
 	/** Whether the current snapshot still matches all material state. */

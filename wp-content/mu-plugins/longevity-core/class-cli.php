@@ -21,6 +21,7 @@ final class CLI {
 		\WP_CLI::add_command( 'longevity readiness', Readiness_Command::class );
 		\WP_CLI::add_command( 'longevity freshness', Freshness_Command::class );
 		\WP_CLI::add_command( 'longevity dependency', Dependency_Command::class );
+		\WP_CLI::add_command( 'longevity approvals', Approvals_Command::class );
 		\WP_CLI::add_command( 'longevity bootstrap', Bootstrap_Command::class );
 		\WP_CLI::add_command( 'longevity migrate', Migrate_Command::class );
 		\WP_CLI::add_command( 'longevity evidence', Evidence_Command::class );
@@ -955,6 +956,49 @@ final class Dependency_Command {
 			return;
 		}
 		\WP_CLI::success( sprintf( 'Indexed %d relationship(s) across %d parent(s); readiness marker recorded.', $result['dependencies_indexed'], $result['parents_scanned'] ) );
+	}
+}
+
+/** Approval activation reconciliation — recover or reject snapshots awaiting audit durability. */
+final class Approvals_Command {
+	/**
+	 * Reconcile pending approval snapshots against the durable audit log.
+	 *
+	 * Bounded and idempotent: activates snapshots whose mandatory audit event
+	 * is confirmed and correctly linked, rejects snapshots with no matching
+	 * event, and reports mismatched linkage or orphaned approved rows as
+	 * unresolved integrity (nonzero exit) for human review. Never prints
+	 * private approval payloads.
+	 *
+	 * ## OPTIONS
+	 *
+	 * [--dry-run]
+	 * : Report recoverable and rejectable snapshots without mutating state.
+	 *
+	 * [--batch=<n>]
+	 * : Pending snapshots scanned per page (1-500, default 200).
+	 *
+	 * @param array $args       Positional arguments (unused).
+	 * @param array $assoc_args Named arguments.
+	 */
+	public function reconcile( array $args, array $assoc_args ): void {
+		unset( $args );
+		if ( ! current_user_can( 'approve_publication' ) ) {
+			\WP_CLI::error( 'This command requires approve_publication. Run WP-CLI with an authorized --user.' );
+		}
+		$dry_run = isset( $assoc_args['dry-run'] );
+		$batch   = isset( $assoc_args['batch'] ) ? (int) $assoc_args['batch'] : 200;
+		$result  = Approval_Service::reconcile( $dry_run, $batch );
+		\WP_CLI::line( wp_json_encode( $result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+		if ( ! $result['complete'] ) {
+			\WP_CLI::error( sprintf( 'Reconciliation left %d orphaned approved row(s) and %d linkage error(s); manual review required.', $result['orphaned'], $result['errors'] ), false );
+			\WP_CLI::halt( 1 );
+		}
+		if ( $dry_run ) {
+			\WP_CLI::success( sprintf( '[DRY RUN] %d recoverable, %d rejectable across %d scanned pending snapshot(s).', $result['recoverable'], $result['rejectable'], $result['scanned'] ) );
+			return;
+		}
+		\WP_CLI::success( sprintf( 'Activated %d and rejected %d of %d scanned pending snapshot(s).', $result['activated'], $result['rejected'], $result['scanned'] ) );
 	}
 }
 

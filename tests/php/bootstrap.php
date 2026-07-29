@@ -242,11 +242,39 @@ if ( ! isset( $GLOBALS['wpdb'] ) ) {
 				usort( $rows, static fn( $a, $b ) => (int) ( $b['id'] ?? 0 ) <=> (int) ( $a['id'] ?? 0 ) );
 				return ARRAY_A === $output ? $rows : array_map( static fn( $r ) => (object) $r, $rows );
 			}
+			if ( false !== strpos( $query, 'FROM wp_lel_approval_snapshots' ) ) {
+				preg_match( '/id > (\d+)/', $query, $floor_match );
+				preg_match( '/LIMIT (\d+)/', $query, $limit_match );
+				$floor = (int) ( $floor_match[1] ?? 0 );
+				$limit = (int) ( $limit_match[1] ?? 500 );
+				$rows  = array_values( array_filter(
+					$this->rows['wp_lel_approval_snapshots'],
+					static fn( array $row ): bool => 'pending_audit' === (string) ( $row['approval_status'] ?? '' ) && (int) ( $row['id'] ?? 0 ) > $floor
+				) );
+				usort( $rows, static fn( array $a, array $b ): int => (int) ( $a['id'] ?? 0 ) <=> (int) ( $b['id'] ?? 0 ) );
+				$rows = array_slice( $rows, 0, $limit );
+				return ARRAY_A === $output ? $rows : array_map( static fn( array $row ) => (object) $row, $rows );
+			}
 			return array();
 		}
 
 		public function get_row( string $query, string $output = OBJECT ) {
 			$this->lel_query_log[] = $query;
+			if ( false !== strpos( $query, 'FROM wp_lel_audit_events' ) && false !== strpos( $query, 'idempotency_key =' ) ) {
+				preg_match( "/idempotency_key = '([^']+)'/", $query, $key_match );
+				foreach ( $this->rows['wp_lel_audit_events'] as $row ) {
+					if ( isset( $key_match[1] ) && (string) ( $row['idempotency_key'] ?? '' ) === $key_match[1] ) {
+						$out = array(
+							'id'          => (int) ( $row['id'] ?? 0 ),
+							'event_type'  => (string) ( $row['event_type'] ?? '' ),
+							'object_type' => (string) ( $row['object_type'] ?? '' ),
+							'object_id'   => (int) ( $row['object_id'] ?? 0 ),
+						);
+						return ARRAY_A === $output ? $out : (object) $out;
+					}
+				}
+				return null;
+			}
 			if ( false !== strpos( $query, 'FROM wp_lel_external_evidence' ) ) {
 				$rows = $this->rows['wp_lel_external_evidence'] ?? array();
 				if ( preg_match( '/WHERE id = (\d+)/', $query, $id_match ) ) {
@@ -439,6 +467,31 @@ if ( ! isset( $GLOBALS['wpdb'] ) ) {
 					}
 				}
 				return null;
+			}
+			if ( false !== strpos( $query, 'FROM wp_lel_approval_snapshots' ) && false !== strpos( $query, 'COUNT' ) ) {
+				$count = 0;
+				foreach ( $this->rows['wp_lel_approval_snapshots'] as $row ) {
+					$status = (string) ( $row['approval_status'] ?? '' );
+					if ( false !== strpos( $query, "approval_status = 'approved'" ) ) {
+						if ( 'approved' === $status && empty( $row['invalidated_at'] ) && null === ( $row['audit_event_id'] ?? null ) && null === ( $row['activation_error'] ?? null ) ) {
+							++$count;
+						}
+						continue;
+					}
+					if ( false !== strpos( $query, "approval_status = 'pending_audit'" ) ) {
+						if ( 'pending_audit' !== $status ) {
+							continue;
+						}
+						if ( preg_match( "/approved_at < '([^']+)'/", $query, $stale_match ) ) {
+							if ( strtotime( (string) ( $row['approved_at'] ?? '' ) . ' UTC' ) < strtotime( $stale_match[1] . ' UTC' ) ) {
+								++$count;
+							}
+							continue;
+						}
+						++$count;
+					}
+				}
+				return (string) $count;
 			}
 			if ( false !== strpos( $query, 'FROM wp_lel_invalidation_queue' ) ) {
 				if ( false !== strpos( $query, 'TIMESTAMPDIFF' ) ) {
@@ -819,6 +872,40 @@ if ( ! isset( $GLOBALS['wpdb'] ) ) {
 				return $count;
 			}
 			if ( 0 === stripos( trim( $query ), 'UPDATE wp_lel_approval_snapshots' ) ) {
+				if ( preg_match( '/WHERE id = (\d+)/', $query, $id_match ) ) {
+					$id       = (int) $id_match[1];
+					$activate = false !== strpos( $query, "SET approval_status = 'approved'" );
+					$reject   = false !== strpos( $query, "SET approval_status = 'rejected'" );
+					if ( $activate && ! empty( $GLOBALS['lel_test_fail_activation'] ) ) {
+						return 0;
+					}
+					preg_match( '/audit_event_id = (\d+)/', $query, $audit_match );
+					preg_match( "/combined_hash = '([^']+)'/", $query, $hash_match );
+					preg_match( "/activation_error = '((?:[^'\\\\]|\\\\.)*)'/", $query, $err_match );
+					$count = 0;
+					foreach ( $this->rows['wp_lel_approval_snapshots'] as &$row ) {
+						if ( (int) ( $row['id'] ?? 0 ) !== $id || 'pending_audit' !== (string) ( $row['approval_status'] ?? '' ) ) {
+							continue;
+						}
+						if ( $activate && isset( $hash_match[1] ) && (string) ( $row['combined_hash'] ?? '' ) !== $hash_match[1] ) {
+							continue;
+						}
+						if ( $activate ) {
+							$row['approval_status']  = 'approved';
+							$row['audit_event_id']   = (int) ( $audit_match[1] ?? 0 );
+							$row['activated_at']     = '2026-07-28 00:00:00';
+							$row['activation_error'] = null;
+						} elseif ( $reject ) {
+							$row['approval_status']  = 'rejected';
+							$row['activation_error'] = isset( $err_match[1] ) ? stripslashes( $err_match[1] ) : null;
+						} else {
+							$row['activation_error'] = isset( $err_match[1] ) ? stripslashes( $err_match[1] ) : null;
+						}
+						++$count;
+					}
+					unset( $row );
+					return $count;
+				}
 				preg_match( '/post_id = (\d+)/', $query, $post_match );
 				preg_match( "/approval_type = '([^']+)'/", $query, $type_match );
 				$count = 0;
@@ -1140,32 +1227,32 @@ if ( ! function_exists( 'get_post_field' ) ) {
 }
 
 
-	if ( ! function_exists( 'update_option' ) ) {
-		function update_option( string $option, $value, bool $autoload = false ): bool {
-			if ( 'lel_data_version' === $option && ! empty( $GLOBALS['lel_test_fail_data_version_update'] ) ) {
-				return false;
-			}
-			$GLOBALS['lel_test_options'][ $option ] = $value;
-			return true;
+if ( ! function_exists( 'update_option' ) ) {
+	function update_option( string $option, $value, bool $autoload = false ): bool {
+		if ( 'lel_data_version' === $option && ! empty( $GLOBALS['lel_test_fail_data_version_update'] ) ) {
+			return false;
 		}
+		$GLOBALS['lel_test_options'][ $option ] = $value;
+		return true;
 	}
-	if ( ! function_exists( 'delete_option' ) ) {
-		function delete_option( string $option ): bool {
-			unset( $GLOBALS['lel_test_options'][ $option ] );
-			return true;
-		}
+}
+if ( ! function_exists( 'delete_option' ) ) {
+	function delete_option( string $option ): bool {
+		unset( $GLOBALS['lel_test_options'][ $option ] );
+		return true;
 	}
-	if ( ! function_exists( 'add_option' ) ) {
-		function add_option( string $option, $value = '', string $autoload = 'yes' ): bool {
-			$GLOBALS['lel_test_options'][ $option ] = $value;
-			return true;
-		}
+}
+if ( ! function_exists( 'add_option' ) ) {
+	function add_option( string $option, $value = '', string $autoload = 'yes' ): bool {
+		$GLOBALS['lel_test_options'][ $option ] = $value;
+		return true;
 	}
-	if ( ! function_exists( 'wp_installing' ) ) {
-		function wp_installing(): bool { return false; }
-	}
+}
+if ( ! function_exists( 'wp_installing' ) ) {
+	function wp_installing(): bool { return false; }
+}
 
-	if ( ! defined( 'DAY_IN_SECONDS' ) ) { define( 'DAY_IN_SECONDS', 86400 ); }
+if ( ! defined( 'DAY_IN_SECONDS' ) ) { define( 'DAY_IN_SECONDS', 86400 ); }
 if ( ! defined( 'HOUR_IN_SECONDS' ) ) { define( 'HOUR_IN_SECONDS', 3600 ); }
 if ( ! defined( 'MINUTE_IN_SECONDS' ) ) { define( 'MINUTE_IN_SECONDS', 60 ); }
 if ( ! function_exists( 'wp_json_encode' ) ) {
