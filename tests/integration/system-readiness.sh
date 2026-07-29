@@ -12,7 +12,7 @@ esac
 mkdir -p "$ROOT/reports"
 docker compose run --rm -v "$ROOT/tests:/tests:ro" wpcli wp eval '
 $report = \Longevity\Core\System_Readiness::report();
-$required = array("database", "migrations", "scoring_model", "freshness", "cron_heartbeat", "uploads", "approval_table", "audit_table", "mail_transport", "last_backup", "last_restore_drill");
+$required = array("database", "migrations", "scoring_model", "freshness", "operational_counts", "cron_heartbeat", "uploads", "approval_table", "audit_table", "mail_transport", "last_backup", "last_restore_drill");
 foreach ($required as $key) { if (!isset($report["checks"][$key]["status"])) { fwrite(STDERR, "Missing readiness check: {$key}\n"); exit(1); } }
 foreach (array("mail_transport", "last_backup", "last_restore_drill") as $key) {
   if (!in_array($report["checks"][$key]["status"], array("ok", "unknown_external"), true)) { fwrite(STDERR, "Invalid external status: {$key}\n"); exit(1); }

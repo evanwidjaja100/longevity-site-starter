@@ -411,7 +411,7 @@ aa0ecef90233b3150a430c6d4a32db6cc2a3d6e9f71ffdb29e2bd581903993f9 *./tests/integr
 fa99dde2ffdb4146e0abcee239ed36d9831b8abd77901bd148d1b502fc8cb161 *./tests/integration/rest-public-boundary.sh
 49425309b581c52d105d080059acf6eb62c1d1fd277194dcb570e358cc1d2ac6 *./tests/integration/sast-controls.sh
 b8f355c4a59e3876d8a45dacf32bc2dcb8cd9a707d58913c432813ac55ccdc58 *./tests/integration/supply-chain.sh
-67b2e3cdba8ef893abf6ad2d86991720d0a19fcbf1a246158e2145bb15f9bf8b *./tests/integration/system-readiness.sh
+a5d337dd08d5e3347636193d408e1b1d8957a805c87a2746ddea61260da74b94 *./tests/integration/system-readiness.sh
 d3da0d7762bfd8eadb0eb88b90f3b5076f2b19054f15f07d028a609a20cfc7af *./tests/load/k6-scenario.js
 df814f740e0075a154d9c764fb1940c19e5ea27474dbd523dac9e1ee20c5ff52 *./tests/php/AdminUITest.php
 2e6dd1d5a1a183e4e7d0c36015e26b2e922ecc80394459ea0f37e85eb3b60576 *./tests/php/AdvisoryLockTest.php
@@ -433,7 +433,7 @@ d0549fa6522d91711547b782d473211fdd1932d404f902ac5a7ae96be2494036 *./tests/php/Ev
 104d7c1864ade977d799293f9ae05ef348a09296890fcac1818b46ea3ca6b075 *./tests/php/FingerprintCompletenessTest.php
 acbbf26dfd2353020dc719de64f8212654c755184d5e39bf2153dedfa20bca44 *./tests/php/FreshnessLockTest.php
 a6c7cc09f167ebc63dcc9616e74b37bd03cfb6770ad5dc451a2bd10948761f52 *./tests/php/FreshnessRepositoryTest.php
-3ae4a9897799d167ebdf767c31f9abc2a57703ed95d114010f6a350e10a24a1c *./tests/php/FreshnessTest.php
+290e8af8444d65f193bfa016e4dc0ee35689b66edcd22df4d744a8fd19ea218f *./tests/php/FreshnessTest.php
 c0264fecf842d17c4edd2acb7508b8266361e37d9eed6c8107d5bb962bbd9faa *./tests/php/InvalidationQueueTest.php
 aadf0730f5105de62e85e806a323a6b506a3d1799e0df8c48ad0c881894594dc *./tests/php/LegalHoldTest.php
 70b496d694d1ac452e04999e97506c8340b85c62ade5b1cfbb1966e2df35d486 *./tests/php/MetaAuthorizationTest.php
@@ -512,7 +512,7 @@ e3778198f6a43c75edd2c4235ef9ae2828b6f988bf3ef78f0ca78c842db57b31 *./wp-content/m
 81482ad06891b25ce32e01351716a849e978eb23fe93ec97832e5e97253bc003 *./wp-content/mu-plugins/longevity-core/class-dependency-index.php
 2930381adafcbc4738bb6530926cab8ba6f2f4bc85ec84252a573e034ebdc69f *./wp-content/mu-plugins/longevity-core/class-evidence-store.php
 4db6531ee172f07a79793466f7a9ce176b6d8f5d0354aef2068aa09446a7f5b4 *./wp-content/mu-plugins/longevity-core/class-freshness-repository.php
-2170a7c70f0867a741a4096f08c747e7d371d8458172eb7390fc6ebc55af0578 *./wp-content/mu-plugins/longevity-core/class-freshness.php
+6f8118cbe37f3db5d7cf2d19d2d9933034339ab746c1670427b20309f3f459b8 *./wp-content/mu-plugins/longevity-core/class-freshness.php
 1303cb808bbaeab9f4b12607de1da9f05777d6d693060d2dc077bc280ad27009 *./wp-content/mu-plugins/longevity-core/class-gate-result.php
 6c73fe769077ddef8a9306cb91309c41ba23e27b199843bb62d42066bd2533f9 *./wp-content/mu-plugins/longevity-core/class-governed-query.php
 29a4e0bbedddb922517df7de5b0b1df3c8ea90a0f36371ef2fcc58dc24208e4e *./wp-content/mu-plugins/longevity-core/class-invalidation-queue.php
@@ -543,7 +543,7 @@ b201e0f52ee5df0ac54240b098e074b260fb69905038441f11ca674e3b782649 *./wp-content/m
 56d0426c76b57d64559cc6c5978a4ff5fa2dda7105ebff893a6bffbcf1a20867 *./wp-content/mu-plugins/longevity-core/class-schema.php
 056909b0d08f97bbf6fa69fdcaf15b25721e0ce309bc3c75a303834ba58a8db2 *./wp-content/mu-plugins/longevity-core/class-seo.php
 ac2f73c3f636737f2eaf0b5a778e7c158048c99eb74b1ec2475e7a86cb636c0c *./wp-content/mu-plugins/longevity-core/class-shortcodes.php
-35ad01354af7b6f382eb52b2c42e01d1cd453f6a6e862a7a08c66c438e975ba3 *./wp-content/mu-plugins/longevity-core/class-system-readiness.php
+61fafd45735bd2f380db5e9c3d22d1ddedcd68f758a44bc814871a3a97330ed6 *./wp-content/mu-plugins/longevity-core/class-system-readiness.php
 d687714f57c44e08bc94536ac72161604c269dba859f93411de98be851e8fe74 *./wp-content/mu-plugins/longevity-core/class-trust-pages.php
 b51caa98c4030a206bdbee89fb72ae638331007c4f3b37b7e10173ee825fd038 *./wp-content/mu-plugins/longevity-core/config/scoring/default-review-model.json
 de4a727464eb9c1d4159f5a8ab83059392f722fe4c72f8b1ba5dd64ac2df0c82 *./wp-content/mu-plugins/longevity-core/config/scoring/review-model.schema.json

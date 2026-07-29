@@ -77,6 +77,7 @@ final class System_Readiness {
 			'invalidation_queue'   => self::safely( static fn(): array => self::queue_check() ),
 			'dependency_index'     => self::safely( static fn(): array => self::dependency_index_check() ),
 			'rankings_projection'  => self::safely( static fn(): array => self::rankings_projection_check() ),
+			'operational_counts'   => self::safely( static fn(): array => self::operational_counts_check() ),
 			'contact_rate_limiter' => self::safely( static fn(): array => self::check( Public_Contact::rate_table_exists(), 'ok', 'blocked', 'Contact rate-limit table (public submissions fail closed without it).' ) ),
 			'notification_outbox'  => self::safely( static fn(): array => self::notification_outbox_check() ),
 			'mail_transport'       => self::safely( static fn(): array => self::store_evidence( 'mail', 'lel_mail_transport_evidence', 'Mail transport evidence has not been supplied by an operator.' ) ),
@@ -359,6 +360,23 @@ final class System_Readiness {
 		return array(
 			'status'  => 'ok',
 			'message' => 'Ranking projection is within its supported population ceiling.',
+		);
+	}
+
+	/** Operational readiness counts must be read from the database, never silently reported as zero. */
+	private static function operational_counts_check(): array {
+		$status      = Freshness::status();
+		$unavailable = isset( $status['unavailable_counts'] ) && is_array( $status['unavailable_counts'] ) ? array_values( array_map( 'strval', $status['unavailable_counts'] ) ) : array();
+		if ( empty( $status['operational_counts_available'] ) || array() !== $unavailable ) {
+			return array(
+				'status'      => 'degraded',
+				'message'     => 'One or more operational readiness counts could not be read from the database and must not be treated as zero: ' . ( array() !== $unavailable ? implode( ', ', $unavailable ) : 'unknown' ) . '.',
+				'unavailable' => $unavailable,
+			);
+		}
+		return array(
+			'status'  => 'ok',
+			'message' => 'All operational readiness counts are readable.',
 		);
 	}
 

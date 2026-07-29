@@ -19,6 +19,22 @@ final class Freshness {
 		'retention'    => array( 'hook' => 'lel_contact_retention_cleanup', 'max_age' => 172800 ),
 	);
 
+	/** Only these comparison operators are accepted by the operational-count builder. */
+	private const META_COMPARE_OPERATORS = array( '=', '!=', '<', '<=', '>', '>=', 'IN', 'NOT IN', 'EXISTS', 'NOT EXISTS' );
+
+	/** Map meta_query value types to a CAST target; '' means compare the raw meta_value. */
+	private const META_CAST_TYPES = array(
+		'CHAR'     => '',
+		'BINARY'   => 'BINARY',
+		'DATE'     => 'DATE',
+		'DATETIME' => 'DATETIME',
+		'TIME'     => 'TIME',
+		'NUMERIC'  => 'SIGNED',
+		'SIGNED'   => 'SIGNED',
+		'UNSIGNED' => 'UNSIGNED',
+		'DECIMAL'  => 'DECIMAL(10,2)',
+	);
+
 	/** Register cron and authenticated status hooks. */
 	public static function init(): void {
 		add_action( 'init', array( self::class, 'schedule' ), 30 );
@@ -118,11 +134,20 @@ final class Freshness {
 			}
 			$report['eligible_total'] = Freshness_Repository::eligible_total();
 			$report['cycle_started_at'] = $cycle_started;
-			$report['cycle_scanned'] = self::count_by_meta_query( array( 'post', 'review' ), array( array( 'key' => '_lel_freshness_last_scanned_at', 'value' => $cycle_started, 'compare' => '>=', 'type' => 'DATETIME' ) ), array( 'publish', 'draft', 'pending', 'future', 'private' ) );
-			$report['due_total'] = self::count_by_meta_query( array( 'post', 'review' ), array( 'relation' => 'OR', array( 'key' => 'next_content_review_date', 'value' => $today, 'compare' => '<=', 'type' => 'DATE' ), array( 'key' => 'next_fact_check_date', 'value' => $today, 'compare' => '<=', 'type' => 'DATE' ), array( 'key' => 'next_medical_review_date', 'value' => $today, 'compare' => '<=', 'type' => 'DATE' ) ), array( 'publish', 'draft', 'pending', 'future', 'private' ) );
-			$report['remaining_estimate'] = max( 0, $report['eligible_total'] - $report['cycle_scanned'] );
+			$cycle_scanned = self::count_by_meta_query( array( 'post', 'review' ), array( array( 'key' => '_lel_freshness_last_scanned_at', 'value' => $cycle_started, 'compare' => '>=', 'type' => 'DATETIME' ) ), array( 'publish', 'draft', 'pending', 'future', 'private' ) );
+			$due_total     = self::count_by_meta_query( array( 'post', 'review' ), array( 'relation' => 'OR', array( 'key' => 'next_content_review_date', 'value' => $today, 'compare' => '<=', 'type' => 'DATE' ), array( 'key' => 'next_fact_check_date', 'value' => $today, 'compare' => '<=', 'type' => 'DATE' ), array( 'key' => 'next_medical_review_date', 'value' => $today, 'compare' => '<=', 'type' => 'DATE' ) ), array( 'publish', 'draft', 'pending', 'future', 'private' ) );
+			$report['cycle_scanned'] = $cycle_scanned;
+			$report['due_total']     = $due_total;
+			$report['counts_available'] = ( null !== $cycle_scanned ) && ( null !== $due_total );
+			if ( null === $cycle_scanned ) {
+				// An unreadable scan count must never be treated as zero progress or completion.
+				$report['remaining_estimate'] = null;
+				$report['cycle_complete']     = false;
+			} else {
+				$report['remaining_estimate'] = max( 0, $report['eligible_total'] - $cycle_scanned );
+				$report['cycle_complete']     = $report['eligible_total'] <= $cycle_scanned;
+			}
 			$report['last_success_at'] = gmdate( DATE_W3C );
-			$report['cycle_complete'] = $report['eligible_total'] <= $report['cycle_scanned'];
 			if ( $report['cycle_complete'] ) {
 				$report['cycle_completed_at'] = gmdate( DATE_W3C );
 				$report['last_cycle_completed_at'] = $report['cycle_completed_at'];
@@ -165,24 +190,41 @@ final class Freshness {
 		$report = self::status();
 		echo '<div class="wrap"><h1>' . esc_html__( 'Longevity operational status', 'longevity-core' ) . '</h1><p>' . esc_html__( 'Counts are operational signals. Inspect and resolve records through their protected editorial screens.', 'longevity-core' ) . '</p><table class="widefat striped"><tbody>';
 		foreach ( $report as $label => $value ) {
-			echo '<tr><th scope="row">' . esc_html( ucwords( str_replace( '_', ' ', $label ) ) ) . '</th><td>' . esc_html( is_scalar( $value ) ? (string) $value : wp_json_encode( $value ) ) . '</td></tr>';
+			if ( null === $value ) {
+				$display = __( 'unavailable', 'longevity-core' );
+			} elseif ( is_scalar( $value ) ) {
+				$display = (string) $value;
+			} else {
+				$display = (string) wp_json_encode( $value );
+			}
+			echo '<tr><th scope="row">' . esc_html( ucwords( str_replace( '_', ' ', $label ) ) ) . '</th><td>' . esc_html( $display ) . '</td></tr>';
 		}
 		echo '</tbody></table></div>';
 	}
 
 	/** Return non-sensitive operational counts for admin and CLI. */
 	public static function status(): array {
-		$last = get_option( 'lel_last_freshness_report', array() );
+		$last  = get_option( 'lel_last_freshness_report', array() );
 		$today = gmdate( 'Y-m-d' );
-		$pub_status = array( 'publish', 'draft', 'pending', 'future', 'private' );
+		$counts = array(
+			'overdue_content_reviews' => self::count_by_meta_query( array( 'post', 'review' ), array( 'key' => '_lel_freshness_status', 'value' => 'update_due' ) ),
+			'overdue_fact_checks'     => self::count_by_meta_query( array( 'post', 'review' ), array( array( 'key' => 'next_fact_check_date', 'value' => $today, 'compare' => '<', 'type' => 'DATE' ) ) ),
+			'overdue_medical_reviews' => self::count_by_meta_query( array( 'post', 'review' ), array( array( 'key' => 'next_medical_review_date', 'value' => $today, 'compare' => '<', 'type' => 'DATE' ) ) ),
+			'pending_corrections'     => self::count_by_meta_query( 'lel_correction', array( 'relation' => 'OR', array( 'key' => 'correction_status', 'compare' => 'NOT EXISTS' ), array( 'key' => 'correction_status', 'value' => 'complete', 'compare' => '!=' ) ) ),
+			'unapproved_affiliates'   => self::count_by_meta_query( 'lel_affiliate', array( 'relation' => 'OR', array( 'key' => 'relationship_status', 'compare' => 'NOT EXISTS' ), array( 'key' => 'relationship_status', 'value' => 'active', 'compare' => '!=' ) ) ),
+			'invalid_test_records'    => self::count_by_meta_query( 'lel_test_record', array( 'relation' => 'OR', array( 'key' => 'approval_status', 'compare' => 'NOT EXISTS' ), array( 'key' => 'approval_status', 'value' => 'approved', 'compare' => '!=' ) ) ),
+		);
+		$unavailable = array_keys( array_filter( $counts, static fn( $value ): bool => null === $value ) );
 		return array(
-			'last_freshness_run'        => is_array( $last ) ? ( $last['run_at'] ?? __( 'Never', 'longevity-core' ) ) : __( 'Never', 'longevity-core' ),
-			'overdue_content_reviews'   => self::count_by_meta_query( array( 'post', 'review' ), array( 'key' => '_lel_freshness_status', 'value' => 'update_due' ) ),
-			'overdue_fact_checks'       => self::count_by_meta_query( array( 'post', 'review' ), array( array( 'key' => 'next_fact_check_date', 'value' => $today, 'compare' => '<', 'type' => 'DATE' ) ) ),
-			'overdue_medical_reviews'   => self::count_by_meta_query( array( 'post', 'review' ), array( array( 'key' => 'next_medical_review_date', 'value' => $today, 'compare' => '<', 'type' => 'DATE' ) ) ),
-			'pending_corrections'       => self::count_by_meta_query( 'lel_correction', array( 'relation' => 'OR', array( 'key' => 'correction_status', 'compare' => 'NOT EXISTS' ), array( 'key' => 'correction_status', 'value' => 'complete', 'compare' => '!=' ) ) ),
-			'unapproved_affiliates'     => self::count_by_meta_query( 'lel_affiliate', array( 'relation' => 'OR', array( 'key' => 'relationship_status', 'compare' => 'NOT EXISTS' ), array( 'key' => 'relationship_status', 'value' => 'active', 'compare' => '!=' ) ) ),
-			'invalid_test_records'      => self::count_by_meta_query( 'lel_test_record', array( 'relation' => 'OR', array( 'key' => 'approval_status', 'compare' => 'NOT EXISTS' ), array( 'key' => 'approval_status', 'value' => 'approved', 'compare' => '!=' ) ) ),
+			'last_freshness_run'           => is_array( $last ) ? ( $last['run_at'] ?? __( 'Never', 'longevity-core' ) ) : __( 'Never', 'longevity-core' ),
+			'overdue_content_reviews'      => $counts['overdue_content_reviews'],
+			'overdue_fact_checks'          => $counts['overdue_fact_checks'],
+			'overdue_medical_reviews'      => $counts['overdue_medical_reviews'],
+			'pending_corrections'          => $counts['pending_corrections'],
+			'unapproved_affiliates'        => $counts['unapproved_affiliates'],
+			'invalid_test_records'         => $counts['invalid_test_records'],
+			'operational_counts_available' => array() === $unavailable,
+			'unavailable_counts'           => $unavailable,
 			'repeated_emergency_overrides' => self::count_repeated_overrides(),
 			'failed_freshness_jobs'     => get_option( 'lel_freshness_last_error', false ) ? 1 : 0,
 			'last_batch_processed'      => is_array( $last ) ? (int) ( $last['processed'] ?? 0 ) : 0,
@@ -192,42 +234,146 @@ final class Freshness {
 		);
 	}
 
-	/** Count records matching a meta query via direct SQL (avoids SQL_CALC_FOUND_ROWS). */
-	private static function count_by_meta_query( $post_type, array $meta_query, $post_status = 'any' ): int {
+	/**
+	 * Build a COUNT(DISTINCT p.ID) query and its ordered parameters for a bounded meta query.
+	 *
+	 * Pure and side-effect free so structural correctness (join shape, operator
+	 * allowlisting, placeholder/parameter parity and ordering) can be unit tested
+	 * without a database. Returns a null `sql` with a non-empty `error` when the
+	 * meta query cannot be represented safely.
+	 *
+	 * @param string|array<int, string> $post_type   One or more post types.
+	 * @param array<mixed>              $meta_query  A flat clause or a relation-grouped set of clauses.
+	 * @param string|array<int, string> $post_status 'any' (no status filter) or explicit statuses.
+	 * @return array{sql: ?string, params: array<int, string>, error: string}
+	 */
+	public static function build_meta_count_query( $post_type, array $meta_query, $post_status = 'any' ): array {
 		global $wpdb;
-		$types = is_array( $post_type ) ? $post_type : array( $post_type );
-		$types_in = implode( ',', array_fill( 0, count( $types ), '%s' ) );
-		$statuses = is_array( $post_status ) ? $post_status : array( $post_status );
-		if ( in_array( 'any', $statuses, true ) ) {
-			$where = 'p.post_type IN (' . $types_in . ')';
-		} else {
-			$status_in = implode( ',', array_fill( 0, count( $statuses ), '%s' ) );
-			$where = 'p.post_type IN (' . $types_in . ') AND p.post_status IN (' . $status_in . ')';
+		$posts    = isset( $wpdb ) && isset( $wpdb->posts ) ? (string) $wpdb->posts : 'wp_posts';
+		$postmeta = isset( $wpdb ) && isset( $wpdb->postmeta ) ? (string) $wpdb->postmeta : 'wp_postmeta';
+
+		$types = array_values( array_filter( array_map( 'strval', is_array( $post_type ) ? $post_type : array( $post_type ) ), static fn( string $type ): bool => '' !== $type ) );
+		if ( array() === $types ) {
+			return array( 'sql' => null, 'params' => array(), 'error' => 'empty_post_type' );
 		}
-		$join = '';
-		$params = array_merge( $types, $statuses );
-		$relation = isset( $meta_query['relation'] ) && 'OR' === strtoupper( (string) $meta_query['relation'] ) ? ' OR ' : ' AND ';
-		$conditions = array();
-		foreach ( $meta_query as $clause ) {
-			if ( ! is_array( $clause ) || ! isset( $clause['key'] ) ) {
+
+		$statuses   = is_array( $post_status ) ? array_values( array_map( 'strval', $post_status ) ) : array( (string) $post_status );
+		$any_status = array() === $statuses || in_array( 'any', $statuses, true );
+
+		// A flat clause (top-level 'key') is a single AND condition; otherwise honour the relation.
+		if ( isset( $meta_query['key'] ) ) {
+			$relation = ' AND ';
+			$clauses  = array( $meta_query );
+		} else {
+			$relation = isset( $meta_query['relation'] ) && 'OR' === strtoupper( (string) $meta_query['relation'] ) ? ' OR ' : ' AND ';
+			$clauses  = array();
+			foreach ( $meta_query as $key => $clause ) {
+				if ( 'relation' !== $key && is_array( $clause ) && isset( $clause['key'] ) ) {
+					$clauses[] = $clause;
+				}
+			}
+		}
+
+		// JOIN clauses precede the WHERE clause, so their bound meta_key params must come first.
+		$join_sql    = '';
+		$join_params = array();
+		$conditions  = array();
+		$cond_params = array();
+		$index       = 0;
+		foreach ( $clauses as $clause ) {
+			$alias    = 'pm' . $index;
+			++$index;
+			$meta_key = (string) $clause['key'];
+			$compare  = isset( $clause['compare'] ) ? strtoupper( trim( (string) $clause['compare'] ) ) : ( isset( $clause['value'] ) ? '=' : 'EXISTS' );
+			if ( ! in_array( $compare, self::META_COMPARE_OPERATORS, true ) ) {
+				return array( 'sql' => null, 'params' => array(), 'error' => 'unsupported_operator:' . $compare );
+			}
+
+			if ( 'NOT EXISTS' === $compare ) {
+				$join_sql     .= " LEFT JOIN {$postmeta} {$alias} ON p.ID = {$alias}.post_id AND {$alias}.meta_key = %s";
+				$join_params[] = $meta_key;
+				$conditions[]  = "{$alias}.post_id IS NULL";
 				continue;
 			}
-			$alias = 'pm_' . md5( (string) $clause['key'] . (string) ($clause['value'] ?? '') );
-			$join .= ' INNER JOIN ' . $wpdb->postmeta . ' ' . $alias . ' ON p.ID = ' . $alias . '.post_id';
-			$cond = $alias . '.meta_key = %s';
-			$params[] = $clause['key'];
-			if ( isset( $clause['value'] ) ) {
-				$compare = isset( $clause['compare'] ) ? (string) $clause['compare'] : '=';
-				$cond .= ' AND ' . $alias . '.meta_value ' . $compare . ' %s';
-				$params[] = (string) $clause['value'];
+
+			// Every remaining operator requires the row to exist: INNER JOIN on the key.
+			$join_sql     .= " INNER JOIN {$postmeta} {$alias} ON p.ID = {$alias}.post_id AND {$alias}.meta_key = %s";
+			$join_params[] = $meta_key;
+
+			if ( 'EXISTS' === $compare ) {
+				continue; // Presence is already guaranteed by the INNER JOIN.
 			}
-			$conditions[] = $cond;
+
+			$type   = isset( $clause['type'] ) ? strtoupper( trim( (string) $clause['type'] ) ) : '';
+			$cast   = self::META_CAST_TYPES[ $type ] ?? '';
+			$column = '' === $cast ? "{$alias}.meta_value" : "CAST({$alias}.meta_value AS {$cast})";
+
+			if ( 'IN' === $compare || 'NOT IN' === $compare ) {
+				$values = array_values( array_map( 'strval', (array) ( $clause['value'] ?? array() ) ) );
+				if ( array() === $values ) {
+					return array( 'sql' => null, 'params' => array(), 'error' => 'empty_in_set' );
+				}
+				$conditions[] = "{$column} {$compare} (" . implode( ', ', array_fill( 0, count( $values ), '%s' ) ) . ')';
+				foreach ( $values as $value ) {
+					$cond_params[] = $value;
+				}
+				continue;
+			}
+
+			if ( ! isset( $clause['value'] ) ) {
+				return array( 'sql' => null, 'params' => array(), 'error' => 'missing_value' );
+			}
+			$conditions[]  = "{$column} {$compare} %s";
+			$cond_params[] = (string) $clause['value'];
 		}
-		if ( ! empty( $conditions ) ) {
-			$where .= ' AND (' . implode( $relation, $conditions ) . ')';
+
+		$where_parts  = array( 'p.post_type IN (' . implode( ', ', array_fill( 0, count( $types ), '%s' ) ) . ')' );
+		$where_params = $types;
+		if ( ! $any_status ) {
+			$where_parts[] = 'p.post_status IN (' . implode( ', ', array_fill( 0, count( $statuses ), '%s' ) ) . ')';
+			$where_params  = array_merge( $where_params, $statuses );
 		}
-		$sql = $wpdb->prepare( 'SELECT COUNT(DISTINCT p.ID) FROM ' . $wpdb->posts . ' p ' . $join . ' WHERE ' . $where, $params );
-		return (int) $wpdb->get_var( $sql );
+		if ( array() !== $conditions ) {
+			$where_parts[] = '(' . implode( $relation, $conditions ) . ')';
+		}
+
+		$sql = "SELECT COUNT(DISTINCT p.ID) FROM {$posts} p{$join_sql} WHERE " . implode( ' AND ', $where_parts );
+
+		// Placeholder order in SQL: JOIN meta_key(s), post_type(s), post_status(es), then condition values.
+		return array(
+			'sql'    => $sql,
+			'params' => array_merge( $join_params, $where_params, $cond_params ),
+			'error'  => '',
+		);
+	}
+
+	/**
+	 * Execute a bounded meta count, failing closed to null on invalid input or a database error.
+	 * An unreadable operational count must never be reported as zero.
+	 *
+	 * @param string|array<int, string> $post_type   One or more post types.
+	 * @param array<mixed>              $meta_query  A flat clause or a relation-grouped set of clauses.
+	 * @param string|array<int, string> $post_status 'any' or explicit statuses.
+	 */
+	private static function count_by_meta_query( $post_type, array $meta_query, $post_status = 'any' ): ?int {
+		global $wpdb;
+		if ( ! is_object( $wpdb ) || ! method_exists( $wpdb, 'get_var' ) || ! method_exists( $wpdb, 'prepare' ) ) {
+			return null;
+		}
+		$built = self::build_meta_count_query( $post_type, $meta_query, $post_status );
+		if ( null === $built['sql'] ) {
+			Logger::error( 'freshness_count_query_invalid', array( 'error' => (string) $built['error'] ) );
+			return null;
+		}
+		$wpdb->last_error = '';
+		$sql      = array() === $built['params'] ? $built['sql'] : $wpdb->prepare( $built['sql'], $built['params'] );
+		$result   = $wpdb->get_var( $sql );
+		$db_error = trim( (string) ( $wpdb->last_error ?? '' ) );
+		if ( null === $result || '' !== $db_error ) {
+			Logger::error( 'freshness_count_query_failed', array( 'reason' => '' !== $db_error ? 'db_error' : 'null_result' ) );
+			return null;
+		}
+		return (int) $result;
 	}
 
 	/** Count posts with two or more append-only emergency override events. */
