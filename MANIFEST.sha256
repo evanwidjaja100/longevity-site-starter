@@ -1,7 +1,7 @@
 32007e1e9b3057cf7ef967516a242e31b7f7bcb0c1e0c2f4458fdb0a0f756aca *./.dockerignore
 ac613995293398045d2e73bd8ad026f6d4bb4e6fccea0cfbf22d0f317cb3c032 *./.env.ci.template
 f47c059e7c00c6c18557084cfd9573197e795dc7b6d3969b945893cb686c66d2 *./.env.example
-cc9901ab2107b94beac4046a11a533e2628f059001cfec47688cbdf5b554d36c *./.env.production.example
+ab784e205ddc66f723a611a866f1c48d930d3e0af446e65a33726c680321d86c *./.env.production.example
 8579dfc77acfbbc24ae474ae8a7397cf868c6fc0cfedd5d579714d004c7729e2 *./.gitattributes
 b37a107785de2cf26c10906292db47c266d668fdd3b131bd670645c424547852 *./.github/dependabot.yml
 3a77cbcf6accc306d7d1ffea88190197654a8a38ea35d527923ea87fee6baf8e *./.github/workflows/ci.yml
@@ -10,7 +10,7 @@ f62e0dfd685dcd1bc596336b1364fc4a1e1cf6ba892b4a449ed98637da4fb6b5 *./.github/work
 92c2384c236c6a0c7c50e79a2075f19c260a6bec1869ce6bec7632892f0ae06b *./.gitignore
 cfa2d75ad28f3e20e39f11a15277753a396d2fea81caf1094bf9eb31a2bd1c7c *./.npmrc
 396a27c4750af851492403954b6f45b9c2e47351cb39271db8414d814cd26655 *./.stylelintrc.json
-16c88c9d65c3104cde16db2300c6e6f2ee151c77025bfc7b449cf957a8239017 *./AGENTS.md
+2d2390a7e56522803c0904d33fd8de203d414808d41fd7d11ce107da259ee9c3 *./AGENTS.md
 0ea49aabac398228480e719c9615cc3d699a3b20a61be5b317bcbc578b6c1fa6 *./CONTRIBUTING.md
 9447d2299312b00b25a3214d7fcaab49e6f16000ff1b8135b7a46f772da5f16d *./Makefile
 0bd836107a3f6a9dded936a4b050bbf63cf4c558574864cb35fc323f88593555 *./README.md
@@ -163,10 +163,11 @@ f29eb7fdd2e85d8235103ba12b77ac1aead884543c132039e894c8cdc23dd6a6 *./docs/impleme
 7d75b5f4549a872eefe532a1d95237fae92a394418bd4738a499860f05e2aaf3 *./docs/labdoor-inspired-implementation.md
 d2a7d368585a68e85e6b34cb2b7baaf16d32413cbec30e302a1e6fa58960bfb8 *./docs/operations/backup-and-restore.md
 8d7695a3ddd82b13599f4f205df25e73ab4698d19dd3c67ae305b6c955bfcbef *./docs/operations/csp-enforcement-plan.md
+11cbb1b9b1b0a8c439f211d8c4e44630b12447fd317921c881443b65af0e4bb8 *./docs/operations/database-privileges.md
 e3c751f038941ae186c91f73a4972619b0f2c71eed6e7a2e2ae3fcd1cb3ca97e *./docs/operations/dependency-governance.md
 90923c94e202e65892a9b582134fc8d72a63e5ac4a21092829b6a651116019fb *./docs/operations/incident-response.md
 5c2f2399236bb5d449b8807cd51ab1cd5302441ae3a80b53a6f8b095590f7401 *./docs/operations/local-development.md
-88491f7bd03da4f0dfca02050fe7eaf607d72813de2ff70870e21892c251103a *./docs/operations/managed-wordpress-deployment.md
+77e7a200ac5145398643d8edee32cfb7cbfd98fc4589892c363d4476ff9cce2a *./docs/operations/managed-wordpress-deployment.md
 57d9b6181d27d6604084a5eaec019e283de74d71defaf4422d842ad55d0bdc6e *./docs/operations/monitoring.md
 ebc90275c517b51bc3de63182ab4fb722ac4391a81caf4569e9cf9767d65eba2 *./docs/operations/performance-baselines.md
 51a7c556d6b746898099ea4c773694976c4566f143c85521a2b27ff438900e6b *./docs/operations/product-kpis.md
@@ -257,7 +258,7 @@ f195bd5559ec2989527b8e686528b5292f320b40ed56aa7a51b97fa91d0acbeb *./operations/q
 f866c66b62b390fdece64025de34590e099cf92195eeac45f3ef4c0a06ac8bbc *./operations/release/release-checklist.md
 c4de6748e1b0344b12c7ced99fe8eab412c1f7b68fa2ead5948ce684685981d9 *./operations/runbooks/affiliate-incident.md
 ad341a34c736a6deee2183d14fa038cde1931e13f0e15aa4529e8bac5d499b6d *./operations/runbooks/audit-chain-integrity-failure.md
-da0cd8581b54834ef6ed8274c55c0e2522e63bc687d1b4543834c945457af8d7 *./operations/runbooks/database-unavailable.md
+631a39d991eb8791cd0f1fc469c7d7771a5399b0e8216469465755da5f5b2566 *./operations/runbooks/database-unavailable.md
 5f4201033b1d84f40458001161363b79ba3e0dea9c51f15d76b3bdf7aa27fe8a *./operations/runbooks/freshness-cron-stuck.md
 65825685f547b81f6e98a54e8c29882117edc034aba0625de993964885d21b8c *./operations/runbooks/lock-exhaustion.md
 3efb8961f33f796adf881a7490c3abd7725c10dbcc565a88fde29b4eb7babbbf *./operations/runbooks/medical-safety-correction.md
@@ -300,7 +301,7 @@ da49c179fe7be1ed9d5aab9d90d027d15dd85559126e2078cc1f97957f2047a6 *./scripts/smok
 af6c99218b1405dfcadf96fa48a31c0d5a6d77ef3588eab6e8c392f470b3145e *./scripts/update-contact-page.php
 4bd998c20285088695b7b71d2ed34072d6fc94b28589b496ea7303fb54f6b112 *./scripts/update-trust-page-dates.php
 293413cf9f0343058619e8d11e7159f5a0b8bb113de18199602d9e7f7e68fd73 *./scripts/validate-content.py
-d6cea5a9e789e921e267a9207067bc61d17ac2c88bec3ef6398095c0186f9e10 *./scripts/validate-env.sh
+1075bbe9a435d07a98eee6db5386d559fe2a0b3a8c7d2165e0fa14485ca5a3f0 *./scripts/validate-env.sh
 9027cf436cff1b855ad3c89e6e707ae662580bc751af7682cce3ae1bf1477798 *./scripts/validate-freshness.py
 ab18a9c4a96f3be3243beb2fffe99c7d299b71ca4d7189b06568432b71028333 *./scripts/validate-internal-links.py
 583b1e74c7b4e58c930cf9564a49f708376da3922838e9a5b1479aea1f9c0360 *./scripts/validate.sh
@@ -400,7 +401,7 @@ ebcd52a8cd79d7e9a552b1bae1b9b349ded163ebf5359ca2e93124c9d21f3fee *./tests/fixtur
 8ac0c221e17c4d40c61085c96b28265753996e9d882853f1848af6cf7b4ecb6c *./tests/integration/audit-chain.php
 232a15aa1596f306428bbb079962e9aa1ddf1ed65630154db35918f599957d3f *./tests/integration/audit-chain.sh
 75952644eb80d7fd54f08fb26714d3d015433d2e573054fdebe518c495d36895 *./tests/integration/contact-idempotency.sh
-1c9abd61c84c8fb74668de20d11e89d56bb55bcc4c9731b4f018ae35f4faddac *./tests/integration/environment-validation.sh
+fa6300d94efa35e2819027903bb47264fb432b707dfe5fa6db12586adfe17299 *./tests/integration/environment-validation.sh
 7d80fdd4cf191fcc62d3be921ebd2d5fbc5754404be9931b7b727d5513fcb85d *./tests/integration/freshness-lock.sh
 9c0b43713a77c9b727fdfab7aa6a8f7fcfc1a62a1e9980715b810b38809252a6 *./tests/integration/health-endpoint.sh
 7400faa61cb40790ad447b4459bb8d9ee19fb684c42a7bdf83f117e8accc7c0a *./tests/integration/manifest.sh

@@ -37,7 +37,7 @@ done < "$ENV_FILE"
 
 errors=0
 warnings=0
-required="WORDPRESS_DB_NAME WORDPRESS_DB_USER WORDPRESS_DB_PASSWORD WORDPRESS_DB_ROOT_PASSWORD WP_SITE_URL WP_SITE_TITLE WP_ADMIN_USER WP_ADMIN_PASSWORD WP_ADMIN_EMAIL WP_ENVIRONMENT_TYPE WP_TIMEZONE WP_LOCALE WP_DEBUG WP_DEBUG_LOG WP_DEBUG_DISPLAY FORCE_SSL_ADMIN DISALLOW_FILE_MODS"
+required="WORDPRESS_DB_NAME WORDPRESS_DB_USER WORDPRESS_DB_PASSWORD WP_SITE_URL WP_SITE_TITLE WP_ADMIN_USER WP_ADMIN_PASSWORD WP_ADMIN_EMAIL WP_ENVIRONMENT_TYPE WP_TIMEZONE WP_LOCALE WP_DEBUG WP_DEBUG_LOG WP_DEBUG_DISPLAY FORCE_SSL_ADMIN DISALLOW_FILE_MODS"
 
 for key in $required; do
   value="${!key-}"
@@ -46,6 +46,24 @@ for key in $required; do
     errors=$((errors + 1))
   fi
 done
+
+# DB root credential contract: local/CI Docker needs it to initialize the
+# disposable database container; managed staging/production must never carry
+# it (least privilege — the application uses only its scoped DB user).
+case "${WP_ENVIRONMENT_TYPE-}" in
+  local|development)
+    if [ -z "${WORDPRESS_DB_ROOT_PASSWORD-}" ]; then
+      echo "ERROR: WORDPRESS_DB_ROOT_PASSWORD is required in local/development (Docker database initialization)." >&2
+      errors=$((errors + 1))
+    fi
+    ;;
+  staging|production)
+    if [ -n "${WORDPRESS_DB_ROOT_PASSWORD-}" ]; then
+      echo "ERROR: WORDPRESS_DB_ROOT_PASSWORD must not be set in ${WP_ENVIRONMENT_TYPE}. Managed hosts use only the least-privilege application credential; see docs/operations/database-privileges.md." >&2
+      errors=$((errors + 1))
+    fi
+    ;;
+esac
 
 is_placeholder() {
   printf '%s' "$1" | grep -Eiq '(^|[-_])(change|replace|example|password|secret|changeme|placeholder)([-_]|$)|example\.(com|test)|your[-_]'

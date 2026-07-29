@@ -15,7 +15,9 @@
 
 ## Diagnosis
 
-1. Check the database container health:
+1. Check the database container health (local/CI Docker stack only — managed
+   production carries no DB root credential; use the host control plane and
+   provider diagnostics instead):
    ```bash
    docker compose ps
    docker compose exec db mysqladmin ping -h 127.0.0.1 -u root -p"$WORDPRESS_DB_ROOT_PASSWORD"

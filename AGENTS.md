@@ -206,7 +206,7 @@ CI enforces a minimum coverage threshold (default 30%). Coverage is measured via
 
 `.env.example` documents all local variables. CI uses `.env.ci.template`. Production uses `config/environments/production.example.php`.
 
-Key variables: `WORDPRESS_PORT`, `WORDPRESS_DB_NAME`, `WORDPRESS_DB_USER`, `WORDPRESS_DB_PASSWORD`, `WORDPRESS_DB_ROOT_PASSWORD`, `WP_SITE_URL`, `WP_SITE_TITLE`, `WP_ADMIN_USER`, `WP_ADMIN_PASSWORD`, `WP_ADMIN_EMAIL`, `WP_ENVIRONMENT_TYPE`, `WP_DEBUG`, `FORCE_SSL_ADMIN`, `DISALLOW_FILE_MODS`, `INSTALL_OPTIONAL_PLUGINS`.
+Key variables: `WORDPRESS_PORT`, `WORDPRESS_DB_NAME`, `WORDPRESS_DB_USER`, `WORDPRESS_DB_PASSWORD`, `WORDPRESS_DB_ROOT_PASSWORD` (local/CI Docker only — forbidden in managed staging/production; see `docs/operations/database-privileges.md`), `WP_SITE_URL`, `WP_SITE_TITLE`, `WP_ADMIN_USER`, `WP_ADMIN_PASSWORD`, `WP_ADMIN_EMAIL`, `WP_ENVIRONMENT_TYPE`, `WP_DEBUG`, `FORCE_SSL_ADMIN`, `DISALLOW_FILE_MODS`, `INSTALL_OPTIONAL_PLUGINS`.
 
 ## Docker
 
