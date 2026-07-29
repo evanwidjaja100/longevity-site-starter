@@ -15,7 +15,7 @@ defined( 'ABSPATH' ) || exit;
 
 /** Advances additive, restart-safe governance migrations via explicit CLI invocation. */
 final class Migrations {
-	public const CURRENT_VERSION = 18;
+	public const CURRENT_VERSION = 19;
 
 	/** Lock time-to-live in seconds. */
 	private const LOCK_TTL = 300;
@@ -336,6 +336,10 @@ final class Migrations {
 			// records and never rewrites an existing canonical value.
 			Public_Contact::migrate_retention_deadlines();
 		}
+		if ( 19 === $version ) {
+			self::load_db_delta();
+			Contact_Idempotency::install();
+		}
 	}
 
 	/** Validate schema postconditions after each migration version. */
@@ -394,6 +398,11 @@ final class Migrations {
 				'columns' => array( 'id', 'evidence_type', 'release_sha', 'artifact_checksum', 'result', 'environment', 'produced_at', 'expires_at', 'payload_json', 'record_hash', 'recorded_by', 'recorded_at' ),
 				'indexes' => array( 'PRIMARY' => true, 'type_id' => false, 'release_sha' => false ),
 			),
+			'contact_idempotency' => array(
+				'table'   => Contact_Idempotency::table_name(),
+				'columns' => array( 'id', 'request_key_hash', 'state', 'message_post_id', 'lease_expires_at', 'created_at', 'updated_at', 'completed_at', 'schema_version' ),
+				'indexes' => array( 'PRIMARY' => true, 'request_key_hash' => true, 'state_lease' => false ),
+			),
 		);
 		if ( $version >= 17 ) {
 			$contracts['approval']['columns']                   = array_merge( $contracts['approval']['columns'], array( 'audit_event_id', 'activated_at', 'activation_error' ) );
@@ -413,6 +422,7 @@ final class Migrations {
 			16 => array_keys( $contracts ),
 			17 => array_keys( $contracts ),
 			18 => array_keys( $contracts ),
+			19 => array_keys( $contracts ),
 		)[ $version ] ?? array();
 
 		$result = array();

@@ -8,6 +8,7 @@ final class ContactPersistenceTest extends TestCase {
 	protected function setUp(): void {
 		$GLOBALS['wpdb']->lel_test_set_rows( 'wp_lel_rate_limits', array() );
 		$GLOBALS['wpdb']->lel_test_set_rows( 'wp_lel_notification_outbox', array() );
+		$GLOBALS['wpdb']->lel_test_set_rows( 'wp_lel_contact_idempotency', array() );
 		$GLOBALS['lel_test_posts']         = array();
 		$GLOBALS['lel_test_meta']          = array();
 		$GLOBALS['lel_test_mails']         = array();
@@ -17,14 +18,15 @@ final class ContactPersistenceTest extends TestCase {
 		$GLOBALS['lel_test_options']['admin_email'] = 'admin@example.com';
 		$GLOBALS['wpdb']->last_error = '';
 		unset( $GLOBALS['lel_test_options']['lel_contact_reconciliation_1'], $GLOBALS['lel_test_options']['lel_contact_reconciliation_999'] );
-		unset( $GLOBALS['lel_test_wp_die'], $GLOBALS['lel_test_drop_meta_keys'], $GLOBALS['lel_test_fail_wp_mail'], $GLOBALS['lel_test_fail_wp_insert_post'], $GLOBALS['lel_test_fail_insert'] );
+		unset( $GLOBALS['lel_test_wp_die'], $GLOBALS['lel_test_drop_meta_keys'], $GLOBALS['lel_test_fail_wp_mail'], $GLOBALS['lel_test_fail_wp_insert_post'], $GLOBALS['lel_test_fail_insert'], $GLOBALS['lel_test_fail_idem_insert'], $GLOBALS['lel_test_fail_idem_update'] );
 		$_SERVER['REMOTE_ADDR'] = '198.51.100.20';
 	}
 
 	protected function tearDown(): void {
 		$GLOBALS['wpdb']->lel_test_set_rows( 'wp_lel_rate_limits', array() );
 		$GLOBALS['wpdb']->lel_test_set_rows( 'wp_lel_notification_outbox', array() );
-		unset( $GLOBALS['lel_test_wp_die'], $GLOBALS['lel_test_drop_meta_keys'], $GLOBALS['lel_test_fail_wp_mail'], $GLOBALS['lel_test_fail_wp_insert_post'], $GLOBALS['lel_test_has_action'], $GLOBALS['lel_test_fail_insert'] );
+		$GLOBALS['wpdb']->lel_test_set_rows( 'wp_lel_contact_idempotency', array() );
+		unset( $GLOBALS['lel_test_wp_die'], $GLOBALS['lel_test_drop_meta_keys'], $GLOBALS['lel_test_fail_wp_mail'], $GLOBALS['lel_test_fail_wp_insert_post'], $GLOBALS['lel_test_has_action'], $GLOBALS['lel_test_fail_insert'], $GLOBALS['lel_test_fail_idem_insert'], $GLOBALS['lel_test_fail_idem_update'] );
 		$_POST = array();
 	}
 

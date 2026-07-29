@@ -7,11 +7,12 @@ final class ContactPrivacyTest extends TestCase {
 	protected function setUp(): void {
 		$GLOBALS['wpdb']->lel_test_set_rows( 'wp_lel_rate_limits', array() );
 		$GLOBALS['wpdb']->lel_test_set_rows( 'wp_lel_notification_outbox', array() );
+		$GLOBALS['wpdb']->lel_test_set_rows( 'wp_lel_contact_idempotency', array() );
 		$GLOBALS['lel_test_posts']   = array();
 		$GLOBALS['lel_test_meta']    = array();
 		$GLOBALS['lel_test_mails']   = array();
 		$GLOBALS['lel_test_redirects'] = array();
-		unset( $GLOBALS['lel_test_wp_die'], $GLOBALS['lel_test_fail_rate_insert'] );
+		unset( $GLOBALS['lel_test_wp_die'], $GLOBALS['lel_test_fail_rate_insert'], $GLOBALS['lel_test_fail_idem_insert'], $GLOBALS['lel_test_fail_idem_update'] );
 		$_SERVER['REMOTE_ADDR'] = '198.51.100.10';
 		unset( $_SERVER['CONTENT_LENGTH'] );
 		$GLOBALS['lel_test_options']['admin_email'] = 'admin@example.com';
@@ -20,7 +21,8 @@ final class ContactPrivacyTest extends TestCase {
 	protected function tearDown(): void {
 		$GLOBALS['wpdb']->lel_test_set_rows( 'wp_lel_rate_limits', array() );
 		$GLOBALS['wpdb']->lel_test_set_rows( 'wp_lel_notification_outbox', array() );
-		unset( $GLOBALS['lel_test_wp_die'], $GLOBALS['lel_test_fail_rate_insert'] );
+		$GLOBALS['wpdb']->lel_test_set_rows( 'wp_lel_contact_idempotency', array() );
+		unset( $GLOBALS['lel_test_wp_die'], $GLOBALS['lel_test_fail_rate_insert'], $GLOBALS['lel_test_fail_idem_insert'], $GLOBALS['lel_test_fail_idem_update'] );
 		$_POST = array();
 		$_GET  = array();
 		unset( $_SERVER['CONTENT_LENGTH'] );

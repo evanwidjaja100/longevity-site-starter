@@ -161,6 +161,7 @@ if ( ! isset( $GLOBALS['wpdb'] ) ) {
 			'wp_lel_audit_sequence'      => array(),
 			'wp_lel_rate_limits'         => array(),
 			'wp_lel_notification_outbox' => array(),
+			'wp_lel_contact_idempotency' => array(),
 			'wp_lel_external_evidence'   => array(),
 		);
 
@@ -297,9 +298,26 @@ if ( ! isset( $GLOBALS['wpdb'] ) ) {
 				return null;
 			}
 			if ( false !== strpos( $query, 'FROM wp_lel_notification_outbox' ) ) {
+				if ( ! isset( $this->rows['wp_lel_notification_outbox'] ) ) {
+					$this->last_error = "Table 'wp_lel_notification_outbox' doesn't exist";
+					return null;
+				}
 				preg_match( "/lease_owner = '([^']+)'/", $query, $owner_match );
 				foreach ( $this->rows['wp_lel_notification_outbox'] ?? array() as $row ) {
 					if ( isset( $owner_match[1] ) && (string) ( $row['lease_owner'] ?? '' ) === $owner_match[1] && 'pending' === ( $row['status'] ?? '' ) ) {
+						return ARRAY_A === $output ? $row : (object) $row;
+					}
+				}
+				return null;
+			}
+			if ( false !== strpos( $query, 'FROM wp_lel_contact_idempotency' ) ) {
+				if ( ! isset( $this->rows['wp_lel_contact_idempotency'] ) ) {
+					$this->last_error = "Table 'wp_lel_contact_idempotency' doesn't exist";
+					return null;
+				}
+				preg_match( "/request_key_hash = '([^']+)'/", $query, $m );
+				foreach ( $this->rows['wp_lel_contact_idempotency'] as $row ) {
+					if ( isset( $m[1] ) && (string) ( $row['request_key_hash'] ?? '' ) === $m[1] ) {
 						return ARRAY_A === $output ? $row : (object) $row;
 					}
 				}
@@ -580,6 +598,37 @@ if ( ! isset( $GLOBALS['wpdb'] ) ) {
 				}
 				return null;
 			}
+			if ( false !== strpos( $query, 'FROM wp_lel_contact_idempotency' ) ) {
+				if ( ! isset( $this->rows['wp_lel_contact_idempotency'] ) ) {
+					$this->last_error = "Table 'wp_lel_contact_idempotency' doesn't exist";
+					return null;
+				}
+				if ( preg_match( "/state = '([a-z_]+)'/", $query, $sm ) ) {
+					$stuck  = false;
+					$cutoff = 0;
+					if ( preg_match( "/lease_expires_at < '([^']+)'/", $query, $cm ) ) {
+						$stuck  = true;
+						$cutoff = strtotime( $cm[1] . ' UTC' );
+					}
+					$count = 0;
+					foreach ( $this->rows['wp_lel_contact_idempotency'] as $row ) {
+						if ( (string) ( $row['state'] ?? '' ) !== $sm[1] ) {
+							continue;
+						}
+						if ( $stuck ) {
+							if ( empty( $row['lease_expires_at'] ) ) {
+								continue;
+							}
+							if ( strtotime( (string) $row['lease_expires_at'] . ' UTC' ) >= $cutoff ) {
+								continue;
+							}
+						}
+						++$count;
+					}
+					return (string) $count;
+				}
+				return '0';
+			}
 			if ( preg_match( '/SHOW TABLES LIKE [\'\"]?([^\'\" ]+)/', $query, $match ) ) {
 				return isset( $this->rows[ $match[1] ] ) ? $match[1] : null;
 			}
@@ -838,6 +887,109 @@ if ( ! isset( $GLOBALS['wpdb'] ) ) {
 				$this->rows['wp_lel_dependencies'][] = $new;
 				return 1;
 			}
+			if ( preg_match( '/^INSERT INTO wp_lel_contact_idempotency\b/i', $trimmed ) ) {
+				if ( ! isset( $this->rows['wp_lel_contact_idempotency'] ) ) {
+					$this->last_error = "Table 'wp_lel_contact_idempotency' doesn't exist";
+					return false;
+				}
+				if ( ! empty( $GLOBALS['lel_test_fail_idem_insert'] ) ) {
+					$this->last_error = 'Simulated idempotency insert failure (test hook).';
+					return false;
+				}
+				preg_match( "/VALUES \('([^']+)', '([^']+)', (NULL|\d+), (NULL|'[^']+'), '([^']+)', '([^']+)', (NULL|'[^']+'), (\d+)\)/", $trimmed, $v );
+				$key = (string) ( $v[1] ?? '' );
+				foreach ( $this->rows['wp_lel_contact_idempotency'] as $row ) {
+					if ( (string) ( $row['request_key_hash'] ?? '' ) === $key ) {
+						$this->last_error = 'Duplicate entry for request_key_hash';
+						return false;
+					}
+				}
+				$this->last_error = '';
+				$this->insert_id  = count( $this->rows['wp_lel_contact_idempotency'] ) + 1;
+				$this->rows['wp_lel_contact_idempotency'][] = array(
+					'id'               => $this->insert_id,
+					'request_key_hash' => $key,
+					'state'            => (string) ( $v[2] ?? 'processing' ),
+					'message_post_id'  => ( isset( $v[3] ) && 'NULL' !== $v[3] ) ? (int) $v[3] : null,
+					'lease_expires_at' => ( isset( $v[4] ) && 'NULL' !== $v[4] ) ? trim( $v[4], "'" ) : null,
+					'created_at'       => (string) ( $v[5] ?? gmdate( 'Y-m-d H:i:s' ) ),
+					'updated_at'       => (string) ( $v[6] ?? gmdate( 'Y-m-d H:i:s' ) ),
+					'completed_at'     => ( isset( $v[7] ) && 'NULL' !== $v[7] ) ? trim( $v[7], "'" ) : null,
+					'schema_version'   => (int) ( $v[8] ?? 1 ),
+				);
+				return 1;
+			}
+			if ( preg_match( '/^UPDATE wp_lel_contact_idempotency\b/i', $trimmed ) ) {
+				if ( ! isset( $this->rows['wp_lel_contact_idempotency'] ) ) {
+					$this->last_error = "Table 'wp_lel_contact_idempotency' doesn't exist";
+					return false;
+				}
+				if ( ! empty( $GLOBALS['lel_test_fail_idem_update'] ) ) {
+					$this->last_error = 'Simulated idempotency update failure (test hook).';
+					return false;
+				}
+				preg_match( "/request_key_hash = '([^']+)'/", $trimmed, $key_match );
+				$key        = (string) ( $key_match[1] ?? '' );
+				$now        = time();
+				$is_reclaim = false !== strpos( $trimmed, "SET state = 'processing'" );
+				$new_state  = '';
+				if ( preg_match( "/SET state = '([a-z_]+)'/", $trimmed, $sm ) ) {
+					$new_state = $sm[1];
+				}
+				$count = 0;
+				foreach ( $this->rows['wp_lel_contact_idempotency'] as &$row ) {
+					if ( (string) ( $row['request_key_hash'] ?? '' ) !== $key ) {
+						continue;
+					}
+					$state = (string) ( $row['state'] ?? '' );
+					if ( $is_reclaim ) {
+						$expired = 'processing' === $state && ! empty( $row['lease_expires_at'] ) && strtotime( (string) $row['lease_expires_at'] . ' UTC' ) < $now;
+						if ( ! ( $expired || 'failed' === $state ) ) {
+							continue;
+						}
+					} elseif ( 'processing' !== $state ) {
+						continue;
+					}
+					if ( '' !== $new_state ) {
+						$row['state'] = $new_state;
+					}
+					if ( false !== strpos( $trimmed, 'message_post_id = NULL' ) ) {
+						$row['message_post_id'] = null;
+					} elseif ( preg_match( '/message_post_id = (\d+)/', $trimmed, $pm ) ) {
+						$row['message_post_id'] = (int) $pm[1];
+					}
+					if ( false !== strpos( $trimmed, 'lease_expires_at = NULL' ) ) {
+						$row['lease_expires_at'] = null;
+					} elseif ( preg_match( "/lease_expires_at = '([^']+)'/", $trimmed, $lm ) ) {
+						$row['lease_expires_at'] = $lm[1];
+					}
+					if ( preg_match( "/completed_at = '([^']+)'/", $trimmed, $cm ) ) {
+						$row['completed_at'] = $cm[1];
+					}
+					$row['updated_at'] = gmdate( 'Y-m-d H:i:s' );
+					++$count;
+				}
+				unset( $row );
+				return $count;
+			}
+			if ( preg_match( '/^DELETE FROM wp_lel_contact_idempotency\b/i', $trimmed ) ) {
+				if ( ! isset( $this->rows['wp_lel_contact_idempotency'] ) ) {
+					$this->last_error = "Table 'wp_lel_contact_idempotency' doesn't exist";
+					return false;
+				}
+				preg_match( "/updated_at < '([^']+)'/", $trimmed, $cm );
+				$cutoff = isset( $cm[1] ) ? strtotime( $cm[1] . ' UTC' ) : 0;
+				$before = count( $this->rows['wp_lel_contact_idempotency'] );
+				$this->rows['wp_lel_contact_idempotency'] = array_values( array_filter(
+					$this->rows['wp_lel_contact_idempotency'],
+					static function ( array $row ) use ( $cutoff ): bool {
+						$terminal = in_array( (string) ( $row['state'] ?? '' ), array( 'completed', 'failed' ), true );
+						$old      = ! empty( $row['updated_at'] ) && strtotime( (string) $row['updated_at'] . ' UTC' ) < $cutoff;
+						return ! ( $terminal && $old );
+					}
+				) );
+				return $before - count( $this->rows['wp_lel_contact_idempotency'] );
+			}
 			if ( 0 === stripos( trim( $query ), 'UPDATE wp_lel_override_intents' ) ) {
 				preg_match( "/request_id = '([^']+)'/", $query, $rid_match );
 				preg_match( "/SET state = '([a-z]+)'/", $query, $set_match );
@@ -979,6 +1131,7 @@ require_once LONGEVITY_CORE_PATH . 'class-publication-lock.php';
 require_once LONGEVITY_CORE_PATH . 'class-dependency-index.php';
 require_once LONGEVITY_CORE_PATH . 'class-invalidation-queue.php';
 require_once LONGEVITY_CORE_PATH . 'class-notification-outbox.php';
+require_once LONGEVITY_CORE_PATH . 'class-contact-idempotency.php';
 require_once LONGEVITY_CORE_PATH . 'class-evidence-store.php';
 require_once LONGEVITY_CORE_PATH . 'class-system-readiness.php';
 require_once LONGEVITY_CORE_PATH . 'class-metrics.php';

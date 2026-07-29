@@ -32,6 +32,7 @@ $longevity_core_files = array(
 	'class-dependency-index.php',
 	'class-invalidation-queue.php',
 	'class-notification-outbox.php',
+	'class-contact-idempotency.php',
 	'class-evidence-store.php',
 	'class-approval-service.php',
 	'class-claims.php',

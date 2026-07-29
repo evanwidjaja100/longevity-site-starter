@@ -16,6 +16,7 @@ class Public_Contact {
 	private const MAX_REQUEST_BYTES      = 16384;
 	private const PRIVACY_NOTICE_VERSION = '2026-07';
 	private const RECONCILIATION_PREFIX  = 'lel_contact_reconciliation_';
+	private const IDEMPOTENCY_RETENTION_DAYS = 7;
 
 	/** Canonical, authoritative per-record retention deadline (UTC `Y-m-d H:i:s`). */
 	private const RETENTION_META_KEY = 'contact_retention_until_gmt';
@@ -196,6 +197,7 @@ class Public_Contact {
 		$deletion_failure = 0;
 
 		self::purge_expired_rate_rows();
+		Contact_Idempotency::purge_terminal( self::IDEMPOTENCY_RETENTION_DAYS * DAY_IN_SECONDS );
 
 		while ( true ) {
 			$messages = get_posts(
@@ -634,20 +636,28 @@ class Public_Contact {
 			self::fail_submission( 'security' );
 		}
 
-		$existing = get_posts(
-			array(
-				'post_type'      => 'longevity_message',
-				'post_status'    => 'private',
-				'posts_per_page' => 1,
-				'fields'         => 'ids',
-				'meta_key'       => 'contact_idempotency_key', // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key
-				'meta_value'     => $request_id, // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_value
-				'no_found_rows'  => true,
-			)
-		);
-		if ( ! empty( $existing ) ) {
-			wp_safe_redirect( self::feedback_url( 'submitted=1' ), 303 );
-			exit;
+		$idempotency_key = Contact_Idempotency::key_hash( $request_id );
+		$reservation     = Contact_Idempotency::reserve( $idempotency_key );
+		$resume_post_id  = 0;
+		switch ( $reservation['state'] ) {
+			case 'unavailable':
+				self::fail_unavailable();
+				return;
+			case 'completed':
+			case 'in_progress':
+				wp_safe_redirect( self::feedback_url( 'submitted=1' ), 303 );
+				exit;
+			case 'resume':
+				$candidate = (int) $reservation['post_id'];
+				$existing  = $candidate > 0 ? get_post( $candidate ) : null;
+				if ( $existing && 'longevity_message' === $existing->post_type ) {
+					$resume_post_id = $candidate;
+				}
+				break;
+			case 'reserved':
+			case 'reclaimed':
+			default:
+				break;
 		}
 
 		$retention_days = min( 365, max( 1, (int) get_option( 'lel_contact_retention_days', 90 ) ) );
@@ -672,31 +682,44 @@ class Public_Contact {
 			$meta_input['contact_type'] = 'correction_report';
 		}
 
-		$post_id = wp_insert_post(
-			array(
-				'post_type'    => 'longevity_message',
-				'post_status'  => 'private',
-				'post_title'   => sprintf( '[%s] %s', $subject, $name ),
-				'post_content' => $message,
-				'meta_input'   => $meta_input,
-			),
-			true
-		);
+		if ( $resume_post_id > 0 ) {
+			$post_id = $resume_post_id;
+		} else {
+			$post_id = wp_insert_post(
+				array(
+					'post_type'    => 'longevity_message',
+					'post_status'  => 'private',
+					'post_title'   => sprintf( '[%s] %s', $subject, $name ),
+					'post_content' => $message,
+					'meta_input'   => $meta_input,
+				),
+				true
+			);
 
-		if ( is_wp_error( $post_id ) || (int) $post_id < 1 ) {
-			self::fail_submission( 'save_failed' );
-		}
-		$post_id = (int) $post_id;
+			if ( is_wp_error( $post_id ) || (int) $post_id < 1 ) {
+				Contact_Idempotency::mark_failed( $idempotency_key );
+				self::fail_submission( 'save_failed' );
+			}
+			$post_id = (int) $post_id;
 
-		$post = get_post( $post_id );
-		if ( ! $post || 'longevity_message' !== $post->post_type || 'private' !== $post->post_status || $message !== $post->post_content ) {
-			self::delete_contact_checked( $post_id, false, 'aggregate_readback_failed' );
-			self::fail_unavailable();
-		}
-		foreach ( $meta_input as $meta_key => $meta_value ) {
-			if ( (string) get_post_meta( $post_id, $meta_key, true ) !== (string) $meta_value ) {
-				self::delete_contact_checked( $post_id, false, 'metadata_readback_failed' );
+			if ( ! Contact_Idempotency::link_post( $idempotency_key, $post_id ) ) {
+				self::delete_contact_checked( $post_id, false, 'idempotency_link_failed' );
+				Contact_Idempotency::mark_failed( $idempotency_key );
 				self::fail_unavailable();
+			}
+
+			$post = get_post( $post_id );
+			if ( ! $post || 'longevity_message' !== $post->post_type || 'private' !== $post->post_status || $message !== $post->post_content ) {
+				self::delete_contact_checked( $post_id, false, 'aggregate_readback_failed' );
+				Contact_Idempotency::mark_failed( $idempotency_key );
+				self::fail_unavailable();
+			}
+			foreach ( $meta_input as $meta_key => $meta_value ) {
+				if ( (string) get_post_meta( $post_id, $meta_key, true ) !== (string) $meta_value ) {
+					self::delete_contact_checked( $post_id, false, 'metadata_readback_failed' );
+					Contact_Idempotency::mark_failed( $idempotency_key );
+					self::fail_unavailable();
+				}
 			}
 		}
 
@@ -715,12 +738,18 @@ class Public_Contact {
 		);
 		if ( null === $outbox_id ) {
 			self::delete_contact_checked( $post_id, true, 'outbox_enqueue_compensation_failed' );
+			Contact_Idempotency::mark_failed( $idempotency_key );
 			try {
 				Audit_Log::record( 'contact_outbox_enqueue_failed', 'contact', $post_id, array( 'subject' => $subject ), 0, 'public_form' );
 			} catch ( \RuntimeException $error ) {
 				unset( $error );
 				Logger::error( 'contact_outbox_enqueue_failed', array( 'contact_id' => $post_id ) );
 			}
+			self::fail_unavailable();
+		}
+
+		if ( ! Contact_Idempotency::complete( $idempotency_key, $post_id ) ) {
+			self::mark_reconciliation_required( $post_id, 'idempotency_complete_failed' );
 			self::fail_unavailable();
 		}
 

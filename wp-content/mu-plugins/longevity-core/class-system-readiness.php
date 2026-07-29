@@ -79,6 +79,7 @@ final class System_Readiness {
 			'rankings_projection'  => self::safely( static fn(): array => self::rankings_projection_check() ),
 			'operational_counts'   => self::safely( static fn(): array => self::operational_counts_check() ),
 			'contact_rate_limiter' => self::safely( static fn(): array => self::check( Public_Contact::rate_table_exists(), 'ok', 'blocked', 'Contact rate-limit table (public submissions fail closed without it).' ) ),
+			'contact_idempotency'  => self::safely( static fn(): array => self::contact_idempotency_check() ),
 			'notification_outbox'  => self::safely( static fn(): array => self::notification_outbox_check() ),
 			'mail_transport'       => self::safely( static fn(): array => self::store_evidence( 'mail', 'lel_mail_transport_evidence', 'Mail transport evidence has not been supplied by an operator.' ) ),
 			'last_backup'          => self::safely( static fn(): array => self::store_evidence( 'backup', 'lel_last_backup_evidence', 'Backup evidence has not been supplied by an operator.' ) ),
@@ -402,6 +403,29 @@ final class System_Readiness {
 			'status'  => 'ok',
 			'message' => 'Notification outbox operational.',
 			'pending' => $stats['pending'],
+		);
+	}
+
+	/** Contact submission idempotency reservation health and stuck observability. */
+	private static function contact_idempotency_check(): array {
+		$stats = Contact_Idempotency::stats();
+		if ( empty( $stats['available'] ) ) {
+			return array(
+				'status'  => 'blocked',
+				'message' => 'Contact idempotency reservation table is unavailable: ' . (string) ( $stats['error'] ?? 'unknown' ) . '.',
+			);
+		}
+		if ( (int) $stats['stuck'] > 0 ) {
+			return array(
+				'status'  => 'degraded',
+				'message' => sprintf( '%d contact idempotency reservation(s) stuck in processing beyond the lease horizon.', (int) $stats['stuck'] ),
+				'stuck'   => (int) $stats['stuck'],
+			);
+		}
+		return array(
+			'status'     => 'ok',
+			'message'    => 'Contact idempotency reservations healthy.',
+			'processing' => (int) $stats['processing'],
 		);
 	}
 
