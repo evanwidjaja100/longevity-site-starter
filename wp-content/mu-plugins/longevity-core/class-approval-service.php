@@ -390,7 +390,9 @@ final class Approval_Service {
 				Meta_Authorization::exit_trusted_scope();
 			}
 			$completion_key = '' === $idempotency_key ? '' : $idempotency_key . ':completed';
-			return Audit_Log::record( 'approval_invalidated', 'post', $post_id, array( 'reason' => $reason, 'source' => '' === $idempotency_key ? 'direct' : 'queue', 'intent_event_id' => $intent_id ), $actor_id, 'system', true, $completion_key );
+			$event_id       = Audit_Log::record( 'approval_invalidated', 'post', $post_id, array( 'reason' => $reason, 'source' => '' === $idempotency_key ? 'direct' : 'queue', 'intent_event_id' => $intent_id ), $actor_id, 'system', true, $completion_key );
+			Rankings::invalidate_review( $post_id, 'approval_invalidated' );
+			return $event_id;
 		} catch ( \Throwable $error ) {
 			self::reconcile_invalidation_failure( $post_id, $reason, $actor_id, $intent_id, $idempotency_key, $error );
 			throw $error;

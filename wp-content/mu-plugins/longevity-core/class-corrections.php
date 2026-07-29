@@ -166,7 +166,7 @@ final class Corrections {
 				$parent_id = (int) get_post_meta( $post_id, 'corrected_post_id', true );
 				if ( $parent_id > 0 ) {
 					Approval_Service::invalidate_direct( $parent_id, 'correction_completed', $actor_id, false );
-					Rankings::invalidate();
+					Rankings::invalidate_review( $parent_id, 'correction_completed' );
 				}
 			}
 		} catch ( \Throwable $error ) {

@@ -12,6 +12,8 @@ defined( 'ABSPATH' ) || exit;
 /** Keeps every public ranking representation behind the same governance rules. */
 final class Rankings {
 	private const CACHE_GROUP      = 'longevity_rankings';
+	private const ELIGIBLE_CACHE   = 'lel_rankings_eligible';
+	private const RANKING_VERSION  = '2';
 	private const CONFIDENCE_ORDER = array(
 		'High confidence'     => 4,
 		'Moderate confidence' => 3,
@@ -24,30 +26,81 @@ final class Rankings {
 		add_action( 'save_post_review', array( self::class, 'invalidate' ) );
 		add_action( 'save_post_lel_test_record', array( self::class, 'invalidate' ) );
 		add_action( 'save_post_lel_protocol', array( self::class, 'invalidate' ) );
+		add_action( 'save_post_lel_affiliate', array( self::class, 'invalidate' ) );
 		add_action( 'set_object_terms', array( self::class, 'invalidate' ) );
 		add_action( 'transition_post_status', array( self::class, 'invalidate' ) );
 	}
 
-	/** Delete versioned ranking aggregates without exposing private record data. */
+	/** Back-compat hook entry point: invalidate the whole ranking cache. */
 	public static function invalidate(): void {
-		update_option( 'lel_rankings_cache_version', (string) microtime( true ), false );
+		self::invalidate_all( 'governed_transition' );
 	}
 
 	/**
-	 * Return the complete set of eligible review IDs from a persistent cache.
+	 * Central ranking invalidation API: bump the shared cache generation so every
+	 * signature-scoped aggregate is recomputed on next read. No private record
+	 * data is written or logged.
+	 */
+	public static function invalidate_all( string $reason = 'unspecified' ): void {
+		$next = (int) get_option( 'lel_rankings_generation', 1 ) + 1;
+		update_option( 'lel_rankings_generation', $next, false );
+		update_option( 'lel_rankings_cache_version', (string) $next, false );
+		Logger::log( Logger::INFO, 'rankings_cache_invalidated', array( 'scope' => 'all', 'reason' => self::sanitize_reason( $reason ), 'generation' => $next ) );
+	}
+
+	/**
+	 * Invalidate rankings for a single review after a durable per-review
+	 * transition. The eligible set is a shared aggregate, so the generation is
+	 * bumped and the live re-validation guard guarantees this review is
+	 * re-evaluated regardless.
+	 */
+	public static function invalidate_review( int $post_id, string $reason = 'unspecified' ): void {
+		if ( $post_id <= 0 ) {
+			return;
+		}
+		self::invalidate_all( 'review:' . self::sanitize_reason( $reason ) );
+	}
+
+	/** Reduce an invalidation reason to a bounded, privacy-safe token. */
+	private static function sanitize_reason( string $reason ): string {
+		$reason = preg_replace( '/[^a-z0-9_:.-]/i', '_', $reason ) ?? '';
+		return '' === $reason ? 'unspecified' : substr( $reason, 0, 64 );
+	}
+
+	/**
+	 * Immutable generation signature folded into every cache entry. A change to
+	 * the ranking version, invalidation generation, scoring model, or the UTC
+	 * eligibility date makes prior cache entries non-matching (requirement: do
+	 * not rely solely on TTL; date-based rules re-evaluate at UTC rollover).
+	 */
+	private static function generation_signature(): string {
+		$scoring = Runtime_Config::scoring_model_status();
+		return implode(
+			'|',
+			array(
+				self::RANKING_VERSION,
+				(string) get_option( 'lel_rankings_cache_version', '1' ),
+				$scoring['valid'] ? (string) ( $scoring['model']['version'] ?? '' ) : 'invalid',
+				Date_Validator::today(),
+			)
+		);
+	}
+
+	/**
+	 * Return the complete set of eligible review IDs.
 	 *
-	 * Evaluates ALL published reviews (not just the newest 100) and stores
-	 * the eligible ID set in a versioned transient. Invalidation is triggered
-	 * by governed transitions via the hooks registered in init().
+	 * A signature-scoped persistent cache narrows the candidate set, but every
+	 * cached id is re-validated live before it is returned for public rendering.
+	 * Stale ids are dropped, counted, and force a generation bump. A cached
+	 * eligible id can therefore never bypass a current governance failure.
 	 *
 	 * @return list<int> Eligible review post IDs.
 	 */
 	public static function eligible_ids(): array {
-		$version   = (string) get_option( 'lel_rankings_cache_version', '1' );
-		$cache_key = 'eligible_ids_' . md5( $version );
-		$cached    = get_transient( 'lel_rankings_' . $cache_key );
-		if ( is_array( $cached ) ) {
-			return $cached;
+		$signature = self::generation_signature();
+		$cached    = get_transient( self::ELIGIBLE_CACHE );
+		if ( is_array( $cached ) && isset( $cached['signature'], $cached['ids'] ) && is_array( $cached['ids'] ) && hash_equals( $signature, (string) $cached['signature'] ) ) {
+			return self::live_revalidate( array_values( array_map( 'intval', $cached['ids'] ) ) );
 		}
 		$all_reviews = get_posts(
 			array(
@@ -63,8 +116,35 @@ final class Rankings {
 			)
 		);
 		$eligible = array_values( array_filter( array_map( 'intval', $all_reviews ), static fn( int $id ) => self::is_eligible( $id ) ) );
-		set_transient( 'lel_rankings_' . $cache_key, $eligible, 6 * HOUR_IN_SECONDS );
+		set_transient( self::ELIGIBLE_CACHE, array( 'signature' => $signature, 'ids' => $eligible ), 6 * HOUR_IN_SECONDS );
 		return $eligible;
+	}
+
+	/**
+	 * Re-evaluate every cached id against current governance state. Ids that are
+	 * no longer eligible (or cannot be confirmed) are dropped fail-closed and the
+	 * generation is bumped so the cached aggregate rebuilds without them.
+	 *
+	 * @param list<int> $ids Cached candidate ids.
+	 * @return list<int> Live-eligible ids.
+	 */
+	private static function live_revalidate( array $ids ): array {
+		$live     = array();
+		$rejected = 0;
+		foreach ( $ids as $id ) {
+			if ( self::is_eligible( $id ) ) {
+				$live[] = $id;
+			} else {
+				++$rejected;
+			}
+		}
+		if ( $rejected > 0 ) {
+			$total = (int) get_option( 'lel_rankings_cache_rejections', 0 ) + $rejected;
+			update_option( 'lel_rankings_cache_rejections', $total, false );
+			Logger::log( Logger::WARNING, 'rankings_cache_stale_rejected', array( 'rejected' => $rejected, 'total' => $total ) );
+			self::invalidate_all( 'live_revalidation_rejected' );
+		}
+		return $live;
 	}
 
 	/**
@@ -158,10 +238,18 @@ final class Rankings {
 	/**
 	 * Whether a review is safe and complete enough for a public ordered ranking.
 	 *
+	 * Fail-closed: any error while evaluating eligibility is treated as
+	 * ineligible so a governance-evaluation failure can never make a review public.
+	 *
 	 * @param int $post_id Review post ID.
 	 */
 	public static function is_eligible( int $post_id ): bool {
-		return array() === self::eligibility_reasons( $post_id );
+		try {
+			return array() === self::eligibility_reasons( $post_id );
+		} catch ( \Throwable $error ) {
+			Logger::log( Logger::ERROR, 'rankings_eligibility_error', array( 'error' => get_class( $error ) ) );
+			return false;
+		}
 	}
 
 	/** Return the requested public sort through a strict allowlist. */

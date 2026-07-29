@@ -40,6 +40,7 @@ final class Metrics {
 		$csp_violations = (int) get_option( 'lel_csp_violation_count', 0 );
 		$fallback_fail  = class_exists( Invalidation_Queue::class ) ? Invalidation_Queue::fallback_failure_count() : (int) get_option( 'lel_invalidation_fallback_failures', 0 );
 		$lock_failures  = class_exists( Publication_Lock::class ) ? Publication_Lock::failure_count() : 0;
+		$rank_rejects   = (int) get_option( 'lel_rankings_cache_rejections', 0 );
 
 		$lines[] = '# HELP lel_audit_write_failures_total Total audit-log write failures observed.';
 		$lines[] = '# TYPE lel_audit_write_failures_total counter';
@@ -56,6 +57,10 @@ final class Metrics {
 		$lines[] = '# HELP lel_publication_lock_failures_total Total publication-lock acquisition failures.';
 		$lines[] = '# TYPE lel_publication_lock_failures_total counter';
 		$lines[] = 'lel_publication_lock_failures_total ' . $lock_failures;
+
+		$lines[] = '# HELP lel_rankings_cache_rejected_total Total cached ranking IDs rejected by live eligibility revalidation.';
+		$lines[] = '# TYPE lel_rankings_cache_rejected_total counter';
+		$lines[] = 'lel_rankings_cache_rejected_total ' . $rank_rejects;
 
 		$identity    = class_exists( Evidence_Store::class ) ? Evidence_Store::runtime_release_identity() : array();
 		$environment = in_array( (string) ( $identity['environment'] ?? '' ), array( 'local', 'development', 'staging', 'production' ), true ) ? (string) $identity['environment'] : 'unknown';
