@@ -62,6 +62,29 @@ final class Metrics {
 		$lines[] = '# TYPE lel_rankings_cache_rejected_total counter';
 		$lines[] = 'lel_rankings_cache_rejected_total ' . $rank_rejects;
 
+		// Affiliate dependency-edge health. -1 means "unknown", never zero:
+		// an unavailable index or missing backfill report must not scrape as
+		// a healthy empty state.
+		$edge_count  = class_exists( Dependency_Index::class ) ? Dependency_Index::affiliate_edge_count() : null;
+		$edge_report = get_option( 'lel_affiliate_edge_report', null );
+		$edge_report = is_array( $edge_report ) ? $edge_report : null;
+		$lines[]     = '# HELP lel_affiliate_dependency_edges Materialized affiliate dependency edges; -1 when the index is unavailable.';
+		$lines[]     = '# TYPE lel_affiliate_dependency_edges gauge';
+		$lines[]     = 'lel_affiliate_dependency_edges ' . ( null === $edge_count ? '-1' : $edge_count );
+		foreach ( array(
+			'lel_affiliate_unresolved_destinations' => array( 'unresolved', 'Affiliate destinations with no registry match during the last completed edge backfill; -1 before any completed backfill.' ),
+			'lel_affiliate_ambiguous_destinations'  => array( 'ambiguous', 'Affiliate destinations matching multiple registry rows during the last completed edge backfill; -1 before any completed backfill.' ),
+			'lel_affiliate_broad_fallbacks'         => array( 'broad_fallbacks', 'Parents bound to every registry row because edge extraction failed during the last completed backfill; -1 before any completed backfill.' ),
+		) as $metric => $spec ) {
+			$lines[] = '# HELP ' . $metric . ' ' . $spec[1];
+			$lines[] = '# TYPE ' . $metric . ' gauge';
+			$lines[] = $metric . ' ' . ( null === $edge_report ? '-1' : (int) ( $edge_report[ $spec[0] ] ?? -1 ) );
+		}
+		$backfill_pending = ! class_exists( Dependency_Index::class ) || ! Dependency_Index::backfill_marker_current();
+		$lines[]          = '# HELP lel_dependency_backfill_pending 1 while the dependency-index backfill for the current generation has not completed.';
+		$lines[]          = '# TYPE lel_dependency_backfill_pending gauge';
+		$lines[]          = 'lel_dependency_backfill_pending ' . ( $backfill_pending ? 1 : 0 );
+
 		$identity    = class_exists( Evidence_Store::class ) ? Evidence_Store::runtime_release_identity() : array();
 		$environment = in_array( (string) ( $identity['environment'] ?? '' ), array( 'local', 'development', 'staging', 'production' ), true ) ? (string) $identity['environment'] : 'unknown';
 		$source_sha  = preg_match( '/\A(?:[a-f0-9]{40}|[a-f0-9]{64})\z/', (string) ( $identity['release_sha'] ?? '' ) ) ? (string) $identity['release_sha'] : 'unknown';

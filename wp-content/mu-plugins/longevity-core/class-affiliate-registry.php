@@ -155,6 +155,68 @@ final class Affiliate_Registry {
 		}
 	}
 
+	/**
+	 * Resolve content destinations to exact registry dependency edges.
+	 *
+	 * Matching is purely structural (domain + subdomain policy) and ignores
+	 * lifecycle eligibility: an inactive or expired merchant that a parent
+	 * still links to must remain a dependency so status changes invalidate it.
+	 *
+	 * @param string          $content      Post content to scan.
+	 * @param array<int, int> $merchant_ids Candidate registry record IDs.
+	 * @return array{edges: array<int, int>, unresolved: int, ambiguous: int}|null
+	 *         Null when extraction failed and callers must bind conservatively.
+	 */
+	public static function resolve_merchant_edges( string $content, array $merchant_ids ): ?array {
+		$destinations = self::destinations_in_content( $content );
+		if ( null === $destinations ) {
+			return null;
+		}
+		$edges      = array();
+		$unresolved = 0;
+		$ambiguous  = 0;
+		foreach ( $destinations as $url ) {
+			$destination = self::normalize_destination( $url );
+			if ( null === $destination ) {
+				++$unresolved;
+				continue;
+			}
+			$matches = array();
+			foreach ( $merchant_ids as $merchant_id ) {
+				if ( self::merchant_matches_host( (int) $merchant_id, $destination['host'] ) ) {
+					$matches[] = (int) $merchant_id;
+				}
+			}
+			if ( array() === $matches ) {
+				++$unresolved;
+				continue;
+			}
+			if ( count( $matches ) > 1 ) {
+				++$ambiguous;
+			}
+			$edges = array_merge( $edges, $matches );
+		}
+		$edges = array_values( array_unique( $edges ) );
+		sort( $edges, SORT_NUMERIC );
+		return array(
+			'edges'      => $edges,
+			'unresolved' => $unresolved,
+			'ambiguous'  => $ambiguous,
+		);
+	}
+
+	/** Whether a registry record's domain policy covers a normalized host. */
+	public static function merchant_matches_host( int $merchant_id, string $host ): bool {
+		$registered = self::normalize_domain( (string) get_post_meta( $merchant_id, 'merchant_domain', true ) );
+		if ( '' === $registered || '' === $host ) {
+			return false;
+		}
+		if ( $host === $registered ) {
+			return true;
+		}
+		return (bool) get_post_meta( $merchant_id, 'allow_subdomains', true ) && str_ends_with( $host, '.' . $registered );
+	}
+
 	/** Find an eligible merchant registry record by normalized destination; ambiguity fails closed. */
 	public static function find_by_url( string $url ): ?\WP_Post {
 		$destination = self::normalize_destination( $url );

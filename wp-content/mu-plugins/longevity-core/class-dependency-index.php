@@ -17,7 +17,18 @@ final class Dependency_Index {
 	public const SCHEMA_VERSION = '1.1.0';
 
 	/** Source-to-index algorithm generation; changes force a fresh backfill. */
-	public const DATA_GENERATION = '2';
+	public const DATA_GENERATION = '3';
+
+	/**
+	 * Affiliate edge-resolution counters for the current backfill run.
+	 *
+	 * @var array{unresolved: int, ambiguous: int, broad_fallbacks: int}
+	 */
+	private static array $affiliate_stats = array(
+		'unresolved'      => 0,
+		'ambiguous'       => 0,
+		'broad_fallbacks' => 0,
+	);
 
 	/** Table name. */
 	public static function table_name(): string {
@@ -203,11 +214,16 @@ final class Dependency_Index {
 	 *
 	 * @param bool $dry_run When true, nothing is written.
 	 * @param int  $batch   Parents per page (bounded 10–500).
-	 * @return array{parents_scanned: int, dependencies_indexed: int, complete: bool, dry_run: bool, generation: string, drift: array{valid: bool, parents_checked: int, missing: int, stale: int, orphans: int}}
+	 * @return array{parents_scanned: int, dependencies_indexed: int, complete: bool, dry_run: bool, generation: string, drift: array{valid: bool, parents_checked: int, missing: int, stale: int, orphans: int}, affiliate: array{unresolved: int, ambiguous: int, broad_fallbacks: int}}
 	 */
 	public static function run_backfill( bool $dry_run = false, int $batch = 200 ): array {
 		global $wpdb;
-		$batch  = min( 500, max( 10, $batch ) );
+		$batch                 = min( 500, max( 10, $batch ) );
+		self::$affiliate_stats = array(
+			'unresolved'      => 0,
+			'ambiguous'       => 0,
+			'broad_fallbacks' => 0,
+		);
 		$result = array(
 			'parents_scanned'      => 0,
 			'dependencies_indexed' => 0,
@@ -215,6 +231,7 @@ final class Dependency_Index {
 			'dry_run'              => $dry_run,
 			'generation'           => self::DATA_GENERATION,
 			'drift'                => array( 'valid' => false, 'parents_checked' => 0, 'missing' => 0, 'stale' => 0, 'orphans' => 0 ),
+			'affiliate'            => self::$affiliate_stats,
 		);
 		if ( ! self::exists() && ! $dry_run ) {
 			return $result;
@@ -253,12 +270,14 @@ final class Dependency_Index {
 				break;
 			}
 		}
-		$result['drift']    = $dry_run ? $result['drift'] : self::verify_drift( $batch );
-		$result['complete'] = $dry_run || true === $result['drift']['valid'];
+		$result['affiliate'] = self::$affiliate_stats;
+		$result['drift']     = $dry_run ? $result['drift'] : self::verify_drift( $batch );
+		$result['complete']  = $dry_run || true === $result['drift']['valid'];
 		if ( ! $dry_run && $result['complete'] ) {
 			self::write_option( 'lel_dependency_index_generation', self::DATA_GENERATION );
 			self::write_option( 'lel_dependency_index_schema_version', self::SCHEMA_VERSION );
 			self::write_option( 'lel_dependency_index_backfilled_at', gmdate( DATE_W3C ) );
+			self::write_option( 'lel_affiliate_edge_report', $result['affiliate'] );
 			if ( ! delete_option( 'lel_dependency_backfill_cursor' ) && false !== get_option( 'lel_dependency_backfill_cursor', false ) ) {
 				throw new \RuntimeException( 'Could not clear dependency backfill cursor.' );
 			}
@@ -341,10 +360,28 @@ final class Dependency_Index {
 
 	/** Whether the completion marker is current and still drift-free. */
 	public static function backfill_is_current(): bool {
+		return self::backfill_marker_current() && true === self::verify_drift()['valid'];
+	}
+
+	/** Cheap generation/schema/completion marker check without a drift scan. */
+	public static function backfill_marker_current(): bool {
 		return '' !== (string) get_option( 'lel_dependency_index_backfilled_at', '' )
 			&& self::DATA_GENERATION === (string) get_option( 'lel_dependency_index_generation', '' )
-			&& self::SCHEMA_VERSION === (string) get_option( 'lel_dependency_index_schema_version', '' )
-			&& true === self::verify_drift()['valid'];
+			&& self::SCHEMA_VERSION === (string) get_option( 'lel_dependency_index_schema_version', '' );
+	}
+
+	/** Count materialized affiliate edges; null when the count is unavailable. */
+	public static function affiliate_edge_count(): ?int {
+		global $wpdb;
+		if ( ! self::exists() ) {
+			return null;
+		}
+		self::clear_database_error( $wpdb );
+		$count = $wpdb->get_var( 'SELECT COUNT(*) FROM ' . self::table_name() . " WHERE dependency_type = 'lel_affiliate'" );
+		if ( self::database_failed( $wpdb ) || null === $count ) {
+			return null;
+		}
+		return (int) $count;
 	}
 
 	/** Build the complete source-of-truth dependency sets for one parent. */
@@ -396,11 +433,46 @@ final class Dependency_Index {
 		return $sets;
 	}
 
-	/** Conservatively bind affiliate-linked content to every registry row. */
+	/**
+	 * Resolve the exact affiliate registry records a parent's content uses.
+	 *
+	 * Destinations are matched against every non-trash registry row (any
+	 * lifecycle status) so status flips on a referenced merchant still
+	 * invalidate the parent. Extraction failure falls back to binding every
+	 * registry row: over-invalidation is safe, under-invalidation is not.
+	 */
 	private static function affiliate_ids_for_parent( int $parent ): array {
 		if ( '1' !== (string) get_post_meta( $parent, '_lel_has_affiliate_links', true ) ) {
 			return array();
 		}
+		$registry_ids = self::affiliate_registry_ids();
+		if ( array() === $registry_ids ) {
+			return array();
+		}
+		$content  = (string) get_post_field( 'post_content', $parent );
+		$resolved = Affiliate_Registry::resolve_merchant_edges( $content, $registry_ids );
+		if ( null === $resolved ) {
+			++self::$affiliate_stats['broad_fallbacks'];
+			Logger::error( 'affiliate_edge_extraction_failed_broad_binding', array( 'parent_post_id' => $parent ) );
+			return $registry_ids;
+		}
+		self::$affiliate_stats['unresolved'] += $resolved['unresolved'];
+		self::$affiliate_stats['ambiguous']  += $resolved['ambiguous'];
+		if ( $resolved['unresolved'] > 0 || $resolved['ambiguous'] > 0 ) {
+			Logger::info(
+				'affiliate_edge_resolution_incomplete',
+				array(
+					'parent_post_id' => $parent,
+					'unresolved'     => $resolved['unresolved'],
+					'ambiguous'      => $resolved['ambiguous'],
+				)
+			);
+		}
+		return $resolved['edges'];
+	}
+
+	/** All non-trash affiliate registry record IDs, fail-closed on DB errors. */
+	private static function affiliate_registry_ids(): array {
 		global $wpdb;
 		self::clear_database_error( $wpdb );
 		$ids              = $wpdb->get_col( "SELECT ID FROM {$wpdb->posts} WHERE post_type = 'lel_affiliate' AND post_status NOT IN ('trash','auto-draft') ORDER BY ID ASC" );
@@ -516,7 +588,16 @@ final class Dependency_Index {
 			return self::governed_ids( array( 'post', 'review' ), 'medical_reviewer_user_id', (string) $dep_id );
 		}
 		if ( 'lel_affiliate' === $type ) {
-			return self::governed_ids( array( 'post', 'review' ), '_lel_has_affiliate_links', '1' );
+			$parents = array();
+			foreach ( self::governed_ids( array( 'post', 'review' ), '_lel_has_affiliate_links', '1' ) as $parent_id ) {
+				$content  = (string) get_post_field( 'post_content', $parent_id );
+				$resolved = Affiliate_Registry::resolve_merchant_edges( $content, array( $dep_id ) );
+				// Extraction failure keeps the parent: over-invalidation is safe.
+				if ( null === $resolved || array() !== $resolved['edges'] ) {
+					$parents[] = $parent_id;
+				}
+			}
+			return $parents;
 		}
 		return array();
 	}

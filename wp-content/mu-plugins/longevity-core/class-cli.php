@@ -911,9 +911,10 @@ final class Freshness_Command {
 /**
  * Dependency index maintenance.
  *
- * The backfill indexes claim, source, test-record, protocol, and reviewer
- * credential relationships. Affiliate relationships are intentionally not
- * indexed; they remain served by the flag-based fallback lookup.
+ * The backfill indexes claim, source, test-record, protocol, reviewer
+ * credential, and affiliate relationships. Affiliate edges are exact: each
+ * parent binds only the registry records its content destinations resolve
+ * to, falling back to binding every record when extraction fails.
  */
 final class Dependency_Command {
 	/**

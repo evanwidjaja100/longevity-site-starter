@@ -16,23 +16,40 @@ final class DependencyIndexTest extends TestCase {
 		$GLOBALS['lel_test_options']    = array();
 		$GLOBALS['lel_test_posts']      = array();
 		$GLOBALS['lel_test_meta']       = array();
-		unset( $GLOBALS['lel_test_fail_dependency_insert'] );
+		unset( $GLOBALS['lel_test_fail_dependency_insert'], $GLOBALS['lel_test_html_processor_throws'] );
 	}
 
 	protected function tearDown(): void {
-		unset( $GLOBALS['lel_test_fail_dependency_insert'] );
+		unset( $GLOBALS['lel_test_fail_dependency_insert'], $GLOBALS['lel_test_html_processor_throws'] );
 	}
 
 	private static function log(): array {
 		return $GLOBALS['wpdb']->lel_query_log;
 	}
 
-	private static function make_post( int $id, string $type ): void {
-		$post              = new stdClass();
-		$post->ID          = $id;
-		$post->post_type   = $type;
-		$post->post_status = 'publish';
+	private static function make_post( int $id, string $type, string $content = '' ): void {
+		$post               = new stdClass();
+		$post->ID           = $id;
+		$post->post_type    = $type;
+		$post->post_status  = 'publish';
+		$post->post_content = $content;
 		$GLOBALS['lel_test_posts'][ $id ] = $post;
+	}
+
+	private static function make_merchant( int $id, string $domain, string $status = 'active', bool $allow_subdomains = false ): void {
+		self::make_post( $id, 'lel_affiliate' );
+		$GLOBALS['lel_test_meta'][ $id ] = array(
+			'merchant_domain'     => $domain,
+			'relationship_status' => $status,
+		);
+		if ( $allow_subdomains ) {
+			$GLOBALS['lel_test_meta'][ $id ]['allow_subdomains'] = '1';
+		}
+	}
+
+	private static function make_affiliate_parent( int $id, string $content ): void {
+		self::make_post( $id, 'post', $content );
+		$GLOBALS['lel_test_meta'][ $id ] = array( '_lel_has_affiliate_links' => '1' );
 	}
 
 	public function test_replace_dependencies_is_transactional_delete_then_insert(): void {
@@ -194,5 +211,111 @@ final class DependencyIndexTest extends TestCase {
 
 		self::assertSame( 1, $result['parents_scanned'], 'A resumed generation must continue after its checkpoint instead of restarting.' );
 		self::assertTrue( $result['complete'] );
+	}
+
+	public function test_affiliate_edges_bind_only_referenced_merchants(): void {
+		self::make_merchant( 500, 'merchant-a.example' );
+		self::make_merchant( 501, 'merchant-b.example' );
+		self::make_affiliate_parent( 30, '<a href="https://merchant-a.example/product" rel="sponsored">A</a>' );
+
+		Dependency_Index::reindex_parent( 30 );
+
+		self::assertSame( array( 30 ), Dependency_Index::find_parents( 'lel_affiliate', 500 ) );
+		self::assertSame( array(), Dependency_Index::find_parents( 'lel_affiliate', 501 ), 'A parent must not be bound to merchants it never links to.' );
+	}
+
+	public function test_merchant_change_invalidates_only_linked_parents(): void {
+		self::make_merchant( 500, 'merchant-a.example' );
+		self::make_merchant( 501, 'merchant-b.example' );
+		self::make_affiliate_parent( 30, '<a href="https://merchant-a.example/x" rel="sponsored">A</a>' );
+		self::make_affiliate_parent( 40, '<a href="https://merchant-b.example/y" rel="sponsored">B</a>' );
+
+		Dependency_Index::reindex_parent( 30 );
+		Dependency_Index::reindex_parent( 40 );
+
+		self::assertSame( array( 30 ), Dependency_Index::find_parents( 'lel_affiliate', 500 ) );
+		self::assertSame( array( 40 ), Dependency_Index::find_parents( 'lel_affiliate', 501 ) );
+	}
+
+	public function test_removing_link_removes_obsolete_edge_after_reindex(): void {
+		self::make_merchant( 500, 'merchant-a.example' );
+		self::make_affiliate_parent( 30, '<a href="https://merchant-a.example/x" rel="sponsored">A</a>' );
+		Dependency_Index::reindex_parent( 30 );
+		self::assertSame( array( 30 ), Dependency_Index::find_parents( 'lel_affiliate', 500 ) );
+
+		$GLOBALS['lel_test_posts'][30]->post_content = '<p>Link removed during revision.</p>';
+		Dependency_Index::reindex_parent( 30 );
+
+		self::assertSame( array(), Dependency_Index::find_parents( 'lel_affiliate', 500 ), 'Removing the link must remove the obsolete edge after reindexing.' );
+	}
+
+	public function test_affiliate_parse_failure_falls_back_to_broad_binding(): void {
+		self::make_merchant( 500, 'merchant-a.example' );
+		self::make_merchant( 501, 'merchant-b.example' );
+		self::make_affiliate_parent( 30, '<a href="https://merchant-a.example/x" rel="sponsored">A</a>' );
+		$GLOBALS['lel_test_html_processor_throws'] = true;
+
+		Dependency_Index::reindex_parent( 30 );
+
+		self::assertSame( array( 30 ), Dependency_Index::find_parents( 'lel_affiliate', 500 ) );
+		self::assertSame( array( 30 ), Dependency_Index::find_parents( 'lel_affiliate', 501 ), 'Parse failure must over-invalidate, never under-invalidate.' );
+	}
+
+	public function test_ambiguous_destination_binds_every_matching_merchant(): void {
+		self::make_merchant( 500, 'dup.example' );
+		self::make_merchant( 501, 'dup.example' );
+		self::make_affiliate_parent( 30, '<a href="https://dup.example/x" rel="sponsored">D</a>' );
+
+		Dependency_Index::reindex_parent( 30 );
+
+		self::assertSame( array( 30 ), Dependency_Index::find_parents( 'lel_affiliate', 500 ) );
+		self::assertSame( array( 30 ), Dependency_Index::find_parents( 'lel_affiliate', 501 ), 'Conflicting registry rows must both be treated as dependencies.' );
+	}
+
+	public function test_subdomain_link_binds_only_subdomain_permitting_merchant(): void {
+		self::make_merchant( 500, 'merchant-a.example', 'active', true );
+		self::make_merchant( 501, 'merchant-a.example' );
+		self::make_affiliate_parent( 30, '<a href="https://shop.merchant-a.example/x" rel="sponsored">A</a>' );
+
+		Dependency_Index::reindex_parent( 30 );
+
+		self::assertSame( array( 30 ), Dependency_Index::find_parents( 'lel_affiliate', 500 ) );
+		self::assertSame( array(), Dependency_Index::find_parents( 'lel_affiliate', 501 ), 'Exact-only merchants must not match subdomain destinations.' );
+	}
+
+	public function test_inactive_merchant_still_receives_edge_for_referenced_domain(): void {
+		self::make_merchant( 500, 'merchant-a.example', 'ended' );
+		self::make_affiliate_parent( 30, '<a href="https://merchant-a.example/x" rel="sponsored">A</a>' );
+
+		Dependency_Index::reindex_parent( 30 );
+
+		self::assertSame( array( 30 ), Dependency_Index::find_parents( 'lel_affiliate', 500 ), 'Status changes on a referenced merchant must invalidate the parent, so the edge must exist while inactive.' );
+	}
+
+	public function test_unregistered_destination_creates_no_edges(): void {
+		self::make_merchant( 500, 'merchant-a.example' );
+		self::make_affiliate_parent( 30, '<a href="https://unregistered.example/x" rel="sponsored">U</a>' );
+
+		Dependency_Index::reindex_parent( 30 );
+
+		self::assertSame( array(), Dependency_Index::find_parents( 'lel_affiliate', 500 ) );
+	}
+
+	public function test_backfill_edge_count_is_proportional_to_actual_links(): void {
+		self::make_merchant( 500, 'merchant-a.example' );
+		self::make_merchant( 501, 'merchant-b.example' );
+		self::make_merchant( 502, 'merchant-c.example' );
+		self::make_affiliate_parent( 30, '<a href="https://merchant-a.example/x" rel="sponsored">A</a>' );
+		self::make_affiliate_parent( 40, '<a href="https://merchant-b.example/y" rel="sponsored">B</a>' );
+		self::make_affiliate_parent( 50, '<a href="https://merchant-c.example/z" rel="sponsored">C</a>' );
+
+		$result = Dependency_Index::run_backfill( false, 200 );
+
+		$affiliate_rows = array_filter(
+			$GLOBALS['wpdb']->lel_test_rows( 'wp_lel_dependencies' ),
+			static fn( array $row ): bool => 'lel_affiliate' === $row['dependency_type']
+		);
+		self::assertCount( 3, $affiliate_rows, 'Edge growth must track actual links, not parents multiplied by merchants.' );
+		self::assertTrue( $result['drift']['valid'] );
 	}
 }
