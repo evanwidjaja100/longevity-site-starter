@@ -1549,13 +1549,91 @@ if ( ! function_exists( 'get_posts' ) ) {
 		if ( array_key_exists( 'lel_test_get_posts_result', $GLOBALS ) ) {
 			return $GLOBALS['lel_test_get_posts_result'];
 		}
-		// Real-behavior simulation: honors post_type, meta filter, and posts_per_page
-		// exactly like WordPress (a 200 cap really truncates at 200).
+		// Real-behavior simulation: honors post_type, meta filter, meta_query,
+		// and posts_per_page exactly like WordPress (a 200 cap really truncates).
 		$types      = array_map( 'strval', (array) ( $args['post_type'] ?? array( 'post' ) ) );
 		$limit      = (int) ( $args['posts_per_page'] ?? 5 );
 		$meta_key   = isset( $args['meta_key'] ) ? (string) $args['meta_key'] : null;
 		$meta_value = isset( $args['meta_value'] ) ? (string) $args['meta_value'] : null;
-		$posts      = $GLOBALS['lel_test_posts'] ?? array();
+
+		// Optional single-level meta_query with AND/OR relation.
+		$clauses  = array();
+		$relation = 'AND';
+		if ( isset( $args['meta_query'] ) && is_array( $args['meta_query'] ) ) {
+			foreach ( $args['meta_query'] as $mq_key => $clause ) {
+				if ( 'relation' === $mq_key ) {
+					$relation = 'OR' === strtoupper( (string) $clause ) ? 'OR' : 'AND';
+					continue;
+				}
+				if ( is_array( $clause ) && isset( $clause['key'] ) ) {
+					$clauses[] = array(
+						'key'     => (string) $clause['key'],
+						'value'   => $clause['value'] ?? '',
+						'compare' => strtoupper( (string) ( $clause['compare'] ?? '=' ) ),
+						'type'    => strtoupper( (string) ( $clause['type'] ?? 'CHAR' ) ),
+					);
+				}
+			}
+		}
+		$is_datetime = static fn( string $v ): bool => (bool) preg_match( '/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/', $v );
+		$is_date     = static fn( string $v ): bool => (bool) preg_match( '/^\d{4}-\d{2}-\d{2}$/', $v );
+		$eval_meta   = static function ( int $id ) use ( $clauses, $relation, $is_datetime, $is_date ): bool {
+			if ( empty( $clauses ) ) {
+				return true;
+			}
+			$results = array();
+			foreach ( $clauses as $clause ) {
+				$stored  = $GLOBALS['lel_test_meta'][ $id ][ $clause['key'] ] ?? null;
+				$compare = $clause['compare'];
+				if ( 'EXISTS' === $compare ) {
+					$results[] = null !== $stored && '' !== $stored;
+					continue;
+				}
+				if ( 'NOT EXISTS' === $compare ) {
+					$results[] = null === $stored || '' === $stored;
+					continue;
+				}
+				if ( null === $stored ) {
+					$results[] = false;
+					continue;
+				}
+				$left  = (string) $stored;
+				$right = (string) $clause['value'];
+				if ( in_array( $compare, array( '<', '<=', '>', '>=' ), true ) ) {
+					if ( 'DATETIME' === $clause['type'] && ( ! $is_datetime( $left ) || ! $is_datetime( $right ) ) ) {
+						$results[] = false;
+						continue;
+					}
+					if ( 'DATE' === $clause['type'] && ( ! $is_date( $left ) || ! $is_date( $right ) ) ) {
+						$results[] = false;
+						continue;
+					}
+				}
+				switch ( $compare ) {
+					case '!=':
+						$results[] = $left !== $right;
+						break;
+					case '<':
+						$results[] = strcmp( $left, $right ) < 0;
+						break;
+					case '<=':
+						$results[] = strcmp( $left, $right ) <= 0;
+						break;
+					case '>':
+						$results[] = strcmp( $left, $right ) > 0;
+						break;
+					case '>=':
+						$results[] = strcmp( $left, $right ) >= 0;
+						break;
+					default:
+						$results[] = $left === $right;
+						break;
+				}
+			}
+			return 'OR' === $relation ? in_array( true, $results, true ) : ! in_array( false, $results, true );
+		};
+
+		$posts = $GLOBALS['lel_test_posts'] ?? array();
 		ksort( $posts );
 		$matched = array();
 		foreach ( $posts as $id => $post ) {
@@ -1563,6 +1641,9 @@ if ( ! function_exists( 'get_posts' ) ) {
 				continue;
 			}
 			if ( null !== $meta_key && (string) ( $GLOBALS['lel_test_meta'][ $id ][ $meta_key ] ?? '' ) !== $meta_value ) {
+				continue;
+			}
+			if ( ! $eval_meta( (int) $id ) ) {
 				continue;
 			}
 			$matched[] = $post;

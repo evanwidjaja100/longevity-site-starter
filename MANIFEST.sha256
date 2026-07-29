@@ -423,8 +423,9 @@ ab97ec0b72d7c22f71b2fe327f60a36304037cf4404dfb4699fecbe5967a019f *./tests/php/Ap
 08e94530dc68f8e5b196d464a6fb5fec9c8392851d1debbf0506c3f7ebd75bc3 *./tests/php/ArchitectureTest.php
 edf64071a59e018c1b2f81b55121b397031ff44787ffa52970c49ab4af166258 *./tests/php/AuditLogTransactionTest.php
 9ccd74ed0d451e8a9cff0e18703550cc5ee8dd7f21d1f122955ab427af4b18bf *./tests/php/ClaimVerificationTest.php
-fb2ee8dcb98db2f8eac892d4f805f30ffca41b9038f8b6542efb042124155694 *./tests/php/ContactPersistenceTest.php
+a41f86e30083dbceca9b1399f2f57b2826a803a795417ae726faf4eaf063faeb *./tests/php/ContactPersistenceTest.php
 b34297f394653f03398c57bf4f405c5ea26d8539f7cce4349415e384fd47e4b7 *./tests/php/ContactPrivacyTest.php
+3a666dcf554c750d0ad44ea2fd6a68b3f5c1984cef42242f8a13dc8f86e25b2b *./tests/php/ContactRetentionTest.php
 f3190dca2cc32fc9bfe319bfd7485dc708430f2604c8b5d489d91393cf4a6079 *./tests/php/ContentDiscoveryTest.php
 09558fcfed7c4561b1d99a9e81962d19ff29eb9fb2be040cd71ea8bc9547ec54 *./tests/php/CspReportTest.php
 28648b71485e30d9b711827610816be7324fead37e9c4151d8b25d9f55dd27fe *./tests/php/DateValidationTest.php
@@ -435,7 +436,7 @@ acbbf26dfd2353020dc719de64f8212654c755184d5e39bf2153dedfa20bca44 *./tests/php/Fr
 a6c7cc09f167ebc63dcc9616e74b37bd03cfb6770ad5dc451a2bd10948761f52 *./tests/php/FreshnessRepositoryTest.php
 290e8af8444d65f193bfa016e4dc0ee35689b66edcd22df4d744a8fd19ea218f *./tests/php/FreshnessTest.php
 c0264fecf842d17c4edd2acb7508b8266361e37d9eed6c8107d5bb962bbd9faa *./tests/php/InvalidationQueueTest.php
-aadf0730f5105de62e85e806a323a6b506a3d1799e0df8c48ad0c881894594dc *./tests/php/LegalHoldTest.php
+b3f6660e5d9157033f36ebde3e1f626600bf623f57eda743145e76efccb10783 *./tests/php/LegalHoldTest.php
 70b496d694d1ac452e04999e97506c8340b85c62ade5b1cfbb1966e2df35d486 *./tests/php/MetaAuthorizationTest.php
 cb7f5320214a0d44553016595fb0c7c74e8f9cff0d36376f91b091dc02666828 *./tests/php/MetaRegistryTest.php
 988406878622d32b33ee6df4a52ad64cefd8e1bc3b6152c545484b6fe90f0723 *./tests/php/MigrationsLockTest.php
@@ -459,7 +460,7 @@ d633fdf056900f38b27b0406528359dc8581973b44c737dc5900088012e35fbc *./tests/php/Ro
 556f748401ec1b7f1f0e028e56ea7109fb7248f32305da289c4eb76f64aac437 *./tests/php/SystemReadinessTest.php
 328f3e09b8eea632865cb1b064dccadde8577c6d25a411e7e99b2ff2ec11d3ec *./tests/php/TestRecordApprovalTest.php
 6a1615511f1e69e033417f0b40fea90dd152d530371ddbd7c7ed56ad57e78e45 *./tests/php/TrustPagesTest.php
-ee23cf03f395218acb0c4a9896f595698262bbf1efbb01f7f97a2189d95762fb *./tests/php/bootstrap.php
+0b0b272a77e0ba3f11e856d8d852297e678aa5cae7ebc129745c8cae6c589598 *./tests/php/bootstrap.php
 8e58ce6e7287be689ba5c5911f763ada405a3356302fd5dcbf731b3208eeb95f *./tests/php/run-unit-tests.php
 6c4daca1adf2c0208567b38c36f07ec5afd62842915066523fd4fe78b44498ba *./tests/php/stubs/wp-cli-stub.php
 74f7ea35f9e5857b9ad81f05a178e751b67274ce4132df461cc0470025ff962a *./tests/php/stubs/wpdb-stub.php
@@ -521,11 +522,11 @@ e3778198f6a43c75edd2c4235ef9ae2828b6f988bf3ef78f0ca78c842db57b31 *./wp-content/m
 4a17d9adb6c6a7bd2ff52324c7e157c1ec1ab0162b80ae0c447c22b88cb60cc7 *./wp-content/mu-plugins/longevity-core/class-meta-authorization.php
 c27e0fdf058606e3f0e8094a093bb125a71655a8556e3af2a7ee0dea76a840f7 *./wp-content/mu-plugins/longevity-core/class-meta-registry.php
 e4fb1f3ab27e9d00d864646d9c44511a15080d4a05faacf1ede9b025ab594bea *./wp-content/mu-plugins/longevity-core/class-metrics.php
-4b7cc70682530d3f6b71204783e92baa0ca7d6d5721cc2538c409d9d7c189f47 *./wp-content/mu-plugins/longevity-core/class-migrations.php
+0a78eafea70e8ac18a3dcd867c707e4e074ecee90b2d732161e37f1fc02bc910 *./wp-content/mu-plugins/longevity-core/class-migrations.php
 bd6f10b085fca31bc350deb2e163f5fcaf0d63671c20659bac477380d6394a4b *./wp-content/mu-plugins/longevity-core/class-notification-outbox.php
 00423713222c90ae94bf0c3b143b9434885b2e8a3fe8cb3265ce541c20a10c71 *./wp-content/mu-plugins/longevity-core/class-override-intent.php
 d85fba14162c11e8952bf46e3407df84fcfe46db715711ec5ef83498fc733c9e *./wp-content/mu-plugins/longevity-core/class-platform-requirements.php
-f7b00fc0a229387f9447d9afb9ba3e021655304aac690ebe654921ba81960c84 *./wp-content/mu-plugins/longevity-core/class-public-contact.php
+f09552ba32373667072cb74051729939c283bc64c0b9358aaeeaf6bae988836d *./wp-content/mu-plugins/longevity-core/class-public-contact.php
 9a42a6ce9ff6de1d85896109b931bbc61d04ed75e0a590263270fe02235fb4ad *./wp-content/mu-plugins/longevity-core/class-public-content.php
 d689f8fb196be7e6776e935b2ff9707aeca0ee9719581429f662ab9093de1572 *./wp-content/mu-plugins/longevity-core/class-public-nav.php
 311464263c51750c636e0f20cb121a24fde69273e06c9e0596158b17bf4b0da0 *./wp-content/mu-plugins/longevity-core/class-public-rankings.php

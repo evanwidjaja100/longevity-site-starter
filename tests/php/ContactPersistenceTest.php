@@ -88,7 +88,7 @@ final class ContactPersistenceTest extends TestCase {
 		self::assertSame( 'private', $post->post_status );
 		self::assertSame( array(), $GLOBALS['lel_test_mails'], 'Mail must go through the outbox, never inline.' );
 		$meta = $GLOBALS['lel_test_meta'][ $post->ID ];
-		foreach ( array( 'contact_subject', 'contact_email', 'contact_name', 'contact_network_id', 'contact_rate_key_version', 'contact_submitted', 'contact_retention_until', 'contact_privacy_version', 'contact_idempotency_key' ) as $required ) {
+		foreach ( array( 'contact_subject', 'contact_email', 'contact_name', 'contact_network_id', 'contact_rate_key_version', 'contact_submitted', 'contact_retention_until', 'contact_retention_until_gmt', 'contact_privacy_version', 'contact_idempotency_key' ) as $required ) {
 			self::assertArrayHasKey( $required, $meta );
 			self::assertNotSame( '', (string) $meta[ $required ] );
 		}

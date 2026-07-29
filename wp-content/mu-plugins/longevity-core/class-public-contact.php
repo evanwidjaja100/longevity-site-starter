@@ -17,6 +17,17 @@ class Public_Contact {
 	private const PRIVACY_NOTICE_VERSION = '2026-07';
 	private const RECONCILIATION_PREFIX  = 'lel_contact_reconciliation_';
 
+	/** Canonical, authoritative per-record retention deadline (UTC `Y-m-d H:i:s`). */
+	private const RETENTION_META_KEY = 'contact_retention_until_gmt';
+
+	/** Legacy per-record deadline written as an ISO-8601 string by older releases. */
+	private const LEGACY_RETENTION_META_KEY = 'contact_retention_until';
+
+	/** Non-PII backfill report and resumable cursor for the retention migration. */
+	private const RETENTION_BACKFILL_REPORT_OPTION = 'lel_contact_retention_backfill_report';
+	private const RETENTION_BACKFILL_CURSOR_OPTION = 'lel_contact_retention_backfill_cursor';
+	private const RETENTION_BACKFILL_BATCH         = 200;
+
 	/** Register privacy-preserving retention. */
 	public static function init(): void {
 		add_action( 'init', array( self::class, 'schedule_retention' ), 30 );
@@ -164,13 +175,25 @@ class Public_Contact {
 		}
 	}
 
-	/** Permanently remove expired contact records and their PII-bearing outbox rows. */
+	/**
+	 * Permanently remove contact records whose authoritative per-record deadline
+	 * has elapsed, along with their PII-bearing outbox rows.
+	 *
+	 * Selection is driven solely by the canonical per-record deadline
+	 * (`contact_retention_until_gmt`), never by the current global setting or the
+	 * post date. A later change to the global setting therefore affects only new
+	 * submissions; already-stored records keep the deadline captured at intake.
+	 * Records lacking a usable canonical deadline are never selected or deleted.
+	 */
 	public static function run_retention_cleanup(): int {
-		$retention_days = min( 365, max( 1, (int) get_option( 'lel_contact_retention_days', 90 ) ) );
-		$cutoff         = gmdate( 'Y-m-d H:i:s', time() - ( $retention_days * DAY_IN_SECONDS ) );
-		$runtime_cap    = 25; // Seconds.
-		$start          = time();
-		$total_deleted  = 0;
+		$now              = gmdate( 'Y-m-d H:i:s' );
+		$runtime_cap      = 25; // Seconds.
+		$start            = time();
+		$total_deleted    = 0;
+		$legal_hold       = 0;
+		$malformed        = 0;
+		$lock_unavailable = 0;
+		$deletion_failure = 0;
 
 		self::purge_expired_rate_rows();
 
@@ -181,11 +204,12 @@ class Public_Contact {
 					'post_status'    => 'any',
 					'posts_per_page' => 100,
 					'fields'         => 'ids',
-					'date_query'     => array(
+					'meta_query'     => array( // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query
 						array(
-							'before'    => $cutoff,
-							'inclusive' => true,
-							'column'    => 'post_date_gmt',
+							'key'     => self::RETENTION_META_KEY,
+							'value'   => $now,
+							'compare' => '<=',
+							'type'    => 'DATETIME',
 						),
 					),
 					'no_found_rows'  => true,
@@ -197,17 +221,24 @@ class Public_Contact {
 			$deleted_this_pass = 0;
 			foreach ( $messages as $message_id ) {
 				$message_id = (int) $message_id;
-				$outcome    = Advisory_Lock::with_lock(
+				// Fail-safe re-check on the request path: never delete a record
+				// whose stored deadline is not a valid, due canonical datetime.
+				if ( ! self::deadline_is_due( (string) get_post_meta( $message_id, self::RETENTION_META_KEY, true ), $now ) ) {
+					++$malformed;
+					continue;
+				}
+				$outcome = Advisory_Lock::with_lock(
 					Legal_Hold::lock_name( $message_id ),
 					0,
-					static function () use ( $message_id ): bool {
+					static function () use ( $message_id ): string {
 						if ( Legal_Hold::protects_from_retention( $message_id ) ) {
-							return false;
+							return 'held';
 						}
-						return self::delete_contact_checked( $message_id, true, 'retention_cleanup_failed' );
+						return self::delete_contact_checked( $message_id, true, 'retention_cleanup_failed' ) ? 'deleted' : 'failed';
 					}
 				);
 				if ( Advisory_Lock::ACQUIRED !== $outcome['status'] ) {
+					++$lock_unavailable;
 					Logger::warning(
 						'contact_retention_lock_unavailable',
 						array(
@@ -217,9 +248,13 @@ class Public_Contact {
 					);
 					continue;
 				}
-				if ( true === $outcome['result'] ) {
+				if ( 'deleted' === $outcome['result'] ) {
 					++$total_deleted;
 					++$deleted_this_pass;
+				} elseif ( 'held' === $outcome['result'] ) {
+					++$legal_hold;
+				} else {
+					++$deletion_failure;
 				}
 			}
 			if ( 0 === $deleted_this_pass ) {
@@ -232,20 +267,185 @@ class Public_Contact {
 			}
 		}
 
-		if ( $total_deleted > 0 ) {
+		if ( $total_deleted > 0 || $legal_hold > 0 || $malformed > 0 || $lock_unavailable > 0 || $deletion_failure > 0 ) {
 			Audit_Log::record(
 				'contact_retention_cleanup',
 				'system',
 				0,
 				array(
-					'deleted_count'  => $total_deleted,
-					'retention_days' => $retention_days,
+					'deleted_count'      => $total_deleted,
+					'legal_hold_skipped' => $legal_hold,
+					'malformed_deadline' => $malformed,
+					'lock_unavailable'   => $lock_unavailable,
+					'deletion_failure'   => $deletion_failure,
 				),
 				0,
 				'cron'
 			);
 		}
 		return $total_deleted;
+	}
+
+	/**
+	 * One-time, additive, restart-safe backfill of the canonical per-record
+	 * retention deadline from the legacy ISO-8601 value.
+	 *
+	 * Never deletes a record, never rewrites an existing canonical value, and
+	 * never substitutes the current global setting for a stored deadline. Records
+	 * with a malformed or missing legacy deadline are reported (NO PII) for a
+	 * privacy-owner decision, not silently guessed. The report and cursor are
+	 * persisted so an interrupted run resumes without double counting.
+	 *
+	 * @return array{normalized:int, already_canonical:int, malformed:int, missing:int, malformed_ids:list<int>, missing_ids:list<int>}
+	 */
+	public static function migrate_retention_deadlines(): array {
+		$cursor = (int) get_option( self::RETENTION_BACKFILL_CURSOR_OPTION, 0 );
+		$report = 0 === $cursor
+			? self::empty_backfill_report()
+			: self::sanitize_backfill_report( get_option( self::RETENTION_BACKFILL_REPORT_OPTION, array() ) );
+		$seen   = array();
+
+		while ( true ) {
+			$ids = get_posts(
+				array(
+					'post_type'      => 'longevity_message',
+					'post_status'    => 'any',
+					'fields'         => 'ids',
+					'posts_per_page' => self::RETENTION_BACKFILL_BATCH,
+					'offset'         => $cursor,
+					'orderby'        => 'ID',
+					'order'          => 'ASC',
+					'no_found_rows'  => true,
+				)
+			);
+			// Deduplicate defensively so termination never depends on the data
+			// store honoring the offset (guards resumable-batch correctness).
+			$ids = array_values(
+				array_filter(
+					array_map( 'intval', (array) $ids ),
+					static function ( int $id ) use ( &$seen ): bool {
+						if ( $id <= 0 || isset( $seen[ $id ] ) ) {
+							return false;
+						}
+						$seen[ $id ] = true;
+						return true;
+					}
+				)
+			);
+			if ( empty( $ids ) ) {
+				break;
+			}
+			foreach ( $ids as $id ) {
+				self::backfill_one_deadline( $id, $report );
+			}
+			$cursor += self::RETENTION_BACKFILL_BATCH;
+			update_option( self::RETENTION_BACKFILL_CURSOR_OPTION, $cursor, false );
+			update_option( self::RETENTION_BACKFILL_REPORT_OPTION, $report, false );
+		}
+		update_option( self::RETENTION_BACKFILL_REPORT_OPTION, $report, false );
+		return $report;
+	}
+
+	/** Backfill a single record's canonical deadline, updating the report counters. */
+	private static function backfill_one_deadline( int $id, array &$report ): void {
+		if ( '' !== self::normalize_canonical_deadline( (string) get_post_meta( $id, self::RETENTION_META_KEY, true ) ) ) {
+			++$report['already_canonical'];
+			return;
+		}
+		$legacy = (string) get_post_meta( $id, self::LEGACY_RETENTION_META_KEY, true );
+		if ( '' === trim( $legacy ) ) {
+			++$report['missing'];
+			self::append_bounded_id( $report['missing_ids'], $id );
+			return;
+		}
+		$normalized = self::normalize_legacy_deadline( $legacy );
+		if ( '' === $normalized ) {
+			++$report['malformed'];
+			self::append_bounded_id( $report['malformed_ids'], $id );
+			return;
+		}
+		update_post_meta( $id, self::RETENTION_META_KEY, $normalized );
+		if ( (string) get_post_meta( $id, self::RETENTION_META_KEY, true ) === $normalized ) {
+			++$report['normalized'];
+		} else {
+			++$report['malformed'];
+			self::append_bounded_id( $report['malformed_ids'], $id );
+		}
+	}
+
+	/** Empty (zeroed) backfill report structure. */
+	private static function empty_backfill_report(): array {
+		return array(
+			'normalized'        => 0,
+			'already_canonical' => 0,
+			'malformed'         => 0,
+			'missing'           => 0,
+			'malformed_ids'     => array(),
+			'missing_ids'       => array(),
+		);
+	}
+
+	/** Coerce a persisted report back into a well-formed structure for resume. */
+	private static function sanitize_backfill_report( $stored ): array {
+		$report = self::empty_backfill_report();
+		if ( ! is_array( $stored ) ) {
+			return $report;
+		}
+		foreach ( array( 'normalized', 'already_canonical', 'malformed', 'missing' ) as $key ) {
+			$report[ $key ] = max( 0, (int) ( $stored[ $key ] ?? 0 ) );
+		}
+		foreach ( array( 'malformed_ids', 'missing_ids' ) as $key ) {
+			if ( isset( $stored[ $key ] ) && is_array( $stored[ $key ] ) ) {
+				$report[ $key ] = array_values( array_slice( array_map( 'intval', $stored[ $key ] ), 0, 100 ) );
+			}
+		}
+		return $report;
+	}
+
+	/** Append an id to a bounded report list, avoiding duplicates and unbounded growth. */
+	private static function append_bounded_id( array &$ids, int $id ): void {
+		if ( count( $ids ) < 100 && ! in_array( $id, $ids, true ) ) {
+			$ids[] = $id;
+		}
+	}
+
+	/** Whether a stored value is a valid canonical deadline at or before $now. */
+	private static function deadline_is_due( string $value, string $now ): bool {
+		$normalized = self::normalize_canonical_deadline( $value );
+		return '' !== $normalized && strcmp( $normalized, $now ) <= 0;
+	}
+
+	/** Validate and canonicalize a `Y-m-d H:i:s` UTC datetime, or return an empty string. */
+	private static function normalize_canonical_deadline( string $value ): string {
+		$value = trim( $value );
+		if ( ! preg_match( '/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/', $value ) ) {
+			return '';
+		}
+		$date   = \DateTimeImmutable::createFromFormat( '!Y-m-d H:i:s', $value, new \DateTimeZone( 'UTC' ) );
+		$errors = \DateTimeImmutable::getLastErrors();
+		if ( false === $date || ( is_array( $errors ) && ( $errors['warning_count'] > 0 || $errors['error_count'] > 0 ) ) ) {
+			return '';
+		}
+		return $date->format( 'Y-m-d H:i:s' ) === $value ? $value : '';
+	}
+
+	/** Parse a legacy ISO-8601 deadline into a canonical UTC datetime, or return an empty string. */
+	private static function normalize_legacy_deadline( string $value ): string {
+		$value = trim( $value );
+		if ( '' === $value ) {
+			return '';
+		}
+		$canonical = self::normalize_canonical_deadline( $value );
+		if ( '' !== $canonical ) {
+			return $canonical;
+		}
+		try {
+			$date = new \DateTimeImmutable( $value );
+		} catch ( \Exception $error ) {
+			unset( $error );
+			return '';
+		}
+		return $date->setTimezone( new \DateTimeZone( 'UTC' ) )->format( 'Y-m-d H:i:s' );
 	}
 
 	/**
@@ -451,16 +651,18 @@ class Public_Contact {
 		}
 
 		$retention_days = min( 365, max( 1, (int) get_option( 'lel_contact_retention_days', 90 ) ) );
+		$retention_ts   = time() + ( $retention_days * DAY_IN_SECONDS );
 		$meta_input     = array(
-			'contact_subject'          => $subject,
-			'contact_email'            => $email,
-			'contact_name'             => $name,
-			'contact_network_id'       => $identifier,
-			'contact_rate_key_version' => (string) max( 1, (int) get_option( 'lel_contact_rate_key_version', 1 ) ),
-			'contact_submitted'        => gmdate( DATE_ATOM ),
-			'contact_retention_until'  => gmdate( DATE_ATOM, time() + ( $retention_days * DAY_IN_SECONDS ) ),
-			'contact_privacy_version'  => self::PRIVACY_NOTICE_VERSION,
-			'contact_idempotency_key'  => $request_id,
+			'contact_subject'             => $subject,
+			'contact_email'               => $email,
+			'contact_name'                => $name,
+			'contact_network_id'          => $identifier,
+			'contact_rate_key_version'    => (string) max( 1, (int) get_option( 'lel_contact_rate_key_version', 1 ) ),
+			'contact_submitted'           => gmdate( DATE_ATOM ),
+			'contact_retention_until'     => gmdate( DATE_ATOM, $retention_ts ),
+			'contact_retention_until_gmt' => gmdate( 'Y-m-d H:i:s', $retention_ts ),
+			'contact_privacy_version'     => self::PRIVACY_NOTICE_VERSION,
+			'contact_idempotency_key'     => $request_id,
 		);
 		$fixture_token  = sanitize_text_field( wp_unslash( $_POST['longevity_contact_fixture'] ?? '' ) );
 		if ( '' !== $fixture_token && hash_equals( (string) get_option( 'lel_e2e_contact_fixture_token', '' ), $fixture_token ) ) {

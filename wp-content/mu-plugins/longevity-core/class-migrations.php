@@ -15,7 +15,7 @@ defined( 'ABSPATH' ) || exit;
 
 /** Advances additive, restart-safe governance migrations via explicit CLI invocation. */
 final class Migrations {
-	public const CURRENT_VERSION = 17;
+	public const CURRENT_VERSION = 18;
 
 	/** Lock time-to-live in seconds. */
 	private const LOCK_TTL = 300;
@@ -330,6 +330,12 @@ final class Migrations {
 			}
 			Approval_Repository::backfill_legacy_activation();
 		}
+		if ( 18 === $version ) {
+			// Additive, restart-safe backfill of the authoritative per-record
+			// retention deadline. Writes post meta only (no DDL); never deletes
+			// records and never rewrites an existing canonical value.
+			Public_Contact::migrate_retention_deadlines();
+		}
 	}
 
 	/** Validate schema postconditions after each migration version. */
@@ -389,7 +395,7 @@ final class Migrations {
 				'indexes' => array( 'PRIMARY' => true, 'type_id' => false, 'release_sha' => false ),
 			),
 		);
-		if ( 17 === $version ) {
+		if ( $version >= 17 ) {
 			$contracts['approval']['columns']                   = array_merge( $contracts['approval']['columns'], array( 'audit_event_id', 'activated_at', 'activation_error' ) );
 			$contracts['approval']['indexes']['approval_state'] = false;
 			$contracts['approval']['indexes']['approval_audit'] = false;
@@ -406,6 +412,7 @@ final class Migrations {
 			15 => array( 'override' ),
 			16 => array_keys( $contracts ),
 			17 => array_keys( $contracts ),
+			18 => array_keys( $contracts ),
 		)[ $version ] ?? array();
 
 		$result = array();

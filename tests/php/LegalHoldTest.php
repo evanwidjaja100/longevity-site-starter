@@ -37,6 +37,9 @@ final class LegalHoldTest extends TestCase {
 		$post->post_status   = 'private';
 		$post->post_date_gmt = $post_date_gmt;
 		$GLOBALS['lel_test_posts'][ $id ] = $post;
+		// Retention selection is driven by the authoritative per-record deadline;
+		// seed a long-past canonical value so these fixtures are due for cleanup.
+		$GLOBALS['lel_test_meta'][ $id ]['contact_retention_until_gmt'] = '2020-01-02 00:00:00';
 	}
 
 	public function test_place_requires_capability(): void {
