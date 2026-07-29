@@ -52,19 +52,22 @@ final class Affiliate_Registry {
 		if ( has_shortcode( $content, 'affiliate_link' ) ) {
 			return true;
 		}
-		if ( preg_match_all( '/<a\b[^>]*>/i', $content, $tag_matches ) ) {
-			foreach ( $tag_matches[0] as $tag ) {
-				if ( self::tag_has_sponsored_rel( $tag ) ) {
-					return true;
-				}
-			}
+		$hrefs = self::sponsored_anchor_hrefs( $content );
+		if ( null === $hrefs ) {
+			// Parser failure: treat the content as affiliate-bearing so the
+			// affiliate publication gates apply and fail closed downstream.
+			return true;
 		}
-		return false;
+		return array() !== $hrefs;
 	}
 
 	/** Verify every affiliate destination present in content against an active registry record. */
 	public static function all_destinations_registered( string $content ): bool {
-		foreach ( self::destinations_in_content( $content ) as $url ) {
+		$destinations = self::destinations_in_content( $content );
+		if ( null === $destinations ) {
+			return false;
+		}
+		foreach ( $destinations as $url ) {
 			if ( ! self::find_by_url( $url ) ) {
 				return false;
 			}
@@ -74,8 +77,12 @@ final class Affiliate_Registry {
 
 	/** Return relationship owners associated with active destinations in content. */
 	public static function relationship_owners_for_content( string $content ): array {
-		$owners = array();
-		foreach ( self::destinations_in_content( $content ) as $url ) {
+		$owners       = array();
+		$destinations = self::destinations_in_content( $content );
+		if ( null === $destinations ) {
+			return array();
+		}
+		foreach ( $destinations as $url ) {
 			$merchant = self::find_by_url( $url );
 			if ( $merchant ) {
 				$owner = (int) get_post_meta( $merchant->ID, 'owner_user_id', true );
@@ -87,8 +94,14 @@ final class Affiliate_Registry {
 		return array_values( array_unique( $owners ) );
 	}
 
-	/** Extract normalized, bounded affiliate destinations without exposing other links. */
-	private static function destinations_in_content( string $content ): array {
+	/**
+	 * Extract every affiliate destination in content without truncation.
+	 *
+	 * @return array<int, string>|null Complete list of raw destinations, or
+	 *                                 null when extraction failed and callers
+	 *                                 must fail closed.
+	 */
+	private static function destinations_in_content( string $content ): ?array {
 		$urls = array();
 		if ( preg_match_all( '/' . get_shortcode_regex( array( 'affiliate_link' ) ) . '/s', $content, $matches, PREG_SET_ORDER ) ) {
 			foreach ( $matches as $match ) {
@@ -98,59 +111,108 @@ final class Affiliate_Registry {
 				}
 			}
 		}
-		// Match anchors with rel containing 'sponsored' in any token order, case-insensitive.
-		if ( preg_match_all( '/<a\b[^>]*>/i', $content, $tag_matches ) ) {
-			foreach ( $tag_matches[0] as $tag ) {
-				if ( ! self::tag_has_sponsored_rel( $tag ) ) {
+		$hrefs = self::sponsored_anchor_hrefs( $content );
+		if ( null === $hrefs ) {
+			return null;
+		}
+		return array_values( array_unique( array_merge( $urls, $hrefs ) ) );
+	}
+
+	/**
+	 * Extract the href of every sponsored-marked anchor using the WordPress
+	 * HTML API. A sponsored anchor without a usable href yields an empty
+	 * string so validation fails closed instead of silently skipping it.
+	 *
+	 * @return array<int, string>|null Hrefs, or null when parsing failed.
+	 */
+	private static function sponsored_anchor_hrefs( string $content ): ?array {
+		if ( '' === $content || false === stripos( $content, '<a' ) ) {
+			return array();
+		}
+		if ( ! class_exists( '\WP_HTML_Tag_Processor' ) ) {
+			Logger::error( 'affiliate_anchor_parser_unavailable', array() );
+			return null;
+		}
+		try {
+			$processor = new \WP_HTML_Tag_Processor( $content );
+			$hrefs     = array();
+			while ( $processor->next_tag( array( 'tag_name' => 'a' ) ) ) {
+				$rel = $processor->get_attribute( 'rel' );
+				if ( ! is_string( $rel ) ) {
 					continue;
 				}
-				if ( preg_match( '/\bhref=["\']([^"\']+)["\']/i', $tag, $href_match ) ) {
-					$urls[] = $href_match[1];
+				$tokens = preg_split( '/\s+/', strtolower( trim( $rel ) ) ) ?: array();
+				if ( ! in_array( 'sponsored', $tokens, true ) ) {
+					continue;
 				}
+				$href    = $processor->get_attribute( 'href' );
+				$hrefs[] = is_string( $href ) ? $href : '';
 			}
+			return $hrefs;
+		} catch ( \Throwable $error ) {
+			Logger::error( 'affiliate_anchor_parse_failed', array( 'message' => substr( $error->getMessage(), 0, 160 ) ) );
+			return null;
 		}
-		return array_slice( array_values( array_unique( array_filter( array_map( 'esc_url_raw', $urls ) ) ) ), 0, 100 );
 	}
 
-	/** Whether an anchor tag's rel attribute contains 'sponsored' as a token (case-insensitive, any order). */
-	private static function tag_has_sponsored_rel( string $tag ): bool {
-		if ( ! preg_match( '/\brel=["\']([^"\']*)["\']|\brel=([^\s>]+)/i', $tag, $rel_match ) ) {
-			return false;
-		}
-		$rel_value = '' !== $rel_match[1] ? $rel_match[1] : ( $rel_match[2] ?? '' );
-		$tokens    = preg_split( '/[\s]+/', strtolower( trim( $rel_value ) ) ) ?: array();
-		return in_array( 'sponsored', $tokens, true );
-	}
-
-	/** Find an eligible merchant registry record by normalized destination. */
+	/** Find an eligible merchant registry record by normalized destination; ambiguity fails closed. */
 	public static function find_by_url( string $url ): ?\WP_Post {
 		$destination = self::normalize_destination( $url );
 		if ( null === $destination ) {
 			return null;
 		}
-		$posts = get_posts(
+		$matches = array();
+		foreach ( self::active_merchant_ids() as $post_id ) {
+			$record = array(
+				'merchant_domain'    => (string) get_post_meta( $post_id, 'merchant_domain', true ),
+				'relationship_status' => (string) get_post_meta( $post_id, 'relationship_status', true ),
+				'effective_date'     => (string) get_post_meta( $post_id, 'effective_date', true ),
+				'expiration_date'    => (string) get_post_meta( $post_id, 'expiration_date', true ),
+				'last_verified_date' => (string) get_post_meta( $post_id, 'last_verified_date', true ),
+				'allow_subdomains'   => (bool) get_post_meta( $post_id, 'allow_subdomains', true ),
+			);
+			if ( self::relationship_is_eligible( $record, $url ) ) {
+				$matches[] = $post_id;
+			}
+		}
+		if ( 1 !== count( $matches ) ) {
+			if ( count( $matches ) > 1 ) {
+				Logger::error(
+					'affiliate_registry_conflict',
+					array(
+						'host'    => $destination['host'],
+						'matches' => count( $matches ),
+					)
+				);
+			}
+			return null;
+		}
+		$post = get_post( $matches[0] );
+		return ( $post instanceof \WP_Post ) ? $post : null;
+	}
+
+	/**
+	 * Complete deterministic projection of active registry record IDs.
+	 *
+	 * Loads IDs only (no full-object hydration) so the whole registry is
+	 * always evaluated; there is no prefix cap.
+	 *
+	 * @return array<int, int>
+	 */
+	private static function active_merchant_ids(): array {
+		$ids = get_posts(
 			array(
 				'post_type'      => 'lel_affiliate',
 				'post_status'    => 'any',
-				'posts_per_page' => 100,
+				'posts_per_page' => -1,
+				'fields'         => 'ids',
+				'orderby'        => 'ID',
+				'order'          => 'ASC',
 				'no_found_rows'  => true,
-				'meta_query'     => array( array( 'key' => 'relationship_status', 'value' => 'active' ) ),
+				'meta_query'     => array( array( 'key' => 'relationship_status', 'value' => 'active' ) ), // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query
 			)
 		);
-		foreach ( $posts as $post ) {
-			$record = array(
-				'merchant_domain'   => (string) get_post_meta( $post->ID, 'merchant_domain', true ),
-				'relationship_status'=> (string) get_post_meta( $post->ID, 'relationship_status', true ),
-				'effective_date'     => (string) get_post_meta( $post->ID, 'effective_date', true ),
-				'expiration_date'    => (string) get_post_meta( $post->ID, 'expiration_date', true ),
-				'last_verified_date' => (string) get_post_meta( $post->ID, 'last_verified_date', true ),
-				'allow_subdomains'   => (bool) get_post_meta( $post->ID, 'allow_subdomains', true ),
-			);
-			if ( self::relationship_is_eligible( $record, $url ) ) {
-				return $post;
-			}
-		}
-		return null;
+		return array_map( 'intval', $ids );
 	}
 
 	/** Normalize and reject unsafe affiliate destinations. */

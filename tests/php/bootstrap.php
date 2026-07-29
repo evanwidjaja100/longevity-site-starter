@@ -1876,6 +1876,71 @@ if ( ! class_exists( 'WP_Post' ) ) {
 	}
 }
 
+if ( ! class_exists( 'WP_HTML_Tag_Processor' ) ) {
+	/**
+	 * Minimal core-shaped HTML tag processor stub: next_tag() by tag name and
+	 * get_attribute() with quoted/unquoted/boolean attributes, mirroring the
+	 * subset of core behavior first-party code relies on. Set
+	 * $GLOBALS['lel_test_html_processor_throws'] to simulate parser failure.
+	 */
+	class WP_HTML_Tag_Processor {
+		private string $html;
+		private int $offset = 0;
+		/** @var array<string, string|true> */
+		private array $attributes = array();
+
+		public function __construct( string $html ) {
+			$this->html = $html;
+		}
+
+		public function next_tag( $query = null ): bool {
+			if ( ! empty( $GLOBALS['lel_test_html_processor_throws'] ) ) {
+				throw new \RuntimeException( 'Simulated HTML parser failure (test mode).' );
+			}
+			$target = null;
+			if ( is_string( $query ) && '' !== $query ) {
+				$target = strtolower( $query );
+			} elseif ( is_array( $query ) && isset( $query['tag_name'] ) ) {
+				$target = strtolower( (string) $query['tag_name'] );
+			}
+			while ( preg_match( '/<([a-zA-Z][a-zA-Z0-9-]*)((?:[^>"\']|"[^"]*"|\'[^\']*\')*)>/s', $this->html, $m, PREG_OFFSET_CAPTURE, $this->offset ) ) {
+				$this->offset = (int) $m[0][1] + strlen( $m[0][0] );
+				$name = strtolower( $m[1][0] );
+				if ( null !== $target && $name !== $target ) {
+					continue;
+				}
+				$this->attributes = array();
+				if ( preg_match_all( '/([a-zA-Z_:][-a-zA-Z0-9_:.]*)(?:\s*=\s*(?:"([^"]*)"|\'([^\']*)\'|([^\s\/>]+)))?/', (string) $m[2][0], $attrs, PREG_SET_ORDER ) ) {
+					foreach ( $attrs as $attr ) {
+						$attr_name = strtolower( $attr[1] );
+						if ( isset( $this->attributes[ $attr_name ] ) ) {
+							continue;
+						}
+						if ( isset( $attr[4] ) && '' !== $attr[4] ) {
+							$this->attributes[ $attr_name ] = html_entity_decode( $attr[4], ENT_QUOTES );
+						} elseif ( isset( $attr[3] ) && '' !== $attr[3] ) {
+							$this->attributes[ $attr_name ] = html_entity_decode( $attr[3], ENT_QUOTES );
+						} elseif ( isset( $attr[2] ) && '' !== $attr[2] ) {
+							$this->attributes[ $attr_name ] = html_entity_decode( $attr[2], ENT_QUOTES );
+						} elseif ( isset( $attr[0] ) && false !== strpos( $attr[0], '=' ) ) {
+							$this->attributes[ $attr_name ] = '';
+						} else {
+							$this->attributes[ $attr_name ] = true;
+						}
+					}
+				}
+				return true;
+			}
+			return false;
+		}
+
+		/** @return string|true|null */
+		public function get_attribute( string $name ) {
+			return $this->attributes[ strtolower( $name ) ] ?? null;
+		}
+	}
+}
+
 if ( ! class_exists( 'WP_REST_Response' ) ) {
 	class WP_REST_Response {
 		private $data;
