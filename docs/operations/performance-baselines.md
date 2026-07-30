@@ -1,5 +1,8 @@
 # Performance Baselines and SLOs
 
+**Owner:** Operations
+**Last reviewed:** 2026-07-30
+
 ## Approved load assumptions
 
 | Dimension | Target | Surge | Notes |
@@ -24,11 +27,12 @@
 
 ## CI smoke load
 
-- **Scenario:** `tests/load/k6-scenario.js`
-- **Profile:** 5 VUs, 30s hold, 15s ramp-down (smoke)
-- **Surge:** 20 VUs, 20s hold (staging only)
+- **Scenario:** `tests/load/k6-scenario.js` (routes derived from `config/routes.json`)
+- **Image:** `grafana/k6:2.1.0` pinned by digest in CI
+- **Profile:** 5 VUs, 30s hold, 15s ramp-down (smoke, default)
+- **Surge:** 20 VUs, 20s hold — enabled only with `K6_PROFILE=load` (staging/perf environments)
 - **Thresholds:** p95 < 1000 ms, p99 < 2000 ms, error rate < 1%
-- **Non-blocking in CI:** catches gross regressions; staging tests are blocking
+- **Blocking in CI:** the candidate smoke gate fails the `load-smoke` job on any threshold breach; deeper staging load tests remain a separate blocking acceptance gate (PRV3-ACC-04)
 
 ## Abort thresholds
 
