@@ -20,6 +20,7 @@ fb83a00039993c7c8e055c3ea43980f4e3aa081f19ae65afd13b234e242171f5 *./compose.yaml
 af08fcf5d1cb826d1898a66f43770bc62c73a7ee410431d21e1fd5e6bb5c872e *./config/content-schema/editorial-meta.schema.json
 27a89c0da59a0f18c807b64f218e4b31a98ecf410587f02f58b74702f0c9a410 *./config/environments/production.example.php
 24e3d4b74f3c630f15afda85cf1c444696b8c1519dcbfc2515624da59098095f *./config/release-required-jobs.json
+8efc25ab5350b0f6c23ee57786df90907174336fec0db7f96ba1ab604316b780 *./config/routes.json
 b51caa98c4030a206bdbee89fb72ae638331007c4f3b37b7e10173ee825fd038 *./config/scoring/default-review-model.json
 b71cc623105844c588e4dc74a9e2d32b67ba97a2bcda5609069b2aa88125e31d *./content/backlog/editorial-calendar-legacy.csv
 c178a298ceda21c3470d8108f7fa4b905c829308480f6b74163a6ff0ac3c4593 *./content/backlog/legacy-first-8-briefs/01-what-is-biohacking-an-evidence-aware-beginner-s-guide.md
@@ -390,7 +391,7 @@ f62289451e40a03fda2ae13e70806b80ab9a2d418b2d68723ad2fc9b34278942 *./tests/e2e/sn
 6cb111643909d43f41c377d7449534278ada350abf95053bba9258d979484d94 *./tests/e2e/snapshots/visual.spec.js-snapshots/wearables-desktop-chromium-win32.png
 773b77883fc70a0517425cca33c73400c788dd40221a222577aeaf532ebbd768 *./tests/e2e/snapshots/visual.spec.js-snapshots/wearables-mobile-chromium-win32.png
 570f2a66f10110013d3440da394b3c689f1443e81adc48a0d86288894e1b2119 *./tests/e2e/snapshots/visual.spec.js-snapshots/wearables-tablet-chromium-win32.png
-c63ae8a7ba66728ec99713f00ef0bbdf7ff20f6644c5173a6faecc1b912a7ae1 *./tests/e2e/support/route-expectations.js
+5e12d154597d081da86014099aa34b9d89eedb47fd6cfe8acf360782ea2aa03f *./tests/e2e/support/route-expectations.js
 6dbe00408bf3643984446f30d9f14cd4d1ca505a93bb5829826c0138412f4a13 *./tests/e2e/visual.spec.js
 1e877fed98b634361dc19ed192512a24b8e2145acaee6bf7bf9b74be6be05aaa *./tests/fixtures/invalid.env
 9e6458af75bcfaa95c9b3375d1dedad6572ab031315cdbc31563021dd7c2ece0 *./tests/fixtures/malicious.env
@@ -462,6 +463,7 @@ e1ddd595ed9bd7ffa4259c3ec6568b346e4917775ec4af472f2e6df0eed23d65 *./tests/php/Ra
 68d4ef348cf34beef9c837ac2f018f2fbed0aeee9de4add36c1c8518e1f220fe *./tests/php/ReviewerCredentialCascadeTest.php
 48cb33bc6a5aa8159eb85ffe37ddd37f249db76a67d7f151a50c15b6fc05ed1d *./tests/php/ReviewerCredentialsTest.php
 f8ce4b20433121468aee3eceebb1a87601d8140ca9b55f13a1c384917ccffd7e *./tests/php/RolesTest.php
+3ea537fcc1b809230ecff23ac369a435b8ee43b3dab95d6450de66d2cd899192 *./tests/php/RouteContractTest.php
 d633fdf056900f38b27b0406528359dc8581973b44c737dc5900088012e35fbc *./tests/php/RoutesTest.php
 c078563eec20818eacbc5ae0d8e34940f1c4af23e9e8128946ff3fb7d197e750 *./tests/php/RuntimeConfigTest.php
 c61f7833b4ef1022f634bab75047f94950febd9779f2b00592f48109919b6a61 *./tests/php/SystemReadinessTest.php
