@@ -16,9 +16,9 @@
     "test:routes": "playwright test tests/e2e/routes.spec.js",
     "test:page-readiness": "playwright test tests/e2e/page-readiness.spec.js",
     "test:bootstrap": "playwright test tests/e2e/bootstrap.spec.js",
-    "test:lighthouse": "lhci autorun --config=lighthouserc.cjs",
+    "test:lighthouse": "node scripts/lighthouse-preflight.mjs && lhci autorun --config=lighthouserc.cjs",
     "audit:locked": "npm audit --audit-level=high",
-    "test:lighthouse:desktop": "lhci autorun --config=lighthouserc.desktop.cjs"
+    "test:lighthouse:desktop": "node scripts/lighthouse-preflight.mjs && lhci autorun --config=lighthouserc.desktop.cjs"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.10.0",

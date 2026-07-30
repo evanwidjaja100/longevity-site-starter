@@ -4,7 +4,7 @@ f47c059e7c00c6c18557084cfd9573197e795dc7b6d3969b945893cb686c66d2 *./.env.example
 ab784e205ddc66f723a611a866f1c48d930d3e0af446e65a33726c680321d86c *./.env.production.example
 8579dfc77acfbbc24ae474ae8a7397cf868c6fc0cfedd5d579714d004c7729e2 *./.gitattributes
 b37a107785de2cf26c10906292db47c266d668fdd3b131bd670645c424547852 *./.github/dependabot.yml
-3a77cbcf6accc306d7d1ffea88190197654a8a38ea35d527923ea87fee6baf8e *./.github/workflows/ci.yml
+8e5cdc15bb92ff0c590564f81287844a6dcb2adf14605a5c376e34cc98c2921c *./.github/workflows/ci.yml
 c2911c77c7804b1482bbf1f0f2c5d0b0f34ca81aa51b8c71d083f84afdd7b473 *./.github/workflows/scheduled-content-validation.yml
 f62e0dfd685dcd1bc596336b1364fc4a1e1cf6ba892b4a449ed98637da4fb6b5 *./.github/workflows/security.yml
 92c2384c236c6a0c7c50e79a2075f19c260a6bec1869ce6bec7632892f0ae06b *./.gitignore
@@ -247,7 +247,7 @@ b83bc73896abb9a39ff10873d1b075f680d7598515773a70a6c0110f53eccdbc *./docs/testing
 1cc756ba8de329077191f3d33b8f2761384b41587d88b9249233ddfb12c4c82e *./eslint.config.js
 46fdffe3aa23659f3f1cfc0d1aa2a0518aff852b6b98782ca85cc6e6206cdc6b *./lighthouserc.cjs
 480f16140635319499c2123756065de6ba6d275df79c0e701884873a27e474fd *./lighthouserc.desktop.cjs
-b44f87f170dd25a8dcfe47069837efa54ac751f39d8cdd8443958a6c16529821 *./lighthouserc.shared.cjs
+69f7e5aa95ac9889dd11ec9745fea96ff41b4ce04670e016b42d7401e98dcd18 *./lighthouserc.shared.cjs
 3fd4e85097a27d71bd818bb849e3fa3d7f3586aa4474108d60a6493c23d001fc *./opencode.jsonc
 b867e094694d2ce6f5f7f07297042109b8f4e97d4eb1175111d50ee4b73daf15 *./operations/90-day-roadmap.md
 d159b3c48b1a6c24875cfd32d47f156fea92385fd2f7c38724f2c04b1def48af *./operations/analytics-event-spec.md
@@ -269,7 +269,7 @@ ad341a34c736a6deee2183d14fa038cde1931e13f0e15aa4529e8bac5d499b6d *./operations/r
 6642db79761905918d19ebfb430f5c471e735cbe278bd229d3d513f5647a049b *./ops/monitoring/alert-rules.yml
 503f3669e561155a9f98116e058ea7ddcf874eed803d0c155562e7ea621bd547 *./ops/monitoring/prometheus-scrape.yml
 b9cda2faff197ce7934308f0389999ba6bcbde098734aef945d1f8eb8542af62 *./package-lock.json
-a99c8bc4a6413cd5e47e1647a1d510f264760ce9cb7ca3590148d933ad0bb1c8 *./package.json
+932d925bd29cd33c274b38d33f79044a714069342864d4c2dd8fe700867045a6 *./package.json
 bdc75d27f0b73475d3236a545177d394c6b2adee3be0edc688fcf06a3584bfb8 *./phpcs.xml.dist
 e57e4847627fb0c6ea710a4d5e988923a04e71aba574a96e45823eb735f8f707 *./phpstan.neon.dist
 c199e69e13537c229579ce4ee759cdc131cf326b0dc9a07bb9724e391805965c *./phpunit.xml.dist
@@ -292,6 +292,7 @@ b6a9a07fd110664bca9a517ab94ba7114ea0b419e59ea740d22483f3eca41a5a *./scripts/cron
 76f717be8886f84fd12664cfb79e9aa556d17046739c0f791b755ae11f5b9ca8 *./scripts/export-test-data.py
 d885e4ca622ac902db3018de1181ee7c6222effb367ea64eea1af1a33e266a80 *./scripts/generate-dependency-sbom.php
 632a4333dad937b367243da03f579d90405ecf0e9216e0414a58d9e0b66e3b8c *./scripts/generate-release-evidence.sh
+1bb22096b48162fe3bf02729ffec6046bea42ed5cc07e92d9131717d5dcdf059 *./scripts/lighthouse-preflight.mjs
 3ece357410ef7960b0cf5aa2afaa25c3231dc0a41b141b361f4a2adbdcf638f5 *./scripts/p0-3-baseline-screenshots.mjs
 462567ea5b77b116a7bbd5d4c25f9eff833680993274564e54602dd15d753ee8 *./scripts/populate-trust-pages.php
 0be55855efd9c446c837f1fa8e401129fcb72cc5a8816c9e1b1f00be7d05afb0 *./scripts/regenerate-manifest.php
@@ -418,7 +419,7 @@ fa99dde2ffdb4146e0abcee239ed36d9831b8abd77901bd148d1b502fc8cb161 *./tests/integr
 49425309b581c52d105d080059acf6eb62c1d1fd277194dcb570e358cc1d2ac6 *./tests/integration/sast-controls.sh
 b8f355c4a59e3876d8a45dacf32bc2dcb8cd9a707d58913c432813ac55ccdc58 *./tests/integration/supply-chain.sh
 a5d337dd08d5e3347636193d408e1b1d8957a805c87a2746ddea61260da74b94 *./tests/integration/system-readiness.sh
-d3da0d7762bfd8eadb0eb88b90f3b5076f2b19054f15f07d028a609a20cfc7af *./tests/load/k6-scenario.js
+4233d13ec7ff9ea598185504e70ec47abe1c4aef2749cd85e1804df852b9c988 *./tests/load/k6-scenario.js
 df814f740e0075a154d9c764fb1940c19e5ea27474dbd523dac9e1ee20c5ff52 *./tests/php/AdminUITest.php
 2e6dd1d5a1a183e4e7d0c36015e26b2e922ecc80394459ea0f37e85eb3b60576 *./tests/php/AdvisoryLockTest.php
 67756e001e32196382992142cabb8069061125018c6c88449cbac3658f1fef64 *./tests/php/AffiliateLifecycleTest.php

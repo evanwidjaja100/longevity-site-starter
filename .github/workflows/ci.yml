@@ -279,7 +279,7 @@ jobs:
     timeout-minutes: 15
     env:
       EVIDENCE_ACTION_SHAS: 'actions/checkout@11d5960a326750d5838078e36cf38b85af677262 actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
-      EVIDENCE_CONTAINER_IMAGES: 'mysql@sha256:62fb722c78b24245ddff1796a0fcee4a49cc5b87e0aaaf20c92d1da9e0a2497b longevity-wordpress:dev longevity-wpcli:dev grafana/k6:latest'
+      EVIDENCE_CONTAINER_IMAGES: 'mysql@sha256:62fb722c78b24245ddff1796a0fcee4a49cc5b87e0aaaf20c92d1da9e0a2497b longevity-wordpress:dev longevity-wpcli:dev grafana/k6:2.1.0@sha256:65c920dc067d5e2e00befbf982af6ad6ad0117034e8b1c65817c7975c52d4669'
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
@@ -291,7 +291,7 @@ jobs:
       - run: bash scripts/ci-setup.sh
       - name: Initialize evidence directory
         run: mkdir -p reports/load-smoke
-      - name: k6 smoke load (non-blocking)
+      - name: k6 candidate smoke gate (blocking; threshold failure fails this job)
         env:
           WP_SITE_URL: http://localhost:8080
           PLAYWRIGHT_JUNIT_OUTPUT_FILE: reports/load-smoke/k6-junit.xml
@@ -299,7 +299,7 @@ jobs:
           docker run --rm --network host \
             -e WP_SITE_URL=http://localhost:8080 \
             -v "$PWD:/work" -w /work \
-            grafana/k6:latest \
+            grafana/k6:2.1.0@sha256:65c920dc067d5e2e00befbf982af6ad6ad0117034e8b1c65817c7975c52d4669 \
             k6 run tests/load/k6-scenario.js
       - name: Finalize evidence
         run: php scripts/write-release-evidence-metadata.php load-smoke load-smoke-evidence reports/load-smoke success
