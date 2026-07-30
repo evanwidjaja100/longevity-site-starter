@@ -170,7 +170,7 @@ e3c751f038941ae186c91f73a4972619b0f2c71eed6e7a2e2ae3fcd1cb3ca97e *./docs/operati
 90923c94e202e65892a9b582134fc8d72a63e5ac4a21092829b6a651116019fb *./docs/operations/incident-response.md
 5c2f2399236bb5d449b8807cd51ab1cd5302441ae3a80b53a6f8b095590f7401 *./docs/operations/local-development.md
 77e7a200ac5145398643d8edee32cfb7cbfd98fc4589892c363d4476ff9cce2a *./docs/operations/managed-wordpress-deployment.md
-57d9b6181d27d6604084a5eaec019e283de74d71defaf4422d842ad55d0bdc6e *./docs/operations/monitoring.md
+d17a7e5088cea834574aee59e77918a1f5919d5c90519066552548f85a97fb75 *./docs/operations/monitoring.md
 1798fac3fe301a03a3d993bbcccb3d442dd12d6af02aa57ff03cf458bc3387d0 *./docs/operations/performance-baselines.md
 51a7c556d6b746898099ea4c773694976c4566f143c85521a2b27ff438900e6b *./docs/operations/product-kpis.md
 dd1b9c5a87122421a5a4c6f268a717c9baafb27336cf912f6a4fcba96c33e800 *./docs/operations/release-process.md
@@ -263,10 +263,11 @@ c4de6748e1b0344b12c7ced99fe8eab412c1f7b68fa2ead5948ce684685981d9 *./operations/r
 ad341a34c736a6deee2183d14fa038cde1931e13f0e15aa4529e8bac5d499b6d *./operations/runbooks/audit-chain-integrity-failure.md
 631a39d991eb8791cd0f1fc469c7d7771a5399b0e8216469465755da5f5b2566 *./operations/runbooks/database-unavailable.md
 5f4201033b1d84f40458001161363b79ba3e0dea9c51f15d76b3bdf7aa27fe8a *./operations/runbooks/freshness-cron-stuck.md
+10230a1a0b5dba0c9acd827767e589b02623804e1c005aa2225c78a7c0ddf995 *./operations/runbooks/invalidation-fallback-failure.md
 65825685f547b81f6e98a54e8c29882117edc034aba0625de993964885d21b8c *./operations/runbooks/lock-exhaustion.md
 3efb8961f33f796adf881a7490c3abd7725c10dbcc565a88fde29b4eb7babbbf *./operations/runbooks/medical-safety-correction.md
 71a79fd4d770c4a061003e7aa0fbe80a9ff9c8fb411d9d42b8dff5a825337970 *./operations/usability-review-plan.md
-6642db79761905918d19ebfb430f5c471e735cbe278bd229d3d513f5647a049b *./ops/monitoring/alert-rules.yml
+289ebb2e278406e6d06036046f31c493e4865e32bea9d0cfe836fc3d05ea93e6 *./ops/monitoring/alert-rules.yml
 503f3669e561155a9f98116e058ea7ddcf874eed803d0c155562e7ea621bd547 *./ops/monitoring/prometheus-scrape.yml
 b9cda2faff197ce7934308f0389999ba6bcbde098734aef945d1f8eb8542af62 *./package-lock.json
 932d925bd29cd33c274b38d33f79044a714069342864d4c2dd8fe700867045a6 *./package.json
@@ -448,6 +449,7 @@ c0264fecf842d17c4edd2acb7508b8266361e37d9eed6c8107d5bb962bbd9faa *./tests/php/In
 b3f6660e5d9157033f36ebde3e1f626600bf623f57eda743145e76efccb10783 *./tests/php/LegalHoldTest.php
 70b496d694d1ac452e04999e97506c8340b85c62ade5b1cfbb1966e2df35d486 *./tests/php/MetaAuthorizationTest.php
 cb7f5320214a0d44553016595fb0c7c74e8f9cff0d36376f91b091dc02666828 *./tests/php/MetaRegistryTest.php
+652f98d9bc4ab54605bdd78ee06c311ee47980161d46dfdc87a61eba7b86c8bb *./tests/php/MetricsCatalogTest.php
 988406878622d32b33ee6df4a52ad64cefd8e1bc3b6152c545484b6fe90f0723 *./tests/php/MigrationsLockTest.php
 70cb7d9d37f3d45734d9e0f074088af7de411caa7e09d254d99a04e01c061417 *./tests/php/OverrideIntentTest.php
 2ecf3826a3c640ef6da690f8c58037e1d396aeeefc94d3e42ec030845b017a9d *./tests/php/PreflightTest.php
