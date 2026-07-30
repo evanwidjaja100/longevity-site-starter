@@ -6,13 +6,17 @@
 		<exclude>tests/php/RoutesTest.php</exclude>
 	</testsuite>
   </testsuites>
-  <coverage>
+  <!--
+	Coverage semantics (PRV3-QA-03):
+	- Local `composer test` runs assertions only; no coverage driver is required
+	  and a missing driver can never turn a passing run into a failure.
+	- CI requests coverage explicitly (see .github/workflows/ci.yml quality-php:
+	  `composer test - - -coverage-clover=coverage.xml`) under PCOV and enforces
+	  the minimum threshold; a missing driver there fails with a targeted error.
+  -->
+  <source>
 	<include>
 		<directory suffix=".php">wp-content/mu-plugins/longevity-core</directory>
 	</include>
-	<report>
-		<clover outputFile="coverage.xml"/>
-		<text outputFile="php://stdout"/>
-	</report>
-  </coverage>
+  </source>
 </phpunit>
