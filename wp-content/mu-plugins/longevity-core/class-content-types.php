@@ -69,13 +69,21 @@ final class Content_Types {
 					'protected'                 => true,
 					'show_in_admin_status_list' => true,
 					'show_in_admin_all_list'    => true,
-					'label_count'               => _n_noop( $label . ' <span class="count">(%s)</span>', $label . ' <span class="count">(%s)</span>', 'longevity-core' ),
+					'label_count'               => _n_noop( $label . ' <span class="count">(%s)</span>', $label . ' <span class="count">(%s)</span>', 'longevity-core' ), // phpcs:ignore WordPress.WP.I18n.NonSingularStringLiteralSingular, WordPress.WP.I18n.NonSingularStringLiteralPlural -- Internal editorial status labels are generated from the status map; the dynamic prefix cannot be a literal.
 				)
 			);
 		}
 	}
 
-	/** Register an administrative CPT. */
+	/**
+	 * Register an administrative CPT.
+	 *
+	 * @param string $post_type  Post type key.
+	 * @param string $plural     Plural display label.
+	 * @param string $singular   Singular display label.
+	 * @param string $icon       Dashicon name for the menu.
+	 * @param string $capability Capability required to manage the type.
+	 */
 	private static function register_private_type( string $post_type, string $plural, string $singular, string $icon, string $capability ): void {
 		register_post_type(
 			$post_type,

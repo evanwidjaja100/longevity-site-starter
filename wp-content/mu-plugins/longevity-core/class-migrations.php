@@ -181,7 +181,11 @@ final class Migrations {
 		return $result;
 	}
 
-	/** Human-readable fail-closed explanation for each refused lock state. */
+	/**
+	 * Human-readable fail-closed explanation for each refused lock state.
+	 *
+	 * @param string $state Advisory lock state constant.
+	 */
 	private static function lock_refusal_message( string $state ): string {
 		if ( Advisory_Lock::CONTENDED === $state ) {
 			return 'Migration lock is held by another process. It releases automatically when that process finishes or its database connection closes; retry shortly.';
@@ -225,7 +229,12 @@ final class Migrations {
 		}
 	}
 
-	/** Execute an individual restart-safe migration. */
+	/**
+	 * Execute an individual restart-safe migration.
+	 *
+	 * @param int $version Migration version to apply.
+	 * @throws \RuntimeException When a migration step cannot enforce its schema or integrity requirements.
+	 */
 	private static function run_version( int $version ): void {
 		if ( 1 === $version ) {
 			add_option( 'lel_last_freshness_report', array(), '', false );
@@ -342,14 +351,22 @@ final class Migrations {
 		}
 	}
 
-	/** Validate schema postconditions after each migration version. */
+	/**
+	 * Validate schema postconditions after each migration version.
+	 *
+	 * @param int $version Migration version just applied.
+	 */
 	private static function validate_postconditions( int $version ): void {
 		foreach ( self::schema_contracts( $version ) as $table => $contract ) {
 			self::validate_table_contract( $version, $table, $contract['columns'], $contract['indexes'] );
 		}
 	}
 
-	/** Complete custom-table contracts introduced or repaired by a version. */
+	/**
+	 * Complete custom-table contracts introduced or repaired by a version.
+	 *
+	 * @param int $version Migration version whose contracts are needed.
+	 */
 	private static function schema_contracts( int $version ): array {
 		global $wpdb;
 		$contracts = array(
@@ -476,7 +493,15 @@ final class Migrations {
 		return $result;
 	}
 
-	/** Assert every required column and named index without performing DDL. */
+	/**
+	 * Assert every required column and named index without performing DDL.
+	 *
+	 * @param int                 $version Migration version under validation.
+	 * @param string              $table   Table name to inspect.
+	 * @param array<int, string>  $columns Required column names.
+	 * @param array<string, bool> $indexes Required index names mapped to uniqueness.
+	 * @throws \RuntimeException When a required column or index is missing.
+	 */
 	private static function validate_table_contract( int $version, string $table, array $columns, array $indexes ): void {
 		global $wpdb;
 		foreach ( $columns as $column ) {
@@ -498,7 +523,12 @@ final class Migrations {
 		}
 	}
 
-	/** Advance the migration version only when the durable reread confirms it. */
+	/**
+	 * Advance the migration version only when the durable reread confirms it.
+	 *
+	 * @param int $version Migration version to persist.
+	 * @throws \RuntimeException When the stored version cannot be durably confirmed.
+	 */
 	private static function write_data_version( int $version ): void {
 		$updated = update_option( 'lel_data_version', $version, false );
 		$stored  = (int) get_option( 'lel_data_version', 0 );
@@ -507,7 +537,11 @@ final class Migrations {
 		}
 	}
 
-	/** Ensure WordPress's additive schema helper is available. */
+	/**
+	 * Ensure WordPress's additive schema helper is available.
+	 *
+	 * @throws \RuntimeException When dbDelta cannot be loaded.
+	 */
 	private static function load_db_delta(): void {
 		if ( ! function_exists( 'dbDelta' ) && defined( 'ABSPATH' ) && is_readable( ABSPATH . 'wp-admin/includes/upgrade.php' ) ) {
 			require_once ABSPATH . 'wp-admin/includes/upgrade.php';
@@ -579,7 +613,11 @@ final class Migrations {
 		update_option( 'lel_legacy_approvals_marked', $total_marked, false );
 	}
 
-	/** Map compatibility statuses to snapshot types. */
+	/**
+	 * Map compatibility statuses to snapshot types.
+	 *
+	 * @param string $key Compatibility status meta key.
+	 */
 	private static function approval_type_for_status( string $key ): string {
 		return array(
 			'fact_check_status'           => 'fact_check',

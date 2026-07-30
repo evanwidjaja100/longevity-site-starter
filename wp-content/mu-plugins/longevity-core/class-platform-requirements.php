@@ -17,7 +17,11 @@ final class Platform_Requirements {
 
 	public const REQUIRED_EXTENSIONS = array( 'json', 'mbstring', 'hash', 'filter', 'pcre' );
 
-	/** Evaluate the actual WordPress runtime and database capabilities. */
+	/**
+	 * Evaluate the actual WordPress runtime and database capabilities.
+	 *
+	 * @param bool $require_wp_cli Whether WP-CLI availability is also required.
+	 */
 	public static function check( bool $require_wp_cli = false ): array {
 		global $wpdb, $wp_version;
 		$loaded = array_values( array_filter( self::REQUIRED_EXTENSIONS, 'extension_loaded' ) );
@@ -32,7 +36,12 @@ final class Platform_Requirements {
 		);
 	}
 
-	/** Evaluate only PHP and extension requirements. */
+	/**
+	 * Evaluate only PHP and extension requirements.
+	 *
+	 * @param string             $php_version       PHP version string to test.
+	 * @param array<int, string> $loaded_extensions Names of loaded PHP extensions.
+	 */
 	public static function evaluate( string $php_version, array $loaded_extensions ): array {
 		$results   = array();
 		$results[] = array(
@@ -51,7 +60,15 @@ final class Platform_Requirements {
 		return $results;
 	}
 
-	/** Pure evaluator for WordPress, MySQL, and required database capabilities. */
+	/**
+	 * Pure evaluator for WordPress, MySQL, and required database capabilities.
+	 *
+	 * @param string               $php_version       PHP version string to test.
+	 * @param array<int, string>   $loaded_extensions Names of loaded PHP extensions.
+	 * @param string               $wordpress_version WordPress core version string.
+	 * @param array<string, mixed> $database          Database version and capability facts.
+	 * @param bool|null            $wp_cli            WP-CLI availability, or null to skip that check.
+	 */
 	public static function evaluate_runtime( string $php_version, array $loaded_extensions, string $wordpress_version, array $database, ?bool $wp_cli = null ): array {
 		$results   = self::evaluate( $php_version, $loaded_extensions );
 		$wp_parsed = self::wordpress_version( $wordpress_version );
@@ -62,6 +79,7 @@ final class Platform_Requirements {
 		);
 
 		$database_version = (string) ( $database['version'] ?? '' );
+		// phpcs:ignore PHPCompatibility.Extensions.RemovedExtensions.mysql_DeprecatedRemoved -- False positive: first-party static method, not the removed mysql_* extension.
 		$mysql_version    = self::mysql_version( $database_version );
 		$results[]        = array(
 			'requirement' => 'mysql',
@@ -125,7 +143,13 @@ final class Platform_Requirements {
 		);
 	}
 
-	/** A standard capability result. */
+	/**
+	 * A standard capability result.
+	 *
+	 * @param string $name        Machine requirement identifier.
+	 * @param string $description Human-readable capability description.
+	 * @param bool   $satisfied   Whether the capability is available.
+	 */
 	private static function capability( string $name, string $description, bool $satisfied ): array {
 		return array(
 			'requirement' => $name,
@@ -134,7 +158,11 @@ final class Platform_Requirements {
 		);
 	}
 
-	/** Accept only plain numeric core release strings; pre-release or mangled versions never satisfy the baseline. */
+	/**
+	 * Accept only plain numeric core release strings; pre-release or mangled versions never satisfy the baseline.
+	 *
+	 * @param string $raw Raw WordPress version string to validate.
+	 */
 	private static function wordpress_version( string $raw ): ?string {
 		$raw = trim( $raw );
 		if ( 1 !== preg_match( '/\A\d+(?:\.\d+){0,3}\z/', $raw ) ) {
@@ -143,7 +171,11 @@ final class Platform_Requirements {
 		return $raw;
 	}
 
-	/** Parse only the tested Oracle MySQL family; MariaDB needs separate qualification. */
+	/**
+	 * Parse only the tested Oracle MySQL family; MariaDB needs separate qualification.
+	 *
+	 * @param string $raw Raw database VERSION() string to parse.
+	 */
 	private static function mysql_version( string $raw ): ?string {
 		if ( '' === $raw || false !== stripos( $raw, 'mariadb' ) || 1 !== preg_match( '/\A(\d+(?:\.\d+){1,2})/', $raw, $matches ) ) {
 			return null;

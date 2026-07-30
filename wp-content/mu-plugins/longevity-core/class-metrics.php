@@ -15,7 +15,11 @@ defined( 'ABSPATH' ) || exit;
 
 /** Builds a Prometheus text-format metrics payload. */
 final class Metrics {
-	/** Map a readiness status string to a numeric gauge value. */
+	/**
+	 * Map a readiness status string to a numeric gauge value.
+	 *
+	 * @param string $status Normalized readiness status keyword.
+	 */
 	private static function status_value( string $status ): float {
 		switch ( $status ) {
 			case 'ok':
@@ -132,8 +136,13 @@ final class Metrics {
 		return implode( "\n", $lines ) . "\n";
 	}
 
-	/** Format a float without a trailing locale decimal comma. */
+	/**
+	 * Format a float without a trailing locale decimal comma.
+	 *
+	 * @param float $value Gauge value to format.
+	 */
 	private static function format_float( float $value ): string {
-		return rtrim( rtrim( number_format( $value, 1, '.', '' ), '0' ), '.' ) ?: '0';
+		$trimmed = rtrim( rtrim( number_format( $value, 1, '.', '' ), '0' ), '.' );
+		return $trimmed ? $trimmed : '0';
 	}
 }

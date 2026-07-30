@@ -17,7 +17,11 @@ final class Override_Intent {
 	public const STATE_FAILED      = 'failed';
 	public const STATE_COMPENSATED = 'compensated';
 
-	/** @var array<string, array<string, mixed>> Request-local cache; the database remains authoritative. */
+	/**
+	 * Request-local cache of intent rows keyed by correlation ID.
+	 *
+	 * @var array<string, array<string, mixed>> Request-local cache; the database remains authoritative.
+	 */
 	private static array $cache = array();
 
 	/** Table name. */
@@ -124,13 +128,27 @@ final class Override_Intent {
 		return self::STATE_AUTHORIZED;
 	}
 
-	/** Whether an intent still authorizes exactly one pending status transition. */
+	/**
+	 * Whether an intent still authorizes exactly one pending status transition.
+	 *
+	 * @param string $correlation_id Caller-supplied idempotency key.
+	 * @param int    $post_id        Post the transition applies to.
+	 * @return bool Whether the intent authorizes the transition.
+	 */
 	public static function authorizes_transition( string $correlation_id, int $post_id ): bool {
 		$record = self::intent( $correlation_id );
 		return is_array( $record ) && $post_id === (int) $record['post_id'] && self::STATE_AUTHORIZED === (string) $record['state'];
 	}
 
-	/** Finalize only after WordPress reports the actual post-status transition. */
+	/**
+	 * Finalize only after WordPress reports the actual post-status transition.
+	 *
+	 * @param string $correlation_id         Caller-supplied idempotency key.
+	 * @param int    $post_id                Post the transition applies to.
+	 * @param string $actual_status          Status WordPress actually applied.
+	 * @param string $actual_previous_status Prior status WordPress reported, if known.
+	 * @return string One of the STATE_* constants.
+	 */
 	public static function finalize( string $correlation_id, int $post_id, string $actual_status, string $actual_previous_status = '' ): string {
 		$record = self::intent( $correlation_id );
 		if ( ! $record || $post_id !== (int) $record['post_id'] ) {
@@ -171,7 +189,14 @@ final class Override_Intent {
 		return self::STATE_FAILED;
 	}
 
-	/** Record successful restoration of the immutable previous status. */
+	/**
+	 * Record successful restoration of the immutable previous status.
+	 *
+	 * @param string $correlation_id Caller-supplied idempotency key.
+	 * @param int    $post_id        Post the transition applies to.
+	 * @param string $actual_status  Status WordPress restored to.
+	 * @return string One of the STATE_* constants.
+	 */
 	public static function compensate( string $correlation_id, int $post_id, string $actual_status ): string {
 		$record = self::intent( $correlation_id );
 		if ( ! $record || $post_id !== (int) $record['post_id'] || ! in_array( (string) $record['state'], array( self::STATE_FAILED, self::STATE_AUTHORIZED ), true ) || ! hash_equals( (string) $record['previous_status'], $actual_status ) ) {
@@ -184,7 +209,13 @@ final class Override_Intent {
 		return self::STATE_COMPENSATED;
 	}
 
-	/** Read a durable intent by correlation ID. */
+	/**
+	 * Read a durable intent by correlation ID.
+	 *
+	 * @param string $correlation_id Caller-supplied idempotency key.
+	 * @param bool   $refresh        Whether to bypass the request-local cache.
+	 * @return array|null Intent row, or null when absent.
+	 */
 	public static function intent( string $correlation_id, bool $refresh = false ): ?array {
 		global $wpdb;
 		if ( ! $refresh && isset( self::$cache[ $correlation_id ] ) ) {
@@ -202,7 +233,13 @@ final class Override_Intent {
 		return $row;
 	}
 
-	/** Normalize and validate every immutable authorization field. */
+	/**
+	 * Normalize and validate every immutable authorization field.
+	 *
+	 * @param string $correlation_id Caller-supplied idempotency key.
+	 * @param array  $fields         Raw override fields and validation snapshot.
+	 * @return array|null Normalized record, or null when validation fails.
+	 */
 	private static function normalize( string $correlation_id, array $fields ): ?array {
 		$correlation_id = trim( $correlation_id );
 		$reason         = trim( sanitize_textarea_field( (string) ( $fields['reason'] ?? '' ) ) );
@@ -239,7 +276,13 @@ final class Override_Intent {
 		);
 	}
 
-	/** Return a prior result only when the idempotency key describes the same immutable request. */
+	/**
+	 * Return a prior result only when the idempotency key describes the same immutable request.
+	 *
+	 * @param array $existing  Stored intent row.
+	 * @param array $requested Normalized incoming request.
+	 * @return string One of the STATE_* constants.
+	 */
 	private static function replay_state( array $existing, array $requested ): string {
 		foreach ( array( 'post_id', 'previous_status', 'requested_status', 'user_id', 'capability_snapshot', 'fingerprint', 'approval_state', 'reason', 'channel', 'source_sha', 'plugin_version' ) as $field ) {
 			if ( (string) ( $existing[ $field ] ?? '' ) !== (string) $requested[ $field ] ) {
@@ -267,7 +310,17 @@ final class Override_Intent {
 		return in_array( $state, array( self::STATE_AUTHORIZED, self::STATE_APPLIED, self::STATE_FAILED, self::STATE_COMPENSATED ), true ) ? $state : self::STATE_FAILED;
 	}
 
-	/** Atomic state transition; immutable columns are never updated. */
+	/**
+	 * Atomic state transition; immutable columns are never updated.
+	 *
+	 * @param string $correlation_id   Caller-supplied idempotency key.
+	 * @param int    $post_id          Post the transition applies to.
+	 * @param string $from             Required current state.
+	 * @param string $to               Target state.
+	 * @param string $result           Result label stored with the row.
+	 * @param string $timestamp_column Timestamp column to stamp for this transition.
+	 * @return bool Whether exactly one row transitioned.
+	 */
 	private static function transition( string $correlation_id, int $post_id, string $from, string $to, string $result, string $timestamp_column ): bool {
 		global $wpdb;
 		$columns = array( 'authorized_at', 'applied_at', 'failed_at', 'compensated_at' );
@@ -290,7 +343,13 @@ final class Override_Intent {
 		return true;
 	}
 
-	/** Immutable audit projection shared by each state transition. */
+	/**
+	 * Immutable audit projection shared by each state transition.
+	 *
+	 * @param array  $record Stored intent row.
+	 * @param string $result Result label for this projection.
+	 * @return array Audit payload fields.
+	 */
 	private static function audit_payload( array $record, string $result ): array {
 		return array(
 			'correlation_id'      => $record['request_id'],

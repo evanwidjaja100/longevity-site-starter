@@ -13,10 +13,18 @@ defined( 'ABSPATH' ) || exit;
 final class Publication_Gates {
 	private const TRANSIENT_PREFIX = 'lel_gate_notice_';
 
-	/** @var array<int, string> Authorized correlations awaiting WordPress's actual transition hook. */
+	/**
+	 * Authorized correlations awaiting WordPress's actual transition hook.
+	 *
+	 * @var array<int, string>
+	 */
 	private static array $pending_overrides = array();
 
-	/** Prevent nested compensation transitions from finalizing the original intent twice. */
+	/**
+	 * Prevent nested compensation transitions from finalizing the original intent twice.
+	 *
+	 * @var bool
+	 */
 	private static bool $compensating = false;
 
 	/** Register hooks. */
@@ -31,7 +39,12 @@ final class Publication_Gates {
 		add_action( 'wp_after_insert_post', array( self::class, 'release_after_post_update' ), 999, 1 );
 	}
 
-	/** Evaluate a post from persisted WordPress state. */
+	/**
+	 * Evaluate a post from persisted WordPress state.
+	 *
+	 * @param int   $post_id Post ID to evaluate.
+	 * @param array $overrides Prospective field and metadata overrides.
+	 */
 	public static function evaluate( int $post_id, array $overrides = array() ): Gate_Result {
 		$post = get_post( $post_id );
 		if ( ! $post ) {
@@ -76,7 +89,11 @@ final class Publication_Gates {
 		return $result;
 	}
 
-	/** Pure readiness evaluation for testability. */
+	/**
+	 * Pure readiness evaluation for testability.
+	 *
+	 * @param array $context Resolved gate evaluation context values.
+	 */
 	public static function evaluate_values( array $context ): Gate_Result {
 		$result = new Gate_Result();
 		$today  = Date_Validator::is_valid( (string) ( $context['as_of_date'] ?? '' ) ) ? (string) $context['as_of_date'] : Date_Validator::today();
@@ -308,17 +325,31 @@ final class Publication_Gates {
 		return $result;
 	}
 
-	/** Compute the prospective combined hash for a post with pending changes. */
+	/**
+	 * Compute the prospective combined hash for a post with pending changes.
+	 *
+	 * @param int   $post_id Post ID being evaluated.
+	 * @param array $prospective Prospective post state from overrides.
+	 */
 	private static function prospective_hash( int $post_id, array $prospective ): string {
 		return (string) Approval_Fingerprint::build( $post_id, 'editorial', $prospective )['combined_hash'];
 	}
 
-	/** Verify editorial approval covers the prospective state (DB + pending changes). */
+	/**
+	 * Verify editorial approval covers the prospective state (DB + pending changes).
+	 *
+	 * @param int   $post_id Post ID being evaluated.
+	 * @param array $prospective Prospective post state to verify.
+	 */
 	private static function prospective_state_matches_approval( int $post_id, array $prospective ): bool {
 		return Approval_Service::is_current_for_state( $post_id, 'editorial', $prospective );
 	}
 
-	/** Convert gate overrides into the canonical state used by every approval. */
+	/**
+	 * Convert gate overrides into the canonical state used by every approval.
+	 *
+	 * @param array $overrides Gate overrides supplied by the caller.
+	 */
 	private static function prospective_state( array $overrides ): array {
 		$state = array();
 		foreach ( array( 'post_title', 'post_excerpt', 'post_content', 'post_author', 'featured_image_id' ) as $key ) {
@@ -341,7 +372,12 @@ final class Publication_Gates {
 		return $state;
 	}
 
-	/** Enforce classic-editor publishing by preserving content as a draft. */
+	/**
+	 * Enforce classic-editor publishing by preserving content as a draft.
+	 *
+	 * @param array $data Sanitized post data about to be saved.
+	 * @param array $postarr Raw post array submitted to WordPress.
+	 */
 	public static function enforce_classic_publish( array $data, array $postarr ): array {
 		if ( ! in_array( $data['post_type'] ?? '', array( 'post', 'review' ), true ) || ! in_array( $data['post_status'] ?? '', array( 'publish', 'future', 'private' ), true ) ) {
 			return $data;
@@ -424,7 +460,12 @@ final class Publication_Gates {
 		return $data;
 	}
 
-	/** Enforce REST/block-editor publishing with a structured error. */
+	/**
+	 * Enforce REST/block-editor publishing with a structured error.
+	 *
+	 * @param \stdClass        $prepared_post Post object prepared for insertion.
+	 * @param \WP_REST_Request $request Incoming REST request.
+	 */
 	public static function enforce_rest_publish( $prepared_post, \WP_REST_Request $request ) {
 		$status_param = $request->get_param( 'status' );
 		$status       = (string) ( null !== $status_param ? $status_param : ( $prepared_post->post_status ?? '' ) );
@@ -526,12 +567,22 @@ final class Publication_Gates {
 		);
 	}
 
-	/** Release the publication lock after WordPress has saved the post. */
+	/**
+	 * Release the publication lock after WordPress has saved the post.
+	 *
+	 * @param int $post_id Post ID that was saved.
+	 */
 	public static function release_after_post_update( int $post_id ): void {
 		Publication_Lock::release( $post_id );
 	}
 
-	/** Finalize an authorized intent only after WordPress reports the real status transition. */
+	/**
+	 * Finalize an authorized intent only after WordPress reports the real status transition.
+	 *
+	 * @param string   $new_status New post status after the transition.
+	 * @param string   $old_status Previous post status before the transition.
+	 * @param \WP_Post $post Post being transitioned.
+	 */
 	public static function finalize_override( string $new_status, string $old_status, \WP_Post $post ): void {
 		if ( self::$compensating || ! isset( self::$pending_overrides[ $post->ID ] ) ) {
 			return;
@@ -589,7 +640,13 @@ final class Publication_Gates {
 		echo '</ul></div>';
 	}
 
-	/** Log status changes. */
+	/**
+	 * Log status changes.
+	 *
+	 * @param string   $new_status New post status after the transition.
+	 * @param string   $old_status Previous post status before the transition.
+	 * @param \WP_Post $post Post being transitioned.
+	 */
 	public static function log_status_transition( string $new_status, string $old_status, \WP_Post $post ): void {
 		if ( $new_status === $old_status || ! in_array( $post->post_type, array( 'post', 'review' ), true ) ) {
 			return;
@@ -604,12 +661,26 @@ final class Publication_Gates {
 		);
 	}
 
-	/** Persist a non-sensitive append-only governance event. */
+	/**
+	 * Persist a non-sensitive append-only governance event.
+	 *
+	 * @param int    $post_id Post the event relates to.
+	 * @param string $event Machine-readable event key.
+	 * @param array  $details Non-sensitive event context.
+	 */
 	public static function log_event( int $post_id, string $event, array $details = array() ): void {
 		Audit_Log::record( $event, 'post', $post_id, $details, get_current_user_id(), 'workflow' );
 	}
 
-	/** Add a required text check. */
+	/**
+	 * Add a required text check.
+	 *
+	 * @param Gate_Result $result Gate result to record the outcome on.
+	 * @param array       $context Evaluation context to read from.
+	 * @param string      $field Context key holding the required text.
+	 * @param string      $code Blocking code emitted when the field is empty.
+	 * @param string      $message Message shown when the field is empty.
+	 */
 	private static function required_text_check( Gate_Result $result, array $context, string $field, string $code, string $message ): void {
 		if ( '' === trim( (string) ( $context[ $field ] ?? '' ) ) ) {
 			$result->block( $code, $message );
@@ -618,7 +689,13 @@ final class Publication_Gates {
 		}
 	}
 
-	/** Whether a value is a valid date relative to the reference (future or non-future). */
+	/**
+	 * Whether a value is a valid date relative to the reference (future or non-future).
+	 *
+	 * @param string $value Date string to validate.
+	 * @param string $today Reference date to compare against.
+	 * @param bool   $future Whether the value must be after the reference.
+	 */
 	private static function is_date_relative( string $value, string $today, bool $future ): bool {
 		if ( ! Date_Validator::is_valid( $value ) ) {
 			return false;
@@ -627,7 +704,11 @@ final class Publication_Gates {
 		return $future ? $cmp > 0 : $cmp <= 0;
 	}
 
-	/** Include metadata that WordPress will write after the post data filter. */
+	/**
+	 * Include metadata that WordPress will write after the post data filter.
+	 *
+	 * @param array $postarr Raw post array submitted to WordPress.
+	 */
 	private static function postarr_meta_overrides( array $postarr ): array {
 		$input       = isset( $postarr['meta_input'] ) && is_array( $postarr['meta_input'] ) ? $postarr['meta_input'] : array();
 		$overrides   = array();
@@ -644,7 +725,11 @@ final class Publication_Gates {
 		return $overrides;
 	}
 
-	/** Read a classic request's prospective featured-image relationship. */
+	/**
+	 * Read a classic request's prospective featured-image relationship.
+	 *
+	 * @param array $postarr Raw post array submitted to WordPress.
+	 */
 	private static function classic_featured_image( array $postarr ): ?int {
 		if ( isset( $postarr['meta_input'] ) && is_array( $postarr['meta_input'] ) && array_key_exists( '_thumbnail_id', $postarr['meta_input'] ) ) {
 			return absint( $postarr['meta_input']['_thumbnail_id'] );
@@ -653,7 +738,11 @@ final class Publication_Gates {
 		return array_key_exists( '_thumbnail_id', $_POST ) ? absint( wp_unslash( $_POST['_thumbnail_id'] ) ) : null;
 	}
 
-	/** Read authorized metadata submitted by the classic editor for same-request evaluation. */
+	/**
+	 * Read authorized metadata submitted by the classic editor for same-request evaluation.
+	 *
+	 * @param int $post_id Post being saved.
+	 */
 	private static function classic_request_overrides( int $post_id ): array {
 		if ( empty( $_POST['longevity_editorial_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['longevity_editorial_nonce'] ) ), 'longevity_save_editorial' ) ) {
 			return array();
@@ -690,7 +779,12 @@ final class Publication_Gates {
 		return $overrides;
 	}
 
-	/** Values that are projected only by an approval service, never by a request. */
+	/**
+	 * Values that are projected only by an approval service, never by a request.
+	 *
+	 * @param string $key Metadata key being written.
+	 * @param mixed  $value Proposed metadata value.
+	 */
 	public static function service_only_meta( string $key, $value ): bool {
 		$value = is_scalar( $value ) ? (string) $value : '';
 		$final = array(
@@ -703,7 +797,18 @@ final class Publication_Gates {
 		return ( 'medical_review_attested' === $key && '1' === $value ) || ( isset( $final[ $key ] ) && in_array( $value, $final[ $key ], true ) );
 	}
 
-	/** Create or replay a durable authorization and remember it for post-transition finalization. */
+	/**
+	 * Create or replay a durable authorization and remember it for post-transition finalization.
+	 *
+	 * @param int    $post_id Post being published.
+	 * @param string $previous_status Status before the override.
+	 * @param string $requested_status Status the caller intends to set.
+	 * @param string $fingerprint Prospective editorial approval fingerprint.
+	 * @param string $reason Reviewer-supplied override reason.
+	 * @param string $channel Origin channel (classic or rest).
+	 * @param bool   $nonce_verified Whether the request nonce was verified.
+	 * @param string $correlation_id Idempotency correlation ID.
+	 */
 	private static function authorize_override( int $post_id, string $previous_status, string $requested_status, string $fingerprint, string $reason, string $channel, bool $nonce_verified, string $correlation_id ): string {
 		$user_id          = get_current_user_id();
 		$current_approval = Approval_Repository::current( $post_id, 'editorial' );
@@ -746,7 +851,11 @@ final class Publication_Gates {
 		return sanitize_text_field( (string) $value );
 	}
 
-	/** Store a user-scoped notice. */
+	/**
+	 * Store a user-scoped notice.
+	 *
+	 * @param array $messages Notice messages to store.
+	 */
 	private static function set_notice( array $messages ): void {
 		set_transient( self::TRANSIENT_PREFIX . get_current_user_id(), array_values( array_unique( array_map( 'sanitize_text_field', $messages ) ) ), MINUTE_IN_SECONDS );
 	}
@@ -759,7 +868,11 @@ final class Publication_Gates {
 		return wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['longevity_editorial_nonce'] ) ), 'longevity_save_editorial' );
 	}
 
-	/** Verify reviewer identity and credentials. */
+	/**
+	 * Verify reviewer identity and credentials.
+	 *
+	 * @param array $context Evaluation context holding reviewer fields.
+	 */
 	private static function reviewer_is_valid( array $context ): bool {
 		$user_id = (int) ( $context['medical_reviewer_user_id'] ?? 0 );
 		return Reviewer_Credentials::is_valid_for(
@@ -769,7 +882,12 @@ final class Publication_Gates {
 		);
 	}
 
-	/** Check featured image alternative text only when an image exists. */
+	/**
+	 * Check featured image alternative text only when an image exists.
+	 *
+	 * @param int  $post_id Post whose featured image is checked.
+	 * @param ?int $prospective_thumbnail_id Prospective thumbnail ID, or null to use the saved one.
+	 */
 	private static function featured_image_alt_present( int $post_id, ?int $prospective_thumbnail_id = null ): bool {
 		$thumbnail_id = null === $prospective_thumbnail_id ? get_post_thumbnail_id( $post_id ) : $prospective_thumbnail_id;
 		if ( ! $thumbnail_id ) {
@@ -778,7 +896,11 @@ final class Publication_Gates {
 		return '' !== trim( (string) get_post_meta( $thumbnail_id, '_wp_attachment_image_alt', true ) );
 	}
 
-	/** Count source records linked through claims. */
+	/**
+	 * Count source records linked through claims.
+	 *
+	 * @param int $post_id Post whose linked sources are counted.
+	 */
 	private static function source_count_for_post( int $post_id ): int {
 		// Complete retrieval: a capped page could hide missing sources on claim 201+.
 		$claims     = Governed_Query::ids_by_meta( array( 'lel_claim' ), 'post_id', (string) $post_id );

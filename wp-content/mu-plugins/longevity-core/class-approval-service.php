@@ -11,10 +11,18 @@ defined( 'ABSPATH' ) || exit;
 
 /** Routes all governed approvals through immutable snapshots. */
 final class Approval_Service {
-	/** @var bool Prevent recursive invalidation. */
+	/**
+	 * Prevent recursive invalidation.
+	 *
+	 * @var bool
+	 */
 	private static bool $mutating = false;
 
-	/** @var bool Suppress the per-field credential hook during batched writes. */
+	/**
+	 * Suppress the per-field credential hook during batched writes.
+	 *
+	 * @var bool
+	 */
 	private static bool $suppress_credential_hook = false;
 
 	/** Register material-change invalidation hooks. */
@@ -25,7 +33,7 @@ final class Approval_Service {
 		add_action( 'added_post_meta', array( self::class, 'on_meta_changed' ), 20, 4 );
 		add_action( 'deleted_post_meta', array( self::class, 'on_meta_deleted' ), 20, 4 );
 
-		// R2.4 — transitive dependency cascade
+		// R2.4 — transitive dependency cascade.
 		add_action( 'added_post_meta', array( self::class, 'on_claim_post_id_set' ), 20, 4 );
 		add_action( 'updated_post_meta', array( self::class, 'on_claim_post_id_set' ), 20, 4 );
 		add_action( 'save_post_lel_claim', array( self::class, 'on_save_dependency' ), 20, 3 );
@@ -37,7 +45,13 @@ final class Approval_Service {
 		add_action( 'added_user_meta', array( self::class, 'on_credential_changed' ), 20, 4 );
 	}
 
-	/** Cascade invalidation when a dependency post is saved (created or updated). */
+	/**
+	 * Cascade invalidation when a dependency post is saved (created or updated).
+	 *
+	 * @param int      $post_id Dependency post ID being saved.
+	 * @param \WP_Post $post    The dependency post object.
+	 * @param bool     $update  Whether this is an update to an existing post.
+	 */
 	public static function on_save_dependency( int $post_id, \WP_Post $post, bool $update ): void {
 		unset( $update );
 		if ( self::$mutating || ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) || wp_is_post_revision( $post_id ) ) {
@@ -72,7 +86,14 @@ final class Approval_Service {
 		}
 	}
 
-	/** Cascade when claim post_id meta is first set (post-insert gap). */
+	/**
+	 * Cascade when claim post_id meta is first set (post-insert gap).
+	 *
+	 * @param int    $meta_id    Meta row ID (unused).
+	 * @param int    $post_id    Claim post ID whose meta changed.
+	 * @param string $meta_key   Meta key that was written.
+	 * @param mixed  $meta_value New meta value (the linked content post ID).
+	 */
 	public static function on_claim_post_id_set( int $meta_id, int $post_id, string $meta_key, $meta_value ): void {
 		unset( $meta_id );
 		if ( self::$mutating || 'post_id' !== $meta_key || 'lel_claim' !== get_post_type( $post_id ) ) {
@@ -93,12 +114,23 @@ final class Approval_Service {
 		}
 	}
 
-	/** Toggle suppression of the per-field credential hook during batched writes. */
+	/**
+	 * Toggle suppression of the per-field credential hook during batched writes.
+	 *
+	 * @param bool $suppress Whether to suppress the per-field credential hook.
+	 */
 	public static function suppress_credential_hook( bool $suppress ): void {
 		self::$suppress_credential_hook = $suppress;
 	}
 
-	/** Cascade invalidation when any verified reviewer-credential field changes. */
+	/**
+	 * Cascade invalidation when any verified reviewer-credential field changes.
+	 *
+	 * @param int    $meta_id    Meta row ID (unused).
+	 * @param int    $user_id    Reviewer user ID whose credential changed.
+	 * @param string $meta_key   Credential meta key that was written.
+	 * @param mixed  $meta_value New credential meta value (unused).
+	 */
 	public static function on_credential_changed( int $meta_id, int $user_id, string $meta_key, $meta_value ): void {
 		unset( $meta_id, $meta_value );
 		if ( self::$mutating || self::$suppress_credential_hook || ! in_array( $meta_key, Reviewer_Credentials::verified_fields(), true ) ) {
@@ -108,7 +140,13 @@ final class Approval_Service {
 		Reviewer_Credentials::detect_and_cascade( $user_id, 'meta:' . $meta_key, $actor );
 	}
 
-	/** Resolve the approvals that depend on a reviewer credential and enqueue them. */
+	/**
+	 * Resolve the approvals that depend on a reviewer credential and enqueue them.
+	 *
+	 * @param int    $reviewer_id Reviewer user ID whose credential changed.
+	 * @param string $reason      Machine-readable invalidation reason.
+	 * @param int    $actor_id    User ID credited with the cascade.
+	 */
 	public static function invalidate_dependents_of_credential( int $reviewer_id, string $reason, int $actor_id ): void {
 		$parent_ids = Dependency_Index::find_parents( 'credential', $reviewer_id );
 		if ( ! empty( $parent_ids ) ) {
@@ -122,6 +160,11 @@ final class Approval_Service {
 	 * The transactional path guarantees all-or-nothing queue rows; on failure
 	 * the best-effort path (idempotent via the unique open-row key) retries so
 	 * a save is never aborted, and the failure is logged for observability.
+	 *
+	 * @param array  $parent_ids Post IDs whose approvals must be invalidated.
+	 * @param string $reason     Machine-readable invalidation reason.
+	 * @param int    $actor_id   User ID credited with the cascade.
+	 * @throws \RuntimeException When the audit log is unhealthy and enqueue is blocked.
 	 */
 	private static function enqueue_durably( array $parent_ids, string $reason, int $actor_id ): void {
 		if ( ! Audit_Log::request_is_healthy() ) {
@@ -141,7 +184,14 @@ final class Approval_Service {
 		}
 	}
 
-	/** Create an immutable approval bound to current fingerprints. */
+	/**
+	 * Create an immutable approval bound to current fingerprints.
+	 *
+	 * @param int    $post_id          Post being approved.
+	 * @param string $approval_type    Approval type (medical, fact_check, testing, etc.).
+	 * @param int    $actor_id         User ID performing the approval.
+	 * @param array  $approval_payload Optional approval metadata to persist.
+	 */
 	public static function approve( int $post_id, string $approval_type, int $actor_id, array $approval_payload = array() ): ?array {
 		if ( ! Audit_Log::request_is_healthy() ) {
 			return null;
@@ -297,6 +347,10 @@ final class Approval_Service {
 	 * Derived from the snapshot ID, approval type, and combined fingerprint so
 	 * that a retry of the same approval reuses the same audit event and
 	 * reconciliation can locate the event for a pending snapshot.
+	 *
+	 * @param int    $snapshot_id   Approval snapshot row ID.
+	 * @param string $approval_type Approval type being recorded.
+	 * @param string $combined_hash Combined fingerprint hash of the snapshot.
 	 */
 	public static function mandatory_audit_key( int $snapshot_id, string $approval_type, string $combined_hash ): string {
 		return 'approval_completed:' . $snapshot_id . ':' . $approval_type . ':' . $combined_hash;
@@ -310,6 +364,8 @@ final class Approval_Service {
 	 * event, and counts (never guesses) mismatched linkage as an integrity
 	 * error. Never prints private payloads.
 	 *
+	 * @param bool $dry_run When true, report actions without mutating snapshots.
+	 * @param int  $batch   Maximum snapshots to scan per batch (clamped 1-500).
 	 * @return array{scanned:int, recoverable:int, rejectable:int, activated:int, rejected:int, orphaned:int, errors:int, dry_run:bool, complete:bool}
 	 */
 	public static function reconcile( bool $dry_run = true, int $batch = 200 ): array {
@@ -322,7 +378,8 @@ final class Approval_Service {
 		$rejected    = 0;
 		$errors      = 0;
 		do {
-			$rows = Approval_Repository::pending_batch( $after, $batch );
+			$rows      = Approval_Repository::pending_batch( $after, $batch );
+			$row_count = count( $rows );
 			foreach ( $rows as $row ) {
 				++$scanned;
 				$id       = (int) ( $row['id'] ?? 0 );
@@ -349,7 +406,7 @@ final class Approval_Service {
 					++$rejected;
 				}
 			}
-		} while ( count( $rows ) === $batch );
+		} while ( $row_count === $batch );
 		$orphaned = Approval_Repository::count_orphaned_approved();
 		return array(
 			'scanned'     => $scanned,
@@ -364,33 +421,53 @@ final class Approval_Service {
 		);
 	}
 
-	/** Whether the current snapshot still matches all material state. */
+	/**
+	 * Whether the current snapshot still matches all material state.
+	 *
+	 * @param int    $post_id       Post whose approval is being checked.
+	 * @param string $approval_type Approval type to check.
+	 */
 	public static function is_current( int $post_id, string $approval_type ): bool {
 		$current = Approval_Repository::current( $post_id, $approval_type );
 		if ( ! $current ) {
 			return false;
 		}
-		if ( function_exists( 'wp_get_post_revisions' ) && null !== ( $current['revision_id'] ?? null ) && (int) $current['revision_id'] !== (int) self::latest_revision_id( $post_id ) ) {
+		if ( function_exists( 'wp_get_post_revisions' ) && null !== ( $current['revision_id'] ?? null ) && (int) self::latest_revision_id( $post_id ) !== (int) $current['revision_id'] ) {
 			return false;
 		}
 		$fingerprint = Approval_Fingerprint::build( $post_id, $approval_type );
 		return hash_equals( (string) $current['combined_hash'], (string) $fingerprint['combined_hash'] );
 	}
 
-	/** Whether the current snapshot matches the complete prospective request state. */
+	/**
+	 * Whether the current snapshot matches the complete prospective request state.
+	 *
+	 * @param int    $post_id       Post whose approval is being checked.
+	 * @param string $approval_type Approval type to check.
+	 * @param array  $prospective   Prospective request state to fingerprint against.
+	 */
 	public static function is_current_for_state( int $post_id, string $approval_type, array $prospective ): bool {
 		$current = Approval_Repository::current( $post_id, $approval_type );
 		if ( ! $current ) {
 			return false;
 		}
-		if ( function_exists( 'wp_get_post_revisions' ) && null !== ( $current['revision_id'] ?? null ) && (int) $current['revision_id'] !== (int) self::latest_revision_id( $post_id ) ) {
+		if ( function_exists( 'wp_get_post_revisions' ) && null !== ( $current['revision_id'] ?? null ) && (int) self::latest_revision_id( $post_id ) !== (int) $current['revision_id'] ) {
 			return false;
 		}
 		$fingerprint = Approval_Fingerprint::build( $post_id, $approval_type, $prospective );
 		return hash_equals( (string) $current['combined_hash'], (string) $fingerprint['combined_hash'] );
 	}
 
-	/** Invalidate an approval type and project an explicit stale state. */
+	/**
+	 * Invalidate an approval type and project an explicit stale state.
+	 *
+	 * @param int    $post_id       Post whose approval is being invalidated.
+	 * @param string $approval_type Approval type to invalidate.
+	 * @param string $reason        Machine-readable invalidation reason.
+	 * @param int    $actor_id      User ID credited with the invalidation.
+	 * @throws \RuntimeException When the audit log is unhealthy and invalidation is blocked.
+	 * @throws \Throwable When a post-intent invalidation step fails and is re-thrown.
+	 */
 	public static function invalidate( int $post_id, string $approval_type, string $reason, int $actor_id = 0 ): void {
 		if ( ! Audit_Log::request_is_healthy() ) {
 			throw new \RuntimeException( esc_html( 'Approval invalidation blocked: ' . Audit_Log::unhealthy_reason() ) );
@@ -442,7 +519,17 @@ final class Approval_Service {
 		}
 	}
 
-	/** Invalidate snapshots when post content materially changes. */
+	/**
+	 * Invalidate snapshots when post content materially changes.
+	 *
+	 * @param int    $post_id         Post whose approvals are invalidated.
+	 * @param string $reason          Machine-readable invalidation reason.
+	 * @param int    $actor_id        User ID credited with the invalidation.
+	 * @param bool   $check_current   When true, skip approval types that are still current.
+	 * @param string $idempotency_key Queue idempotency key; empty for direct calls.
+	 * @throws \RuntimeException When the audit log is unhealthy or the publication lock cannot be acquired.
+	 * @throws \Throwable When a post-intent invalidation step fails and is re-thrown.
+	 */
 	public static function invalidate_direct( int $post_id, string $reason, int $actor_id = 0, bool $check_current = false, string $idempotency_key = '' ): int {
 		if ( ! Audit_Log::request_is_healthy() ) {
 			throw new \RuntimeException( esc_html( 'Approval invalidation blocked: ' . Audit_Log::unhealthy_reason() ) );
@@ -495,7 +582,13 @@ final class Approval_Service {
 		}
 	}
 
-	/** Invalidate snapshots when post content materially changes. */
+	/**
+	 * Invalidate snapshots when post content materially changes.
+	 *
+	 * @param int      $post_id     Post ID that was updated.
+	 * @param \WP_Post $post_after  Post state after the update.
+	 * @param \WP_Post $post_before Post state before the update.
+	 */
 	public static function on_post_updated( int $post_id, \WP_Post $post_after, \WP_Post $post_before ): void {
 		if ( self::$mutating || ! in_array( $post_after->post_type, array( 'post', 'review' ), true ) ) {
 			return;
@@ -508,7 +601,14 @@ final class Approval_Service {
 		}
 	}
 
-	/** Invalidate only when governed metadata changes. */
+	/**
+	 * Invalidate only when governed metadata changes.
+	 *
+	 * @param int    $meta_id    Meta row ID (unused).
+	 * @param int    $post_id    Post whose metadata changed.
+	 * @param string $meta_key   Meta key that was written.
+	 * @param mixed  $meta_value New meta value (unused).
+	 */
 	public static function on_meta_changed( int $meta_id, int $post_id, string $meta_key, $meta_value ): void {
 		unset( $meta_id, $meta_value );
 		if ( self::$mutating ) {
@@ -532,13 +632,26 @@ final class Approval_Service {
 		self::invalidate_all( $post_id, 'governed_meta_changed:' . $meta_key, function_exists( 'get_current_user_id' ) ? get_current_user_id() : 0 );
 	}
 
-	/** Deleted metadata callback has a different fourth argument shape. */
+	/**
+	 * Deleted metadata callback has a different fourth argument shape.
+	 *
+	 * @param array  $meta_ids   Deleted meta row IDs (unused).
+	 * @param int    $post_id    Post whose metadata was deleted.
+	 * @param string $meta_key   Meta key that was deleted.
+	 * @param mixed  $meta_value Meta value passed by the hook.
+	 */
 	public static function on_meta_deleted( array $meta_ids, int $post_id, string $meta_key, $meta_value ): void {
 		unset( $meta_ids );
 		self::on_meta_changed( 0, $post_id, $meta_key, $meta_value );
 	}
 
-	/** Actor/capability and separation-of-duty checks. */
+	/**
+	 * Actor/capability and separation-of-duty checks.
+	 *
+	 * @param int    $post_id  Post being approved.
+	 * @param string $type     Approval type being requested.
+	 * @param int    $actor_id User ID attempting the approval.
+	 */
 	private static function actor_can_approve( int $post_id, string $type, int $actor_id ): bool {
 		if ( $actor_id <= 0 || ! function_exists( 'user_can' ) ) {
 			return false;
@@ -553,7 +666,8 @@ final class Approval_Service {
 		}
 		if ( 'testing' === $type ) {
 			$record_id = (int) get_post_meta( $post_id, 'test_record_id', true );
-			$testers   = preg_split( '/[\s,]+/', (string) get_post_meta( $record_id, 'tester_user_ids', true ) ) ?: array();
+			$split_ids = preg_split( '/[\s,]+/', (string) get_post_meta( $record_id, 'tester_user_ids', true ) );
+			$testers   = $split_ids ? $split_ids : array();
 			$submitter = (int) get_post_meta( $record_id, 'submitted_by', true );
 			$record    = get_post( $record_id );
 			return user_can( $actor_id, 'approve_test_records' )
@@ -579,7 +693,12 @@ final class Approval_Service {
 		return false;
 	}
 
-	/** Validate semantic dates and approval-specific dependencies before snapshotting. */
+	/**
+	 * Validate semantic dates and approval-specific dependencies before snapshotting.
+	 *
+	 * @param int    $post_id Post being approved.
+	 * @param string $type    Approval type being requested.
+	 */
 	private static function state_is_approvable( int $post_id, string $type ): bool {
 		$today = Date_Validator::today();
 		if ( 'medical' === $type ) {
@@ -624,7 +743,13 @@ final class Approval_Service {
 		return false;
 	}
 
-	/** Project snapshot success into existing metadata for compatibility. */
+	/**
+	 * Project snapshot success into existing metadata for compatibility.
+	 *
+	 * @param int    $post_id  Post whose legacy status metadata is updated.
+	 * @param string $type     Approval type that was activated.
+	 * @param int    $actor_id User ID who performed the approval.
+	 */
 	private static function project_legacy_status( int $post_id, string $type, int $actor_id ): void {
 		self::$mutating = true;
 		try {
@@ -664,12 +789,22 @@ final class Approval_Service {
 		}
 	}
 
-	/** Invalidate every approval type via the async queue. */
+	/**
+	 * Invalidate every approval type via the async queue.
+	 *
+	 * @param int    $post_id  Post whose approvals are invalidated.
+	 * @param string $reason   Machine-readable invalidation reason.
+	 * @param int    $actor_id User ID credited with the invalidation.
+	 */
 	private static function invalidate_all( int $post_id, string $reason, int $actor_id ): void {
 		Invalidation_Queue::enqueue( array( $post_id ), $reason, $actor_id );
 	}
 
-	/** Legacy status key. */
+	/**
+	 * Legacy status key.
+	 *
+	 * @param string $type Approval type to map to its legacy status meta key.
+	 */
 	private static function status_key( string $type ): string {
 		return array(
 			'fact_check' => 'fact_check_status',
@@ -680,7 +815,11 @@ final class Approval_Service {
 		)[ $type ] ?? '';
 	}
 
-	/** Latest revision ID. */
+	/**
+	 * Latest revision ID.
+	 *
+	 * @param int $post_id Post whose newest revision is looked up.
+	 */
 	private static function latest_revision_id( int $post_id ): ?int {
 		$revisions = wp_get_post_revisions(
 			$post_id,
@@ -694,7 +833,11 @@ final class Approval_Service {
 		return $revision ? (int) $revision->ID : null;
 	}
 
-	/** Bounded approval payload. */
+	/**
+	 * Bounded approval payload.
+	 *
+	 * @param array $payload Raw approval payload supplied by the caller.
+	 */
 	private static function sanitize_payload( array $payload ): array {
 		$out = array();
 		foreach ( array_slice( $payload, 0, 20, true ) as $key => $value ) {
@@ -707,7 +850,15 @@ final class Approval_Service {
 		return $out;
 	}
 
-	/** Invalidate snapshots without allowing a database error to look like no-op. */
+	/**
+	 * Invalidate snapshots without allowing a database error to look like no-op.
+	 *
+	 * @param int    $post_id  Post whose snapshots are invalidated.
+	 * @param string $type     Approval type to invalidate.
+	 * @param string $reason   Machine-readable invalidation reason.
+	 * @param int    $actor_id User ID credited with the invalidation.
+	 * @throws \RuntimeException When the repository write reports a database error.
+	 */
 	private static function invalidate_snapshots( int $post_id, string $type, string $reason, int $actor_id ): int {
 		global $wpdb;
 		if ( is_object( $wpdb ) ) {
@@ -720,7 +871,13 @@ final class Approval_Service {
 		return $changed;
 	}
 
-	/** Idempotently project stale status and surface metadata storage errors. */
+	/**
+	 * Idempotently project stale status and surface metadata storage errors.
+	 *
+	 * @param int    $post_id    Post whose legacy status is set to stale.
+	 * @param string $status_key Legacy status meta key to update.
+	 * @throws \RuntimeException When the metadata write reports a database error.
+	 */
 	private static function persist_stale_status( int $post_id, string $status_key ): void {
 		global $wpdb;
 		if ( is_object( $wpdb ) ) {
@@ -732,7 +889,15 @@ final class Approval_Service {
 		}
 	}
 
-	/** Durably audit intent before any approval or compatibility state changes. */
+	/**
+	 * Durably audit intent before any approval or compatibility state changes.
+	 *
+	 * @param int    $post_id         Post whose approvals will be invalidated.
+	 * @param string $approval_type   Approval type, or 'all' for a full sweep.
+	 * @param string $reason          Machine-readable invalidation reason.
+	 * @param int    $actor_id        User ID credited with the invalidation.
+	 * @param string $idempotency_key Queue idempotency key; empty for direct calls.
+	 */
 	private static function record_invalidation_intent( int $post_id, string $approval_type, string $reason, int $actor_id, string $idempotency_key = '' ): int {
 		$intent_key = '' === $idempotency_key ? '' : $idempotency_key . ':intent';
 		return Audit_Log::record(
@@ -750,7 +915,16 @@ final class Approval_Service {
 		);
 	}
 
-	/** Leave durable retry work when a post-intent invalidation step fails. */
+	/**
+	 * Leave durable retry work when a post-intent invalidation step fails.
+	 *
+	 * @param int        $post_id         Post whose invalidation failed.
+	 * @param string     $reason          Machine-readable invalidation reason.
+	 * @param int        $actor_id        User ID credited with the invalidation.
+	 * @param int        $intent_id       Audit event ID of the recorded intent.
+	 * @param string     $idempotency_key Queue idempotency key; empty for direct calls.
+	 * @param \Throwable $error           Failure that interrupted the invalidation.
+	 */
 	private static function reconcile_invalidation_failure( int $post_id, string $reason, int $actor_id, int $intent_id, string $idempotency_key, \Throwable $error ): void {
 		if ( $intent_id <= 0 || '' !== $idempotency_key ) {
 			return; // Queue jobs retain their existing outbox row and lease for retry.

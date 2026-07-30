@@ -11,7 +11,11 @@ defined( 'ABSPATH' ) || exit;
 
 /** Validates ISO calendar dates using UTC semantics. */
 final class Date_Validator {
-	/** Normalize a valid YYYY-MM-DD date or return an empty string. */
+	/**
+	 * Normalize a valid YYYY-MM-DD date or return an empty string.
+	 *
+	 * @param mixed $value Candidate date value.
+	 */
 	public static function normalize( $value ): string {
 		$value = trim( sanitize_text_field( (string) $value ) );
 		if ( ! preg_match( '/^\d{4}-\d{2}-\d{2}$/', $value ) ) {
@@ -25,19 +29,33 @@ final class Date_Validator {
 		return $date->format( 'Y-m-d' ) === $value ? $value : '';
 	}
 
-	/** Parse a valid date. */
+	/**
+	 * Parse a valid date.
+	 *
+	 * @param mixed $value Candidate date value.
+	 */
 	public static function parse( $value ): ?\DateTimeImmutable {
 		$normalized = self::normalize( $value );
 		return '' === $normalized ? null : new \DateTimeImmutable( $normalized, new \DateTimeZone( 'UTC' ) );
 	}
 
 
-	/** Whether a value is a semantically valid ISO calendar date. */
+	/**
+	 * Whether a value is a semantically valid ISO calendar date.
+	 *
+	 * @param mixed $value Candidate date value.
+	 */
 	public static function is_valid( $value ): bool {
 		return '' !== self::normalize( $value );
 	}
 
-	/** Compare two valid dates; negative, zero, or positive like strcmp. */
+	/**
+	 * Compare two valid dates; negative, zero, or positive like strcmp.
+	 *
+	 * @param string $left  First date to compare.
+	 * @param string $right Second date to compare.
+	 * @throws \InvalidArgumentException When either date is not a valid calendar value.
+	 */
 	public static function compare( string $left, string $right ): int {
 		$left_date  = self::parse( $left );
 		$right_date = self::parse( $right );
@@ -47,7 +65,12 @@ final class Date_Validator {
 		return $left_date <=> $right_date;
 	}
 
-	/** Whether a date is after another date. */
+	/**
+	 * Whether a date is after another date.
+	 *
+	 * @param string $left  Candidate later date.
+	 * @param string $right Reference date.
+	 */
 	public static function after( string $left, string $right ): bool {
 		$left_date  = self::parse( $left );
 		$right_date = self::parse( $right );

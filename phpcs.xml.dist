@@ -26,4 +26,17 @@
   <rule ref="PHPCompatibilityWP">
     <properties><property name="testVersion" value="8.3-" /></properties>
   </rule>
+  <!-- Narrow, documented exceptions (PRV3-QA-02). -->
+  <rule ref="WordPress.Files.FileName.InvalidClassFileName">
+    <!-- bootstrap.php is the plugin entry point required by longevity-core.php
+         under a fixed name; it also defines the Bootstrap class. Renaming would
+         break the loader, so the class-file naming rule does not apply here. -->
+    <exclude-pattern>wp-content/mu-plugins/longevity-core/bootstrap.php</exclude-pattern>
+  </rule>
+  <rule ref="Generic.Files.OneObjectStructurePerFile">
+    <!-- class-cli.php is the cohesive WP-CLI command registry (one trait plus
+         per-namespace command classes) registered together. Splitting into one
+         file per class is deferred as a separate structural refactor. -->
+    <exclude-pattern>wp-content/mu-plugins/longevity-core/class-cli.php</exclude-pattern>
+  </rule>
 </ruleset>

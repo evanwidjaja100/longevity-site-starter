@@ -11,7 +11,11 @@ defined( 'ABSPATH' ) || exit;
 
 /** Selects never-scanned and least-recently-scanned records without starvation. */
 final class Freshness_Repository {
-	/** Select a bounded fair batch from WordPress. */
+	/**
+	 * Select a bounded fair batch from WordPress.
+	 *
+	 * @param int $batch_size Requested maximum number of post IDs.
+	 */
 	public static function next_batch( int $batch_size ): array {
 		$batch_size = min( 250, max( 1, $batch_size ) );
 		$never      = get_posts(
@@ -55,7 +59,12 @@ final class Freshness_Repository {
 		return array_values( array_unique( array_map( 'intval', array_merge( $never, $scanned ) ) ) );
 	}
 
-	/** Pure fairness helper used by unit tests. */
+	/**
+	 * Pure fairness helper used by unit tests.
+	 *
+	 * @param array $records    Candidate records, each with an 'id' and optional 'last_scanned_at' key.
+	 * @param int   $batch_size Maximum number of records to return.
+	 */
 	public static function select_fair_batch( array $records, int $batch_size ): array {
 		usort(
 			$records,

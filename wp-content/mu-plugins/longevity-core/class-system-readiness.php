@@ -107,7 +107,11 @@ final class System_Readiness {
 		);
 	}
 
-	/** Convert exceptions and malformed producer output into an explicit error. */
+	/**
+	 * Convert exceptions and malformed producer output into an explicit error.
+	 *
+	 * @param callable $producer Check producer returning a status record array.
+	 */
 	private static function safely( callable $producer ): array {
 		try {
 			$result = $producer();
@@ -544,7 +548,7 @@ final class System_Readiness {
 			$latest = Evidence_Store::latest( $type );
 			if ( is_array( $latest ) ) {
 				return array(
-					'status'  => $environment === (string) ( $latest['environment'] ?? '' ) ? 'error' : 'blocked',
+					'status'  => (string) ( $latest['environment'] ?? '' ) === $environment ? 'error' : 'blocked',
 					'message' => 'No valid active evidence record matches the current environment.',
 				);
 			}
@@ -632,7 +636,7 @@ final class System_Readiness {
 			);
 		}
 		$current_env = function_exists( 'wp_get_environment_type' ) ? wp_get_environment_type() : '';
-		if ( $current_env !== (string) ( $record['environment'] ?? '' ) ) {
+		if ( (string) ( $record['environment'] ?? '' ) !== $current_env ) {
 			return array(
 				'status'      => 'blocked',
 				'message'     => 'Evidence was produced for a different environment.',

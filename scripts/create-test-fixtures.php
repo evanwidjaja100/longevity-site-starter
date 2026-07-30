@@ -34,7 +34,16 @@ wp_update_user(
 	)
 );
 
-/** Find or create a synthetic actor and grant only the requested fixture capabilities. */
+/**
+ * Find or create a synthetic actor and grant only the requested fixture capabilities.
+ *
+ * @param string $login        Synthetic user login.
+ * @param string $email        Synthetic email on a reserved example domain.
+ * @param string $display_name Clearly labeled synthetic display name.
+ * @param string $role         Role slug to assign.
+ * @param array  $capabilities Additional capabilities to grant.
+ * @return WP_User The found or created synthetic user.
+ */
 function lel_fixture_user( string $login, string $email, string $display_name, string $role, array $capabilities = array() ): WP_User {
 	$user = get_user_by( 'login', $login );
 	if ( ! $user ) {
@@ -62,7 +71,16 @@ $tester              = lel_fixture_user( 'lel_synthetic_tester', 'tester@example
 $test_approver       = lel_fixture_user( 'lel_synthetic_test_approver', 'test-approver@example.invalid', '[TEST] Synthetic Test Approver', 'subscriber', array( 'approve_test_records' ) );
 $commercial_approver = lel_fixture_user( 'lel_synthetic_commercial_approver', 'commercial-approver@example.invalid', '[TEST] Synthetic Commercial Approver', 'subscriber', array( 'approve_commercial_disclosure' ) );
 
-/** Find or create a named post. */
+/**
+ * Find or create a named post.
+ *
+ * @param string $type      Post type slug.
+ * @param string $slug      Post slug used for idempotent lookup.
+ * @param string $title     Post title.
+ * @param string $content   Post content.
+ * @param int    $author_id Author user ID.
+ * @return int The created or updated post ID.
+ */
 function lel_fixture_post( string $type, string $slug, string $title, string $content, int $author_id ): int {
 	$found   = get_posts(
 		array(
@@ -91,7 +109,12 @@ function lel_fixture_post( string $type, string $slug, string $title, string $co
 	return (int) $result;
 }
 
-/** Apply a metadata map. */
+/**
+ * Apply a metadata map.
+ *
+ * @param int   $post_id Target post ID.
+ * @param array $values  Map of meta keys to values.
+ */
 function lel_fixture_meta( int $post_id, array $values ): void {
 	\Longevity\Core\Meta_Authorization::enter_trusted_scope();
 	try {
@@ -103,7 +126,13 @@ function lel_fixture_meta( int $post_id, array $values ): void {
 	}
 }
 
-/** Common publication metadata for synthetic public fixtures. */
+/**
+ * Common publication metadata for synthetic public fixtures.
+ *
+ * @param string $today       Current UTC date in Y-m-d format.
+ * @param string $next_review Next scheduled content-review date in Y-m-d format.
+ * @return array Publication metadata map.
+ */
 function lel_fixture_public_meta( string $today, string $next_review ): array {
 	return array(
 		'content_summary'               => 'A synthetic page for exercising editorial metadata and public trust components.',
@@ -121,7 +150,14 @@ function lel_fixture_public_meta( string $today, string $next_review ): array {
 	);
 }
 
-/** Create or refresh a content approval through the same immutable service used in production. */
+/**
+ * Create or refresh a content approval through the same immutable service used in production.
+ *
+ * @param int    $post_id  Target post ID.
+ * @param string $type     Approval type slug.
+ * @param int    $actor_id Approving user ID.
+ * @param array  $payload  Optional approval payload.
+ */
 function lel_fixture_approve( int $post_id, string $type, int $actor_id, array $payload = array() ): void {
 	if ( \Longevity\Core\Approval_Service::is_current( $post_id, $type ) ) {
 		$projection = array(
@@ -436,7 +472,17 @@ lel_fixture_meta(
 	)
 );
 
-/** Create another approved synthetic test record for ranking coverage. */
+/**
+ * Create another approved synthetic test record for ranking coverage.
+ *
+ * @param string $slug        Post slug for the test record.
+ * @param string $product     Synthetic product name.
+ * @param int    $tester_id   Tester user ID.
+ * @param int    $approver_id Approving user ID.
+ * @param string $today       Current UTC date in Y-m-d format.
+ * @param array  $results     Public test-result rows.
+ * @return int The approved test-record post ID.
+ */
 function lel_fixture_test_record( string $slug, string $product, int $tester_id, int $approver_id, string $today, array $results ): int {
 	$record = lel_fixture_post( 'lel_test_record', $slug, '[TEST] ' . $product . ' test record', '', $tester_id );
 	lel_fixture_meta(

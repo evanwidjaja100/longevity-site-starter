@@ -51,17 +51,32 @@ final class Logger {
 		error_log( '[longevity] ' . $json );
 	}
 
-	/** Convenience wrapper for warnings. */
+	/**
+	 * Convenience wrapper for warnings.
+	 *
+	 * @param string               $event   Short machine-readable event key.
+	 * @param array<string, mixed> $context Additional bounded context fields.
+	 */
 	public static function warning( string $event, array $context = array() ): void {
 		self::log( self::WARNING, $event, $context );
 	}
 
-	/** Convenience wrapper for errors. */
+	/**
+	 * Convenience wrapper for errors.
+	 *
+	 * @param string               $event   Short machine-readable event key.
+	 * @param array<string, mixed> $context Additional bounded context fields.
+	 */
 	public static function error( string $event, array $context = array() ): void {
 		self::log( self::ERROR, $event, $context );
 	}
 
-	/** Convenience wrapper for informational events. */
+	/**
+	 * Convenience wrapper for informational events.
+	 *
+	 * @param string               $event   Short machine-readable event key.
+	 * @param array<string, mixed> $context Additional bounded context fields.
+	 */
 	public static function info( string $event, array $context = array() ): void {
 		self::log( self::INFO, $event, $context );
 	}

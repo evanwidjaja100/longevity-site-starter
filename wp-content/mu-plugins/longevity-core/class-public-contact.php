@@ -348,7 +348,12 @@ class Public_Contact {
 		return $report;
 	}
 
-	/** Backfill a single record's canonical deadline, updating the report counters. */
+	/**
+	 * Backfill a single record's canonical deadline, updating the report counters.
+	 *
+	 * @param int   $id     Contact record post ID.
+	 * @param array $report Backfill report counters, updated by reference.
+	 */
 	private static function backfill_one_deadline( int $id, array &$report ): void {
 		if ( '' !== self::normalize_canonical_deadline( (string) get_post_meta( $id, self::RETENTION_META_KEY, true ) ) ) {
 			++$report['already_canonical'];
@@ -387,7 +392,11 @@ class Public_Contact {
 		);
 	}
 
-	/** Coerce a persisted report back into a well-formed structure for resume. */
+	/**
+	 * Coerce a persisted report back into a well-formed structure for resume.
+	 *
+	 * @param mixed $stored Previously persisted report option value.
+	 */
 	private static function sanitize_backfill_report( $stored ): array {
 		$report = self::empty_backfill_report();
 		if ( ! is_array( $stored ) ) {
@@ -404,20 +413,34 @@ class Public_Contact {
 		return $report;
 	}
 
-	/** Append an id to a bounded report list, avoiding duplicates and unbounded growth. */
+	/**
+	 * Append an id to a bounded report list, avoiding duplicates and unbounded growth.
+	 *
+	 * @param array $ids Bounded report ID list, updated by reference.
+	 * @param int   $id  Post ID to append.
+	 */
 	private static function append_bounded_id( array &$ids, int $id ): void {
 		if ( count( $ids ) < 100 && ! in_array( $id, $ids, true ) ) {
 			$ids[] = $id;
 		}
 	}
 
-	/** Whether a stored value is a valid canonical deadline at or before $now. */
+	/**
+	 * Whether a stored value is a valid canonical deadline at or before $now.
+	 *
+	 * @param string $value Stored deadline value.
+	 * @param string $now   Current UTC datetime in `Y-m-d H:i:s` format.
+	 */
 	private static function deadline_is_due( string $value, string $now ): bool {
 		$normalized = self::normalize_canonical_deadline( $value );
 		return '' !== $normalized && strcmp( $normalized, $now ) <= 0;
 	}
 
-	/** Validate and canonicalize a `Y-m-d H:i:s` UTC datetime, or return an empty string. */
+	/**
+	 * Validate and canonicalize a `Y-m-d H:i:s` UTC datetime, or return an empty string.
+	 *
+	 * @param string $value Candidate datetime value.
+	 */
 	private static function normalize_canonical_deadline( string $value ): string {
 		$value = trim( $value );
 		if ( ! preg_match( '/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/', $value ) ) {
@@ -431,7 +454,11 @@ class Public_Contact {
 		return $date->format( 'Y-m-d H:i:s' ) === $value ? $value : '';
 	}
 
-	/** Parse a legacy ISO-8601 deadline into a canonical UTC datetime, or return an empty string. */
+	/**
+	 * Parse a legacy ISO-8601 deadline into a canonical UTC datetime, or return an empty string.
+	 *
+	 * @param string $value Legacy stored deadline value.
+	 */
 	private static function normalize_legacy_deadline( string $value ): string {
 		$value = trim( $value );
 		if ( '' === $value ) {
@@ -804,7 +831,8 @@ class Public_Contact {
 	 * @param string $query Allowlisted feedback query.
 	 */
 	private static function feedback_url( string $query ): string {
-		$base = Routes::public_page_url( 'contact' ) ?: home_url( '/contact/' );
+		$contact_url = Routes::public_page_url( 'contact' );
+		$base        = $contact_url ? $contact_url : home_url( '/contact/' );
 		if ( function_exists( 'wp_get_referer' ) && function_exists( 'wp_validate_redirect' ) ) {
 			$referer = wp_get_referer();
 			$valid   = $referer ? wp_validate_redirect( $referer, '' ) : '';

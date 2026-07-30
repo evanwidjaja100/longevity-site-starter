@@ -38,10 +38,14 @@ final class Admin_UI {
 		}
 	}
 
-	/** Render readiness summary. */
+	/**
+	 * Render readiness summary.
+	 *
+	 * @param \WP_Post $post Post being edited.
+	 */
 	public static function render_readiness( \WP_Post $post ): void {
 		$result = Publication_Gates::evaluate( $post->ID );
-		printf( '<div class="lel-readiness-summary" role="status"><p><strong>%s%%</strong> %s</p><p>%s &middot; %s &middot; %s</p></div>', esc_html( (string) $result->completion_percentage() ), esc_html__( 'complete across applicable checks', 'longevity-core' ), esc_html( sprintf( _n( '%d blocker', '%d blockers', count( $result->blocking() ), 'longevity-core' ), count( $result->blocking() ) ) ), esc_html( sprintf( _n( '%d warning', '%d warnings', count( $result->warnings() ), 'longevity-core' ), count( $result->warnings() ) ) ), esc_html( sprintf( _n( '%d passed check', '%d passed checks', count( $result->passed() ), 'longevity-core' ), count( $result->passed() ) ) ) );
+		printf( '<div class="lel-readiness-summary" role="status"><p><strong>%s%%</strong> %s</p><p>%s &middot; %s &middot; %s</p></div>', esc_html( (string) $result->completion_percentage() ), esc_html__( 'complete across applicable checks', 'longevity-core' ), esc_html( sprintf( /* translators: %d: number of blocking checks. */ _n( '%d blocker', '%d blockers', count( $result->blocking() ), 'longevity-core' ), count( $result->blocking() ) ) ), esc_html( sprintf( /* translators: %d: number of warnings. */ _n( '%d warning', '%d warnings', count( $result->warnings() ), 'longevity-core' ), count( $result->warnings() ) ) ), esc_html( sprintf( /* translators: %d: number of passed checks. */ _n( '%d passed check', '%d passed checks', count( $result->passed() ), 'longevity-core' ), count( $result->passed() ) ) ) );
 		self::render_result_group( __( 'Blocking', 'longevity-core' ), $result->blocking(), 'lel-gate-blocking' );
 		self::render_result_group( __( 'Warnings', 'longevity-core' ), $result->warnings(), 'lel-gate-warning' );
 		self::render_result_group( __( 'Passed', 'longevity-core' ), $result->passed(), 'lel-gate-passed' );
@@ -55,7 +59,11 @@ final class Admin_UI {
 		}
 	}
 
-	/** Render governance fields. */
+	/**
+	 * Render governance fields.
+	 *
+	 * @param \WP_Post $post Post being edited.
+	 */
 	public static function render_governance( \WP_Post $post ): void {
 		wp_nonce_field( 'longevity_save_editorial', 'longevity_editorial_nonce' );
 		echo '<div class="lel-editorial-grid">';
@@ -277,7 +285,13 @@ final class Admin_UI {
 		echo '</div></details></div>';
 	}
 
-	/** Save editor metadata through the shared field-authorization service. */
+	/**
+	 * Save editor metadata through the shared field-authorization service.
+	 *
+	 * @param int      $post_id Post ID being saved.
+	 * @param \WP_Post $post    The post object being saved.
+	 * @param bool     $update  Whether this is an update to an existing post.
+	 */
 	public static function save_editorial_meta( int $post_id, \WP_Post $post, bool $update ): void {
 		unset( $update );
 		if ( wp_is_post_revision( $post_id ) || wp_is_post_autosave( $post_id ) ) {
@@ -296,7 +310,7 @@ final class Admin_UI {
 				try {
 					$calculated = Review_Methodology::calculate_score( $dimensions );
 					update_post_meta( $post_id, 'review_score', $calculated['score'] );
-				} catch ( \InvalidArgumentException $exception ) {
+				} catch ( \InvalidArgumentException $exception ) { // phpcs:ignore Generic.CodeAnalysis.EmptyStatement.DetectedCatch -- Intentional: leave review_score unset so readiness remains blocked until weights total 100.
 					// Readiness remains blocked until weights total 100.
 				}
 			} else {
@@ -370,7 +384,11 @@ final class Admin_UI {
 		}
 	}
 
-	/** Render a structured editor so operational staff never need to hand-write JSON. */
+	/**
+	 * Render a structured editor so operational staff never need to hand-write JSON.
+	 *
+	 * @param \WP_Post $post Test record post being edited.
+	 */
 	public static function render_public_test_results_editor( \WP_Post $post ): void {
 		wp_nonce_field( 'longevity_save_public_results', 'longevity_public_results_nonce' );
 		$projection = Review_Methodology::sanitize_public_results( get_post_meta( $post->ID, 'public_test_results', true ) );
@@ -395,7 +413,13 @@ final class Admin_UI {
 		echo '</tbody></table></div><p><button type="button" class="button" data-lel-add-result>' . esc_html__( 'Add result row', 'longevity-core' ) . '</button></p><p><label><input type="checkbox" name="longevity_approve_test_record" value="1"> ' . esc_html__( 'Approve this exact test-record snapshot after saving', 'longevity-core' ) . '</label></p></div>';
 	}
 
-	/** Save structured public rows with nonce and least-privilege capability checks. */
+	/**
+	 * Save structured public rows with nonce and least-privilege capability checks.
+	 *
+	 * @param int      $post_id Test record post ID being saved.
+	 * @param \WP_Post $post    The post object being saved.
+	 * @param bool     $update  Whether this is an update to an existing post.
+	 */
 	public static function save_public_test_results( int $post_id, \WP_Post $post, bool $update ): void {
 		unset( $post, $update );
 		if ( wp_is_post_revision( $post_id ) || wp_is_post_autosave( $post_id ) || ! current_user_can( 'approve_test_records' ) ) {
@@ -411,7 +435,11 @@ final class Admin_UI {
 		}
 	}
 
-	/** Render reviewer profile and independent verification controls. */
+	/**
+	 * Render reviewer profile and independent verification controls.
+	 *
+	 * @param \WP_User $user Profile user being viewed or edited.
+	 */
 	public static function render_reviewer_profile( \WP_User $user ): void {
 		if ( ! current_user_can( 'edit_user', $user->ID ) && ! Reviewer_Credentials::can_verify( get_current_user_id(), $user->ID ) ) {
 			return;
@@ -448,7 +476,11 @@ final class Admin_UI {
 		echo '</table>';
 	}
 
-	/** Save claimed profile data and, separately, an independent verified snapshot. */
+	/**
+	 * Save claimed profile data and, separately, an independent verified snapshot.
+	 *
+	 * @param int $user_id User ID whose profile is being saved.
+	 */
 	public static function save_reviewer_profile( int $user_id ): void {
 		$actor_id = get_current_user_id();
 		if ( current_user_can( 'edit_user', $user_id ) ) {
@@ -479,13 +511,22 @@ final class Admin_UI {
 		}
 	}
 
-	/** Add a readiness column. */
+	/**
+	 * Add a readiness column.
+	 *
+	 * @param array<string, string> $columns Existing list-table columns keyed by slug.
+	 */
 	public static function add_readiness_column( array $columns ): array {
 		$columns['lel_readiness'] = __( 'Readiness', 'longevity-core' );
 		return $columns;
 	}
 
-	/** Render a readiness column. */
+	/**
+	 * Render a readiness column.
+	 *
+	 * @param string $column  Current column slug.
+	 * @param int    $post_id Post ID for the current row.
+	 */
 	public static function render_readiness_column( string $column, int $post_id ): void {
 		if ( 'lel_readiness' !== $column ) {
 			return;
@@ -494,10 +535,14 @@ final class Admin_UI {
 		printf( '<strong>%d%%</strong><br>%s', esc_html( (string) $result->completion_percentage() ), $result->is_blocked() ? esc_html__( 'Blocked', 'longevity-core' ) : esc_html__( 'Ready', 'longevity-core' ) );
 	}
 
-	/** Render an attestation checkbox only to the assigned reviewer. */
+	/**
+	 * Render an attestation checkbox only to the assigned reviewer.
+	 *
+	 * @param int $post_id Post ID under medical review.
+	 */
 	private static function attestation( int $post_id ): void {
 		$reviewer_id = (int) get_post_meta( $post_id, 'medical_reviewer_user_id', true );
-		if ( $reviewer_id !== get_current_user_id() || ! current_user_can( 'complete_medical_review' ) ) {
+		if ( get_current_user_id() !== $reviewer_id || ! current_user_can( 'complete_medical_review' ) ) {
 			$attested = get_post_meta( $post_id, 'medical_review_attested', true );
 			echo '<p><strong>' . esc_html__( 'Reviewer attestation:', 'longevity-core' ) . '</strong> ' . ( $attested ? esc_html__( 'Completed', 'longevity-core' ) : esc_html__( 'Not completed by assigned reviewer', 'longevity-core' ) ) . '</p>';
 			return;
@@ -505,7 +550,11 @@ final class Admin_UI {
 		self::checkbox( $post_id, 'medical_review_attested', __( 'I reviewed the stated scope and confirm that the reviewed language is appropriate for general educational publication as of the recorded review date.', 'longevity-core' ) );
 	}
 
-	/** Render a reviewer selector. */
+	/**
+	 * Render a reviewer selector.
+	 *
+	 * @param int $post_id Post ID whose reviewer assignment is edited.
+	 */
 	private static function reviewer_select( int $post_id ): void {
 		if ( ! self::can_edit_field( $post_id, 'medical_reviewer_user_id' ) ) {
 			self::readonly_field( $post_id, 'medical_reviewer_user_id', __( 'Medical reviewer', 'longevity-core' ) );
@@ -520,12 +569,16 @@ final class Admin_UI {
 		echo self::presence_marker( 'medical_reviewer_user_id' ) . '<p><label for="medical_reviewer_user_id"><strong>' . esc_html__( 'Medical reviewer', 'longevity-core' ) . '</strong></label><br><select class="widefat" id="medical_reviewer_user_id" name="medical_reviewer_user_id"><option value="0">' . esc_html__( 'Select reviewer', 'longevity-core' ) . '</option>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- presence_marker() outputs an input tag whose key is esc_attr()-escaped; remaining output is escaped literals.
 		foreach ( $users as $user ) {
 			$status = (string) get_user_meta( $user->ID, 'credential_verification_status', true );
-			echo '<option value="' . esc_attr( (string) $user->ID ) . '" ' . selected( $value, $user->ID, false ) . '>' . esc_html( sprintf( '%1$s (ID %2$d; %3$s)', $user->display_name, $user->ID, $status ?: __( 'unverified', 'longevity-core' ) ) ) . '</option>';
+			echo '<option value="' . esc_attr( (string) $user->ID ) . '" ' . selected( $value, $user->ID, false ) . '>' . esc_html( sprintf( '%1$s (ID %2$d; %3$s)', $user->display_name, $user->ID, $status ? $status : __( 'unverified', 'longevity-core' ) ) ) . '</option>';
 		}
 		echo '</select></p><p class="description">' . esc_html__( 'Only an assigned authenticated reviewer with verified public credentials can complete the attestation.', 'longevity-core' ) . '</p>';
 	}
 
-	/** Render approved test records with human-readable titles and stable IDs. */
+	/**
+	 * Render approved test records with human-readable titles and stable IDs.
+	 *
+	 * @param int $post_id Review post ID being linked to a test record.
+	 */
 	private static function test_record_select( int $post_id ): void {
 		if ( ! self::can_edit_field( $post_id, 'test_record_id' ) ) {
 			self::readonly_field( $post_id, 'test_record_id', __( 'Test record', 'longevity-core' ) );
@@ -545,12 +598,18 @@ final class Admin_UI {
 		echo self::presence_marker( 'test_record_id' ) . '<p><label for="test_record_id"><strong>' . esc_html__( 'Test record', 'longevity-core' ) . '</strong></label><br><select class="widefat" id="test_record_id" name="test_record_id"><option value="0">' . esc_html__( 'Select an approved record', 'longevity-core' ) . '</option>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- presence_marker() outputs an input tag whose key is esc_attr()-escaped; remaining output is escaped literals.
 		foreach ( $records as $record ) {
 			$status = (string) get_post_meta( $record->ID, 'approval_status', true );
-			echo '<option value="' . esc_attr( (string) $record->ID ) . '" ' . selected( $value, $record->ID, false ) . '>' . esc_html( sprintf( '%1$s (ID %2$d; %3$s)', get_the_title( $record ), $record->ID, $status ?: __( 'not approved', 'longevity-core' ) ) ) . '</option>';
+			echo '<option value="' . esc_attr( (string) $record->ID ) . '" ' . selected( $value, $record->ID, false ) . '>' . esc_html( sprintf( '%1$s (ID %2$d; %3$s)', get_the_title( $record ), $record->ID, $status ? $status : __( 'not approved', 'longevity-core' ) ) ) . '</option>';
 		}
 		echo '</select></p><p class="description">' . esc_html__( 'Publication requires an approved record whose protocol version matches this review.', 'longevity-core' ) . '</p>';
 	}
 
-	/** Render result list. */
+	/**
+	 * Render result list.
+	 *
+	 * @param string                           $title Group heading.
+	 * @param array<int, array<string, mixed>> $items Gate results, each with a code and a message.
+	 * @param string                           $class CSS class for the group wrapper.
+	 */
 	private static function render_result_group( string $title, array $items, string $class ): void {
 		if ( empty( $items ) ) {
 			return;
@@ -567,7 +626,11 @@ final class Admin_UI {
 		echo '</ul></div>';
 	}
 
-	/** Map gate codes to the nearest actionable field. */
+	/**
+	 * Map gate codes to the nearest actionable field.
+	 *
+	 * @param string $code Gate result code.
+	 */
 	private static function readiness_field( string $code ): string {
 		$map = array(
 			'missing_summary'                  => 'content_summary',
@@ -583,7 +646,11 @@ final class Admin_UI {
 		return $map[ $code ] ?? '';
 	}
 
-	/** Render an accessible repeatable dimension editor backed by the existing meta shape. */
+	/**
+	 * Render an accessible repeatable dimension editor backed by the existing meta shape.
+	 *
+	 * @param int $post_id Review post ID whose dimensions are edited.
+	 */
 	private static function score_dimensions_editor( int $post_id ): void {
 		if ( ! self::can_edit_field( $post_id, 'review_score_dimensions' ) ) {
 			self::readonly_field( $post_id, 'review_score_dimensions', __( 'Scoring dimensions', 'longevity-core' ) );
@@ -604,7 +671,12 @@ final class Admin_UI {
 		echo '</tbody></table></div><p><button type="button" class="button" data-lel-add-dimension>' . esc_html__( 'Add dimension', 'longevity-core' ) . '</button></p><p class="lel-score-totals" aria-live="polite"><strong>' . esc_html__( 'Weight total:', 'longevity-core' ) . '</strong> <span data-lel-weight-total>0</span>% &middot; <strong>' . esc_html__( 'Calculated score:', 'longevity-core' ) . '</strong> <span data-lel-calculated-score>0.00</span>/5</p><details><summary>' . esc_html__( 'Raw JSON debug view', 'longevity-core' ) . '</summary><pre class="lel-score-json">' . esc_html( wp_json_encode( Review_Methodology::sanitize_dimensions( $dimensions ), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) ) . '</pre></details></fieldset>';
 	}
 
-	/** Render one dimension row. */
+	/**
+	 * Render one dimension row.
+	 *
+	 * @param int                  $index     Zero-based row index.
+	 * @param array<string, mixed> $dimension Dimension row with name, score, and weight.
+	 */
 	private static function score_dimension_row( int $index, array $dimension ): void {
 		$name   = (string) ( $dimension['name'] ?? '' );
 		$score  = (string) ( $dimension['score'] ?? '' );
@@ -612,6 +684,13 @@ final class Admin_UI {
 		echo '<tr data-lel-score-row><td><label class="screen-reader-text" for="lel-dimension-name-' . esc_attr( (string) $index ) . '">' . esc_html__( 'Dimension name', 'longevity-core' ) . '</label><input id="lel-dimension-name-' . esc_attr( (string) $index ) . '" type="text" name="review_score_dimensions_rows[' . esc_attr( (string) $index ) . '][name]" value="' . esc_attr( $name ) . '"></td><td><label class="screen-reader-text" for="lel-dimension-score-' . esc_attr( (string) $index ) . '">' . esc_html__( 'Dimension score', 'longevity-core' ) . '</label><input id="lel-dimension-score-' . esc_attr( (string) $index ) . '" type="number" min="0" max="5" step="0.1" name="review_score_dimensions_rows[' . esc_attr( (string) $index ) . '][score]" value="' . esc_attr( $score ) . '"></td><td><label class="screen-reader-text" for="lel-dimension-weight-' . esc_attr( (string) $index ) . '">' . esc_html__( 'Dimension weight', 'longevity-core' ) . '</label><input id="lel-dimension-weight-' . esc_attr( (string) $index ) . '" type="number" min="0" max="100" step="0.1" name="review_score_dimensions_rows[' . esc_attr( (string) $index ) . '][weight]" value="' . esc_attr( $weight ) . '"></td><td><button type="button" class="button-link-delete" data-lel-remove-dimension>' . esc_html__( 'Remove', 'longevity-core' ) . '</button></td></tr>';
 	}
 
+	/**
+	 * Render an editable textarea field, or a read-only fallback.
+	 *
+	 * @param int    $post_id Post ID whose meta is edited.
+	 * @param string $key     Meta key.
+	 * @param string $label   Field label.
+	 */
 	private static function textarea( int $post_id, string $key, string $label ): void {
 		if ( ! self::can_edit_field( $post_id, $key ) ) {
 			self::readonly_field( $post_id, $key, $label );
@@ -621,7 +700,12 @@ final class Admin_UI {
 		echo self::presence_marker( $key ) . '<p><label for="' . esc_attr( $key ) . '"><strong>' . esc_html( $label ) . '</strong></label><br><textarea class="widefat" rows="3" id="' . esc_attr( $key ) . '" name="' . esc_attr( $key ) . '" aria-describedby="' . esc_attr( $key ) . '-help">' . esc_textarea( (string) $value ) . '</textarea>' . self::field_help( $key ) . '</p>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- presence_marker() and field_help() output markup built only from esc_attr()/esc_html()-escaped values.
 	}
 
-	/** Render one structured public test-result row. */
+	/**
+	 * Render one structured public test-result row.
+	 *
+	 * @param array<string, mixed> $row   Sanitized public result row.
+	 * @param int                  $index Zero-based row index.
+	 */
 	private static function public_result_row( array $row, int $index ): void {
 		$fields = array( 'label', 'observed_value', 'unit', 'reference_label', 'reference_value', 'note', 'display_order' );
 		echo '<tr data-lel-result-row>';
@@ -642,6 +726,16 @@ final class Admin_UI {
 	}
 
 
+	/**
+	 * Render an editable number field, or a read-only fallback.
+	 *
+	 * @param int        $post_id Post ID whose meta is edited.
+	 * @param string     $key     Meta key.
+	 * @param string     $label   Field label.
+	 * @param int|string $step    Step attribute value.
+	 * @param int|null   $min     Minimum attribute value, or null to omit.
+	 * @param int|null   $max     Maximum attribute value, or null to omit.
+	 */
 	private static function number( int $post_id, string $key, string $label, $step = 1, $min = null, $max = null ): void {
 		if ( ! self::can_edit_field( $post_id, $key ) ) {
 			self::readonly_field( $post_id, $key, $label );
@@ -656,6 +750,14 @@ final class Admin_UI {
 		echo self::presence_marker( $key ) . '<p><label for="' . esc_attr( $key ) . '"><strong>' . esc_html( $label ) . '</strong></label><br><input class="widefat" type="number" step="' . esc_attr( (string) $step ) . '"' . $attrs . ' id="' . esc_attr( $key ) . '" name="' . esc_attr( $key ) . '" value="' . esc_attr( (string) $value ) . '"></p>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- presence_marker() output and $attrs are built only from esc_attr()-escaped values.
 	}
 
+	/**
+	 * Render an editable input field, or a read-only fallback.
+	 *
+	 * @param int    $post_id Post ID whose meta is edited.
+	 * @param string $key     Meta key.
+	 * @param string $label   Field label.
+	 * @param string $type    HTML input type attribute.
+	 */
 	private static function input( int $post_id, string $key, string $label, string $type ): void {
 		if ( ! self::can_edit_field( $post_id, $key ) ) {
 			self::readonly_field( $post_id, $key, $label );
@@ -665,6 +767,13 @@ final class Admin_UI {
 		echo self::presence_marker( $key ) . '<p><label for="' . esc_attr( $key ) . '"><strong>' . esc_html( $label ) . '</strong></label><br><input class="widefat" type="' . esc_attr( $type ) . '" id="' . esc_attr( $key ) . '" name="' . esc_attr( $key ) . '" value="' . esc_attr( (string) $value ) . '" aria-describedby="' . esc_attr( $key ) . '-help">' . self::field_help( $key ) . '</p>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- presence_marker() and field_help() output markup built only from esc_attr()/esc_html()-escaped values.
 	}
 
+	/**
+	 * Render an editable checkbox field, or a read-only fallback.
+	 *
+	 * @param int    $post_id Post ID whose meta is edited.
+	 * @param string $key     Meta key.
+	 * @param string $label   Field label.
+	 */
 	private static function checkbox( int $post_id, string $key, string $label ): void {
 		if ( ! self::can_edit_field( $post_id, $key ) ) {
 			self::readonly_field( $post_id, $key, $label );
@@ -674,7 +783,14 @@ final class Admin_UI {
 		echo self::presence_marker( $key ) . '<input type="hidden" name="' . esc_attr( $key ) . '" value="0"><p><label><input type="checkbox" name="' . esc_attr( $key ) . '" value="1" ' . checked( $value, true, false ) . '> ' . esc_html( $label ) . '</label></p>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- presence_marker() outputs an input tag whose key is esc_attr()-escaped; remaining output is escaped.
 	}
 
-	/** Render an explicit snapshot-approval action separate from editable workflow state. */
+	/**
+	 * Render an explicit snapshot-approval action separate from editable workflow state.
+	 *
+	 * @param string $name       Checkbox input name.
+	 * @param string $capability Capability required to see the action.
+	 * @param string $label      Action label.
+	 * @param string $help       Help text describing the approval semantics.
+	 */
 	private static function approval_action( string $name, string $capability, string $label, string $help ): void {
 		if ( ! current_user_can( $capability ) ) {
 			return;
@@ -682,6 +798,14 @@ final class Admin_UI {
 		echo '<p><label><input type="checkbox" name="' . esc_attr( $name ) . '" value="1"> <strong>' . esc_html( $label ) . '</strong></label><br><span class="description">' . esc_html( $help ) . '</span></p>';
 	}
 
+	/**
+	 * Render an editable select field, or a read-only fallback.
+	 *
+	 * @param int                   $post_id Post ID whose meta is edited.
+	 * @param string                $key     Meta key.
+	 * @param string                $label   Field label.
+	 * @param array<string, string> $options Option values mapped to display labels.
+	 */
 	private static function select( int $post_id, string $key, string $label, array $options ): void {
 		if ( ! self::can_edit_field( $post_id, $key ) ) {
 			self::readonly_field( $post_id, $key, $label );
@@ -695,17 +819,32 @@ final class Admin_UI {
 		echo '</select>' . self::field_help( $key ) . '</p>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- field_help() outputs markup built only from esc_attr()/esc_html()-escaped values.
 	}
 
-	/** Whether the current actor may edit a field. */
+	/**
+	 * Whether the current actor may edit a field.
+	 *
+	 * @param int    $post_id Post ID whose meta would be written.
+	 * @param string $key     Meta key.
+	 */
 	private static function can_edit_field( int $post_id, string $key ): bool {
 		return Meta_Authorization::can_write( $key, $post_id, get_current_user_id(), 'classic' );
 	}
 
-	/** Presence marker prevents absent/unrendered protected booleans from being cleared. */
+	/**
+	 * Presence marker prevents absent/unrendered protected booleans from being cleared.
+	 *
+	 * @param string $key Meta key the marker represents.
+	 */
 	private static function presence_marker( string $key ): string {
 		return '<input type="hidden" name="lel_present[' . esc_attr( $key ) . ']" value="1">';
 	}
 
-	/** Read-only representation for actors lacking the write policy. */
+	/**
+	 * Read-only representation for actors lacking the write policy.
+	 *
+	 * @param int    $post_id Post ID whose meta is shown.
+	 * @param string $key     Meta key.
+	 * @param string $label   Field label.
+	 */
 	private static function readonly_field( int $post_id, string $key, string $label ): void {
 		$value = get_post_meta( $post_id, $key, true );
 		if ( is_array( $value ) ) {
@@ -713,7 +852,11 @@ final class Admin_UI {
 		echo '<p><strong>' . esc_html( $label ) . '</strong><br><span class="description">' . esc_html( '' === (string) $value ? __( 'Not set', 'longevity-core' ) : (string) $value ) . '</span></p>';
 	}
 
-	/** Render registered field help without duplicating governance definitions. */
+	/**
+	 * Render registered field help without duplicating governance definitions.
+	 *
+	 * @param string $key Meta key whose registered description is rendered.
+	 */
 	private static function field_help( string $key ): string {
 		$definitions = Meta_Registry::definitions();
 		$description = (string) ( $definitions[ $key ]['description'] ?? '' );

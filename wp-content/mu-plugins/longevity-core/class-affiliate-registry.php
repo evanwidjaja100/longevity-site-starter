@@ -47,7 +47,11 @@ final class Affiliate_Registry {
 		}
 	}
 
-	/** Whether content contains an affiliate shortcode or sponsored link marker. */
+	/**
+	 * Whether content contains an affiliate shortcode or sponsored link marker.
+	 *
+	 * @param string $content Post content to scan.
+	 */
 	public static function content_has_affiliate_link( string $content ): bool {
 		if ( has_shortcode( $content, 'affiliate_link' ) ) {
 			return true;
@@ -61,7 +65,11 @@ final class Affiliate_Registry {
 		return array() !== $hrefs;
 	}
 
-	/** Verify every affiliate destination present in content against an active registry record. */
+	/**
+	 * Verify every affiliate destination present in content against an active registry record.
+	 *
+	 * @param string $content Post content to scan.
+	 */
 	public static function all_destinations_registered( string $content ): bool {
 		$destinations = self::destinations_in_content( $content );
 		if ( null === $destinations ) {
@@ -75,7 +83,11 @@ final class Affiliate_Registry {
 		return true;
 	}
 
-	/** Return relationship owners associated with active destinations in content. */
+	/**
+	 * Return relationship owners associated with active destinations in content.
+	 *
+	 * @param string $content Post content to scan.
+	 */
 	public static function relationship_owners_for_content( string $content ): array {
 		$owners       = array();
 		$destinations = self::destinations_in_content( $content );
@@ -97,6 +109,7 @@ final class Affiliate_Registry {
 	/**
 	 * Extract every affiliate destination in content without truncation.
 	 *
+	 * @param string $content Post content to scan.
 	 * @return array<int, string>|null Complete list of raw destinations, or
 	 *                                 null when extraction failed and callers
 	 *                                 must fail closed.
@@ -123,6 +136,7 @@ final class Affiliate_Registry {
 	 * HTML API. A sponsored anchor without a usable href yields an empty
 	 * string so validation fails closed instead of silently skipping it.
 	 *
+	 * @param string $content Post content to scan.
 	 * @return array<int, string>|null Hrefs, or null when parsing failed.
 	 */
 	private static function sponsored_anchor_hrefs( string $content ): ?array {
@@ -141,7 +155,8 @@ final class Affiliate_Registry {
 				if ( ! is_string( $rel ) ) {
 					continue;
 				}
-				$tokens = preg_split( '/\s+/', strtolower( trim( $rel ) ) ) ?: array();
+				$rel_tokens = preg_split( '/\s+/', strtolower( trim( $rel ) ) );
+				$tokens     = $rel_tokens ? $rel_tokens : array();
 				if ( ! in_array( 'sponsored', $tokens, true ) ) {
 					continue;
 				}
@@ -205,7 +220,12 @@ final class Affiliate_Registry {
 		);
 	}
 
-	/** Whether a registry record's domain policy covers a normalized host. */
+	/**
+	 * Whether a registry record's domain policy covers a normalized host.
+	 *
+	 * @param int    $merchant_id Affiliate registry record ID.
+	 * @param string $host        Normalized destination host.
+	 */
 	public static function merchant_matches_host( int $merchant_id, string $host ): bool {
 		$registered = self::normalize_domain( (string) get_post_meta( $merchant_id, 'merchant_domain', true ) );
 		if ( '' === $registered || '' === $host ) {
@@ -217,7 +237,11 @@ final class Affiliate_Registry {
 		return (bool) get_post_meta( $merchant_id, 'allow_subdomains', true ) && str_ends_with( $host, '.' . $registered );
 	}
 
-	/** Find an eligible merchant registry record by normalized destination; ambiguity fails closed. */
+	/**
+	 * Find an eligible merchant registry record by normalized destination; ambiguity fails closed.
+	 *
+	 * @param string $url Raw affiliate destination URL.
+	 */
 	public static function find_by_url( string $url ): ?\WP_Post {
 		$destination = self::normalize_destination( $url );
 		if ( null === $destination ) {
@@ -282,7 +306,11 @@ final class Affiliate_Registry {
 		return array_map( 'intval', $ids );
 	}
 
-	/** Normalize and reject unsafe affiliate destinations. */
+	/**
+	 * Normalize and reject unsafe affiliate destinations.
+	 *
+	 * @param string $url Raw affiliate destination URL.
+	 */
 	public static function normalize_destination( string $url ): ?array {
 		$parts = wp_parse_url( trim( $url ) );
 		if ( ! is_array( $parts ) || ! isset( $parts['scheme'], $parts['host'] ) ) {
@@ -304,10 +332,16 @@ final class Affiliate_Registry {
 		);
 	}
 
-	/** Evaluate dates, verification recency and exact/subdomain policy. */
+	/**
+	 * Evaluate dates, verification recency and exact/subdomain policy.
+	 *
+	 * @param array<string, mixed> $record Registry record metadata to evaluate.
+	 * @param string               $url    Raw affiliate destination URL.
+	 * @param string|null          $today  Comparison date (Y-m-d), or null for today.
+	 */
 	public static function relationship_is_eligible( array $record, string $url, ?string $today = null ): bool {
 		$destination = self::normalize_destination( $url );
-		$today       = $today ?: Date_Validator::today();
+		$today       = $today ? $today : Date_Validator::today();
 		if ( null === $destination || ! Date_Validator::is_valid( $today ) || 'active' !== ( $record['relationship_status'] ?? '' ) ) {
 			return false;
 		}
@@ -334,7 +368,11 @@ final class Affiliate_Registry {
 		return ! empty( $record['allow_subdomains'] ) && str_ends_with( $destination['host'], '.' . $registered );
 	}
 
-	/** Canonical ASCII domain with harmless presentation variants removed. */
+	/**
+	 * Canonical ASCII domain with harmless presentation variants removed.
+	 *
+	 * @param string $domain Domain name to normalize.
+	 */
 	public static function normalize_domain( string $domain ): string {
 		$domain = strtolower( rtrim( trim( $domain ), '.' ) );
 		$domain = preg_replace( '/^www\./', '', $domain );
@@ -347,7 +385,13 @@ final class Affiliate_Registry {
 		return preg_match( '/^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/', $domain ) ? $domain : '';
 	}
 
-	/** Render a safe, instrumented affiliate link. */
+	/**
+	 * Render a safe, instrumented affiliate link.
+	 *
+	 * @param string $url       Affiliate destination URL.
+	 * @param string $label     Visible link text.
+	 * @param string $placement Placement key for click instrumentation.
+	 */
 	public static function render_link( string $url, string $label, string $placement = 'article' ): string {
 		$url = esc_url( $url );
 		if ( '' === $url ) {

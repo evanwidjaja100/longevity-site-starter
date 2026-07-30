@@ -49,7 +49,11 @@ final class Invalidation_Queue {
 		return isset( $wpdb->prefix ) ? $wpdb->prefix . 'lel_invalidation_queue' : 'wp_lel_invalidation_queue';
 	}
 
-	/** Install the queue table (additive, idempotent). */
+	/**
+	 * Install the queue table (additive, idempotent).
+	 *
+	 * @throws \RuntimeException When the table or the audit idempotency constraint cannot be created.
+	 */
 	public static function install(): void {
 		global $wpdb;
 		if ( ! isset( $wpdb ) || ! is_object( $wpdb ) || ! function_exists( 'dbDelta' ) ) {
@@ -190,9 +194,10 @@ final class Invalidation_Queue {
 	 * Deduplication is a single INSERT ... ON DUPLICATE KEY UPDATE against
 	 * the uniq_open_parent key — no racy SELECT-then-INSERT probe.
 	 *
-	 * @param list<int> $parent_ids Post IDs to invalidate.
+	 * @param integer[] $parent_ids Post IDs to invalidate.
 	 * @param string    $reason    Invalidation reason.
 	 * @param int       $actor_id  Actor triggering the invalidation.
+	 * @throws \RuntimeException When a job can be neither queued nor applied directly.
 	 */
 	public static function enqueue( array $parent_ids, string $reason, int $actor_id = 0 ): void {
 		if ( empty( $parent_ids ) ) {
@@ -221,7 +226,14 @@ final class Invalidation_Queue {
 		self::schedule_processing( 5 );
 	}
 
-	/** Persist retry work after a direct invalidation outcome could not be audited. */
+	/**
+	 * Persist retry work after a direct invalidation outcome could not be audited.
+	 *
+	 * @param int    $parent_id Parent post ID.
+	 * @param string $reason    Invalidation reason.
+	 * @param int    $actor_id  Actor triggering the invalidation.
+	 * @throws \RuntimeException When the reconciliation job cannot be queued.
+	 */
 	public static function enqueue_reconciliation( int $parent_id, string $reason, int $actor_id = 0 ): void {
 		if ( $parent_id <= 0 ) {
 			return;
@@ -247,7 +259,7 @@ final class Invalidation_Queue {
 	 * than silently dropped — the queue doubles as the durable outbox.
 	 * Cron scheduling is deferred until after COMMIT.
 	 *
-	 * @param list<int> $parent_ids Post IDs to invalidate.
+	 * @param integer[] $parent_ids Post IDs to invalidate.
 	 * @param string    $reason    Invalidation reason.
 	 * @param int       $actor_id  Actor triggering the invalidation.
 	 * @throws \RuntimeException When the table is unavailable or any insert fails (after ROLLBACK).
@@ -306,14 +318,23 @@ final class Invalidation_Queue {
 		);
 	}
 
-	/** Schedule near-term queue processing if not already scheduled. */
+	/**
+	 * Schedule near-term queue processing if not already scheduled.
+	 *
+	 * @param int $delay Seconds to wait before processing.
+	 */
 	public static function schedule_processing( int $delay = 5 ): void {
 		if ( ! wp_next_scheduled( self::PROCESS_HOOK ) ) {
 			wp_schedule_single_event( time() + $delay, self::PROCESS_HOOK );
 		}
 	}
 
-	/** Record a synchronous fallback invalidation failure for observability. */
+	/**
+	 * Record a synchronous fallback invalidation failure for observability.
+	 *
+	 * @param int    $post_id Affected post ID.
+	 * @param string $reason  Failure reason.
+	 */
 	private static function record_fallback_failure( int $post_id, string $reason ): void {
 		$count = (int) get_option( 'lel_invalidation_fallback_failures', 0 );
 		self::write_counter( 'lel_invalidation_fallback_failures', $count + 1 );
@@ -326,7 +347,14 @@ final class Invalidation_Queue {
 		);
 	}
 
-	/** Apply invalidation immediately when its durable queue cannot be trusted. */
+	/**
+	 * Apply invalidation immediately when its durable queue cannot be trusted.
+	 *
+	 * @param integer[] $parent_ids Post IDs to invalidate.
+	 * @param string    $reason     Invalidation reason.
+	 * @param int       $actor_id   Actor triggering the invalidation.
+	 * @throws \RuntimeException When synchronous invalidation fails for a post.
+	 */
 	private static function invalidate_synchronously( array $parent_ids, string $reason, int $actor_id ): void {
 		foreach ( array_unique( array_map( 'intval', $parent_ids ) ) as $post_id ) {
 			if ( $post_id <= 0 ) {
@@ -341,7 +369,12 @@ final class Invalidation_Queue {
 		}
 	}
 
-	/** Record a durable-queue write failure so readiness cannot report healthy. */
+	/**
+	 * Record a durable-queue write failure so readiness cannot report healthy.
+	 *
+	 * @param int    $post_id Affected post ID.
+	 * @param string $reason  Failure reason.
+	 */
 	private static function record_enqueue_failure( int $post_id, string $reason ): void {
 		$count = (int) get_option( 'lel_invalidation_enqueue_failures', 0 );
 		self::write_counter( 'lel_invalidation_enqueue_failures', $count + 1 );
@@ -372,6 +405,7 @@ final class Invalidation_Queue {
 	 *
 	 * @param string $worker Worker identity for the lease.
 	 * @return array<string, mixed>|null Claimed job row, or null when none.
+	 * @throws \RuntimeException When the lease claim or the claimed-row load fails.
 	 */
 	private static function claim_next( string $worker ): ?array {
 		global $wpdb;
@@ -415,6 +449,7 @@ final class Invalidation_Queue {
 	 * Process pending invalidation jobs in bounded batches.
 	 *
 	 * @return int Number of jobs processed.
+	 * @throws \RuntimeException When the schema is unavailable or a job transition fails.
 	 */
 	public static function process_batch(): int {
 		global $wpdb;
@@ -555,7 +590,12 @@ final class Invalidation_Queue {
 		);
 	}
 
-	/** Purge completed jobs older than a given number of days (housekeeping). */
+	/**
+	 * Purge completed jobs older than a given number of days (housekeeping).
+	 *
+	 * @param int $older_than_days Age threshold in days.
+	 * @throws \RuntimeException When the purge query fails.
+	 */
 	public static function purge_completed( int $older_than_days = 7 ): int {
 		global $wpdb;
 		if ( ! self::exists() ) {
@@ -575,7 +615,12 @@ final class Invalidation_Queue {
 		return (int) $deleted;
 	}
 
-	/** Read a scalar and surface database errors instead of casting them to zero. */
+	/**
+	 * Read a scalar and surface database errors instead of casting them to zero.
+	 *
+	 * @param string $sql SQL statement to execute.
+	 * @throws \RuntimeException When the read fails.
+	 */
 	private static function scalar( string $sql ): int {
 		global $wpdb;
 		self::clear_database_error( $wpdb );
@@ -586,25 +631,42 @@ final class Invalidation_Queue {
 		return (int) $value;
 	}
 
-	/** Persist a monotonic failure counter and loudly report storage failure. */
+	/**
+	 * Persist a monotonic failure counter and loudly report storage failure.
+	 *
+	 * @param string $name  Option name.
+	 * @param int    $value Counter value to persist.
+	 */
 	private static function write_counter( string $name, int $value ): void {
 		if ( ! update_option( $name, $value, false ) && (int) get_option( $name, 0 ) !== $value ) {
 			error_log( 'Longevity invalidation failure counter could not be persisted: ' . $name ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
 		}
 	}
 
-	/** Current bounded database error. */
+	/**
+	 * Current bounded database error.
+	 *
+	 * @param \wpdb|object $wpdb WordPress database abstraction.
+	 */
 	private static function database_error( $wpdb ): string {
 		$error = trim( (string) ( $wpdb->last_error ?? '' ) );
 		return '' === $error ? 'unknown_database_error' : substr( $error, 0, 200 );
 	}
 
-	/** Clear stale wpdb error state before a read. */
+	/**
+	 * Clear stale wpdb error state before a read.
+	 *
+	 * @param \wpdb $wpdb WordPress database abstraction.
+	 */
 	private static function clear_database_error( $wpdb ): void {
 		$wpdb->last_error = '';
 	}
 
-	/** Whether the latest wpdb operation reported an error. */
+	/**
+	 * Whether the latest wpdb operation reported an error.
+	 *
+	 * @param \wpdb|object $wpdb WordPress database abstraction.
+	 */
 	private static function database_failed( $wpdb ): bool {
 		return '' !== trim( (string) ( $wpdb->last_error ?? '' ) );
 	}

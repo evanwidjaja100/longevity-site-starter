@@ -15,18 +15,19 @@ class Public_Rankings {
 	public static function render_ranking_directory(): string {
 		$groups = Rankings::directory();
 		if ( empty( $groups ) ) {
-			return '<section class="longevity-ranking-empty longevity-empty-state" aria-labelledby="lel-ranking-empty"><p class="longevity-kicker">Our testing program</p><h2 id="lel-ranking-empty">Protocols define how future testing is conducted</h2><p>A published protocol describes the observations, comparisons, conditions, and scoring model. It does not mean a product has been tested. Tested presentation appears only after the completed record is approved and version-matched.</p><p><a href="' . esc_url( Routes::public_page_url( 'testing_methodology' ) ?: home_url( '/testing-methodology/' ) ) . '">' . esc_html__( 'See how testing works', 'longevity-core' ) . '</a></p></section>';
+			$methodology_url = Routes::public_page_url( 'testing_methodology' );
+			return '<section class="longevity-ranking-empty longevity-empty-state" aria-labelledby="lel-ranking-empty"><p class="longevity-kicker">Our testing program</p><h2 id="lel-ranking-empty">Protocols define how future testing is conducted</h2><p>A published protocol describes the observations, comparisons, conditions, and scoring model. It does not mean a product has been tested. Tested presentation appears only after the completed record is approved and version-matched.</p><p><a href="' . esc_url( $methodology_url ? $methodology_url : home_url( '/testing-methodology/' ) ) . '">' . esc_html__( 'See how testing works', 'longevity-core' ) . '</a></p></section>';
 		}
 		$minimum = Rankings::minimum_ranking_size();
 		$enough  = array_values( array_filter( $groups, static fn( $g ) => $g['count'] >= $minimum ) );
 		if ( empty( $enough ) ) {
 			$count = count( $groups );
-			return '<section class="longevity-ranking-empty longevity-empty-state" aria-labelledby="lel-ranking-pre"><p class="longevity-kicker">Consumer Lab rankings</p><h2 id="lel-ranking-pre">Building our comparison inventory</h2><p>' . esc_html( sprintf( _n( 'We have %1$d eligible tested report so far. A minimum of %2$d comparable reports is required before a numbered ranking is produced. Browse individual reports below instead.', 'We have %1$d eligible tested reports so far. A minimum of %2$d comparable reports is required before a numbered ranking is produced. Browse individual reports below instead.', $count, 'longevity-core' ), $count, $minimum ) ) . '</p></section>';
+			return '<section class="longevity-ranking-empty longevity-empty-state" aria-labelledby="lel-ranking-pre"><p class="longevity-kicker">Consumer Lab rankings</p><h2 id="lel-ranking-pre">Building our comparison inventory</h2><p>' . esc_html( sprintf( /* translators: 1: number of eligible tested reports, 2: minimum comparable reports required for a ranking. */ _n( 'We have %1$d eligible tested report so far. A minimum of %2$d comparable reports is required before a numbered ranking is produced. Browse individual reports below instead.', 'We have %1$d eligible tested reports so far. A minimum of %2$d comparable reports is required before a numbered ranking is produced. Browse individual reports below instead.', $count, 'longevity-core' ), $count, $minimum ) ) . '</p></section>';
 		}
-		$html = '<section class="longevity-ranking-directory" aria-labelledby="lel-ranking-directory-title"><div class="longevity-section-header"><div><p class="longevity-kicker">Consumer Lab rankings</p><h2 id="lel-ranking-directory-title">Compare protocol-complete product reports</h2></div><p>' . esc_html( sprintf( __( 'Categories that meet the minimum of %d eligible comparable reports for a numbered ranking.', 'longevity-core' ), $minimum ) ) . '</p></div><div class="longevity-ranking-category-grid">';
+		$html = '<section class="longevity-ranking-directory" aria-labelledby="lel-ranking-directory-title"><div class="longevity-section-header"><div><p class="longevity-kicker">Consumer Lab rankings</p><h2 id="lel-ranking-directory-title">Compare protocol-complete product reports</h2></div><p>' . esc_html( sprintf( /* translators: %d: minimum eligible comparable reports required for a ranking. */ __( 'Categories that meet the minimum of %d eligible comparable reports for a numbered ranking.', 'longevity-core' ), $minimum ) ) . '</p></div><div class="longevity-ranking-category-grid">';
 		foreach ( $enough as $group ) {
 			$term  = $group['term'];
-			$html .= '<article class="longevity-ranking-category"><div class="longevity-category-mark" aria-hidden="true">' . esc_html( strtoupper( mb_substr( $term->name, 0, 1 ) ) ) . '</div><div><p class="longevity-kicker">' . esc_html( sprintf( _n( '%d eligible report', '%d eligible reports', $group['count'], 'longevity-core' ), $group['count'] ) ) . '</p><h3><a href="' . esc_url( get_category_link( $term->term_id ) ) . '" data-lel-event="topic_open" data-topic="' . esc_attr( $term->slug ) . '" data-placement="ranking-directory">' . esc_html( $term->name ) . '</a></h3><dl class="longevity-category-facts"><div><dt>' . esc_html__( 'Top score', 'longevity-core' ) . '</dt><dd>' . esc_html( number_format_i18n( $group['highest_score'], 1 ) ) . '/5</dd></div><div><dt>' . esc_html__( 'Updated', 'longevity-core' ) . '</dt><dd><time datetime="' . esc_attr( $group['latest'] ) . '">' . esc_html( $group['latest'] ) . '</time></dd></div></dl></div></article>';
+			$html .= '<article class="longevity-ranking-category"><div class="longevity-category-mark" aria-hidden="true">' . esc_html( strtoupper( mb_substr( $term->name, 0, 1 ) ) ) . '</div><div><p class="longevity-kicker">' . esc_html( sprintf( /* translators: %d: number of eligible reports in the category. */ _n( '%d eligible report', '%d eligible reports', $group['count'], 'longevity-core' ), $group['count'] ) ) . '</p><h3><a href="' . esc_url( get_category_link( $term->term_id ) ) . '" data-lel-event="topic_open" data-topic="' . esc_attr( $term->slug ) . '" data-placement="ranking-directory">' . esc_html( $term->name ) . '</a></h3><dl class="longevity-category-facts"><div><dt>' . esc_html__( 'Top score', 'longevity-core' ) . '</dt><dd>' . esc_html( number_format_i18n( $group['highest_score'], 1 ) ) . '/5</dd></div><div><dt>' . esc_html__( 'Updated', 'longevity-core' ) . '</dt><dd><time datetime="' . esc_attr( $group['latest'] ) . '">' . esc_html( $group['latest'] ) . '</time></dd></div></dl></div></article>';
 		}
 		return $html . '</div></section>';
 	}
@@ -44,9 +45,9 @@ class Public_Rankings {
 		$count   = count( $eligible );
 		$minimum = Rankings::minimum_ranking_size();
 		if ( $count < $minimum ) {
-			$html = '<section class="longevity-ranking-pre-launch" aria-labelledby="lel-ranking-pre"><div class="longevity-section-header"><div><p class="longevity-kicker">Consumer Lab ranking</p><h2 id="lel-ranking-pre">' . esc_html( $term->name ) . ' — reports only</h2></div><p>' . esc_html( sprintf( __( '%1$d eligible tested product found. A minimum of %2$d comparable reports is required before a numbered ranking is produced. Below are individual reports in the order they were last updated.', 'longevity-core' ), $count, $minimum ) ) . '</p></div><ul class="longevity-report-list">';
+			$html = '<section class="longevity-ranking-pre-launch" aria-labelledby="lel-ranking-pre"><div class="longevity-section-header"><div><p class="longevity-kicker">Consumer Lab ranking</p><h2 id="lel-ranking-pre">' . esc_html( $term->name ) . ' — reports only</h2></div><p>' . esc_html( sprintf( /* translators: 1: number of eligible tested products, 2: minimum comparable reports required for a ranking. */ __( '%1$d eligible tested product found. A minimum of %2$d comparable reports is required before a numbered ranking is produced. Below are individual reports in the order they were last updated.', 'longevity-core' ), $count, $minimum ) ) . '</p></div><ul class="longevity-report-list">';
 			foreach ( Rankings::reviews( (int) $term->term_id, 'updated', array(), $count ) as $review ) {
-				$html .= '<li><a href="' . esc_url( get_permalink( $review ) ) . '">' . esc_html( get_the_title( $review ) ) . '</a> <span class="longevity-small">' . esc_html( sprintf( __( 'Score: %s/5', 'longevity-core' ), number_format_i18n( (float) get_post_meta( $review->ID, 'review_score', true ), 1 ) ) ) . '</span></li>';
+				$html .= '<li><a href="' . esc_url( get_permalink( $review ) ) . '">' . esc_html( get_the_title( $review ) ) . '</a> <span class="longevity-small">' . esc_html( sprintf( /* translators: %s: review score out of five. */ __( 'Score: %s/5', 'longevity-core' ), number_format_i18n( (float) get_post_meta( $review->ID, 'review_score', true ), 1 ) ) ) . '</span></li>';
 			}
 			return $html . '</ul></section>';
 		}
@@ -55,7 +56,7 @@ class Public_Rankings {
 		$filters       = Rankings::requested_filters();
 		$confidence    = array_values( array_unique( array_map( static fn( int $id ) => (string) get_post_meta( $id, 'review_score_confidence', true ), $eligible ) ) );
 		$subscriptions = array_values( array_unique( array_map( static fn( int $id ) => (bool) get_post_meta( $id, 'subscription_required', true ), $eligible ) ) );
-		$html          = '<section class="longevity-ranking-list" aria-labelledby="lel-ranking-list-title"><div class="longevity-section-header"><div><p class="longevity-kicker">Consumer Lab ranking</p><h2 id="lel-ranking-list-title">' . esc_html( $term->name ) . ' product reports</h2></div><p>' . esc_html( sprintf( _n( '%d eligible tested product', '%d eligible tested products', $count, 'longevity-core' ), $count ) ) . '</p></div>';
+		$html          = '<section class="longevity-ranking-list" aria-labelledby="lel-ranking-list-title"><div class="longevity-section-header"><div><p class="longevity-kicker">Consumer Lab ranking</p><h2 id="lel-ranking-list-title">' . esc_html( $term->name ) . ' product reports</h2></div><p>' . esc_html( sprintf( /* translators: %d: number of eligible tested products. */ _n( '%d eligible tested product', '%d eligible tested products', $count, 'longevity-core' ), $count ) ) . '</p></div>';
 		$html         .= '<form class="longevity-ranking-filters" method="get" action="' . esc_url( get_category_link( $term->term_id ) ) . '"><label>' . esc_html__( 'Sort rankings', 'longevity-core' ) . '<select name="ranking_sort" data-lel-event="ranking_sort" data-category="' . esc_attr( $term->slug ) . '">' . Public_Content::options(
 			array(
 				'score'      => __( 'Overall score', 'longevity-core' ),
@@ -86,13 +87,13 @@ class Public_Rankings {
 		if ( empty( $reviews ) ) {
 			return $html . '<div class="longevity-empty-state"><h3>' . esc_html__( 'No reports match these filters', 'longevity-core' ) . '</h3><p><a href="' . esc_url( get_category_link( $term->term_id ) ) . '">' . esc_html__( 'Clear ranking filters', 'longevity-core' ) . '</a></p></div></section>';
 		}
-		$html      .= '<div class="longevity-ranking-table-wrap"><table class="longevity-ranking-table"><caption class="screen-reader-text">' . esc_html( sprintf( __( '%s Consumer Lab ranking', 'longevity-core' ), $term->name ) ) . '</caption><thead><tr><th scope="col">' . esc_html__( 'Rank', 'longevity-core' ) . '</th><th scope="col">' . esc_html__( 'Product and model', 'longevity-core' ) . '</th><th scope="col">' . esc_html__( 'Overall score', 'longevity-core' ) . '</th><th scope="col">' . esc_html__( 'Confidence', 'longevity-core' ) . '</th><th scope="col">' . esc_html__( 'Decision context', 'longevity-core' ) . '</th><th scope="col">' . esc_html__( 'Report', 'longevity-core' ) . '</th></tr></thead><tbody>';
+		$html      .= '<div class="longevity-ranking-table-wrap"><table class="longevity-ranking-table"><caption class="screen-reader-text">' . esc_html( sprintf( /* translators: %s: ranking category name. */ __( '%s Consumer Lab ranking', 'longevity-core' ), $term->name ) ) . '</caption><thead><tr><th scope="col">' . esc_html__( 'Rank', 'longevity-core' ) . '</th><th scope="col">' . esc_html__( 'Product and model', 'longevity-core' ) . '</th><th scope="col">' . esc_html__( 'Overall score', 'longevity-core' ) . '</th><th scope="col">' . esc_html__( 'Confidence', 'longevity-core' ) . '</th><th scope="col">' . esc_html__( 'Decision context', 'longevity-core' ) . '</th><th scope="col">' . esc_html__( 'Report', 'longevity-core' ) . '</th></tr></thead><tbody>';
 		$bands      = Rankings::assign_bands( $reviews );
 		$band_index = 0;
 		$threshold  = Review_Methodology::minimum_meaningful_difference();
 		foreach ( $bands as $band_posts ) {
 			++$band_index;
-			$band_label = 1 === $band_index ? __( 'Top band', 'longevity-core' ) : sprintf( __( 'Band %d', 'longevity-core' ), $band_index );
+			$band_label = 1 === $band_index ? __( 'Top band', 'longevity-core' ) : sprintf( /* translators: %d: ranking band number. */ __( 'Band %d', 'longevity-core' ), $band_index );
 			$is_tie     = count( $band_posts ) > 1;
 			foreach ( $band_posts as $review ) {
 				$score            = (float) get_post_meta( $review->ID, 'review_score', true );
@@ -106,10 +107,14 @@ class Public_Rankings {
 			}
 		}
 		$threshold_display = number_format_i18n( $threshold, 1 );
-		return $html . '</tbody></table></div><p class="longevity-ranking-note"><strong>' . esc_html__( 'How order is determined:', 'longevity-core' ) . '</strong> ' . esc_html( sprintf( __( 'Overall score, then confidence, most recent material update, and product title. Products within %s points of each other share a ranking band and are labelled "not meaningfully different." Commercial relationships never change the score or order.', 'longevity-core' ), $threshold_display ) ) . '</p><p class="longevity-sensitivity-note"><strong>' . esc_html__( 'Scoring model:', 'longevity-core' ) . '</strong> ' . esc_html( Review_Methodology::scoring_sensitivity_note() ) . '</p></section>';
+		return $html . '</tbody></table></div><p class="longevity-ranking-note"><strong>' . esc_html__( 'How order is determined:', 'longevity-core' ) . '</strong> ' . esc_html( sprintf( /* translators: %s: minimum meaningful score difference in points. */ __( 'Overall score, then confidence, most recent material update, and product title. Products within %s points of each other share a ranking band and are labelled "not meaningfully different." Commercial relationships never change the score or order.', 'longevity-core' ), $threshold_display ) ) . '</p><p class="longevity-sensitivity-note"><strong>' . esc_html__( 'Scoring model:', 'longevity-core' ) . '</strong> ' . esc_html( Review_Methodology::scoring_sensitivity_note() ) . '</p></section>';
 	}
 
-	/** Render the decision-dense header for a product report. */
+	/**
+	 * Render the decision-dense header for a product report.
+	 *
+	 * @param int $post_id Review post ID.
+	 */
 	public static function render_product_report_summary( int $post_id ): string {
 		if ( $post_id <= 0 || 'review' !== get_post_type( $post_id ) || ! Runtime_Config::scoring_model_status()['valid'] || ! Approval_Service::is_current( $post_id, 'testing' ) || ! Approval_Service::is_current( $post_id, 'editorial' ) ) {
 			return '';
@@ -138,12 +143,14 @@ class Public_Rankings {
 		$price_region   = (string) get_post_meta( $post_id, 'price_region', true );
 		$price_parts    = array_filter( array( $price_currency, $price_amount > 0 ? number_format_i18n( $price_amount, 2 ) : '' ) );
 
+		$subscription_text = sprintf( /* translators: %s: subscription billing interval. */ __( 'Required (%s)', 'longevity-core' ), (string) get_post_meta( $post_id, 'billing_interval', true ) );
+
 		$fields     = array(
 			__( 'Verdict', 'longevity-core' )          => get_post_meta( $post_id, 'content_summary', true ),
 			__( 'Best for', 'longevity-core' )         => get_post_meta( $post_id, 'best_for', true ),
 			__( 'Not for', 'longevity-core' )          => get_post_meta( $post_id, 'not_for', true ),
-			__( 'Price', 'longevity-core' )            => $price_parts ? implode( ' ', $price_parts ) . ( $price_checked ? ' (' . sprintf( __( 'checked %s', 'longevity-core' ), $price_checked ) . ')' : '' ) . ( $price_region ? ' · ' . $price_region : '' ) : '',
-			__( 'Subscription', 'longevity-core' )     => ( get_post_meta( $post_id, 'subscription_required', true ) ? ( sprintf( __( 'Required (%s)', 'longevity-core' ), (string) get_post_meta( $post_id, 'billing_interval', true ) ) ?: __( 'Required', 'longevity-core' ) ) : __( 'Not required', 'longevity-core' ) ),
+			__( 'Price', 'longevity-core' )            => $price_parts ? implode( ' ', $price_parts ) . ( $price_checked ? ' (' . sprintf( /* translators: %s: date the price was checked. */ __( 'checked %s', 'longevity-core' ), $price_checked ) . ')' : '' ) . ( $price_region ? ' · ' . $price_region : '' ) : '',
+			__( 'Subscription', 'longevity-core' )     => ( get_post_meta( $post_id, 'subscription_required', true ) ? ( $subscription_text ? $subscription_text : __( 'Required', 'longevity-core' ) ) : __( 'Not required', 'longevity-core' ) ),
 			__( 'Model', 'longevity-core' )            => trim( implode( ' · ', array_filter( array( (string) get_post_meta( $post_id, 'tested_product_model', true ), (string) get_post_meta( $post_id, 'product_variant', true ) ) ) ) ),
 			__( 'Firmware version', 'longevity-core' ) => get_post_meta( $post_id, 'tested_firmware_version', true ),
 			__( 'App version', 'longevity-core' )      => get_post_meta( $post_id, 'tested_app_version', true ),
@@ -161,7 +168,7 @@ class Public_Rankings {
 		$score      = (float) get_post_meta( $post_id, 'review_score', true );
 		$confidence = (string) get_post_meta( $post_id, 'review_score_confidence', true );
 		$model      = (string) get_post_meta( $post_id, 'tested_product_model', true );
-		$html       = '<section class="longevity-product-summary" aria-labelledby="lel-product-summary"><div class="longevity-product-identity"><p class="longevity-kicker">' . esc_html__( 'Tested product', 'longevity-core' ) . '</p><h2 id="lel-product-summary">' . esc_html( $model ?: get_the_title( $post_id ) ) . '</h2><span class="longevity-status-badge ' . ( $complete ? 'is-complete' : 'is-incomplete' ) . '">' . esc_html( $complete ? __( 'Testing complete', 'longevity-core' ) : __( 'Testing in progress', 'longevity-core' ) ) . '</span></div>';
+		$html       = '<section class="longevity-product-summary" aria-labelledby="lel-product-summary"><div class="longevity-product-identity"><p class="longevity-kicker">' . esc_html__( 'Tested product', 'longevity-core' ) . '</p><h2 id="lel-product-summary">' . esc_html( $model ? $model : get_the_title( $post_id ) ) . '</h2><span class="longevity-status-badge ' . ( $complete ? 'is-complete' : 'is-incomplete' ) . '">' . esc_html( $complete ? __( 'Testing complete', 'longevity-core' ) : __( 'Testing in progress', 'longevity-core' ) ) . '</span></div>';
 		if ( $complete && Rankings::is_eligible( $post_id ) ) {
 			$html .= '<div class="longevity-score-panel"><span>' . esc_html__( 'Overall score', 'longevity-core' ) . '</span><strong>' . esc_html( number_format_i18n( $score, 1 ) ) . '</strong><span>/5</span><span class="longevity-confidence-badge">' . esc_html( $confidence ) . '</span></div>';
 		}
@@ -178,12 +185,21 @@ class Public_Rankings {
 		return $html . '</dl></section>';
 	}
 
-	/** Map an internal enum value to a reader-facing label, or return the raw value. */
+	/**
+	 * Map an internal enum value to a reader-facing label, or return the raw value.
+	 *
+	 * @param string   $value  Stored enum value.
+	 * @param string[] $labels Reader-facing labels keyed by enum value.
+	 */
 	private static function enum_label( string $value, array $labels ): string {
 		return $labels[ $value ] ?? $value;
 	}
 
-	/** Render approved public-result rows without private record identifiers or raw notes. */
+	/**
+	 * Render approved public-result rows without private record identifiers or raw notes.
+	 *
+	 * @param int $post_id Review post ID.
+	 */
 	public static function render_test_results( int $post_id ): string {
 		if ( $post_id <= 0 || 'review' !== get_post_type( $post_id ) || ! Approval_Service::is_current( $post_id, 'testing' ) ) {
 			return '';
@@ -207,10 +223,10 @@ class Public_Rankings {
 			'informational'   => __( 'Informational', 'longevity-core' ),
 			'not_applicable'  => __( 'Not applicable', 'longevity-core' ),
 		);
-		$html       = '<section class="longevity-test-results" aria-labelledby="lel-test-results"><div class="longevity-section-header"><div><p class="longevity-kicker">Recorded observations</p><h2 id="lel-test-results">Structured test results</h2></div><p>' . esc_html( sprintf( __( 'These are product-unit observations recorded under protocol version %s. They are not clinical validation or health recommendations. Private notes and identifiers are not exposed.', 'longevity-core' ), $version ) ) . '</p></div><div class="longevity-table-wrap"><table><thead><tr><th scope="col">' . esc_html__( 'Metric', 'longevity-core' ) . '</th><th scope="col">' . esc_html__( 'Observed', 'longevity-core' ) . '</th><th scope="col">' . esc_html__( 'Reference', 'longevity-core' ) . '</th><th scope="col">' . esc_html__( 'Result', 'longevity-core' ) . '</th><th scope="col">' . esc_html__( 'Interpretation', 'longevity-core' ) . '</th></tr></thead><tbody>';
+		$html       = '<section class="longevity-test-results" aria-labelledby="lel-test-results"><div class="longevity-section-header"><div><p class="longevity-kicker">Recorded observations</p><h2 id="lel-test-results">Structured test results</h2></div><p>' . esc_html( sprintf( /* translators: %s: testing protocol version identifier. */ __( 'These are product-unit observations recorded under protocol version %s. They are not clinical validation or health recommendations. Private notes and identifiers are not exposed.', 'longevity-core' ), $version ) ) . '</p></div><div class="longevity-table-wrap"><table><thead><tr><th scope="col">' . esc_html__( 'Metric', 'longevity-core' ) . '</th><th scope="col">' . esc_html__( 'Observed', 'longevity-core' ) . '</th><th scope="col">' . esc_html__( 'Reference', 'longevity-core' ) . '</th><th scope="col">' . esc_html__( 'Result', 'longevity-core' ) . '</th><th scope="col">' . esc_html__( 'Interpretation', 'longevity-core' ) . '</th></tr></thead><tbody>';
 		foreach ( $rows as $row ) {
 			$reference = implode( ': ', array_filter( array( $row['reference_label'], $row['reference_value'] ) ) );
-			$html     .= '<tr><th scope="row">' . esc_html( $row['label'] ) . '</th><td>' . esc_html( trim( $row['observed_value'] . ' ' . $row['unit'] ) ) . '</td><td>' . esc_html( $reference ?: '—' ) . '</td><td><span class="longevity-result-status" data-status="' . esc_attr( $row['status'] ) . '">' . esc_html( $labels[ $row['status'] ] ) . '</span></td><td>' . esc_html( $row['note'] ?: '—' ) . '</td></tr>';
+			$html     .= '<tr><th scope="row">' . esc_html( $row['label'] ) . '</th><td>' . esc_html( trim( $row['observed_value'] . ' ' . $row['unit'] ) ) . '</td><td>' . esc_html( $reference ? $reference : '—' ) . '</td><td><span class="longevity-result-status" data-status="' . esc_attr( $row['status'] ) . '">' . esc_html( $labels[ $row['status'] ] ) . '</span></td><td>' . esc_html( $row['note'] ? $row['note'] : '—' ) . '</td></tr>';
 		}
 		$html .= '</tbody></table></div>';
 		if ( $deviations ) {
@@ -222,7 +238,11 @@ class Public_Rankings {
 		return $html . '</section>';
 	}
 
-	/** Render the review verdict and buying-decision context without blank rows. */
+	/**
+	 * Render the review verdict and buying-decision context without blank rows.
+	 *
+	 * @param int $post_id Review post ID.
+	 */
 	public static function render_review_decision( int $post_id ): string {
 		if ( $post_id <= 0 || 'review' !== get_post_type( $post_id ) || ! Approval_Service::is_current( $post_id, 'testing' ) || ! Approval_Service::is_current( $post_id, 'editorial' ) ) {
 			return '';
@@ -252,7 +272,11 @@ class Public_Rankings {
 		return $html . '</dl></section>';
 	}
 
-	/** Render a reproducible score explanation. */
+	/**
+	 * Render a reproducible score explanation.
+	 *
+	 * @param int $post_id Review post ID.
+	 */
 	public static function render_review_score( int $post_id ): string {
 		if ( $post_id <= 0 || 'review' !== get_post_type( $post_id ) || ! Runtime_Config::scoring_model_status()['valid'] || ! Approval_Service::is_current( $post_id, 'testing' ) || ! Approval_Service::is_current( $post_id, 'editorial' ) ) {
 			return '';
@@ -285,7 +309,11 @@ class Public_Rankings {
 		return $html . '</section>';
 	}
 
-	/** Render a valid, version-matched test method. */
+	/**
+	 * Render a valid, version-matched test method.
+	 *
+	 * @param int $post_id Reviewed post ID.
+	 */
 	public static function render_test_method( int $post_id ): string {
 		if ( $post_id <= 0 || ! get_post_meta( $post_id, 'testing_required', true ) || ! Approval_Service::is_current( $post_id, 'testing' ) ) {
 			return '';
@@ -323,7 +351,11 @@ class Public_Rankings {
 		return $html . '<p>' . esc_html__( 'Consumer testing describes this unit and protocol. It does not establish clinical accuracy or universal outcomes.', 'longevity-core' ) . '</p></details>';
 	}
 
-	/** Render safe, deduplicated public sources linked to verified claims. */
+	/**
+	 * Render safe, deduplicated public sources linked to verified claims.
+	 *
+	 * @param int $post_id Content post ID.
+	 */
 	public static function render_source_list( int $post_id ): string {
 		$sources = Claims::public_sources_for_post( $post_id, 50 );
 		if ( empty( $sources ) ) {
@@ -341,10 +373,10 @@ class Public_Rankings {
 				$html .= '. <span class="longevity-source-label">' . esc_html( $source['label'] ) . '</span>';
 			}
 			if ( $source['jurisdiction'] ) {
-				$html .= '. <span class="longevity-source-jurisdiction">' . esc_html( sprintf( __( 'Jurisdiction: %s', 'longevity-core' ), $source['jurisdiction'] ) ) . '</span>';
+				$html .= '. <span class="longevity-source-jurisdiction">' . esc_html( sprintf( /* translators: %s: source jurisdiction name. */ __( 'Jurisdiction: %s', 'longevity-core' ), $source['jurisdiction'] ) ) . '</span>';
 			}
 			if ( $source['accessed_date'] ) {
-				$html .= '. ' . esc_html( sprintf( __( 'Accessed %s', 'longevity-core' ), $source['accessed_date'] ) );
+				$html .= '. ' . esc_html( sprintf( /* translators: %s: date the source was accessed. */ __( 'Accessed %s', 'longevity-core' ), $source['accessed_date'] ) );
 			}
 			if ( $source['url'] ) {
 				$html .= '. <a href="' . esc_url( $source['url'] ) . '" rel="external noopener" data-lel-event="outbound_citation_click">' . esc_html__( 'View source', 'longevity-core' ) . '</a>';
@@ -362,7 +394,11 @@ class Public_Rankings {
 		return $html . '</ol></section>';
 	}
 
-	/** Render verified material claims as a public evidence matrix. */
+	/**
+	 * Render verified material claims as a public evidence matrix.
+	 *
+	 * @param int $post_id Content post ID.
+	 */
 	public static function render_claim_evidence_matrix( int $post_id ): string {
 		if ( $post_id <= 0 ) {
 			return '';

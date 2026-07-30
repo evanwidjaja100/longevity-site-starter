@@ -11,7 +11,11 @@ defined( 'ABSPATH' ) || exit;
 
 /** Registers least-privilege editorial roles. */
 final class Roles {
-	/** @var array<int, string> */
+	/**
+	 * Every custom capability registered by this plugin.
+	 *
+	 * @var array<int, string>
+	 */
 	private const ALL_CUSTOM_CAPS = array(
 		'submit_for_fact_check',
 		'complete_fact_check',
@@ -36,7 +40,11 @@ final class Roles {
 		'lel_manage_legal_holds',
 	);
 
-	/** @var array<int, string> */
+	/**
+	 * Custom capabilities granted to the editorial manager role.
+	 *
+	 * @var array<int, string>
+	 */
 	private const EDITORIAL_MANAGER_CAPS = array(
 		'submit_for_fact_check',
 		'submit_for_medical_review',

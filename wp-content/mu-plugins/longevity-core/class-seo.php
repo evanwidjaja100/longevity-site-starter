@@ -1,4 +1,9 @@
 <?php
+/**
+ * SEO meta output: canonical, description, robots, and social markup.
+ *
+ * @package LongevityCore
+ */
 
 namespace Longevity\Core;
 
@@ -7,11 +12,18 @@ use WP_Term;
 
 defined( 'ABSPATH' ) || exit;
 
+/** Outputs canonical, meta description, robots, and social markup when no SEO plugin is active. */
 final class SEO {
 	private const PRIORITY = 4;
 
+	/**
+	 * Cached detection of an active third-party SEO provider.
+	 *
+	 * @var bool|null
+	 */
 	private static ?bool $provider_active = null;
 
+	/** Register wp_head, robots, and canonical hooks. */
 	public static function init(): void {
 		add_action( 'wp_head', array( self::class, 'output_canonical' ), self::PRIORITY );
 		add_action( 'wp_head', array( self::class, 'output_meta_description' ), self::PRIORITY );
@@ -20,10 +32,12 @@ final class SEO {
 		add_action( 'init', array( self::class, 'remove_core_canonical' ), 10 );
 	}
 
+	/** Remove WordPress core's default rel=canonical output. */
 	public static function remove_core_canonical(): void {
 		remove_action( 'wp_head', 'rel_canonical', 10 );
 	}
 
+	/** Whether a recognised third-party SEO plugin is active (cached per request). */
 	private static function provider_active(): bool {
 		if ( null === self::$provider_active ) {
 			self::$provider_active = defined( 'WPSEO_VERSION' )
@@ -33,6 +47,11 @@ final class SEO {
 		return self::$provider_active;
 	}
 
+	/**
+	 * Resolve the best available meta description for a post or the site.
+	 *
+	 * @param int $post_id Optional post ID; 0 uses the site description.
+	 */
 	public static function resolve_description( int $post_id = 0 ): string {
 		if ( 0 === $post_id ) {
 			return (string) get_bloginfo( 'description' );
@@ -61,6 +80,7 @@ final class SEO {
 		return (string) get_bloginfo( 'description' );
 	}
 
+	/** Echo a meta description tag when no third-party SEO provider is active. */
 	public static function output_meta_description(): void {
 		if ( self::provider_active() ) {
 			return;
@@ -117,11 +137,13 @@ final class SEO {
 		} elseif ( is_search() ) {
 			$url = home_url( '/?s=' . rawurlencode( get_search_query() ) );
 		} elseif ( is_post_type_archive() ) {
-			$url = (string) get_post_type_archive_link( get_query_var( 'post_type' ) ?: 'review' );
+			$queried_type = get_query_var( 'post_type' );
+			$url          = (string) get_post_type_archive_link( $queried_type ? $queried_type : 'review' );
 		}
 		return $url;
 	}
 
+	/** Echo the canonical link tag when no third-party SEO provider is active. */
 	public static function output_canonical(): void {
 		if ( self::provider_active() ) {
 			return;
@@ -132,6 +154,11 @@ final class SEO {
 		}
 	}
 
+	/**
+	 * Apply noindex rules for search, 404, review archive, and flagged posts.
+	 *
+	 * @param array $robots Robots directives keyed by directive name.
+	 */
 	public static function filter_robots( array $robots ): array {
 		if ( self::provider_active() ) {
 			return $robots;
@@ -152,6 +179,7 @@ final class SEO {
 		return $robots;
 	}
 
+	/** Echo Open Graph and Twitter Card tags when no third-party SEO provider is active. */
 	public static function output_social_meta(): void {
 		if ( self::provider_active() ) {
 			return;

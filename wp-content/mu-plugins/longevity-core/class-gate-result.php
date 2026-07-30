@@ -13,16 +13,32 @@ defined( 'ABSPATH' ) || exit;
  * Collects publication readiness outcomes.
  */
 final class Gate_Result {
-	/** @var array<int, array<string, string>> */
+	/**
+	 * Blocking readiness failures that prevent publication.
+	 *
+	 * @var array<int, array<string, string>>
+	 */
 	private array $blocking = array();
 
-	/** @var array<int, array<string, string>> */
+	/**
+	 * Non-blocking readiness warnings.
+	 *
+	 * @var array<int, array<string, string>>
+	 */
 	private array $warnings = array();
 
-	/** @var array<int, array<string, string>> */
+	/**
+	 * Checks that passed.
+	 *
+	 * @var array<int, array<string, string>>
+	 */
 	private array $passed = array();
 
-	/** @var array<int, array<string, string>> */
+	/**
+	 * Checks that did not apply to this post.
+	 *
+	 * @var array<int, array<string, string>>
+	 */
 	private array $not_applicable = array();
 
 	private const BUCKETS = array(
@@ -32,20 +48,51 @@ final class Gate_Result {
 		'skip'  => 'not_applicable',
 	);
 
+	/**
+	 * Append an outcome record to the bucket for a category.
+	 *
+	 * @param string $category Bucket selector: block, warn, pass, or skip.
+	 * @param string $code     Machine-readable check identifier.
+	 * @param string $message  Human-readable outcome description.
+	 */
 	private function push( string $category, string $code, string $message ): void {
-		$prop          = self::BUCKETS[ $category ];
-		$this->$prop[] = array(
+		$prop            = self::BUCKETS[ $category ];
+		$this->{$prop}[] = array(
 			'code'    => $code,
 			'message' => $message,
 		);
 	}
 
+	/**
+	 * Record a blocking failure.
+	 *
+	 * @param string $code    Machine-readable check identifier.
+	 * @param string $message Human-readable failure description.
+	 */
 	public function block( string $code, string $message ): void {
 		$this->push( 'block', $code, $message ); }
+	/**
+	 * Record a non-blocking warning.
+	 *
+	 * @param string $code    Machine-readable check identifier.
+	 * @param string $message Human-readable warning description.
+	 */
 	public function warn( string $code, string $message ): void {
 		$this->push( 'warn', $code, $message ); }
+	/**
+	 * Record a passed check.
+	 *
+	 * @param string $code    Machine-readable check identifier.
+	 * @param string $message Human-readable outcome description.
+	 */
 	public function pass( string $code, string $message ): void {
 		$this->push( 'pass', $code, $message ); }
+	/**
+	 * Record a check that did not apply.
+	 *
+	 * @param string $code    Machine-readable check identifier.
+	 * @param string $message Human-readable outcome description.
+	 */
 	public function skip( string $code, string $message ): void {
 		$this->push( 'skip', $code, $message ); }
 

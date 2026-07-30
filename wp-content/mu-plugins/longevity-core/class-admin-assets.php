@@ -9,6 +9,7 @@ namespace Longevity\Core;
 
 defined( 'ABSPATH' ) || exit;
 
+/** Enqueue governance editor assets on governed post-type edit screens. */
 function longevity_admin_assets_init(): void {
 	add_action(
 		'admin_enqueue_scripts',

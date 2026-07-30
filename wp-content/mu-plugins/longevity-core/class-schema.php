@@ -119,7 +119,13 @@ final class Schema {
 		return $graph;
 	}
 
-	/** Build page, article, author, reviewer, breadcrumb, and optional review entities. */
+	/**
+	 * Build page, article, author, reviewer, breadcrumb, and optional review entities.
+	 *
+	 * @param int    $post_id    Queried post ID to describe.
+	 * @param string $org_id     Organization schema node identifier (URI).
+	 * @param string $website_id WebSite schema node identifier (URI).
+	 */
 	private static function singular_graph( int $post_id, string $org_id, string $website_id ): array {
 		$post = get_post( $post_id );
 		if ( ! $post ) {
@@ -203,7 +209,13 @@ final class Schema {
 		return $graph;
 	}
 
-	/** Build a review entity only for a specific product with real score/method metadata. */
+	/**
+	 * Build a review entity only for a specific product with real score/method metadata.
+	 *
+	 * @param int    $post_id    Reviewed post ID.
+	 * @param string $article_id Article schema node identifier (URI).
+	 * @param string $url        Canonical post permalink.
+	 */
 	private static function review_schema( int $post_id, string $article_id, string $url ): ?array {
 		$model      = trim( (string) get_post_meta( $post_id, 'tested_product_model', true ) );
 		$score      = (float) get_post_meta( $post_id, 'review_score', true );
@@ -255,7 +267,12 @@ final class Schema {
 		);
 	}
 
-	/** Build reviewer person entity only for completed scoped review. */
+	/**
+	 * Build reviewer person entity only for completed scoped review.
+	 *
+	 * @param int    $post_id Reviewed post ID.
+	 * @param string $url     Canonical post permalink.
+	 */
 	private static function reviewer_schema( int $post_id, string $url ): ?array {
 		if ( ! Approval_Service::is_current( $post_id, 'medical' ) ) {
 			return null;
@@ -281,7 +298,12 @@ final class Schema {
 		);
 	}
 
-	/** Build breadcrumbs from visible navigation facts. */
+	/**
+	 * Build breadcrumbs from visible navigation facts.
+	 *
+	 * @param int    $post_id Post ID whose breadcrumb trail is built.
+	 * @param string $id      Breadcrumb schema node identifier (URI).
+	 */
 	private static function breadcrumb_schema( int $post_id, string $id ): array {
 		$visible = Public_Nav::breadcrumb_items( $post_id );
 		$items   = array();
@@ -290,7 +312,7 @@ final class Schema {
 				'@type'    => 'ListItem',
 				'position' => $index + 1,
 				'name'     => $item['name'],
-				'item'     => $item['url'] ?: get_permalink( $post_id ),
+				'item'     => $item['url'] ? $item['url'] : get_permalink( $post_id ),
 			);
 		}
 		return array(
@@ -300,12 +322,20 @@ final class Schema {
 		);
 	}
 
-	/** Get visible article sections. */
+	/**
+	 * Get visible article sections.
+	 *
+	 * @param int $post_id Post ID whose categories are listed.
+	 */
 	private static function article_sections( int $post_id ): array {
 		return array_values( array_map( static fn( $term ) => $term->name, get_the_category( $post_id ) ) );
 	}
 
-	/** Get image schema from a real featured image. */
+	/**
+	 * Get image schema from a real featured image.
+	 *
+	 * @param int $post_id Post ID whose featured image is used.
+	 */
 	private static function image_schema( int $post_id ): ?array {
 		$image = wp_get_attachment_image_src( get_post_thumbnail_id( $post_id ), 'full' );
 		if ( ! $image ) {

@@ -12,22 +12,46 @@ defined( 'ABSPATH' ) || exit;
 /** Central registry for canonical page routes, category terms, and URL resolution. */
 final class Routes {
 
-	/** @var array<string, array> Canonical page definitions. */
+	/**
+	 * Canonical page definitions.
+	 *
+	 * @var array<string, array>
+	 */
 	private static array $page_definitions = array();
 
-	/** @var array<string, array> Canonical category definitions. */
+	/**
+	 * Canonical category definitions.
+	 *
+	 * @var array<string, array>
+	 */
 	private static array $category_definitions = array();
 
-	/** @var array<string, int|null> Request-cached page IDs. */
+	/**
+	 * Request-cached page IDs.
+	 *
+	 * @var array<string, int|null>
+	 */
 	private static array $page_id_cache = array();
 
-	/** @var array<string, int|null> Request-cached category term IDs. */
+	/**
+	 * Request-cached category term IDs.
+	 *
+	 * @var array<string, int|null>
+	 */
 	private static array $category_id_cache = array();
 
-	/** @var array<string, string|null> Request-cached URLs. */
+	/**
+	 * Request-cached URLs.
+	 *
+	 * @var array<string, string|null>
+	 */
 	private static array $url_cache = array();
 
-	/** @var array<string, string|null> Request-cached page statuses. */
+	/**
+	 * Request-cached page statuses.
+	 *
+	 * @var array<string, string|null>
+	 */
 	private static array $status_cache = array();
 
 	/**
@@ -205,7 +229,8 @@ final class Routes {
 			return null;
 		}
 		if ( 'home' === $key ) {
-			return (int) get_option( 'page_on_front' ) ?: null;
+			$front_id = (int) get_option( 'page_on_front' );
+			return $front_id ? $front_id : null;
 		}
 		if ( array_key_exists( $key, self::$page_id_cache ) ) {
 			return self::$page_id_cache[ $key ];

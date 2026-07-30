@@ -27,7 +27,7 @@ final class Governed_Query {
 	/**
 	 * Fetch ALL post IDs of the given types carrying an exact meta key/value pair.
 	 *
-	 * @param list<string>      $post_types    Post types to match.
+	 * @param string[]          $post_types    Post types to match.
 	 * @param string            $meta_key      Meta key to match.
 	 * @param string            $meta_value    Exact meta value to match.
 	 * @param list<string>|null $post_statuses Statuses to match, or null for all.

@@ -11,7 +11,11 @@ defined( 'ABSPATH' ) || exit;
 
 /** Renders breadcrumbs, footer nav, and policy links. */
 class Public_Nav {
-	/** Render visible breadcrumbs from the same hierarchy used by schema. */
+	/**
+	 * Render visible breadcrumbs from the same hierarchy used by schema.
+	 *
+	 * @param int $post_id Optional post ID; 0 resolves the queried object.
+	 */
 	public static function render_breadcrumbs( int $post_id = 0 ): string {
 		$items = self::breadcrumb_items( $post_id );
 		if ( count( $items ) < 2 ) {
@@ -31,7 +35,11 @@ class Public_Nav {
 		return $html . '</ol></nav>';
 	}
 
-	/** Get deterministic visible breadcrumb facts. */
+	/**
+	 * Get deterministic visible breadcrumb facts.
+	 *
+	 * @param int $post_id Optional post ID; 0 resolves the queried object.
+	 */
 	public static function breadcrumb_items( int $post_id = 0 ): array {
 		$items = array(
 			array(

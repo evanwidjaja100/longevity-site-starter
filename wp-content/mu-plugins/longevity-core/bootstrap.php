@@ -256,7 +256,11 @@ final class Bootstrap {
 		return 'DENY';
 	}
 
-	/** Attach the per-request CSP nonce to inline script/style tag attributes. */
+	/**
+	 * Attach the per-request CSP nonce to inline script/style tag attributes.
+	 *
+	 * @param array $attributes Tag attributes keyed by attribute name.
+	 */
 	public static function add_csp_nonce_attribute( array $attributes ): array {
 		$attributes['nonce'] = self::csp_nonce();
 		return $attributes;

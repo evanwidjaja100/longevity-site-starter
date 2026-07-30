@@ -17,7 +17,11 @@ final class Content_Discovery {
 		add_filter( 'wp_robots', array( self::class, 'search_robots' ) );
 	}
 
-	/** Restrict public discovery to supported types and allowlisted GET values. */
+	/**
+	 * Restrict public discovery to supported types and allowlisted GET values.
+	 *
+	 * @param \WP_Query $query Main query being filtered.
+	 */
 	public static function filter_main_query( \WP_Query $query ): void {
 		if ( is_admin() || ! $query->is_main_query() ) {
 			return;
@@ -81,7 +85,11 @@ final class Content_Discovery {
 		return in_array( $value, array( 'relevance', 'newest', 'updated' ), true ) ? $value : 'relevance';
 	}
 
-	/** Search-result pages are useful to readers but should not be indexed. */
+	/**
+	 * Search-result pages are useful to readers but should not be indexed.
+	 *
+	 * @param array $robots Robots directives keyed by directive name.
+	 */
 	public static function search_robots( array $robots ): array {
 		if ( is_search() ) {
 			$robots['noindex'] = true;

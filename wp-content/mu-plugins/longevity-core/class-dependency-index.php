@@ -36,7 +36,11 @@ final class Dependency_Index {
 		return isset( $wpdb->prefix ) ? $wpdb->prefix . 'lel_dependencies' : 'wp_lel_dependencies';
 	}
 
-	/** Install the dependency index table (additive, idempotent). */
+	/**
+	 * Install the dependency index table (additive, idempotent).
+	 *
+	 * @throws \RuntimeException When the dependency index table was not created.
+	 */
 	public static function install(): void {
 		global $wpdb;
 		if ( ! isset( $wpdb ) || ! is_object( $wpdb ) || ! function_exists( 'dbDelta' ) ) {
@@ -77,6 +81,7 @@ final class Dependency_Index {
 	 * @param string $type    Dependency type (e.g. 'lel_claim', 'lel_source', 'lel_test_record', 'lel_protocol', 'lel_affiliate', 'credential').
 	 * @param int    $dep_id  The dependency post/user ID.
 	 * @param int    $parent  The parent post ID that depends on this entity.
+	 * @throws \RuntimeException When the dependency row cannot be written.
 	 */
 	public static function register( string $type, int $dep_id, int $parent ): void {
 		global $wpdb;
@@ -104,6 +109,7 @@ final class Dependency_Index {
 	 * @param string $type   Dependency type.
 	 * @param int    $dep_id The dependency post/user ID.
 	 * @param int    $parent The parent post ID.
+	 * @throws \RuntimeException When the dependency row cannot be removed.
 	 */
 	public static function remove( string $type, int $dep_id, int $parent ): void {
 		global $wpdb;
@@ -130,6 +136,7 @@ final class Dependency_Index {
 	 *
 	 * @param string $type   Dependency type.
 	 * @param int    $dep_id The dependency post/user ID.
+	 * @throws \RuntimeException When the dependency rows cannot be removed.
 	 */
 	public static function remove_all_for_dependency( string $type, int $dep_id ): void {
 		global $wpdb;
@@ -158,7 +165,8 @@ final class Dependency_Index {
 	 *
 	 * @param string    $type    Dependency type.
 	 * @param int       $parent  The parent post ID.
-	 * @param list<int> $dep_ids The full new set of dependency IDs.
+	 * @param integer[] $dep_ids The full new set of dependency IDs.
+	 * @throws \RuntimeException When the replacement transaction cannot be completed.
 	 */
 	public static function replace_dependencies( string $type, int $parent, array $dep_ids ): void {
 		global $wpdb;
@@ -227,6 +235,7 @@ final class Dependency_Index {
 	 * @param bool $dry_run When true, nothing is written.
 	 * @param int  $batch   Parents per page (bounded 10–500).
 	 * @return array{parents_scanned: int, dependencies_indexed: int, complete: bool, dry_run: bool, generation: string, drift: array{valid: bool, parents_checked: int, missing: int, stale: int, orphans: int}, affiliate: array{unresolved: int, ambiguous: int, broad_fallbacks: int}}
+	 * @throws \RuntimeException When a backfill query fails or backfill state cannot be persisted.
 	 */
 	public static function run_backfill( bool $dry_run = false, int $batch = 200 ): array {
 		global $wpdb;
@@ -327,7 +336,12 @@ final class Dependency_Index {
 		return $found;
 	}
 
-	/** Verify source-of-truth edges against the complete materialized index. */
+	/**
+	 * Verify source-of-truth edges against the complete materialized index.
+	 *
+	 * @param int $batch Parents per page (bounded 10–500).
+	 * @throws \RuntimeException When a drift verification query fails.
+	 */
 	public static function verify_drift( int $batch = 200 ): array {
 		global $wpdb;
 		$batch  = min( 500, max( 10, $batch ) );
@@ -410,7 +424,12 @@ final class Dependency_Index {
 		return (int) $count;
 	}
 
-	/** Build the complete source-of-truth dependency sets for one parent. */
+	/**
+	 * Build the complete source-of-truth dependency sets for one parent.
+	 *
+	 * @param int $parent Parent post ID.
+	 * @throws \RuntimeException When the claim dependency query fails.
+	 */
 	private static function source_sets( int $parent ): array {
 		global $wpdb;
 		self::clear_database_error( $wpdb );
@@ -438,7 +457,12 @@ final class Dependency_Index {
 		);
 	}
 
-	/** Read all indexed edges for one parent. */
+	/**
+	 * Read all indexed edges for one parent.
+	 *
+	 * @param int $parent Parent post ID.
+	 * @throws \RuntimeException When the indexed-edge query fails.
+	 */
 	private static function indexed_sets( int $parent ): array {
 		global $wpdb;
 		$table = self::table_name();
@@ -467,6 +491,8 @@ final class Dependency_Index {
 	 * lifecycle status) so status flips on a referenced merchant still
 	 * invalidate the parent. Extraction failure falls back to binding every
 	 * registry row: over-invalidation is safe, under-invalidation is not.
+	 *
+	 * @param int $parent Parent post ID.
 	 */
 	private static function affiliate_ids_for_parent( int $parent ): array {
 		if ( '1' !== (string) get_post_meta( $parent, '_lel_has_affiliate_links', true ) ) {
@@ -498,7 +524,11 @@ final class Dependency_Index {
 		return $resolved['edges'];
 	}
 
-	/** All non-trash affiliate registry record IDs, fail-closed on DB errors. */
+	/**
+	 * All non-trash affiliate registry record IDs, fail-closed on DB errors.
+	 *
+	 * @throws \RuntimeException When the affiliate registry query fails.
+	 */
 	private static function affiliate_registry_ids(): array {
 		global $wpdb;
 		self::clear_database_error( $wpdb );
@@ -509,25 +539,43 @@ final class Dependency_Index {
 		return array_values( array_unique( array_map( 'intval', is_array( $ids ) ? $ids : array() ) ) );
 	}
 
-	/** Persist an option while distinguishing a no-op from a failed write. */
+	/**
+	 * Persist an option while distinguishing a no-op from a failed write.
+	 *
+	 * @param string $name  Option name.
+	 * @param mixed  $value Option value to persist.
+	 * @throws \RuntimeException When the option cannot be persisted.
+	 */
 	private static function write_option( string $name, $value ): void {
 		if ( ! update_option( $name, $value, false ) && get_option( $name, null ) !== $value ) {
 			throw new \RuntimeException( esc_html( 'Could not persist dependency backfill option ' . $name . '.' ) );
 		}
 	}
 
-	/** Bounded database error with a stable fallback. */
+	/**
+	 * Bounded database error with a stable fallback.
+	 *
+	 * @param \wpdb|object $wpdb WordPress database abstraction.
+	 */
 	private static function database_error( $wpdb ): string {
 		$error = trim( (string) ( $wpdb->last_error ?? '' ) );
 		return '' === $error ? 'unknown_database_error' : substr( $error, 0, 200 );
 	}
 
-	/** Clear stale wpdb error state before a read. */
+	/**
+	 * Clear stale wpdb error state before a read.
+	 *
+	 * @param \wpdb $wpdb WordPress database abstraction.
+	 */
 	private static function clear_database_error( $wpdb ): void {
 		$wpdb->last_error = '';
 	}
 
-	/** Whether the latest wpdb operation reported an error. */
+	/**
+	 * Whether the latest wpdb operation reported an error.
+	 *
+	 * @param \wpdb|object $wpdb WordPress database abstraction.
+	 */
 	private static function database_failed( $wpdb ): bool {
 		return '' !== trim( (string) ( $wpdb->last_error ?? '' ) );
 	}
@@ -538,6 +586,7 @@ final class Dependency_Index {
 	 * @param string $type   Dependency type.
 	 * @param int    $dep_id The dependency post/user ID.
 	 * @return list<int> Parent post IDs.
+	 * @throws \RuntimeException When the parent lookup query fails.
 	 */
 	public static function find_parents( string $type, int $dep_id ): array {
 		global $wpdb;
@@ -573,7 +622,7 @@ final class Dependency_Index {
 	 * Find all parent post IDs that depend on any of the given entities.
 	 *
 	 * @param string    $type    Dependency type.
-	 * @param list<int> $dep_ids The dependency post/user IDs.
+	 * @param integer[] $dep_ids The dependency post/user IDs.
 	 * @return list<int> Unique parent post IDs.
 	 */
 	public static function find_parents_batch( string $type, array $dep_ids ): array {
@@ -586,7 +635,12 @@ final class Dependency_Index {
 		return $parents;
 	}
 
-	/** Resolve reverse relationships from canonical posts/meta, never the index. */
+	/**
+	 * Resolve reverse relationships from canonical posts/meta, never the index.
+	 *
+	 * @param string $type   Dependency type.
+	 * @param int    $dep_id The dependency post/user ID.
+	 */
 	private static function authoritative_parents( string $type, int $dep_id ): array {
 		if ( 'lel_claim' === $type ) {
 			$parent = (int) get_post_meta( $dep_id, 'post_id', true );
@@ -630,7 +684,14 @@ final class Dependency_Index {
 		return array();
 	}
 
-	/** Complete authoritative lookup that turns database failure into fail-closed. */
+	/**
+	 * Complete authoritative lookup that turns database failure into fail-closed.
+	 *
+	 * @param string[] $post_types Post types to query.
+	 * @param string   $meta_key   Meta key to match.
+	 * @param string   $meta_value Meta value to match.
+	 * @throws \RuntimeException When the authoritative lookup query fails.
+	 */
 	private static function governed_ids( array $post_types, string $meta_key, string $meta_value ): array {
 		global $wpdb;
 		self::clear_database_error( $wpdb );

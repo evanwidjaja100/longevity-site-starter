@@ -60,8 +60,8 @@ final class Approval_Repository {
 	/**
 	 * Add the PR-02 activation columns and indexes to an already-installed table.
 	 *
-	 * dbDelta does not reliably add columns or keys in place, so this issues
-	 * explicit, idempotent ALTERs. Safe to call repeatedly.
+	 * WordPress's dbDelta does not reliably add columns or keys in place, so this
+	 * issues explicit, idempotent ALTERs. Safe to call repeatedly.
 	 */
 	public static function ensure_activation_columns(): bool {
 		global $wpdb;
@@ -115,7 +115,11 @@ final class Approval_Repository {
 		);
 	}
 
-	/** Insert a snapshot. */
+	/**
+	 * Insert a snapshot.
+	 *
+	 * @param array<string, mixed> $record Column/value pairs to insert.
+	 */
 	public static function insert( array $record ): int {
 		global $wpdb;
 		$inserted = $wpdb->insert( self::table_name(), $record );
@@ -129,6 +133,9 @@ final class Approval_Repository {
 	 * still be pending_audit and its combined fingerprint must be unchanged, so
 	 * a concurrent invalidation or a mismatched request can never be promoted.
 	 *
+	 * @param int    $id             Snapshot row ID to activate.
+	 * @param string $combined_hash  Expected combined fingerprint guard.
+	 * @param int    $audit_event_id Durable audit event ID to link.
 	 * @return int Rows affected (1 on success, 0 when the guard did not match).
 	 */
 	public static function activate( int $id, string $combined_hash, int $audit_event_id ): int {
@@ -146,7 +153,12 @@ final class Approval_Repository {
 		return (int) $wpdb->query( $sql );
 	}
 
-	/** Close an unusable pending snapshot so it can never become current. */
+	/**
+	 * Close an unusable pending snapshot so it can never become current.
+	 *
+	 * @param int    $id     Pending snapshot row ID.
+	 * @param string $reason Human-readable rejection reason.
+	 */
 	public static function reject_pending( int $id, string $reason ): int {
 		global $wpdb;
 		$table = self::table_name();
@@ -160,7 +172,12 @@ final class Approval_Repository {
 		return (int) $wpdb->query( $sql );
 	}
 
-	/** Record why a pending snapshot could not activate without approving it. */
+	/**
+	 * Record why a pending snapshot could not activate without approving it.
+	 *
+	 * @param int    $id     Pending snapshot row ID.
+	 * @param string $reason Human-readable activation-error note.
+	 */
 	public static function note_activation_error( int $id, string $reason ): int {
 		global $wpdb;
 		$table = self::table_name();
@@ -177,6 +194,8 @@ final class Approval_Repository {
 	/**
 	 * Keyset batch of pending snapshots for bounded reconciliation.
 	 *
+	 * @param int $after_id Exclusive keyset cursor; only rows with a greater ID are returned.
+	 * @param int $limit    Maximum number of rows to return.
 	 * @return list<array<string, mixed>>
 	 */
 	public static function pending_batch( int $after_id, int $limit ): array {
@@ -207,7 +226,11 @@ final class Approval_Repository {
 		);
 	}
 
-	/** Count pending snapshots older than the given age in seconds. */
+	/**
+	 * Count pending snapshots older than the given age in seconds.
+	 *
+	 * @param int $max_age_seconds Age threshold in seconds.
+	 */
 	public static function count_stale_pending( int $max_age_seconds ): int {
 		global $wpdb;
 		if ( ! self::exists() ) {
@@ -232,7 +255,12 @@ final class Approval_Repository {
 		return (int) $wpdb->get_var( "SELECT COUNT(1) FROM {$table} WHERE approval_status = 'pending_audit'" );
 	}
 
-	/** Get the newest non-invalidated snapshot. */
+	/**
+	 * Get the newest non-invalidated snapshot.
+	 *
+	 * @param int    $post_id       Governed post ID.
+	 * @param string $approval_type Approval type key.
+	 */
 	public static function current( int $post_id, string $approval_type ): ?array {
 		global $wpdb;
 		$table = self::table_name();
@@ -243,7 +271,14 @@ final class Approval_Repository {
 		return is_array( $row ) ? $row : null;
 	}
 
-	/** Invalidate every current snapshot of a type. */
+	/**
+	 * Invalidate every current snapshot of a type.
+	 *
+	 * @param int    $post_id       Governed post ID.
+	 * @param string $approval_type Approval type key.
+	 * @param string $reason        Human-readable invalidation reason.
+	 * @param int    $actor_id      User ID performing the invalidation.
+	 */
 	public static function invalidate( int $post_id, string $approval_type, string $reason, int $actor_id ): int {
 		global $wpdb;
 		$table = self::table_name();

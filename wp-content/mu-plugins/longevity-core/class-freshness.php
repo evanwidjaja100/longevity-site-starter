@@ -64,7 +64,11 @@ final class Freshness {
 		self::run();
 	}
 
-	/** Persist a namespaced worker heartbeat. */
+	/**
+	 * Persist a namespaced worker heartbeat.
+	 *
+	 * @param string $worker Registered worker key.
+	 */
 	public static function record_worker_heartbeat( string $worker ): void {
 		if ( isset( self::WORKERS[ $worker ] ) ) {
 			update_option( 'lel_worker_heartbeat_' . $worker, gmdate( DATE_W3C ), false );

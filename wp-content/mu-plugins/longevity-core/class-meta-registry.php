@@ -325,12 +325,27 @@ final class Meta_Registry {
 		);
 	}
 
-	/** Construct a field definition. */
+	/**
+	 * Construct a field definition.
+	 *
+	 * @param string   $type          WordPress meta value type.
+	 * @param mixed    $default       Default value for the field.
+	 * @param string   $sanitize      Sanitization rule key.
+	 * @param string[] $post_types    Post types the field applies to.
+	 * @param bool     $rest          Whether the field may appear in REST.
+	 * @param bool     $public        Whether the field is publicly projected.
+	 * @param string   $description   Human-readable field description.
+	 * @param string   $required_when Condition under which the field is required.
+	 */
 	private static function field( string $type, $default, string $sanitize, array $post_types, bool $rest, bool $public, string $description, string $required_when = 'none' ): array {
 		return compact( 'type', 'default', 'sanitize', 'post_types', 'rest', 'public', 'description', 'required_when' );
 	}
 
-	/** Build REST visibility, including an item schema for structured score dimensions. */
+	/**
+	 * Build REST visibility, including an item schema for structured score dimensions.
+	 *
+	 * @param array $definition Registered field definition.
+	 */
 	private static function rest_visibility( array $definition ) {
 		if ( empty( $definition['rest'] ) ) {
 			return false;
@@ -363,7 +378,12 @@ final class Meta_Registry {
 		);
 	}
 
-	/** Sanitize a metadata value using its registered rule. */
+	/**
+	 * Sanitize a metadata value using its registered rule.
+	 *
+	 * @param string $key   Registered meta key.
+	 * @param mixed  $value Raw value to sanitize.
+	 */
 	public static function sanitize_by_key( string $key, $value ) {
 		$definitions = self::definitions();
 		if ( ! isset( $definitions[ $key ] ) ) {
@@ -373,7 +393,12 @@ final class Meta_Registry {
 		return self::sanitize_value( $definitions[ $key ]['sanitize'], $value );
 	}
 
-	/** Sanitize a value by rule. */
+	/**
+	 * Sanitize a value by rule.
+	 *
+	 * @param string $rule  Sanitization rule key.
+	 * @param mixed  $value Raw value to sanitize.
+	 */
 	public static function sanitize_value( string $rule, $value ) {
 		switch ( $rule ) {
 			case 'boolean':
@@ -395,7 +420,8 @@ final class Meta_Registry {
 			case 'textarea':
 				return sanitize_textarea_field( (string) $value );
 			case 'csv_ids':
-				$ids = array_filter( array_map( 'sanitize_key', preg_split( '/[\s,]+/', (string) $value ) ?: array() ) );
+				$parts = preg_split( '/[\s,]+/', (string) $value );
+				$ids   = array_filter( array_map( 'sanitize_key', $parts ? $parts : array() ) );
 				return implode( ',', array_values( array_unique( $ids ) ) );
 			case 'dimensions':
 				return Review_Methodology::sanitize_dimensions( $value );
@@ -434,18 +460,35 @@ final class Meta_Registry {
 		}
 	}
 
-	/** Determine whether a metadata field is public. */
+	/**
+	 * Determine whether a metadata field is public.
+	 *
+	 * @param string $key Registered meta key.
+	 */
 	public static function is_public( string $key ): bool {
 		$definitions = self::definitions();
 		return ! empty( $definitions[ $key ]['public'] );
 	}
 
-	/** Authorize metadata writes through the shared deny-by-default service. */
+	/**
+	 * Authorize metadata writes through the shared deny-by-default service.
+	 *
+	 * @param string $meta_key Registered meta key.
+	 * @param int    $post_id  Target post ID.
+	 * @param int    $user_id  Acting user ID.
+	 * @param string $channel  Write channel, e.g., rest or admin.
+	 */
 	public static function authorize( string $meta_key, int $post_id, int $user_id, string $channel = 'rest' ): bool {
 		return Meta_Authorization::can_write( $meta_key, $post_id, $user_id, $channel );
 	}
 
-	/** Sanitize enum values. */
+	/**
+	 * Sanitize enum values.
+	 *
+	 * @param mixed    $value   Raw value to validate.
+	 * @param string[] $allowed Allowed values.
+	 * @param string   $default Fallback when the value is not allowed.
+	 */
 	private static function enum( $value, array $allowed, string $default ): string {
 		$value = sanitize_text_field( (string) $value );
 		return in_array( $value, $allowed, true ) ? $value : $default;

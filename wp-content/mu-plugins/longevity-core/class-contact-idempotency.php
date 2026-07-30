@@ -72,7 +72,11 @@ final class Contact_Idempotency {
 		return $table === $found;
 	}
 
-	/** Non-reversible reservation key derived from the validated request UUID. */
+	/**
+	 * Non-reversible reservation key derived from the validated request UUID.
+	 *
+	 * @param string $request_uuid Validated request UUID to hash.
+	 */
 	public static function key_hash( string $request_uuid ): string {
 		return hash( 'sha256', 'lel_contact|' . strtolower( $request_uuid ) );
 	}
@@ -114,7 +118,11 @@ final class Contact_Idempotency {
 		);
 	}
 
-	/** Resolve the state of an already-present reservation. */
+	/**
+	 * Resolve the state of an already-present reservation.
+	 *
+	 * @param string $key SHA-256 request key hash.
+	 */
 	private static function resolve_existing( string $key ): array {
 		$row = self::find( $key );
 		if ( ! is_array( $row ) ) {
@@ -169,7 +177,11 @@ final class Contact_Idempotency {
 		);
 	}
 
-	/** One-winner conditional reclaim of an expired-processing or failed row. */
+	/**
+	 * One-winner conditional reclaim of an expired-processing or failed row.
+	 *
+	 * @param string $key SHA-256 request key hash.
+	 */
 	private static function reclaim( string $key ): int|false {
 		global $wpdb;
 		$now   = gmdate( 'Y-m-d H:i:s' );
@@ -191,7 +203,12 @@ final class Contact_Idempotency {
 		return (int) $updated;
 	}
 
-	/** Link the created aggregate to a live processing reservation. */
+	/**
+	 * Link the created aggregate to a live processing reservation.
+	 *
+	 * @param string $key     SHA-256 request key hash.
+	 * @param int    $post_id Linked contact message post ID.
+	 */
 	public static function link_post( string $key, int $post_id ): bool {
 		global $wpdb;
 		if ( $post_id < 1 ) {
@@ -214,7 +231,12 @@ final class Contact_Idempotency {
 		return true;
 	}
 
-	/** Mark a reservation completed against its aggregate. */
+	/**
+	 * Mark a reservation completed against its aggregate.
+	 *
+	 * @param string $key     SHA-256 request key hash.
+	 * @param int    $post_id Persisted contact message post ID.
+	 */
 	public static function complete( string $key, int $post_id ): bool {
 		global $wpdb;
 		if ( $post_id < 1 ) {
@@ -238,7 +260,11 @@ final class Contact_Idempotency {
 		return true;
 	}
 
-	/** Mark a reservation failed and reclaimable; drop any post linkage. */
+	/**
+	 * Mark a reservation failed and reclaimable; drop any post linkage.
+	 *
+	 * @param string $key SHA-256 request key hash.
+	 */
 	public static function mark_failed( string $key ): bool {
 		global $wpdb;
 		$now = gmdate( 'Y-m-d H:i:s' );
@@ -257,7 +283,11 @@ final class Contact_Idempotency {
 		return (int) $updated >= 1;
 	}
 
-	/** Purge terminal reservations older than the cutoff; live ones are kept. */
+	/**
+	 * Purge terminal reservations older than the cutoff; live ones are kept.
+	 *
+	 * @param int $older_than_seconds Age in seconds beyond which terminal rows are purged.
+	 */
 	public static function purge_terminal( int $older_than_seconds ): int {
 		global $wpdb;
 		if ( ! self::exists() ) {
@@ -316,7 +346,11 @@ final class Contact_Idempotency {
 		);
 	}
 
-	/** Count rows matching a trusted static WHERE fragment; null on failure. */
+	/**
+	 * Count rows matching a trusted static WHERE fragment; null on failure.
+	 *
+	 * @param string $where Trusted static SQL WHERE fragment.
+	 */
 	private static function count( string $where ): ?int {
 		global $wpdb;
 		self::clear_db_error();
@@ -328,7 +362,11 @@ final class Contact_Idempotency {
 		return (int) $value;
 	}
 
-	/** Read one reservation row; false on a read failure. */
+	/**
+	 * Read one reservation row; false on a read failure.
+	 *
+	 * @param string $key SHA-256 request key hash.
+	 */
 	private static function find( string $key ): array|false|null {
 		global $wpdb;
 		self::clear_db_error();
@@ -343,7 +381,11 @@ final class Contact_Idempotency {
 		return is_array( $row ) ? $row : null;
 	}
 
-	/** Whether a row's processing lease has elapsed. */
+	/**
+	 * Whether a row's processing lease has elapsed.
+	 *
+	 * @param array<string, mixed> $row Reservation row to inspect.
+	 */
 	private static function lease_expired( array $row ): bool {
 		$lease = (string) ( $row['lease_expires_at'] ?? '' );
 		if ( '' === $lease ) {
@@ -358,7 +400,11 @@ final class Contact_Idempotency {
 		$wpdb->last_error = '';
 	}
 
-	/** Bounded, non-PII operator-visible SQL failure log. */
+	/**
+	 * Bounded, non-PII operator-visible SQL failure log.
+	 *
+	 * @param string $operation Name of the failing SQL operation.
+	 */
 	private static function report_sql_failure( string $operation ): void {
 		global $wpdb;
 		Logger::error(

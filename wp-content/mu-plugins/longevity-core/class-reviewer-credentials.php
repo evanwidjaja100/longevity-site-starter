@@ -60,12 +60,23 @@ final class Reviewer_Credentials {
 		);
 	}
 
-	/** Whether an actor may verify another reviewer. */
+	/**
+	 * Whether an actor may verify another reviewer.
+	 *
+	 * @param int $actor_id    Acting user ID.
+	 * @param int $reviewer_id Reviewer user ID.
+	 */
 	public static function can_verify( int $actor_id, int $reviewer_id ): bool {
 		return $actor_id > 0 && $reviewer_id > 0 && $actor_id !== $reviewer_id && function_exists( 'user_can' ) && user_can( $actor_id, 'verify_reviewer_credentials' );
 	}
 
-	/** Persist a verified snapshot. This method never infers or invents credential data. */
+	/**
+	 * Persist a verified snapshot. This method never infers or invents credential data.
+	 *
+	 * @param int   $reviewer_id Reviewer user ID.
+	 * @param array $data        Submitted verification field values.
+	 * @param int   $actor_id    Acting verifier user ID.
+	 */
 	public static function verify( int $reviewer_id, array $data, int $actor_id ): bool {
 		if ( ! self::can_verify( $actor_id, $reviewer_id ) ) {
 			return false;
@@ -115,7 +126,13 @@ final class Reviewer_Credentials {
 		}
 	}
 
-	/** Mark a previously verified snapshot stale without deleting history. */
+	/**
+	 * Mark a previously verified snapshot stale without deleting history.
+	 *
+	 * @param int    $reviewer_id Reviewer user ID.
+	 * @param string $reason      Human-readable invalidation reason.
+	 * @param int    $actor_id    Acting user ID.
+	 */
 	public static function invalidate( int $reviewer_id, string $reason, int $actor_id = 0 ): void {
 		Approval_Service::suppress_credential_hook( true );
 		try {
@@ -127,7 +144,11 @@ final class Reviewer_Credentials {
 		}
 	}
 
-	/** The full governed verified snapshot treated as a single aggregate. */
+	/**
+	 * The full governed verified snapshot treated as a single aggregate.
+	 *
+	 * @param int $reviewer_id Reviewer user ID.
+	 */
 	public static function verified_snapshot( int $reviewer_id ): array {
 		$snapshot = array();
 		foreach ( self::verified_fields() as $field ) {
@@ -136,7 +157,11 @@ final class Reviewer_Credentials {
 		return $snapshot;
 	}
 
-	/** Canonical fingerprint of the entire verified snapshot. */
+	/**
+	 * Canonical fingerprint of the entire verified snapshot.
+	 *
+	 * @param int $reviewer_id Reviewer user ID.
+	 */
 	public static function fingerprint( int $reviewer_id ): string {
 		return Approval_Fingerprint::hash( self::verified_snapshot( $reviewer_id ) );
 	}
@@ -149,6 +174,10 @@ final class Reviewer_Credentials {
 	 * exactly one invalidation, and repeated callbacks over an unchanged
 	 * snapshot are coalesced. An absent stored fingerprint is treated as changed
 	 * so a first observation always fails closed toward invalidation.
+	 *
+	 * @param int    $reviewer_id Reviewer user ID.
+	 * @param string $reason      Change reason recorded on the cascade.
+	 * @param int    $actor_id    Acting user ID.
 	 */
 	public static function detect_and_cascade( int $reviewer_id, string $reason, int $actor_id ): bool {
 		if ( $reviewer_id <= 0 ) {
@@ -164,7 +193,12 @@ final class Reviewer_Credentials {
 		return true;
 	}
 
-	/** Expire a verified credential and cascade to dependent approvals. */
+	/**
+	 * Expire a verified credential and cascade to dependent approvals.
+	 *
+	 * @param int $reviewer_id Reviewer user ID.
+	 * @param int $actor_id    Acting user ID.
+	 */
 	public static function mark_expired( int $reviewer_id, int $actor_id = 0 ): void {
 		Approval_Service::suppress_credential_hook( true );
 		try {
@@ -262,7 +296,14 @@ final class Reviewer_Credentials {
 		return $report;
 	}
 
-	/** Determine whether the current verified snapshot covers a requested scope and region. */
+	/**
+	 * Determine whether the current verified snapshot covers a requested scope and region.
+	 *
+	 * @param int         $reviewer_id    Reviewer user ID.
+	 * @param string      $required_scope Scope the reviewer must cover.
+	 * @param string      $region         Region the reviewer must cover.
+	 * @param string|null $as_of          Evaluation date; defaults to today.
+	 */
 	public static function is_valid_for( int $reviewer_id, string $required_scope, string $region, ?string $as_of = null ): bool {
 		if ( $reviewer_id <= 0 || ! function_exists( 'user_can' ) || ! user_can( $reviewer_id, 'complete_medical_review' ) ) {
 			return false;
@@ -285,7 +326,11 @@ final class Reviewer_Credentials {
 		return self::covers( $scope, $required_scope ) && self::covers( $regions, $region );
 	}
 
-	/** Public allowlisted reviewer snapshot. */
+	/**
+	 * Public allowlisted reviewer snapshot.
+	 *
+	 * @param int $reviewer_id Reviewer user ID.
+	 */
 	public static function public_snapshot( int $reviewer_id ): array {
 		if ( ! self::is_valid_for( $reviewer_id, '', '' ) ) {
 			return array();
@@ -302,13 +347,19 @@ final class Reviewer_Credentials {
 		);
 	}
 
-	/** Match a comma/newline-separated allowlist. Blank requirements are always covered. */
+	/**
+	 * Match a comma/newline-separated allowlist. Blank requirements are always covered.
+	 *
+	 * @param string $allowlist Allowlist of accepted values.
+	 * @param string $required  Value that must be covered.
+	 */
 	private static function covers( string $allowlist, string $required ): bool {
 		$required = strtolower( trim( $required ) );
 		if ( '' === $required ) {
 			return true;
 		}
-		$items = preg_split( '/[\r\n,;]+/', strtolower( $allowlist ) ) ?: array();
+		$split = preg_split( '/[\r\n,;]+/', strtolower( $allowlist ) );
+		$items = $split ? $split : array();
 		$items = array_filter( array_map( 'trim', $items ) );
 		return in_array( '*', $items, true ) || in_array( 'all', $items, true ) || in_array( $required, $items, true );
 	}

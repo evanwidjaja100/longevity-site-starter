@@ -42,6 +42,8 @@ final class Rankings {
 	 * Central ranking invalidation API: bump the shared cache generation so every
 	 * signature-scoped aggregate is recomputed on next read. No private record
 	 * data is written or logged.
+	 *
+	 * @param string $reason Privacy-safe invalidation reason token.
 	 */
 	public static function invalidate_all( string $reason = 'unspecified' ): void {
 		$next = (int) get_option( 'lel_rankings_generation', 1 ) + 1;
@@ -63,6 +65,9 @@ final class Rankings {
 	 * transition. The eligible set is a shared aggregate, so the generation is
 	 * bumped and the live re-validation guard guarantees this review is
 	 * re-evaluated regardless.
+	 *
+	 * @param int    $post_id Review post ID.
+	 * @param string $reason  Privacy-safe invalidation reason token.
 	 */
 	public static function invalidate_review( int $post_id, string $reason = 'unspecified' ): void {
 		if ( $post_id <= 0 ) {
@@ -71,7 +76,11 @@ final class Rankings {
 		self::invalidate_all( 'review:' . self::sanitize_reason( $reason ) );
 	}
 
-	/** Reduce an invalidation reason to a bounded, privacy-safe token. */
+	/**
+	 * Reduce an invalidation reason to a bounded, privacy-safe token.
+	 *
+	 * @param string $reason Raw invalidation reason.
+	 */
 	private static function sanitize_reason( string $reason ): string {
 		$reason = preg_replace( '/[^a-z0-9_:.-]/i', '_', $reason ) ?? '';
 		return '' === $reason ? 'unspecified' : substr( $reason, 0, 64 );
@@ -162,6 +171,7 @@ final class Rankings {
 			remove_filter( 'posts_where', array( self::class, 'keyset_where' ) );
 			unset( $GLOBALS['lel_rankings_keyset_after'] );
 			$page    = array_values( array_map( 'intval', (array) $page ) );
+			$page_count = count( $page );
 			$highest = $after;
 			foreach ( $page as $id ) {
 				$ids[]   = $id;
@@ -175,13 +185,17 @@ final class Rankings {
 				break;
 			}
 			$after = $highest;
-		} while ( count( $page ) === $batch );
+		} while ( $page_count === $batch );
 		$ids = array_values( array_unique( $ids ) );
 		self::enforce_population_ceiling( $ids, $ceiling );
 		return self::is_degraded() ? array() : $ids;
 	}
 
-	/** Keyset WHERE clause bounding a collection batch to IDs above the cursor. */
+	/**
+	 * Keyset WHERE clause bounding a collection batch to IDs above the cursor.
+	 *
+	 * @param string $where Incoming SQL WHERE clause.
+	 */
 	public static function keyset_where( string $where ): string {
 		global $wpdb;
 		$after = (int) ( $GLOBALS['lel_rankings_keyset_after'] ?? 0 );
@@ -196,8 +210,8 @@ final class Rankings {
 	 * degraded flag is cleared and the population passes through unchanged;
 	 * above it the projection is marked degraded and fails closed to an empty set.
 	 *
-	 * @param list<int> $ids     Candidate population.
-	 * @param int       $ceiling Maximum supported population.
+	 * @param int[] $ids     Candidate population.
+	 * @param int   $ceiling Maximum supported population.
 	 * @return list<int> The population when within the ceiling, otherwise empty.
 	 */
 	public static function enforce_population_ceiling( array $ids, int $ceiling ): array {
@@ -209,7 +223,12 @@ final class Rankings {
 		return array_values( $ids );
 	}
 
-	/** Record a bounded, privacy-safe diagnostic and mark rankings degraded. */
+	/**
+	 * Record a bounded, privacy-safe diagnostic and mark rankings degraded.
+	 *
+	 * @param int $count   Observed population size.
+	 * @param int $ceiling Maximum supported population.
+	 */
 	private static function mark_degraded( int $count, int $ceiling ): void {
 		update_option( 'lel_rankings_degraded', 1, false );
 		Logger::log(
@@ -239,7 +258,7 @@ final class Rankings {
 	 * no longer eligible (or cannot be confirmed) are dropped fail-closed and the
 	 * generation is bumped so the cached aggregate rebuilds without them.
 	 *
-	 * @param list<int> $ids Cached candidate ids.
+	 * @param int[] $ids Cached candidate ids.
 	 * @return list<int> Live-eligible ids.
 	 */
 	private static function live_revalidate( array $ids ): array {
@@ -439,7 +458,12 @@ final class Rankings {
 		return array_values( array_filter( $eligible, static fn( int $id ): bool => self::in_category( $id, $category_id ) ) );
 	}
 
-	/** Whether a review belongs to the given category term. */
+	/**
+	 * Whether a review belongs to the given category term.
+	 *
+	 * @param int $post_id     Review post ID.
+	 * @param int $category_id Category term ID.
+	 */
 	private static function in_category( int $post_id, int $category_id ): bool {
 		foreach ( get_the_category( $post_id ) as $term ) {
 			if ( (int) $term->term_id === $category_id ) {
@@ -453,7 +477,7 @@ final class Rankings {
 	 * Hydrate full WP_Post objects only for the final ordered IDs, preserving the
 	 * computed order regardless of the store's default ordering.
 	 *
-	 * @param list<int> $ids Ordered, already-limited review IDs.
+	 * @param int[] $ids Ordered, already-limited review IDs.
 	 * @return array<int, \WP_Post> Hydrated posts in the supplied order.
 	 */
 	private static function hydrate( array $ids ): array {
@@ -492,8 +516,8 @@ final class Rankings {
 	 * Deterministically order bare review IDs using the same tie-breaking chain
 	 * as sort(). Used to order the complete filtered population before any limit.
 	 *
-	 * @param list<int> $ids  Review IDs.
-	 * @param string    $sort Allowlisted sort key.
+	 * @param int[]  $ids  Review IDs.
+	 * @param string $sort Allowlisted sort key.
 	 * @return list<int> Ordered IDs.
 	 */
 	public static function sort_ids( array $ids, string $sort = 'score' ): array {
@@ -508,10 +532,10 @@ final class Rankings {
 	 * limit. Filtering and sorting always run over every candidate so a
 	 * top-ranked review can never be dropped by a pre-sort cap.
 	 *
-	 * @param list<int> $ids     Complete candidate review IDs.
-	 * @param string    $sort    Allowlisted sort key.
-	 * @param array     $filters Allowlisted filter values.
-	 * @param int       $limit   Caller's requested maximum, applied last.
+	 * @param int[]  $ids     Complete candidate review IDs.
+	 * @param string $sort    Allowlisted sort key.
+	 * @param array  $filters Allowlisted filter values.
+	 * @param int    $limit   Caller's requested maximum, applied last.
 	 * @return list<int> Ordered, limited review IDs.
 	 */
 	public static function order_and_limit( array $ids, string $sort, array $filters, int $limit ): array {
@@ -521,7 +545,12 @@ final class Rankings {
 		return array_slice( $ordered, 0, max( 1, $limit ) );
 	}
 
-	/** Whether a review's metadata satisfies the allowlisted filter values. */
+	/**
+	 * Whether a review's metadata satisfies the allowlisted filter values.
+	 *
+	 * @param int   $post_id Review post ID.
+	 * @param array $filters Allowlisted filter values.
+	 */
 	private static function passes_filters( int $post_id, array $filters ): bool {
 		if ( isset( $filters['confidence'] ) && (string) get_post_meta( $post_id, 'review_score_confidence', true ) !== $filters['confidence'] ) {
 			return false;
@@ -535,7 +564,11 @@ final class Rankings {
 		return true;
 	}
 
-	/** Reduce an arbitrary sort request to an allowlisted key. */
+	/**
+	 * Reduce an arbitrary sort request to an allowlisted key.
+	 *
+	 * @param string $sort Requested sort key.
+	 */
 	private static function normalize_sort( string $sort ): string {
 		return in_array( $sort, array( 'score', 'confidence', 'updated', 'title' ), true ) ? $sort : 'score';
 	}
@@ -544,6 +577,10 @@ final class Rankings {
 	 * Shared deterministic comparison used by every ranking sort. Returns a
 	 * negative, zero, or positive integer ordering $left_id relative to
 	 * $right_id for the requested sort key, always resolving ties by ascending ID.
+	 *
+	 * @param int    $left_id  Left review post ID.
+	 * @param int    $right_id Right review post ID.
+	 * @param string $sort     Allowlisted sort key.
 	 */
 	private static function compare_ids( int $left_id, int $right_id, string $sort ): int {
 		$score      = (float) get_post_meta( $right_id, 'review_score', true ) <=> (float) get_post_meta( $left_id, 'review_score', true );
@@ -579,7 +616,11 @@ final class Rankings {
 		return false;
 	}
 
-	/** Assign ranking bands based on meaningful difference threshold. */
+	/**
+	 * Assign ranking bands based on meaningful difference threshold.
+	 *
+	 * @param array $posts WP_Post-like records.
+	 */
 	public static function assign_bands( array $posts ): array {
 		if ( empty( $posts ) ) {
 			return array();
@@ -618,7 +659,7 @@ final class Rankings {
 	 * latest-update, and top-score span every supplied review so directory and
 	 * minimum-inventory decisions never use a truncated subset.
 	 *
-	 * @param list<int> $ids Complete eligible review IDs.
+	 * @param int[] $ids Complete eligible review IDs.
 	 * @return list<array{term:\WP_Term,count:int,latest:string,highest_score:float}>
 	 */
 	public static function aggregate_directory( array $ids ): array {

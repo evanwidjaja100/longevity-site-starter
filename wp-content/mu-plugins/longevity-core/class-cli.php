@@ -34,14 +34,22 @@ final class CLI {
 
 /** Shared CSV utilities. */
 trait CSV_Command_Utilities {
-	/** Require a logged-in CLI user with a capability. */
+	/**
+	 * Require a logged-in CLI user with a capability.
+	 *
+	 * @param string $capability Capability slug the current user must hold.
+	 */
 	private function require_capability( string $capability ): void {
 		if ( ! current_user_can( $capability ) ) {
 			\WP_CLI::error( sprintf( 'This command requires %s. Run WP-CLI with an authorized --user.', $capability ) );
 		}
 	}
 
-	/** Open an output stream. */
+	/**
+	 * Open an output stream.
+	 *
+	 * @param array $assoc_args Named CLI options; an optional 'file' path.
+	 */
 	private function output_stream( array $assoc_args ) {
 		$file   = isset( $assoc_args['file'] ) ? (string) $assoc_args['file'] : '';
 		$stream = fopen( '' === $file ? 'php://output' : $file, 'wb' );
@@ -51,13 +59,21 @@ trait CSV_Command_Utilities {
 		return $stream;
 	}
 
-	/** Protect spreadsheet consumers from CSV formula injection. */
+	/**
+	 * Protect spreadsheet consumers from CSV formula injection.
+	 *
+	 * @param mixed $value Raw cell value to neutralise.
+	 */
 	private function csv_safe( $value ): string {
 		$value = (string) $value;
 		return preg_match( '/^[=+\-@]/', $value ) ? "'" . $value : $value;
 	}
 
-	/** Read a CSV file into associative rows and preserve row numbers. */
+	/**
+	 * Read a CSV file into associative rows and preserve row numbers.
+	 *
+	 * @param string $file Path to the CSV file to read.
+	 */
 	private function read_csv( string $file ): array {
 		$stream = fopen( $file, 'rb' );
 		if ( false === $stream ) {
@@ -91,7 +107,11 @@ trait CSV_Command_Utilities {
 final class Claims_Command {
 	use CSV_Command_Utilities;
 
-	/** @var array<int, string> */
+	/**
+	 * Claim CSV column order.
+	 *
+	 * @var array<int, string>
+	 */
 	private const FIELDS = array( 'claim_id', 'post_id', 'claim_text', 'claim_category', 'claim_importance', 'claim_location', 'source_id', 'source_type', 'source_title', 'source_authors', 'source_url', 'source_identifier', 'publication_date', 'accessed_date', 'jurisdiction', 'population', 'intervention', 'comparator', 'outcome', 'evidence_design', 'evidence_grade', 'conflict_notes', 'evidence_notes', 'verified_by', 'verification_date', 'verification_status', 'recheck_date', 'superseded_by' );
 
 	/**
@@ -99,6 +119,9 @@ final class Claims_Command {
 	 *
 	 * ## OPTIONS
 	 * [--file=<path>]
+	 *
+	 * @param array $args       Positional arguments (unused).
+	 * @param array $assoc_args Associative arguments.
 	 */
 	public function export( array $args, array $assoc_args ): void {
 		unset( $args );
@@ -133,6 +156,9 @@ final class Claims_Command {
 	 * --file=<path>
 	 * [--dry-run]
 	 * [--update]
+	 *
+	 * @param array $args       Positional arguments (unused).
+	 * @param array $assoc_args Associative arguments.
 	 */
 	public function import( array $args, array $assoc_args ): void {
 		unset( $args );
@@ -167,7 +193,7 @@ final class Claims_Command {
 				$existing ? ++$updated : ++$created;
 				continue;
 			}
-			$post_id = $existing ?: wp_insert_post(
+			$post_id = $existing ? $existing : wp_insert_post(
 				array(
 					'post_type'    => 'lel_claim',
 					'post_status'  => 'private',
@@ -203,6 +229,9 @@ final class Claims_Command {
 	 *
 	 * ## OPTIONS
 	 * <post-id>
+	 *
+	 * @param array $args       Positional arguments.
+	 * @param array $assoc_args Associative arguments (unused).
 	 */
 	public function verify( array $args, array $assoc_args ): void {
 		unset( $assoc_args );
@@ -219,6 +248,9 @@ final class Claims_Command {
 	 *
 	 * ## OPTIONS
 	 * --file=<path>
+	 *
+	 * @param array $args       Positional arguments (unused).
+	 * @param array $assoc_args Associative arguments.
 	 */
 	public function validate( array $args, array $assoc_args ): void {
 		unset( $args );
@@ -239,7 +271,11 @@ final class Claims_Command {
 		\WP_CLI::success( sprintf( 'Validated %d claim row(s).', count( $rows ) ) );
 	}
 
-	/** Validate rows and duplicate stable IDs. */
+	/**
+	 * Validate rows and duplicate stable IDs.
+	 *
+	 * @param array $rows Parsed CSV rows to validate.
+	 */
 	private function validate_rows( array $rows ): array {
 		$errors = array();
 		$seen   = array();
@@ -269,7 +305,11 @@ final class Claims_Command {
 		return $errors;
 	}
 
-	/** Find a claim by stable ID. */
+	/**
+	 * Find a claim by stable ID.
+	 *
+	 * @param string $claim_id Stable claim identifier.
+	 */
 	private static function find_by_stable_id( string $claim_id ): int {
 		$posts = get_posts(
 			array(
@@ -284,7 +324,11 @@ final class Claims_Command {
 		return $posts ? (int) $posts[0] : 0;
 	}
 
-	/** Map CSV fields to sanitization rules. */
+	/**
+	 * Map CSV fields to sanitization rules.
+	 *
+	 * @param string $field CSV field name.
+	 */
 	private static function rule_for_field( string $field ): string {
 		if ( 'source_url' === $field ) {
 			return 'url';
@@ -306,10 +350,19 @@ final class Claims_Command {
 final class Sources_Command {
 	use CSV_Command_Utilities;
 
-	/** @var array<int, string> */
+	/**
+	 * Source CSV column order.
+	 *
+	 * @var array<int, string>
+	 */
 	private const FIELDS = array( 'source_id', 'source_type', 'source_title', 'source_authors', 'source_url', 'source_identifier', 'publication_date', 'accessed_date', 'archive_url', 'rights_notes', 'source_notes', 'validation_status', 'recheck_date' );
 
-	/** Export sources. */
+	/**
+	 * Export sources.
+	 *
+	 * @param array $args       Positional arguments (unused).
+	 * @param array $assoc_args Associative arguments.
+	 */
 	public function export( array $args, array $assoc_args ): void {
 		unset( $args );
 		$this->require_capability( 'manage_claims' );
@@ -332,7 +385,12 @@ final class Sources_Command {
 		\WP_CLI::success( sprintf( 'Exported %d source(s).', count( $posts ) ) );
 	}
 
-	/** Validate a source CSV. */
+	/**
+	 * Validate a source CSV.
+	 *
+	 * @param array $args       Positional arguments (unused).
+	 * @param array $assoc_args Associative arguments.
+	 */
 	public function validate( array $args, array $assoc_args ): void {
 		unset( $args );
 		$this->require_capability( 'manage_claims' );
@@ -414,7 +472,12 @@ final class Preflight_Command {
 
 /** Publication-readiness CLI command. */
 final class Readiness_Command {
-	/** Check a post readiness state. */
+	/**
+	 * Check a post readiness state.
+	 *
+	 * @param array $args       Positional arguments.
+	 * @param array $assoc_args Associative arguments (unused).
+	 */
 	public function __invoke( array $args, array $assoc_args ): void {
 		unset( $assoc_args );
 		$post_id = isset( $args[0] ) ? absint( $args[0] ) : 0;
@@ -433,7 +496,11 @@ final class Readiness_Command {
 /** Bootstrap command — creates canonical pages, categories, and placeholder content idempotently. */
 final class Bootstrap_Command {
 
-	/** @var array<string, array> Canonical page definitions. */
+	/**
+	 * Canonical page definitions.
+	 *
+	 * @var array<string, array>
+	 */
 	private const CANONICAL_PAGES = array(
 		'home'                 => array(
 			'slug'   => 'home',
@@ -517,7 +584,11 @@ final class Bootstrap_Command {
 		),
 	);
 
-	/** @var array<string, array> Canonical category definitions matching Routes. */
+	/**
+	 * Canonical category definitions matching Routes.
+	 *
+	 * @var array<string, array>
+	 */
 	private const CANONICAL_CATEGORIES = array(
 		'evidence'     => array(
 			'slug' => 'evidence-literacy',
@@ -558,6 +629,9 @@ final class Bootstrap_Command {
 	 * ## EXAMPLES
 	 *     wp longevity bootstrap pages
 	 *     wp longevity bootstrap pages --dry-run
+	 *
+	 * @param array $args       Positional arguments (unused).
+	 * @param array $assoc_args Associative arguments.
 	 */
 	public function pages( array $args, array $assoc_args ): void {
 		unset( $args );
@@ -665,6 +739,9 @@ final class Bootstrap_Command {
 	 * ## EXAMPLES
 	 *     wp longevity bootstrap categories
 	 *     wp longevity bootstrap categories --dry-run
+	 *
+	 * @param array $args       Positional arguments (unused).
+	 * @param array $assoc_args Associative arguments.
 	 */
 	public function categories( array $args, array $assoc_args ): void {
 		unset( $args );
@@ -722,6 +799,9 @@ final class Bootstrap_Command {
 	 * ## EXAMPLES
 	 *     wp longevity bootstrap content
 	 *     wp longevity bootstrap content --dry-run
+	 *
+	 * @param array $args       Positional arguments (unused).
+	 * @param array $assoc_args Associative arguments.
 	 */
 	public function content( array $args, array $assoc_args ): void {
 		unset( $args );
@@ -836,6 +916,9 @@ final class Bootstrap_Command {
 	 * ## EXAMPLES
 	 *     wp longevity bootstrap roles
 	 *     wp longevity bootstrap roles --dry-run
+	 *
+	 * @param array $args       Positional arguments (unused).
+	 * @param array $assoc_args Associative arguments.
 	 */
 	public function roles( array $args, array $assoc_args ): void {
 		unset( $args );
@@ -874,6 +957,9 @@ final class Bootstrap_Command {
 	 * ## EXAMPLES
 	 *     wp longevity bootstrap all
 	 *     wp longevity bootstrap all --dry-run
+	 *
+	 * @param array $args       Positional arguments.
+	 * @param array $assoc_args Associative arguments.
 	 */
 	public function all( array $args, array $assoc_args ): void {
 		\WP_CLI::line( '=== Bootstrap: pages ===' );
@@ -893,7 +979,12 @@ final class Bootstrap_Command {
 
 /** Bounded freshness audit and operational-status command. */
 final class Freshness_Command {
-	/** Run the freshness audit or display the latest protected status counts. */
+	/**
+	 * Run the freshness audit or display the latest protected status counts.
+	 *
+	 * @param array $args       Positional arguments.
+	 * @param array $assoc_args Associative arguments (unused).
+	 */
 	public function __invoke( array $args, array $assoc_args ): void {
 		unset( $assoc_args );
 		if ( ! current_user_can( 'approve_publication' ) ) {
@@ -1038,6 +1129,9 @@ final class Migrate_Command {
 	 * ## EXAMPLES
 	 *     wp longevity migrate
 	 *     wp longevity migrate --status
+	 *
+	 * @param array $args       Positional arguments (unused).
+	 * @param array $assoc_args Associative arguments.
 	 */
 	public function __invoke( array $args, array $assoc_args ): void {
 		unset( $args );
@@ -1140,6 +1234,8 @@ final class Evidence_Command {
 	 *     wp longevity evidence record --type=release-artifact --result=pass --source-sha=<full-sha> --checksum=<sha256>
 	 *     wp longevity evidence list --type=backup
 	 *
+	 * @param array $args       Positional arguments (unused).
+	 * @param array $assoc_args Associative arguments.
 	 * @subcommand record
 	 */
 	public function record( array $args, array $assoc_args ): void {
@@ -1185,6 +1281,8 @@ final class Evidence_Command {
 	 *     wp longevity evidence list
 	 *     wp longevity evidence list --type=backup --limit=25
 	 *
+	 * @param array $args       Positional arguments (unused).
+	 * @param array $assoc_args Associative arguments.
 	 * @subcommand list
 	 */
 	public function list( array $args, array $assoc_args ): void {
@@ -1210,6 +1308,8 @@ final class Evidence_Command {
 	 * ## EXAMPLES
 	 *     wp longevity evidence show 42
 	 *
+	 * @param array $args       Positional arguments.
+	 * @param array $assoc_args Associative arguments (unused).
 	 * @subcommand show
 	 */
 	public function show( array $args, array $assoc_args ): void {
@@ -1234,6 +1334,8 @@ final class Evidence_Command {
 	 * ## EXAMPLES
 	 *     wp longevity evidence verify 42
 	 *
+	 * @param array $args       Positional arguments.
+	 * @param array $assoc_args Associative arguments (unused).
 	 * @subcommand verify
 	 */
 	public function verify( array $args, array $assoc_args ): void {
@@ -1266,6 +1368,9 @@ final class Metrics_Command {
 	 * ## EXAMPLES
 	 *     wp longevity metrics
 	 *     wp longevity metrics --file=/var/lib/node_exporter/textfile/longevity.prom
+	 *
+	 * @param array $args       Positional arguments (unused).
+	 * @param array $assoc_args Associative arguments.
 	 */
 	public function __invoke( array $args, array $assoc_args ): void {
 		unset( $args );
@@ -1314,6 +1419,9 @@ final class Legal_Hold_Command {
 	 *     wp longevity legal-hold release 123 --reason="Case closed" --case=CASE-9
 	 *     wp longevity legal-hold list
 	 *     wp longevity legal-hold report
+	 *
+	 * @param array $args       Positional arguments.
+	 * @param array $assoc_args Associative arguments.
 	 */
 	public function __invoke( array $args, array $assoc_args ): void {
 		if ( ! current_user_can( Legal_Hold::CAPABILITY ) ) {
@@ -1474,7 +1582,12 @@ final class Acceptance_Command {
 		}
 	}
 
-	/** Keep acceptance output machine-readable when an individual producer throws. */
+	/**
+	 * Keep acceptance output machine-readable when an individual producer throws.
+	 *
+	 * @param string   $name     Check name for the result payload.
+	 * @param callable $producer Callback that returns the check result.
+	 */
 	private function run_check( string $name, callable $producer ): array {
 		try {
 			return $producer();
@@ -1560,7 +1673,11 @@ final class Acceptance_Command {
 		);
 	}
 
-	/** One-line summary of any non-ok readiness sub-checks. */
+	/**
+	 * One-line summary of any non-ok readiness sub-checks.
+	 *
+	 * @param array $report Readiness report to summarise.
+	 */
 	private function summarize_readiness( array $report ): string {
 		$overall = (string) ( $report['status'] ?? 'blocked' );
 		if ( 'ok' === $overall ) {
@@ -1576,7 +1693,12 @@ final class Acceptance_Command {
 		return 'Non-ok: ' . implode( ', ', $flagged ) . '.';
 	}
 
-	/** Exact candidate identity must match immutable deployed configuration. */
+	/**
+	 * Exact candidate identity must match immutable deployed configuration.
+	 *
+	 * @param string $source_sha        Candidate source commit SHA.
+	 * @param string $artifact_checksum Candidate release artifact checksum.
+	 */
 	private function artifact_identity_check( string $source_sha, string $artifact_checksum ): array {
 		if ( 1 !== preg_match( '/\A(?:[a-f0-9]{40}|[a-f0-9]{64})\z/', $source_sha )
 			|| 1 !== preg_match( '/\A[a-f0-9]{64}\z/', $artifact_checksum ) ) {

@@ -11,13 +11,21 @@ defined( 'ABSPATH' ) || exit;
 
 /** Uses a short-lived database advisory lock when the database is available. */
 final class Publication_Lock {
-	/** @var array<int, int> Re-entrant locks held by this request. */
+	/**
+	 * Re-entrant locks held by this request.
+	 *
+	 * @var array<int, int>
+	 */
 	private static array $held = array();
 
 	/** Option key for lock failure counter. */
 	public const FAILURE_COUNTER_OPTION = 'lel_publication_lock_failures';
 
-	/** Acquire the lock or fail closed. */
+	/**
+	 * Acquire the lock or fail closed.
+	 *
+	 * @param int $post_id Post ID to lock.
+	 */
 	public static function acquire( int $post_id ): bool {
 		if ( $post_id <= 0 ) {
 			return false;
@@ -36,7 +44,13 @@ final class Publication_Lock {
 		return true;
 	}
 
-	/** Log and count a lock acquisition failure for observability. */
+	/**
+	 * Log and count a lock acquisition failure for observability.
+	 *
+	 * @param int    $post_id   Post ID whose lock operation failed.
+	 * @param string $operation Lock operation name (acquire or release).
+	 * @param string $result    Advisory lock result state.
+	 */
 	private static function record_failure( int $post_id, string $operation, string $result ): void {
 		Logger::error(
 			'publication_lock_' . $operation . '_failed',
@@ -59,7 +73,11 @@ final class Publication_Lock {
 		return Advisory_Lock::supported();
 	}
 
-	/** Release one re-entrant lock level. */
+	/**
+	 * Release one re-entrant lock level.
+	 *
+	 * @param int $post_id Post ID to unlock.
+	 */
 	public static function release( int $post_id ): bool {
 		if ( ! isset( self::$held[ $post_id ] ) ) {
 			return true;
@@ -86,7 +104,11 @@ final class Publication_Lock {
 		}
 	}
 
-	/** Database- and site-scoped lock name for one publication record. */
+	/**
+	 * Database- and site-scoped lock name for one publication record.
+	 *
+	 * @param int $post_id Post ID the lock name identifies.
+	 */
 	private static function name( int $post_id ): string {
 		return Advisory_Lock::namespaced_name( 'publication_' . $post_id );
 	}

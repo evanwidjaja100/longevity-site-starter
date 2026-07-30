@@ -14,7 +14,11 @@ final class Evidence_Store {
 	public const RESULTS      = array( 'ok', 'pass', 'fail', 'error' );
 	public const ENVIRONMENTS = array( 'local', 'development', 'staging', 'production' );
 
-	/** @var array<string, array{release_scoped: bool, expiry_required: bool}> */
+	/**
+	 * Registered evidence types and their identity and expiry requirements.
+	 *
+	 * @var array<string, array{release_scoped: bool, expiry_required: bool}>
+	 */
 	private const TYPES = array(
 		'backup'           => array(
 			'release_scoped'  => false,
@@ -96,7 +100,12 @@ final class Evidence_Store {
 		return array_keys( self::TYPES );
 	}
 
-	/** Whether a type must carry exact release identity. */
+	/**
+	 * Whether a type must carry exact release identity.
+	 *
+	 * @param string $type Evidence type slug.
+	 * @return bool True when the type requires release identity.
+	 */
 	public static function is_release_scoped( string $type ): bool {
 		return ! empty( self::TYPES[ $type ]['release_scoped'] );
 	}
@@ -120,7 +129,13 @@ final class Evidence_Store {
 		);
 	}
 
-	/** Record a new immutable evidence row. */
+	/**
+	 * Record a new immutable evidence row.
+	 *
+	 * @param string $type   Evidence type slug.
+	 * @param array  $fields Evidence fields and free-form payload values.
+	 * @return int|\WP_Error New evidence row ID, or WP_Error on failure.
+	 */
 	public static function record( string $type, array $fields ) {
 		if ( ! isset( self::TYPES[ $type ] ) ) {
 			return new \WP_Error( 'evidence_unknown_type', sprintf( 'Unknown evidence type "%s". Valid types: %s', $type, implode( ', ', self::types() ) ) );
@@ -179,8 +194,8 @@ final class Evidence_Store {
 			$prior = self::get( $supersedes_id );
 			if ( null === $prior
 				|| true !== self::validate_stored_record( $prior )
-				|| $type !== (string) ( $prior['evidence_type'] ?? '' )
-				|| $environment !== (string) ( $prior['environment'] ?? '' )
+				|| (string) ( $prior['evidence_type'] ?? '' ) !== $type
+				|| (string) ( $prior['environment'] ?? '' ) !== $environment
 				|| self::is_superseded( $supersedes_id ) ) {
 				return new \WP_Error( 'evidence_invalid_supersession', 'supersedes_id must identify an active earlier record of the same type and environment.' );
 			}
@@ -238,7 +253,12 @@ final class Evidence_Store {
 		return $id;
 	}
 
-	/** Fetch a single evidence record. */
+	/**
+	 * Fetch a single evidence record.
+	 *
+	 * @param int $id Evidence row ID.
+	 * @return array|null Stored row, or null when not found.
+	 */
 	public static function get( int $id ): ?array {
 		global $wpdb;
 		if ( $id <= 0 || ! self::exists() ) {
@@ -248,7 +268,12 @@ final class Evidence_Store {
 		return is_array( $row ) ? $row : null;
 	}
 
-	/** Newest record for a registered type. */
+	/**
+	 * Newest record for a registered type.
+	 *
+	 * @param string $type Evidence type slug.
+	 * @return array|null Newest stored row, or null when none.
+	 */
 	public static function latest( string $type ): ?array {
 		global $wpdb;
 		if ( ! isset( self::TYPES[ $type ] ) || ! self::exists() ) {
@@ -258,7 +283,15 @@ final class Evidence_Store {
 		return is_array( $row ) ? $row : null;
 	}
 
-	/** Newest hash-valid, active record matching exact runtime identity fields. */
+	/**
+	 * Newest hash-valid, active record matching exact runtime identity fields.
+	 *
+	 * @param string $type              Evidence type slug.
+	 * @param string $environment       Environment the record must match.
+	 * @param string $release_sha       Optional source SHA the record must match.
+	 * @param string $artifact_checksum Optional artifact SHA-256 the record must match.
+	 * @return array|null Newest matching valid row, or null when none.
+	 */
 	public static function latest_valid_matching( string $type, string $environment, string $release_sha = '', string $artifact_checksum = '' ): ?array {
 		global $wpdb;
 		if ( ! isset( self::TYPES[ $type ] ) || ! in_array( $environment, self::ENVIRONMENTS, true ) || ! self::exists() ) {
@@ -284,7 +317,13 @@ final class Evidence_Store {
 		return null;
 	}
 
-	/** All records for a type, newest first. */
+	/**
+	 * All records for a type, newest first.
+	 *
+	 * @param string $type  Evidence type slug.
+	 * @param int    $limit Maximum rows to return.
+	 * @return array Stored rows, newest first.
+	 */
 	public static function all( string $type, int $limit = 50 ): array {
 		global $wpdb;
 		if ( ! isset( self::TYPES[ $type ] ) || ! self::exists() ) {
@@ -294,13 +333,23 @@ final class Evidence_Store {
 		return is_array( $rows ) ? $rows : array();
 	}
 
-	/** Verify stored structure, record hash, and any local attachment hash. */
+	/**
+	 * Verify stored structure, record hash, and any local attachment hash.
+	 *
+	 * @param int $id Evidence row ID.
+	 * @return bool True when the stored record validates.
+	 */
 	public static function verify( int $id ): bool {
 		$row = self::get( $id );
 		return null !== $row && true === self::validate_stored_record( $row );
 	}
 
-	/** Validate a stored row without deciding whether its result is launch-ready. */
+	/**
+	 * Validate a stored row without deciding whether its result is launch-ready.
+	 *
+	 * @param array $row Stored evidence row.
+	 * @return true|\WP_Error True when valid, or WP_Error describing the failure.
+	 */
 	public static function validate_stored_record( array $row ) {
 		$type        = (string) ( $row['evidence_type'] ?? '' );
 		$result      = (string) ( $row['result'] ?? '' );
@@ -351,8 +400,8 @@ final class Evidence_Store {
 			$prior = self::get( $supersedes_id );
 			if ( null === $prior
 				|| $supersedes_id >= (int) ( $row['id'] ?? 0 )
-				|| $type !== (string) ( $prior['evidence_type'] ?? '' )
-				|| $environment !== (string) ( $prior['environment'] ?? '' )
+				|| (string) ( $prior['evidence_type'] ?? '' ) !== $type
+				|| (string) ( $prior['environment'] ?? '' ) !== $environment
 				|| true !== self::validate_stored_record( $prior ) ) {
 				return new \WP_Error( 'evidence_supersession_invalid', 'Stored supersession relationship is invalid.' );
 			}
@@ -360,7 +409,12 @@ final class Evidence_Store {
 		return true;
 	}
 
-	/** Whether a later hash-valid record supersedes this record. */
+	/**
+	 * Whether a later hash-valid record supersedes this record.
+	 *
+	 * @param int $id Evidence row ID.
+	 * @return bool True when a later valid record supersedes it.
+	 */
 	public static function is_superseded( int $id ): bool {
 		$row = self::get( $id );
 		if ( null === $row ) {
@@ -372,7 +426,7 @@ final class Evidence_Store {
 			}
 			$payload = self::payload( $candidate );
 			$hash    = (string) ( $candidate['record_hash'] ?? '' );
-			if ( is_array( $payload ) && $id === (int) ( $payload['supersedes_id'] ?? 0 )
+			if ( is_array( $payload ) && (int) ( $payload['supersedes_id'] ?? 0 ) === $id
 				&& self::is_sha256( $hash ) && hash_equals( $hash, self::canonical_hash( $candidate ) ) ) {
 				return true;
 			}
@@ -380,7 +434,12 @@ final class Evidence_Store {
 		return false;
 	}
 
-	/** Compute the tamper-evident hash over the canonical field subset. */
+	/**
+	 * Compute the tamper-evident hash over the canonical field subset.
+	 *
+	 * @param array $row Evidence row fields.
+	 * @return string SHA-256 hash of the canonical field subset.
+	 */
 	private static function canonical_hash( array $row ): string {
 		$canonical = array();
 		foreach ( self::HASHED_FIELDS as $field ) {
@@ -390,7 +449,13 @@ final class Evidence_Store {
 		return hash( 'sha256', (string) wp_json_encode( $canonical, JSON_UNESCAPED_SLASHES ) );
 	}
 
-	/** Verify that the audit log durably links this evidence ID to its exact hash. */
+	/**
+	 * Verify that the audit log durably links this evidence ID to its exact hash.
+	 *
+	 * @param int    $id          Evidence row ID.
+	 * @param string $record_hash Expected record hash.
+	 * @return bool True when a durable audit link exists.
+	 */
 	private static function has_audit_link( int $id, string $record_hash ): bool {
 		if ( $id < 1 || ! Audit_Log::exists() ) {
 			return false;
@@ -398,7 +463,7 @@ final class Evidence_Store {
 		foreach ( Audit_Log::test_events() as $event ) {
 			if ( 'evidence_recorded' === ( $event['event_type'] ?? '' )
 				&& 'external_evidence' === ( $event['object_type'] ?? '' )
-				&& $id === (int) ( $event['object_id'] ?? 0 )
+				&& (int) ( $event['object_id'] ?? 0 ) === $id
 				&& hash_equals( $record_hash, (string) ( $event['payload']['record_hash'] ?? '' ) ) ) {
 				return true;
 			}
@@ -423,13 +488,23 @@ final class Evidence_Store {
 		return false;
 	}
 
-	/** Decode a stored payload. */
+	/**
+	 * Decode a stored payload.
+	 *
+	 * @param array $row Stored evidence row.
+	 * @return array|null Decoded payload, or null when malformed.
+	 */
 	private static function payload( array $row ): ?array {
 		$payload = json_decode( (string) ( $row['payload_json'] ?? '' ), true );
 		return is_array( $payload ) && JSON_ERROR_NONE === json_last_error() ? $payload : null;
 	}
 
-	/** Parse a UTC database datetime or an explicitly offset ISO datetime. */
+	/**
+	 * Parse a UTC database datetime or an explicitly offset ISO datetime.
+	 *
+	 * @param string $value Datetime string to parse.
+	 * @return int|false Unix timestamp, or false when unparseable.
+	 */
 	private static function timestamp( string $value ) {
 		if ( '' === trim( $value ) ) {
 			return false;
@@ -438,17 +513,33 @@ final class Evidence_Store {
 		return strtotime( $value . $suffix );
 	}
 
-	/** Git uses SHA-1 today and can use SHA-256 repositories. */
+	/**
+	 * Git uses SHA-1 today and can use SHA-256 repositories.
+	 *
+	 * @param string $value Candidate commit hash.
+	 * @return bool True for a 40- or 64-character hexadecimal hash.
+	 */
 	private static function is_source_sha( string $value ): bool {
 		return 1 === preg_match( '/\A(?:[a-f0-9]{40}|[a-f0-9]{64})\z/', $value );
 	}
 
-	/** Validate a SHA-256 hexadecimal digest. */
+	/**
+	 * Validate a SHA-256 hexadecimal digest.
+	 *
+	 * @param string $value Candidate digest.
+	 * @return bool True for a 64-character hexadecimal digest.
+	 */
 	private static function is_sha256( string $value ): bool {
 		return 1 === preg_match( '/\A[a-f0-9]{64}\z/', $value );
 	}
 
-	/** Verify a local attachment now and on every explicit verification. */
+	/**
+	 * Verify a local attachment now and on every explicit verification.
+	 *
+	 * @param string $location Local filesystem path of the attachment.
+	 * @param string $expected Expected SHA-256 digest.
+	 * @return bool True when the file exists and matches the digest.
+	 */
 	private static function attachment_matches( string $location, string $expected ): bool {
 		$scheme = (string) parse_url( $location, PHP_URL_SCHEME );
 		if ( ( '' !== $scheme && 1 !== preg_match( '/\A[A-Za-z]:[\\\\\/]/', $location ) ) || ! is_file( $location ) || ! is_readable( $location ) ) {

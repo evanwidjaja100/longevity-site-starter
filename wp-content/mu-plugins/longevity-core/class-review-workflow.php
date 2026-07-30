@@ -113,7 +113,7 @@ final class Review_Workflow {
 		check_admin_referer( 'lel_medical_review', 'lel_review_nonce' );
 		$post_id = isset( $_POST['post_id'] ) ? absint( $_POST['post_id'] ) : 0;
 		$user_id = get_current_user_id();
-		if ( ! $post_id || $user_id !== (int) get_post_meta( $post_id, 'medical_reviewer_user_id', true ) ) {
+		if ( ! $post_id || (int) get_post_meta( $post_id, 'medical_reviewer_user_id', true ) !== $user_id ) {
 			wp_die( esc_html__( 'This review is not assigned to your account.', 'longevity-core' ) );
 		}
 		if ( ! Reviewer_Credentials::is_valid_for( $user_id, (string) get_post_meta( $post_id, 'medical_review_scope', true ), (string) get_post_meta( $post_id, 'region_scope', true ) ) ) {
@@ -222,7 +222,14 @@ final class Review_Workflow {
 		self::redirect( 'lel-fact-check-queue', $post_id, 'fact_complete' );
 	}
 
-	/** Render a table shared by both queues. */
+	/**
+	 * Render a table shared by both queues.
+	 *
+	 * @param array  $posts       Queue post objects to list.
+	 * @param string $page        Admin page slug for action links.
+	 * @param int    $selected_id Currently selected post ID, or 0 when none.
+	 * @param string $status_key  Meta key whose value is shown in the status column.
+	 */
 	private static function render_queue_table( array $posts, string $page, int $selected_id, string $status_key ): void {
 		if ( empty( $posts ) ) {
 			echo '<p>' . esc_html__( 'No records are currently in this queue.', 'longevity-core' ) . '</p>';
@@ -242,9 +249,14 @@ final class Review_Workflow {
 		echo '</tbody></table>';
 	}
 
-	/** Render the selected medical review form. */
+	/**
+	 * Render the selected medical review form.
+	 *
+	 * @param int $post_id Post ID under review.
+	 * @param int $user_id Current reviewer's user ID.
+	 */
 	private static function render_medical_form( int $post_id, int $user_id ): void {
-		if ( $user_id !== (int) get_post_meta( $post_id, 'medical_reviewer_user_id', true ) ) {
+		if ( (int) get_post_meta( $post_id, 'medical_reviewer_user_id', true ) !== $user_id ) {
 			echo '<div class="notice notice-error inline"><p>' . esc_html__( 'This review is not assigned to you.', 'longevity-core' ) . '</p></div>';
 			return;
 		}
@@ -253,7 +265,8 @@ final class Review_Workflow {
 			return;
 		}
 		echo '<hr><h2>' . esc_html( get_the_title( $post ) ) . '</h2>';
-		echo '<p><a href="' . esc_url( get_preview_post_link( $post ) ?: get_permalink( $post ) ) . '" target="_blank" rel="noopener">' . esc_html__( 'Open preview in a new tab', 'longevity-core' ) . '</a></p>';
+		$preview_link = get_preview_post_link( $post );
+		echo '<p><a href="' . esc_url( $preview_link ? $preview_link : get_permalink( $post ) ) . '" target="_blank" rel="noopener">' . esc_html__( 'Open preview in a new tab', 'longevity-core' ) . '</a></p>';
 		echo '<div class="notice notice-info inline"><p>' . esc_html( wp_trim_words( wp_strip_all_tags( $post->post_content ), 180 ) ) . '</p></div>';
 		echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '">';
 		wp_nonce_field( 'lel_medical_review', 'lel_review_nonce' );
@@ -295,7 +308,12 @@ final class Review_Workflow {
 		echo '</form>';
 	}
 
-	/** Render the selected fact-check form. */
+	/**
+	 * Render the selected fact-check form.
+	 *
+	 * @param int   $post_id        Post ID under review.
+	 * @param array $eligible_posts Posts currently eligible for the fact-check queue.
+	 */
 	private static function render_fact_form( int $post_id, array $eligible_posts ): void {
 		$eligible_ids = array_map( static fn( $post ) => (int) $post->ID, $eligible_posts );
 		if ( ! in_array( $post_id, $eligible_ids, true ) ) {
@@ -309,7 +327,8 @@ final class Review_Workflow {
 		$claims   = Claims::count_for_post( $post_id );
 		$verified = Claims::count_for_post( $post_id, 'verified' );
 		echo '<hr><h2>' . esc_html( get_the_title( $post ) ) . '</h2><p><strong>' . esc_html__( 'Claims:', 'longevity-core' ) . '</strong> ' . esc_html( (string) $verified ) . '/' . esc_html( (string) $claims ) . ' ' . esc_html__( 'verified', 'longevity-core' ) . '</p>';
-		echo '<p><a href="' . esc_url( get_preview_post_link( $post ) ?: get_permalink( $post ) ) . '" target="_blank" rel="noopener">' . esc_html__( 'Open preview in a new tab', 'longevity-core' ) . '</a></p>';
+		$preview_link = get_preview_post_link( $post );
+		echo '<p><a href="' . esc_url( $preview_link ? $preview_link : get_permalink( $post ) ) . '" target="_blank" rel="noopener">' . esc_html__( 'Open preview in a new tab', 'longevity-core' ) . '</a></p>';
 		echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '">';
 		wp_nonce_field( 'lel_fact_check', 'lel_fact_nonce' );
 		echo '<input type="hidden" name="action" value="lel_submit_fact_check"><input type="hidden" name="post_id" value="' . esc_attr( (string) $post_id ) . '">';
@@ -328,7 +347,11 @@ final class Review_Workflow {
 		echo '</form>';
 	}
 
-	/** Show reviewer credential readiness without exposing private fields. */
+	/**
+	 * Show reviewer credential readiness without exposing private fields.
+	 *
+	 * @param int $user_id Reviewer's user ID.
+	 */
 	private static function render_reviewer_identity_status( int $user_id ): void {
 		$status   = (string) get_user_meta( $user_id, 'credential_verification_status', true );
 		$is_valid = Reviewer_Credentials::is_valid_for( $user_id, '', '' );
@@ -356,7 +379,13 @@ final class Review_Workflow {
 		echo '<div class="notice notice-' . esc_attr( $type ) . ' is-dismissible"><p>' . esc_html( $text ) . '</p></div>';
 	}
 
-	/** Safely redirect back to a queue. */
+	/**
+	 * Safely redirect back to a queue.
+	 *
+	 * @param string $page    Admin page slug to return to.
+	 * @param int    $post_id Post ID to reselect.
+	 * @param string $message Result message key for the notice.
+	 */
 	private static function redirect( string $page, int $post_id, string $message ): void {
 		wp_safe_redirect(
 			add_query_arg(
@@ -371,23 +400,48 @@ final class Review_Workflow {
 		exit;
 	}
 
-	/** Read an unslashed scalar POST value. */
+	/**
+	 * Read an unslashed scalar POST value.
+	 *
+	 * @param string $key POST field name to read.
+	 * @return string Unslashed raw value, or an empty string when absent.
+	 */
 	private static function posted( string $key ): string {
 		// phpcs:ignore WordPress.Security.NonceVerification.Missing, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Raw POST reader; callers submit_medical_review()/submit_fact_check() verify the nonce via check_admin_referer() and sanitize each value with Meta_Registry::sanitize_value()/sanitize_key().
 		return isset( $_POST[ $key ] ) ? (string) wp_unslash( $_POST[ $key ] ) : '';
 	}
 
-	/** Render a text input. */
+	/**
+	 * Render a text input.
+	 *
+	 * @param string $name  Field name and id attribute.
+	 * @param string $label Visible field label.
+	 * @param mixed  $value Current field value.
+	 * @param string $type  Input type attribute.
+	 */
 	private static function text_field( string $name, string $label, $value, string $type = 'text' ): void {
 		echo '<p><label for="' . esc_attr( $name ) . '"><strong>' . esc_html( $label ) . '</strong></label><br><input class="regular-text" type="' . esc_attr( $type ) . '" id="' . esc_attr( $name ) . '" name="' . esc_attr( $name ) . '" value="' . esc_attr( (string) $value ) . '"></p>';
 	}
 
-	/** Render a textarea. */
+	/**
+	 * Render a textarea.
+	 *
+	 * @param string $name  Field name and id attribute.
+	 * @param string $label Visible field label.
+	 * @param mixed  $value Current field value.
+	 */
 	private static function textarea_field( string $name, string $label, $value ): void {
 		echo '<p><label for="' . esc_attr( $name ) . '"><strong>' . esc_html( $label ) . '</strong></label><br><textarea class="large-text" rows="4" id="' . esc_attr( $name ) . '" name="' . esc_attr( $name ) . '">' . esc_textarea( (string) $value ) . '</textarea></p>';
 	}
 
-	/** Render a select. */
+	/**
+	 * Render a select.
+	 *
+	 * @param string $name    Field name and id attribute.
+	 * @param string $label   Visible field label.
+	 * @param array  $options Option value/label pairs.
+	 * @param mixed  $value   Currently selected value.
+	 */
 	private static function select_field( string $name, string $label, array $options, $value ): void {
 		echo '<p><label for="' . esc_attr( $name ) . '"><strong>' . esc_html( $label ) . '</strong></label><br><select id="' . esc_attr( $name ) . '" name="' . esc_attr( $name ) . '">';
 		foreach ( $options as $option => $option_label ) {

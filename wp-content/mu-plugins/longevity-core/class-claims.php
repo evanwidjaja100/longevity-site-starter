@@ -11,9 +11,16 @@ defined( 'ABSPATH' ) || exit;
 
 /** Claim registry service. */
 final class Claims {
-	/** Register claim/source meta. */
+	/**
+	 * Re-entrancy guard set while the service writes its own trusted metadata.
+	 *
+	 * @var bool
+	 */
 	private static bool $tracking = false;
 
+	/**
+	 * Register provenance hooks for claim metadata writes.
+	 */
 	public static function init(): void {
 		add_action( 'init', array( self::class, 'register_meta' ), 12 );
 		add_action( 'updated_post_meta', array( self::class, 'record_provenance' ), 20, 4 );
@@ -101,7 +108,14 @@ final class Claims {
 	}
 
 
-	/** Enforce preparation/verification separation for claim metadata. */
+	/**
+	 * Enforce preparation/verification separation for claim metadata.
+	 *
+	 * @param string $field   Meta key being written.
+	 * @param int    $post_id Claim post ID.
+	 * @param int    $user_id User attempting the write.
+	 * @return bool Whether the current user may write the field.
+	 */
 	public static function can_write_field( string $field, int $post_id, int $user_id ): bool {
 		if ( $user_id <= 0 ) {
 			return false;
@@ -112,7 +126,14 @@ final class Claims {
 		return user_can( $user_id, 'edit_claims' );
 	}
 
-	/** Validate that a source reference points to an existing, well-formed source record. */
+	/**
+	 * Validate that a source reference points to an existing, well-formed source record.
+	 *
+	 * @param string $source_id  Source post ID as a string, or empty.
+	 * @param string $source_url Direct source URL, or empty.
+	 * @param string $identifier Source identifier such as a DOI, or empty.
+	 * @return bool Whether the reference resolves to a complete source.
+	 */
 	private static function validate_source( string $source_id, string $source_url, string $identifier ): bool {
 		if ( '' !== $source_url || '' !== $identifier ) {
 			return true;
@@ -134,7 +155,13 @@ final class Claims {
 		return true;
 	}
 
-	/** Verify the exact current claim snapshot through an explicit workflow service. */
+	/**
+	 * Verify the exact current claim snapshot through an explicit workflow service.
+	 *
+	 * @param int $post_id  Claim post ID.
+	 * @param int $actor_id User performing the independent verification.
+	 * @return bool Whether verification succeeded.
+	 */
 	public static function verify( int $post_id, int $actor_id ): bool {
 		$prepared_by    = (int) get_post_meta( $post_id, 'prepared_by', true );
 		$last_edited_by = (int) get_post_meta( $post_id, 'last_edited_by', true );
@@ -197,7 +224,14 @@ final class Claims {
 		return true;
 	}
 
-	/** Record immutable provenance fields after an authorized claim edit or verification. */
+	/**
+	 * Record immutable provenance fields after an authorized claim edit or verification.
+	 *
+	 * @param int    $meta_id    Meta row ID (unused; required by the hook signature).
+	 * @param int    $post_id    Claim post ID whose metadata changed.
+	 * @param string $meta_key   Meta key that was written.
+	 * @param mixed  $meta_value New meta value.
+	 */
 	public static function record_provenance( int $meta_id, int $post_id, string $meta_key, $meta_value ): void {
 		unset( $meta_id );
 		if ( self::$tracking || 'lel_claim' !== get_post_type( $post_id ) ) {
@@ -269,7 +303,13 @@ final class Claims {
 		}
 	}
 
-	/** Count claims linked to a post. */
+	/**
+	 * Count claims linked to a post.
+	 *
+	 * @param int    $post_id Article post ID the claims are linked to.
+	 * @param string $status  Optional verification status filter.
+	 * @return int Number of matching claim records.
+	 */
 	public static function count_for_post( int $post_id, string $status = '' ): int {
 		$args = array(
 			'post_type'      => 'lel_claim',
@@ -296,7 +336,13 @@ final class Claims {
 		return (int) $query->found_posts;
 	}
 
-	/** Get public citation URLs/identifiers for an article. */
+	/**
+	 * Get public citation URLs/identifiers for an article.
+	 *
+	 * @param int $post_id Article post ID.
+	 * @param int $limit   Maximum number of claims to inspect.
+	 * @return array List of unique citation URLs or identifiers.
+	 */
 	public static function citations_for_post( int $post_id, int $limit = 20 ): array {
 		$claims    = get_posts(
 			array(
@@ -336,6 +382,10 @@ final class Claims {
 	 * Get safe bibliographic fields for verified claims linked to an article.
 	 *
 	 * Private notes, conflicts, email addresses, and source bodies are never returned.
+	 *
+	 * @param int $post_id Article post ID.
+	 * @param int $limit   Maximum number of claims to inspect.
+	 * @return array List of public source detail arrays.
 	 */
 	public static function public_sources_for_post( int $post_id, int $limit = 50 ): array {
 		if ( $post_id <= 0 ) {
@@ -372,14 +422,14 @@ final class Claims {
 			if ( '' === $title || ( '' === $url && '' === $identifier ) ) {
 				continue;
 			}
-			$key = strtolower( $url ?: $identifier );
+			$key = strtolower( $url ? $url : $identifier );
 			if ( isset( $seen[ $key ] ) ) {
 				continue;
 			}
 			$seen[ $key ] = true;
 			$source_type  = trim( (string) get_post_meta( $claim->ID, 'source_type', true ) );
 			$design       = trim( (string) get_post_meta( $claim->ID, 'evidence_design', true ) );
-			$label        = $design ?: $source_type;
+			$label        = $design ? $design : $source_type;
 
 			$public_conflict = '';
 			$conflict_notes  = trim( (string) get_post_meta( $claim->ID, 'conflict_notes', true ) );
@@ -404,7 +454,13 @@ final class Claims {
 		return $sources;
 	}
 
-	/** Sanitize claim or source metadata by field name pattern. */
+	/**
+	 * Sanitize claim or source metadata by field name pattern.
+	 *
+	 * @param string $field Meta key that determines the sanitizer.
+	 * @param mixed  $value Raw meta value to sanitize.
+	 * @return string Sanitized string value.
+	 */
 	private static function sanitize_field( string $field, $value ): string {
 		$value = (string) $value;
 		if ( str_contains( $field, 'url' ) ) {

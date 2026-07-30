@@ -22,19 +22,39 @@ final class Audit_Log {
 	/** Maximum retry sleep, in microseconds. */
 	private const MAX_RETRY_DELAY = 400000;
 
-	/** When true, record() returns a positive ID without writing (test mode). */
+	/**
+	 * When true, record() returns a positive ID without writing (test mode).
+	 *
+	 * @var bool
+	 */
 	private static bool $test_mode = false;
 
-	/** @var list<string> Event types that simulate a write failure while in test mode. */
+	/**
+	 * Event types that simulate a write failure while in test mode.
+	 *
+	 * @var list<string>
+	 */
 	private static array $test_fail_events = array();
 
-	/** @var list<array<string, mixed>> Events captured while in test mode. */
+	/**
+	 * Events captured while in test mode.
+	 *
+	 * @var list<array<string, mixed>>
+	 */
 	private static array $test_events = array();
 
-	/** A failed COMMIT has an unknown outcome; no later governance write is safe. */
+	/**
+	 * A failed COMMIT has an unknown outcome; no later governance write is safe.
+	 *
+	 * @var string
+	 */
 	private static string $unhealthy_reason = '';
 
-	/** Enable test mode: record() returns a positive ID without writing. */
+	/**
+	 * Enable test mode: record() returns a positive ID without writing.
+	 *
+	 * @param bool $enabled Whether test mode is enabled.
+	 */
 	public static function set_test_mode( bool $enabled ): void {
 		self::$test_mode        = $enabled;
 		self::$test_events      = array();
@@ -45,7 +65,7 @@ final class Audit_Log {
 	/**
 	 * Simulate write failures for specific event types while in test mode.
 	 *
-	 * @param list<string> $event_types Event types that must fail.
+	 * @param string[] $event_types Event types that must fail.
 	 */
 	public static function set_test_fail_events( array $event_types ): void {
 		self::$test_fail_events = $event_types;
@@ -83,7 +103,11 @@ final class Audit_Log {
 		return isset( $wpdb->prefix ) ? $wpdb->prefix . 'lel_audit_sequence' : 'wp_lel_audit_sequence';
 	}
 
-	/** Install additive tables with unique sequence constraint and sequence allocator. */
+	/**
+	 * Install additive tables with unique sequence constraint and sequence allocator.
+	 *
+	 * @throws \RuntimeException When the audit tables or the sequence allocator cannot be created.
+	 */
 	public static function install(): void {
 		global $wpdb;
 		if ( ! isset( $wpdb ) || ! is_object( $wpdb ) || ! function_exists( 'dbDelta' ) ) {
@@ -137,7 +161,7 @@ final class Audit_Log {
 	/**
 	 * Ensure the fork-preventing constraints exist on an already-installed table.
 	 *
-	 * dbDelta does not reliably add UNIQUE keys to existing tables, so this
+	 * The dbDelta helper does not reliably add UNIQUE keys to existing tables, so this
 	 * explicitly enforces InnoDB and the unique previous_event_hash index that
 	 * makes chain forks impossible (two events cannot share a predecessor).
 	 * Idempotent and safe to call repeatedly.
@@ -195,7 +219,14 @@ final class Audit_Log {
 	/**
 	 * Record an event. Sensitive text is never accepted wholesale.
 	 *
-	 * @param bool $mandatory When true, failure throws an exception (fail-closed for state transitions).
+	 * @param string               $event_type      Event type key; sanitized and truncated to 64 characters.
+	 * @param string               $object_type     Governed object type; sanitized and truncated to 40 characters.
+	 * @param int                  $object_id       Governed object identifier.
+	 * @param array<string, mixed> $payload         Non-sensitive contextual data; sanitized and bounded before storage.
+	 * @param int                  $actor_id        Acting user ID, or 0 for a system actor.
+	 * @param string               $source_channel  Origin channel; sanitized and truncated to 32 characters.
+	 * @param bool                 $mandatory       When true, failure throws an exception (fail-closed for state transitions).
+	 * @param string               $idempotency_key Optional raw idempotency key; hashed before storage.
 	 * @return int Insert ID on success, 0 on non-mandatory failure.
 	 * @throws \RuntimeException When $mandatory is true and the write fails after retries.
 	 */
@@ -334,7 +365,11 @@ final class Audit_Log {
 		);
 	}
 
-	/** Recompute the event hash from stored row data for tamper detection. */
+	/**
+	 * Recompute the event hash from stored row data for tamper detection.
+	 *
+	 * @param array<string, mixed> $row Stored audit event row keyed by column name.
+	 */
 	private static function recompute_hash( array $row ): string {
 		$record = array(
 			'sequence'            => (int) $row['sequence'],
@@ -377,6 +412,7 @@ final class Audit_Log {
 	 * audit event actually committed. The raw key is hashed the same way
 	 * record() hashes it before storage.
 	 *
+	 * @param string $raw_key Raw idempotency key; hashed the same way record() hashes it.
 	 * @return array{id:int, event_type:string, object_type:string, object_id:int}|null
 	 */
 	public static function event_for_idempotency_key( string $raw_key ): ?array {
@@ -402,7 +438,12 @@ final class Audit_Log {
 		);
 	}
 
-	/** Allocate the next sequence number atomically via the singleton row. */
+	/**
+	 * Allocate the next sequence number atomically via the singleton row.
+	 *
+	 * @param \wpdb $wpdb WordPress database abstraction instance.
+	 * @throws \RuntimeException When the sequence allocator row cannot be updated or initialized.
+	 */
 	private static function allocate_sequence( $wpdb ): int {
 		$seq_table = self::sequence_table_name();
 		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name derives from the trusted $wpdb->prefix; all values are hardcoded literals.
@@ -436,6 +477,17 @@ final class Audit_Log {
 	 * Every non-committed outcome — including COMMIT failure and mid-write
 	 * exceptions — issues an explicit ROLLBACK so no connection is left
 	 * holding an open transaction or gap lock.
+	 *
+	 * @param \wpdb                $wpdb            WordPress database abstraction instance.
+	 * @param string               $event_type      Sanitized event type key.
+	 * @param string               $object_type     Sanitized governed object type.
+	 * @param int                  $object_id       Governed object identifier.
+	 * @param array<string, mixed> $payload         Sanitized, bounded payload data.
+	 * @param int                  $actor_id        Acting user ID, or 0 for a system actor.
+	 * @param string               $source_channel  Sanitized origin channel.
+	 * @param string               $request_id      Request correlation identifier.
+	 * @param string               $idempotency_key Hashed idempotency key, or empty string when unused.
+	 * @throws \RuntimeException When an in-transaction lookup or predecessor read fails.
 	 */
 	private static function attempt_write( $wpdb, string $event_type, string $object_type, int $object_id, array $payload, int $actor_id, string $source_channel, string $request_id, string $idempotency_key ): int {
 		$table   = self::table_name();
@@ -512,7 +564,11 @@ final class Audit_Log {
 		}
 	}
 
-	/** Whether a DB error is transient and retryable. */
+	/**
+	 * Whether a DB error is transient and retryable.
+	 *
+	 * @param string $error Database error message to classify.
+	 */
 	private static function is_transient_error( string $error ): bool {
 		if ( '' === $error ) {
 			return false;
@@ -526,13 +582,22 @@ final class Audit_Log {
 		return false;
 	}
 
-	/** Bounded exponential delay with jitter between transient attempts. */
+	/**
+	 * Bounded exponential delay with jitter between transient attempts.
+	 *
+	 * @param int $attempt Current one-based attempt number.
+	 */
 	private static function retry_sleep( int $attempt ): void {
 		$delay = min( self::MAX_RETRY_DELAY, 50000 * ( 2 ** max( 0, $attempt - 1 ) ) );
 		usleep( $delay + wp_rand( 0, (int) ( $delay / 2 ) ) );
 	}
 
-	/** Record a write failure for observability. */
+	/**
+	 * Record a write failure for observability.
+	 *
+	 * @param string $event_type Sanitized event type that failed to write.
+	 * @param string $reason     Failure reason; bounded before logging.
+	 */
 	private static function record_failure( string $event_type, string $reason ): void {
 		$count = (int) get_option( 'lel_audit_write_failures', 0 );
 		if ( ! update_option( 'lel_audit_write_failures', $count + 1, false ) && (int) get_option( 'lel_audit_write_failures', 0 ) !== $count + 1 ) {
@@ -547,7 +612,12 @@ final class Audit_Log {
 		);
 	}
 
-	/** Quarantine the request after an unknown transaction outcome. */
+	/**
+	 * Quarantine the request after an unknown transaction outcome.
+	 *
+	 * @param string $reason Stable reason code for the quarantine.
+	 * @param \wpdb  $wpdb   WordPress database abstraction instance.
+	 */
 	private static function mark_request_unhealthy( string $reason, $wpdb ): void {
 		if ( '' === self::$unhealthy_reason ) {
 			self::$unhealthy_reason = $reason . ':' . substr( self::database_error( $wpdb ), 0, 120 );
@@ -561,18 +631,30 @@ final class Audit_Log {
 		}
 	}
 
-	/** Current bounded database error, including a stable fallback. */
+	/**
+	 * Current bounded database error, including a stable fallback.
+	 *
+	 * @param \wpdb|object $wpdb WordPress database abstraction instance.
+	 */
 	private static function database_error( $wpdb ): string {
 		$error = trim( (string) ( $wpdb->last_error ?? '' ) );
 		return '' === $error ? 'unknown_database_error' : substr( $error, 0, 200 );
 	}
 
-	/** Clear stale wpdb error state before an operation that can validly return null. */
+	/**
+	 * Clear stale wpdb error state before an operation that can validly return null.
+	 *
+	 * @param \wpdb $wpdb WordPress database abstraction instance.
+	 */
 	private static function clear_database_error( $wpdb ): void {
 		$wpdb->last_error = '';
 	}
 
-	/** Whether the most recent database operation reported an error. */
+	/**
+	 * Whether the most recent database operation reported an error.
+	 *
+	 * @param \wpdb|object $wpdb WordPress database abstraction instance.
+	 */
 	private static function database_failed( $wpdb ): bool {
 		return '' !== trim( (string) ( $wpdb->last_error ?? '' ) );
 	}
@@ -582,7 +664,11 @@ final class Audit_Log {
 		return Logger::request_id();
 	}
 
-	/** Sanitize and bound nested payloads. */
+	/**
+	 * Sanitize and bound nested payloads.
+	 *
+	 * @param array<string, mixed> $payload Raw payload to sanitize and bound.
+	 */
 	private static function sanitize_payload( array $payload ): array {
 		$blocked = array( 'body', 'message', 'contact_email', 'contact_ip', 'credential_verification_evidence_ref', 'raw_observations', 'evidence_references' );
 		$out     = array();

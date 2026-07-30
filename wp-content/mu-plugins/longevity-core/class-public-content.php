@@ -11,7 +11,11 @@ defined( 'ABSPATH' ) || exit;
 
 /** Renders content-area components: TOC, related content, search, etc. */
 class Public_Content {
-	/** @var array<string, int> */
+	/**
+	 * Per-request counters used to build page-unique element IDs.
+	 *
+	 * @var array<string, int>
+	 */
 	private static array $instance_counts = array();
 
 	/** Register content filters used by public components. */
@@ -19,7 +23,12 @@ class Public_Content {
 		add_filter( 'the_content', array( self::class, 'add_heading_ids' ), 12 );
 	}
 
-	/** Render a TOC only for long articles with at least three H2 headings. */
+	/**
+	 * Render a TOC only for long articles with at least three H2 headings.
+	 *
+	 * @param int $post_id Article post ID.
+	 * @return string Table-of-contents markup, or an empty string.
+	 */
 	public static function render_table_of_contents( int $post_id ): string {
 		$post = get_post( $post_id );
 		if ( ! $post || str_word_count( wp_strip_all_tags( $post->post_content ) ) < 600 ) {
@@ -37,7 +46,12 @@ class Public_Content {
 		return $html . '</ol></nav>';
 	}
 
-	/** Add the same stable IDs used by the TOC while preserving manual IDs. */
+	/**
+	 * Add the same stable IDs used by the TOC while preserving manual IDs.
+	 *
+	 * @param string $content Post content HTML.
+	 * @return string Content with stable heading IDs added.
+	 */
 	public static function add_heading_ids( string $content ): string {
 		if ( ! is_singular( array( 'post', 'review' ) ) || false === stripos( $content, '<h2' ) ) {
 			return $content;
@@ -58,7 +72,13 @@ class Public_Content {
 		);
 	}
 
-	/** Render deterministic related content. */
+	/**
+	 * Render deterministic related content.
+	 *
+	 * @param int $post_id Current article post ID.
+	 * @param int $limit   Maximum number of related items.
+	 * @return string Related-content markup, or an empty string.
+	 */
 	public static function render_related_content( int $post_id, int $limit = 3 ): string {
 		if ( $post_id <= 0 ) {
 			return '';
@@ -120,14 +140,19 @@ class Public_Content {
 		return $html . '</ul></section>';
 	}
 
-	/** Render compact metadata for a query-loop card. */
+	/**
+	 * Render compact metadata for a query-loop card.
+	 *
+	 * @param int $post_id Post ID for the card.
+	 * @return string Card metadata markup.
+	 */
 	public static function render_content_card_meta( int $post_id ): string {
 		if ( $post_id <= 0 ) {
 			return '';
 		}
 		$items   = array();
 		$items[] = '<span><strong>' . esc_html( 'review' === get_post_type( $post_id ) ? __( 'Review', 'longevity-core' ) : __( 'Guide', 'longevity-core' ) ) . '</strong></span>';
-		$items[] = '<time datetime="' . esc_attr( get_the_modified_date( DATE_W3C, $post_id ) ) . '">' . esc_html( sprintf( __( 'Updated %s', 'longevity-core' ), get_the_modified_date( '', $post_id ) ) ) . '</time>';
+		$items[] = '<time datetime="' . esc_attr( get_the_modified_date( DATE_W3C, $post_id ) ) . '">' . esc_html( sprintf( /* translators: %s: human-readable last-updated date. */ __( 'Updated %s', 'longevity-core' ), get_the_modified_date( '', $post_id ) ) ) . '</time>';
 		$grade   = (string) get_post_meta( $post_id, 'evidence_grade', true );
 		if ( $grade ) {
 			$grade_labels = array(
@@ -137,7 +162,7 @@ class Public_Content {
 				'D' => __( 'Mechanistic', 'longevity-core' ),
 				'U' => __( 'Unclear', 'longevity-core' ),
 			);
-			$items[]      = '<span>' . esc_html( sprintf( __( 'Main conclusion: %s', 'longevity-core' ), $grade_labels[ $grade ] ?? __( 'Unclassified', 'longevity-core' ) ) ) . '</span>';
+			$items[]      = '<span>' . esc_html( sprintf( /* translators: %s: evidence-grade strength label. */ __( 'Main conclusion: %s', 'longevity-core' ), $grade_labels[ $grade ] ?? __( 'Unclassified', 'longevity-core' ) ) ) . '</span>';
 		}
 		if ( 'review' === get_post_type( $post_id ) && Runtime_Config::scoring_model_status()['valid'] && Approval_Service::is_current( $post_id, 'testing' ) && Review_Methodology::valid_test_record( (int) get_post_meta( $post_id, 'test_record_id', true ), (string) get_post_meta( $post_id, 'testing_protocol_version', true ) ) ) {
 			$items[] = '<span>' . esc_html__( 'Tested', 'longevity-core' ) . '</span>';
@@ -155,7 +180,7 @@ class Public_Content {
 		$sort         = Content_Discovery::requested_sort();
 		$category     = Content_Discovery::requested_category();
 		$count        = isset( $GLOBALS['wp_query'] ) ? (int) $GLOBALS['wp_query']->found_posts : 0;
-		$html         = '<p class="longevity-result-count" aria-live="polite">' . esc_html( sprintf( _n( '%s result', '%s results', $count, 'longevity-core' ), number_format_i18n( $count ) ) ) . '</p><form class="longevity-search-form" role="search" method="get" action="' . esc_url( home_url( '/' ) ) . '">';
+		$html         = '<p class="longevity-result-count" aria-live="polite">' . esc_html( sprintf( /* translators: %s: number of search results. */ _n( '%s result', '%s results', $count, 'longevity-core' ), number_format_i18n( $count ) ) ) . '</p><form class="longevity-search-form" role="search" method="get" action="' . esc_url( home_url( '/' ) ) . '">';
 		$html        .= '<label>' . esc_html__( 'Search terms', 'longevity-core' ) . '<input type="search" name="s" value="' . esc_attr( $query ) . '"></label>';
 		$html        .= '<label>' . esc_html__( 'Content type', 'longevity-core' ) . '<select name="content_type">' . self::options(
 			array(
@@ -216,7 +241,12 @@ class Public_Content {
 		return $html . '</header>';
 	}
 
-	/** Render correction history through the authoritative correction service. */
+	/**
+	 * Render correction history through the authoritative correction service.
+	 *
+	 * @param int $post_id Post ID whose corrections should be rendered.
+	 * @return string Correction-history markup, or an empty string.
+	 */
 	public static function render_corrections( int $post_id ): string {
 		return $post_id > 0 ? Corrections::render( $post_id ) : '';
 	}
@@ -292,10 +322,10 @@ class Public_Content {
 
 			$counts = array();
 			if ( $guide_count > 0 ) {
-				$counts[] = esc_html( sprintf( _n( '%d guide', '%d guides', $guide_count, 'longevity-core' ), $guide_count ) );
+				$counts[] = esc_html( sprintf( /* translators: %d: number of published guides. */ _n( '%d guide', '%d guides', $guide_count, 'longevity-core' ), $guide_count ) );
 			}
 			if ( $review_count > 0 ) {
-				$counts[] = esc_html( sprintf( _n( '%d product report', '%d product reports', $review_count, 'longevity-core' ), $review_count ) );
+				$counts[] = esc_html( sprintf( /* translators: %d: number of product reports. */ _n( '%d product report', '%d product reports', $review_count, 'longevity-core' ), $review_count ) );
 			}
 			if ( ! empty( $counts ) ) {
 				$html .= implode( ' &middot; ', $counts );
@@ -369,7 +399,8 @@ class Public_Content {
 		$html .= '</select></label>';
 		$html .= '<button class="wp-element-button" type="submit">' . esc_html__( 'Apply', 'longevity-core' ) . '</button>';
 		if ( $topic_slug || $sort ) {
-			$html .= ' <a class="longevity-clear-filters" href="' . esc_url( Routes::public_page_url( 'guides' ) ?: home_url( '/guides/' ) ) . '">' . esc_html__( 'Clear filters', 'longevity-core' ) . '</a>';
+			$guides_url = Routes::public_page_url( 'guides' );
+			$html      .= ' <a class="longevity-clear-filters" href="' . esc_url( $guides_url ? $guides_url : home_url( '/guides/' ) ) . '">' . esc_html__( 'Clear filters', 'longevity-core' ) . '</a>';
 		}
 		$html .= '</form>';
 
@@ -410,7 +441,8 @@ class Public_Content {
 		} else {
 			$html .= '<div class="longevity-empty-state"><p>' . esc_html__( 'No guides match the selected filters.', 'longevity-core' ) . '</p>';
 			if ( $topic_slug ) {
-				$html .= ' <a href="' . esc_url( Routes::public_page_url( 'guides' ) ?: home_url( '/guides/' ) ) . '">' . esc_html__( 'Clear filters and browse all guides.', 'longevity-core' ) . '</a>';
+				$guides_url = Routes::public_page_url( 'guides' );
+				$html      .= ' <a href="' . esc_url( $guides_url ? $guides_url : home_url( '/guides/' ) ) . '">' . esc_html__( 'Clear filters and browse all guides.', 'longevity-core' ) . '</a>';
 			}
 			$html .= '</div>';
 		}
@@ -418,7 +450,12 @@ class Public_Content {
 		return $html . '</section>';
 	}
 
-	/** Extract stable, deduplicated H2/H3 identifiers. */
+	/**
+	 * Extract stable, deduplicated H2/H3 identifiers.
+	 *
+	 * @param string $content Post content HTML.
+	 * @return array List of heading arrays with level, id, and text.
+	 */
 	private static function extract_headings( string $content ): array {
 		preg_match_all( '/<h([23])([^>]*)>(.*?)<\/h\1>/is', $content, $matches, PREG_SET_ORDER );
 		$headings = array();
@@ -432,8 +469,8 @@ class Public_Content {
 			if ( preg_match( "/\\sid=(['\"])([^'\"]+)\\1/i", $match[2], $id_match ) ) {
 				$id = sanitize_title( $id_match[2] );
 			}
-			$base = $id ?: sanitize_title( $text );
-			$base = $base ?: 'section';
+			$base = $id ? $id : sanitize_title( $text );
+			$base = $base ? $base : 'section';
 			$id   = $base;
 			$i    = 2;
 			while ( isset( $used[ $id ] ) ) {
@@ -450,7 +487,13 @@ class Public_Content {
 		return $headings;
 	}
 
-	/** Build select options. */
+	/**
+	 * Build select options.
+	 *
+	 * @param array  $options  Map of option values to labels.
+	 * @param string $selected Currently selected value.
+	 * @return string Rendered option markup.
+	 */
 	public static function options( array $options, string $selected ): string {
 		$html = '';
 		foreach ( $options as $value => $label ) {
@@ -459,14 +502,27 @@ class Public_Content {
 		return $html;
 	}
 
-	/** Join price-check date and region without emitting empty punctuation. */
+	/**
+	 * Join price-check date and region without emitting empty punctuation.
+	 *
+	 * @param int    $post_id    Post ID to read metadata from.
+	 * @param string $date_key   Meta key holding the price-check date.
+	 * @param string $region_key Meta key holding the price region.
+	 * @return string Joined context string, possibly empty.
+	 */
 	public static function checked_context( int $post_id, string $date_key, string $region_key ): string {
 		$date   = trim( (string) get_post_meta( $post_id, $date_key, true ) );
 		$region = trim( (string) get_post_meta( $post_id, $region_key, true ) );
 		return implode( ' · ', array_filter( array( $date, $region ) ) );
 	}
 
-	/** Return a page-unique heading ID. */
+	/**
+	 * Return a page-unique heading ID.
+	 *
+	 * @param string $component Component slug used as the ID prefix.
+	 * @param int    $post_id   Post ID the component renders for.
+	 * @return string Unique element ID.
+	 */
 	public static function unique_id( string $component, int $post_id ): string {
 		$key                           = $component . '-' . $post_id;
 		self::$instance_counts[ $key ] = ( self::$instance_counts[ $key ] ?? 0 ) + 1;

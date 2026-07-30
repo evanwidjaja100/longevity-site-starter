@@ -11,7 +11,11 @@ defined( 'ABSPATH' ) || exit;
 
 /** Renders article meta, trust summary, medical disclaimer, reviewer card. */
 class Public_Trust {
-	/** Render author and editorial dates. */
+	/**
+	 * Render author and editorial dates.
+	 *
+	 * @param int $post_id Post ID to render meta for.
+	 */
 	public static function render_article_meta( int $post_id ): string {
 		if ( $post_id <= 0 || ! get_post( $post_id ) ) {
 			return '';
@@ -52,6 +56,7 @@ class Public_Trust {
 		if ( $fact_date && $fact_user && Approval_Service::is_current( $post_id, 'fact_check' ) ) {
 			$html .= '<span class="longevity-meta-factcheck">' . sprintf( '<span class="longevity-meta-label">%s</span> <a href="%s">%s</a> <time datetime="%s">%s</time>', esc_html__( 'Fact-checked by', 'longevity-core' ), esc_url( get_author_posts_url( $fact_user ) ), esc_html( get_the_author_meta( 'display_name', $fact_user ) ), esc_attr( $fact_date ), esc_html( $fact_date ) ) . '</span>';
 		}
+		// translators: %s: number of minutes of estimated reading time.
 		$html .= '<span class="longevity-meta-reading">' . sprintf( '<span class="longevity-meta-label">%s</span> %s', esc_html__( 'Reading time', 'longevity-core' ), esc_html( sprintf( _n( '%s min', '%s min', $reading_time, 'longevity-core' ), number_format_i18n( $reading_time ) ) ) ) . '</span>';
 		if ( 'none' !== $correction ) {
 			$labels = array(
@@ -67,7 +72,11 @@ class Public_Trust {
 		return $html . '</div>';
 	}
 
-	/** Render evidence, scope, limitations, and commercial relationship. */
+	/**
+	 * Render evidence, scope, limitations, and commercial relationship.
+	 *
+	 * @param int $post_id Post ID to render the trust summary for.
+	 */
 	public static function render_trust_summary( int $post_id ): string {
 		if ( $post_id <= 0 ) {
 			return '';
@@ -97,6 +106,7 @@ class Public_Trust {
 				'D' => __( 'Mechanistic or anecdotal', 'longevity-core' ),
 				'U' => __( 'Unclear', 'longevity-core' ),
 			);
+			// translators: %s: plain-language evidence-grade confidence label.
 			$html        .= '<div class="longevity-evidence-grade"><span class="longevity-badge" data-grade="' . esc_attr( $grade ) . '">' . esc_html( sprintf( __( 'Confidence in the main conclusion: %s', 'longevity-core' ), $grade_labels[ $grade ] ?? __( 'Unclassified', 'longevity-core' ) ) ) . '</span>';
 			if ( $rationale ) {
 				$html .= '<p>' . esc_html( $rationale ) . '</p>';
@@ -117,7 +127,11 @@ class Public_Trust {
 		return $html . '</section>';
 	}
 
-	/** Render verified scoped reviewer identity. */
+	/**
+	 * Render verified scoped reviewer identity.
+	 *
+	 * @param int $post_id Post ID whose medical reviewer is rendered.
+	 */
 	public static function render_reviewer_card( int $post_id ): string {
 		if ( $post_id <= 0 || ! Approval_Service::is_current( $post_id, 'medical' ) ) {
 			return '';
@@ -152,7 +166,11 @@ class Public_Trust {
 		return '<aside class="longevity-medical-disclaimer" role="note"><strong>' . esc_html__( 'Medical disclaimer:', 'longevity-core' ) . '</strong> ' . esc_html__( 'This material is educational and does not replace individualized advice, diagnosis, or treatment from a qualified healthcare professional. Seek professional guidance before changing medication, supplements, diet, or exercise—especially if pregnant, managing a health condition, or preparing for a procedure.', 'longevity-core' ) . '</aside>';
 	}
 
-	/** Render the legacy review box without changing its public contract. */
+	/**
+	 * Render the legacy review box without changing its public contract.
+	 *
+	 * @param array $atts Shortcode attributes (score, best_for, tested).
+	 */
 	public static function render_legacy_review_box( array $atts ): string {
 		$html = '<aside class="longevity-review-box" aria-label="' . esc_attr__( 'Review summary', 'longevity-core' ) . '">';
 		if ( '' !== (string) ( $atts['score'] ?? '' ) ) {
@@ -168,7 +186,11 @@ class Public_Trust {
 		return $html . '</aside>';
 	}
 
-	/** Human-readable, deliberately scoped medical-review label. */
+	/**
+	 * Human-readable, deliberately scoped medical-review label.
+	 *
+	 * @param string $scope Stored medical-review scope key.
+	 */
 	private static function scope_label( string $scope ): string {
 		$labels = array(
 			'full_article'            => __( 'Medically reviewed for the full article scope recorded by the reviewer.', 'longevity-core' ),

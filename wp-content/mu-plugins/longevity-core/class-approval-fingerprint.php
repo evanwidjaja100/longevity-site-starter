@@ -13,18 +13,32 @@ defined( 'ABSPATH' ) || exit;
 final class Approval_Fingerprint {
 	public const SCHEMA_VERSION = '1.1.0';
 
-	/** Canonical JSON for hashing. */
+	/**
+	 * Canonical JSON for hashing.
+	 *
+	 * @param mixed $value Structured value to canonicalize.
+	 */
 	public static function canonical_json( $value ): string {
 		$normalized = self::normalize( $value );
 		return (string) wp_json_encode( $normalized, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION );
 	}
 
-	/** Hash arbitrary structured data. */
+	/**
+	 * Hash arbitrary structured data.
+	 *
+	 * @param mixed $value Structured value to hash.
+	 */
 	public static function hash( $value ): string {
 		return hash( 'sha256', self::canonical_json( $value ) );
 	}
 
-	/** Build all hashes for an approval type. */
+	/**
+	 * Build all hashes for an approval type.
+	 *
+	 * @param int    $post_id       Post ID under review.
+	 * @param string $approval_type Approval type key.
+	 * @param array  $prospective   Prospective request-state overrides.
+	 */
 	public static function build( int $post_id, string $approval_type, array $prospective = array() ): array {
 		$content                 = self::content_payload( $post_id, $prospective );
 		$governed                = self::governed_meta_payload( $post_id, $approval_type, $prospective );
@@ -43,7 +57,12 @@ final class Approval_Fingerprint {
 		return $hashes;
 	}
 
-	/** Common reviewed content payload. */
+	/**
+	 * Common reviewed content payload.
+	 *
+	 * @param int   $post_id     Post ID under review.
+	 * @param array $prospective Prospective request-state overrides.
+	 */
 	private static function content_payload( int $post_id, array $prospective = array() ): array {
 		$post = get_post( $post_id );
 		if ( ! $post ) {
@@ -68,7 +87,13 @@ final class Approval_Fingerprint {
 		);
 	}
 
-	/** Explicit allowlist of metadata governed by each approval. */
+	/**
+	 * Explicit allowlist of metadata governed by each approval.
+	 *
+	 * @param int    $post_id       Post ID under review.
+	 * @param string $approval_type Approval type key.
+	 * @param array  $prospective   Prospective request-state overrides.
+	 */
 	private static function governed_meta_payload( int $post_id, string $approval_type, array $prospective = array() ): array {
 		$common = array( 'content_summary', 'content_scope', 'content_limitations', 'original_contribution', 'region_scope', 'material_health_claims', 'evidence_grade', 'evidence_grade_rationale', 'evidence_cutoff_date', 'uncertainty_statement_present' );
 		$maps   = array(
@@ -89,7 +114,13 @@ final class Approval_Fingerprint {
 		return $data;
 	}
 
-	/** Approval-specific dependent records. */
+	/**
+	 * Approval-specific dependent records.
+	 *
+	 * @param int    $post_id       Post ID under review.
+	 * @param string $approval_type Approval type key.
+	 * @param array  $prospective   Prospective request-state overrides.
+	 */
 	private static function dependency_payload( int $post_id, string $approval_type, array $prospective = array() ): array {
 		if ( in_array( $approval_type, array( 'fact_check', 'medical' ), true ) ) {
 			$data = self::claim_dependency_payload( $post_id );
@@ -127,7 +158,11 @@ final class Approval_Fingerprint {
 		return array();
 	}
 
-	/** Snapshot normalized affiliate destinations and the registry records that govern them. */
+	/**
+	 * Snapshot normalized affiliate destinations and the registry records that govern them.
+	 *
+	 * @param string $content Post content to scan for affiliate destinations.
+	 */
 	private static function affiliate_dependency_payload( string $content ): array {
 		$urls = array();
 		if ( function_exists( 'get_shortcode_regex' ) && preg_match_all( '/' . get_shortcode_regex( array( 'affiliate_link' ) ) . '/s', $content, $matches, PREG_SET_ORDER ) ) {
@@ -160,7 +195,11 @@ final class Approval_Fingerprint {
 		return $data;
 	}
 
-	/** Snapshot claim and linked-source inputs used by every public approval. */
+	/**
+	 * Snapshot claim and linked-source inputs used by every public approval.
+	 *
+	 * @param int $post_id Post ID whose linked claims are snapshotted.
+	 */
 	private static function claim_dependency_payload( int $post_id ): array {
 		// Complete retrieval: every linked claim participates in the fingerprint.
 		$claim_ids     = Governed_Query::ids_by_meta( array( 'lel_claim' ), 'post_id', (string) $post_id );
@@ -190,7 +229,12 @@ final class Approval_Fingerprint {
 		return $data;
 	}
 
-	/** Read an explicit subset of metadata. */
+	/**
+	 * Read an explicit subset of metadata.
+	 *
+	 * @param int      $post_id Post ID to read metadata from.
+	 * @param string[] $keys    Meta keys to include.
+	 */
 	private static function post_meta_subset( int $post_id, array $keys ): array {
 		$data = array();
 		foreach ( $keys as $key ) {
@@ -199,7 +243,13 @@ final class Approval_Fingerprint {
 		return $data;
 	}
 
-	/** Read a post meta value from the prospective request state when supplied. */
+	/**
+	 * Read a post meta value from the prospective request state when supplied.
+	 *
+	 * @param int    $post_id     Post ID to read metadata from.
+	 * @param string $key         Meta key to read.
+	 * @param array  $prospective Prospective request-state overrides.
+	 */
 	private static function prospective_meta( int $post_id, string $key, array $prospective ) {
 		if ( isset( $prospective['meta'] ) && is_array( $prospective['meta'] ) && array_key_exists( $key, $prospective['meta'] ) ) {
 			return $prospective['meta'][ $key ];
@@ -207,7 +257,11 @@ final class Approval_Fingerprint {
 		return get_post_meta( $post_id, $key, true );
 	}
 
-	/** Recursively normalize maps, line endings, objects and numeric keys. */
+	/**
+	 * Recursively normalize maps, line endings, objects and numeric keys.
+	 *
+	 * @param mixed $value Value to normalize recursively.
+	 */
 	private static function normalize( $value ) {
 		if ( is_string( $value ) ) {
 			return str_replace( array( "\r\n", "\r" ), "\n", $value );

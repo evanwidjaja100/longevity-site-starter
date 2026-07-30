@@ -27,7 +27,15 @@ final class Corrections {
 		add_filter( 'delete_post_metadata', array( self::class, 'prevent_direct_status_delete' ), 10, 5 );
 	}
 
-	/** Block direct writes to correction_status. Use transition() instead. */
+	/**
+	 * Block direct writes to correction_status. Use transition() instead.
+	 *
+	 * @param bool|null $check      Short-circuit value from the filter chain (null to proceed).
+	 * @param int       $object_id  Post ID whose meta is being written.
+	 * @param string    $meta_key   Meta key being written.
+	 * @param mixed     $meta_value Proposed meta value.
+	 * @return bool|null Unchanged short-circuit value, or false to block the write.
+	 */
 	public static function prevent_direct_status_write( ?bool $check, int $object_id, string $meta_key, $meta_value ): ?bool {
 		if ( 'correction_status' === $meta_key && 'lel_correction' === get_post_type( $object_id ) ) {
 			$current = get_post_meta( $object_id, 'correction_status', true );
@@ -38,12 +46,27 @@ final class Corrections {
 		return $check;
 	}
 
-	/** Check if a status transition is valid. */
+	/**
+	 * Check if a status transition is valid.
+	 *
+	 * @param string $from Current correction status.
+	 * @param string $to   Candidate next status.
+	 * @return bool True when the transition is permitted.
+	 */
 	public static function transition_is_allowed( string $from, string $to ): bool {
 		return in_array( $to, self::VALID_TRANSITIONS[ $from ] ?? array(), true );
 	}
 
-	/** Block direct add of correction_status. Use transition() instead. */
+	/**
+	 * Block direct add of correction_status. Use transition() instead.
+	 *
+	 * @param bool|null $check      Short-circuit value from the filter chain (null to proceed).
+	 * @param int       $object_id  Post ID whose meta is being added.
+	 * @param string    $meta_key   Meta key being added.
+	 * @param mixed     $meta_value Proposed meta value.
+	 * @param bool      $unique     Whether the key must be unique.
+	 * @return bool|null Unchanged short-circuit value, or false to block the add.
+	 */
 	public static function prevent_direct_status_add( ?bool $check, int $object_id, string $meta_key, $meta_value, bool $unique ): ?bool {
 		unset( $unique );
 		if ( 'correction_status' === $meta_key && 'lel_correction' === get_post_type( $object_id ) ) {
@@ -52,7 +75,16 @@ final class Corrections {
 		return $check;
 	}
 
-	/** Block direct delete of correction_status. Use transition() instead. */
+	/**
+	 * Block direct delete of correction_status. Use transition() instead.
+	 *
+	 * @param bool|null $check         Short-circuit value from the filter chain (null to proceed).
+	 * @param int       $object_id     Post ID whose meta is being deleted.
+	 * @param string    $meta_key      Meta key being deleted.
+	 * @param mixed     $meta_value    Meta value passed to the delete filter.
+	 * @param int|null  $object_id_ref Optional meta row ID passed by the filter.
+	 * @return bool|null Unchanged short-circuit value, or false to block the delete.
+	 */
 	public static function prevent_direct_status_delete( ?bool $check, int $object_id, string $meta_key, $meta_value, ?int $object_id_ref = null ): ?bool {
 		unset( $meta_value, $object_id_ref );
 		if ( 'correction_status' === $meta_key && 'lel_correction' === get_post_type( $object_id ) ) {
@@ -61,7 +93,12 @@ final class Corrections {
 		return $check;
 	}
 
-	/** Return the list of allowed next statuses. */
+	/**
+	 * Return the list of allowed next statuses.
+	 *
+	 * @param string|null $current Current status, or null for all defined statuses.
+	 * @return array List of allowed next status slugs.
+	 */
 	public static function allowed_next_statuses( ?string $current = null ): array {
 		if ( null === $current ) {
 			return array_keys( self::VALID_TRANSITIONS );
@@ -105,7 +142,14 @@ final class Corrections {
 		}
 	}
 
-	/** Transition a correction to a new status with validation. */
+	/**
+	 * Transition a correction to a new status with validation.
+	 *
+	 * @param int    $post_id    Correction post ID.
+	 * @param string $new_status Target correction status.
+	 * @param int    $actor_id   User ID performing the transition.
+	 * @return bool True when the transition and audit write succeed.
+	 */
 	public static function transition( int $post_id, string $new_status, int $actor_id ): bool {
 		if ( $actor_id <= 0 || ! function_exists( 'user_can' ) || ! user_can( $actor_id, 'manage_corrections' ) ) {
 			Audit_Log::record(
@@ -214,7 +258,12 @@ final class Corrections {
 		return true;
 	}
 
-	/** Whether a completed correction's snapshot still matches its stored state. */
+	/**
+	 * Whether a completed correction's snapshot still matches its stored state.
+	 *
+	 * @param int $post_id Correction post ID.
+	 * @return bool True when the stored snapshot hash matches current state.
+	 */
 	public static function completion_snapshot_valid( int $post_id ): bool {
 		$stored_hash = (string) get_post_meta( $post_id, 'completion_snapshot_hash', true );
 		if ( '' === $stored_hash ) {
@@ -236,7 +285,12 @@ final class Corrections {
 		return hash_equals( $stored_hash, hash( 'sha256', Approval_Fingerprint::canonical_json( $snapshot ) ) );
 	}
 
-	/** Get completed material corrections for a post with valid snapshots. */
+	/**
+	 * Get completed material corrections for a post with valid snapshots.
+	 *
+	 * @param int $post_id Corrected (parent) post ID.
+	 * @return array List of correction post objects with intact snapshots.
+	 */
 	public static function public_records( int $post_id ): array {
 		$records = get_posts(
 			array(
@@ -267,7 +321,12 @@ final class Corrections {
 		return array_values( array_filter( $records, static fn( $record ) => self::completion_snapshot_valid( $record->ID ) ) );
 	}
 
-	/** Render public correction history. */
+	/**
+	 * Render public correction history.
+	 *
+	 * @param int $post_id Corrected (parent) post ID.
+	 * @return string HTML markup, or an empty string when there are no records.
+	 */
 	public static function render( int $post_id ): string {
 		$records = self::public_records( $post_id );
 		if ( empty( $records ) ) {
@@ -285,7 +344,13 @@ final class Corrections {
 		return $html . '</ol></section>';
 	}
 
-	/** Sanitize correction values. */
+	/**
+	 * Sanitize correction values.
+	 *
+	 * @param string $rule  Sanitization rule key.
+	 * @param mixed  $value Raw value to sanitize.
+	 * @return mixed Sanitized value.
+	 */
 	private static function sanitize( string $rule, $value ) {
 		if ( 'category' === $rule ) {
 			$value = sanitize_key( (string) $value );

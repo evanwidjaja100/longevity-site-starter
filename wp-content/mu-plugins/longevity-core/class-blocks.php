@@ -11,7 +11,11 @@ defined( 'ABSPATH' ) || exit;
 
 /** Registers editor blocks that share the public component renderer. */
 final class Blocks {
-	/** @var array<string, array{0:string,1:string}> */
+	/**
+	 * Block slug to shared public component renderer callback map.
+	 *
+	 * @var array<string, array{0:string,1:string}>
+	 */
 	private const RENDERERS = array(
 		'article-meta'           => array( Public_Trust::class, 'render_article_meta' ),
 		'trust-summary'          => array( Public_Trust::class, 'render_trust_summary' ),

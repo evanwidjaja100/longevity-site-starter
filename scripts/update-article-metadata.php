@@ -136,12 +136,10 @@ $articles = array(
 );
 
 $updated = 0;
-// phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited
-$errors = array();
+$meta_errors = array();
 
 foreach ( $articles as $article ) {
-// phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited
-	$posts = get_posts(
+	$post_matches = get_posts(
 		array(
 			'name'           => $article['post_name'],
 			'post_type'      => 'post',
@@ -150,17 +148,16 @@ foreach ( $articles as $article ) {
 			'no_found_rows'  => true,
 		)
 	);
-// phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited
-	$post = ! empty( $posts ) ? $posts[0] : null;
-	if ( ! $post ) {
-		$errors[] = "Post not found: /{$article['post_name']}/";
+	$target_post = ! empty( $post_matches ) ? $post_matches[0] : null;
+	if ( ! $target_post ) {
+		$meta_errors[] = "Post not found: /{$article['post_name']}/";
 		\WP_CLI::warning( "Post not found: /{$article['post_name']}/" );
 		continue;
 	}
 
 	$dry_run = in_array( 'dry-run', $args ?? array(), true );
 	if ( $dry_run ) {
-		\WP_CLI::line( "[DRY RUN] Would update metadata for /{$article['post_name']}/ (ID {$post->ID})" );
+		\WP_CLI::line( "[DRY RUN] Would update metadata for /{$article['post_name']}/ (ID {$target_post->ID})" );
 		foreach ( $article['meta'] as $key => $value ) {
 			\WP_CLI::line( "  → {$key}: {$value}" );
 		}
@@ -169,20 +166,20 @@ foreach ( $articles as $article ) {
 	}
 
 	foreach ( array_keys( $article['meta'] ) as $key ) {
-		if ( ! Meta_Authorization::can_write( $key, $post->ID, get_current_user_id(), 'cli' ) ) {
-			\WP_CLI::error( sprintf( 'Current user is not authorized to update %s on post %d.', $key, $post->ID ) );
+		if ( ! Meta_Authorization::can_write( $key, $target_post->ID, get_current_user_id(), 'cli' ) ) {
+			\WP_CLI::error( sprintf( 'Current user is not authorized to update %s on post %d.', $key, $target_post->ID ) );
 		}
 	}
 	foreach ( $article['meta'] as $key => $value ) {
-		update_post_meta( $post->ID, $key, $value );
+		update_post_meta( $target_post->ID, $key, $value );
 	}
 
-	\WP_CLI::line( "Updated metadata for /{$article['post_name']}/ (ID {$post->ID})" );
+	\WP_CLI::line( "Updated metadata for /{$article['post_name']}/ (ID {$target_post->ID})" );
 	++$updated;
 }
 
-\WP_CLI::success( sprintf( 'Done: %d article(s) updated, %d error(s).', $updated, count( $errors ) ) );
+\WP_CLI::success( sprintf( 'Done: %d article(s) updated, %d error(s).', $updated, count( $meta_errors ) ) );
 \WP_CLI::warning( 'No editorial approval snapshot was created. Records remain in editorial_review until a human approver uses the approval workflow.' );
-if ( $errors ) {
+if ( $meta_errors ) {
 	\WP_CLI::halt( 1 );
 }

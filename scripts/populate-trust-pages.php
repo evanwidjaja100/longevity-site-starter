@@ -42,34 +42,32 @@ $page_map = array(
 	'ai-assisted-work-disclosure.md' => 'ai-assisted-work-disclosure',
 );
 
-$updated = 0;
-// phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited
-$errors = array();
+$updated     = 0;
+$seed_errors = array();
 
 foreach ( $page_map as $filename => $slug ) {
 	$filepath = $template_dir . '/' . $filename;
 
 	if ( ! file_exists( $filepath ) ) {
-	// phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited
-		$errors[] = "Template not found: {$filename}";
+		$seed_errors[] = "Template not found: {$filename}";
 		\WP_CLI::warning( "Template not found: {$filepath}" );
 		continue;
 	}
 
 	$markdown = file_get_contents( $filepath );
 	if ( false === $markdown || '' === trim( $markdown ) ) {
-		$errors[] = "Empty template: {$filename}";
+		$seed_errors[] = "Empty template: {$filename}";
 		\WP_CLI::warning( "Empty template: {$filepath}" );
 		continue;
 	}
 
 	if ( Trust_Pages::has_placeholders( $markdown ) ) {
-		$errors[] = "Placeholder markers remain in template: {$filename}";
+		$seed_errors[] = "Placeholder markers remain in template: {$filename}";
 		\WP_CLI::warning( "Template {$filename} still contains placeholder markers ([date], TODO, etc.). Fix the template before seeding." );
 		continue;
 	}
 
-	$posts = get_posts(
+	$page_matches = get_posts(
 		array(
 			'name'           => $slug,
 			'post_type'      => 'page',
@@ -78,14 +76,14 @@ foreach ( $page_map as $filename => $slug ) {
 			'no_found_rows'  => true,
 		)
 	);
-	$post  = ! empty( $posts ) ? $posts[0] : null;
-	if ( ! $post ) {
-		$errors[] = "Page not found by slug: {$slug}";
+	$page_post    = ! empty( $page_matches ) ? $page_matches[0] : null;
+	if ( ! $page_post ) {
+		$seed_errors[] = "Page not found by slug: {$slug}";
 		\WP_CLI::warning( "Page /{$slug}/ does not exist. Run bootstrap first." );
 		continue;
 	}
 
-	$protected = 'publish' === $post->post_status || Trust_Pages::is_approved( (int) $post->ID );
+	$protected = 'publish' === $page_post->post_status || Trust_Pages::is_approved( (int) $page_post->ID );
 	if ( $protected && ! $force ) {
 		\WP_CLI::warning( "Skipping /{$slug}/: page is published or carries a current trust approval. Re-run with --force after reviewing the diff." );
 		continue;
@@ -93,42 +91,45 @@ foreach ( $page_map as $filename => $slug ) {
 
 	$html = convert_markdown_to_blocks( $markdown );
 
-	if ( $html === (string) $post->post_content ) {
-		\WP_CLI::line( "Unchanged /{$slug}/ (ID {$post->ID}); skipping." );
+	if ( $html === (string) $page_post->post_content ) {
+		\WP_CLI::line( "Unchanged /{$slug}/ (ID {$page_post->ID}); skipping." );
 		continue;
 	}
 
 	if ( $dry_run ) {
-		\WP_CLI::line( "[DRY RUN] Would update /{$slug}/ (ID {$post->ID}) with content from {$filename}" . ( $protected ? ' (FORCED overwrite of approved/published page)' : '' ) );
+		\WP_CLI::line( "[DRY RUN] Would update /{$slug}/ (ID {$page_post->ID}) with content from {$filename}" . ( $protected ? ' (FORCED overwrite of approved/published page)' : '' ) );
 		++$updated;
 		continue;
 	}
 
 	$result = wp_update_post(
 		array(
-			'ID'           => $post->ID,
+			'ID'           => $page_post->ID,
 			'post_content' => $html,
 		),
 		true
 	);
 
 	if ( is_wp_error( $result ) ) {
-		$errors[] = "Failed to update /{$slug}/: " . $result->get_error_message();
+		$seed_errors[] = "Failed to update /{$slug}/: " . $result->get_error_message();
 		\WP_CLI::warning( "Failed to update /{$slug}/: " . $result->get_error_message() );
 		continue;
 	}
 
-	\WP_CLI::line( "Updated /{$slug}/ (ID {$post->ID}) with content from {$filename}. A named human trust-page approval is required before publication." );
+	\WP_CLI::line( "Updated /{$slug}/ (ID {$page_post->ID}) with content from {$filename}. A named human trust-page approval is required before publication." );
 	++$updated;
 }
 
-\WP_CLI::success( sprintf( 'Done: %d page(s) updated, %d error(s).', $updated, count( $errors ) ) );
-if ( $errors ) {
+\WP_CLI::success( sprintf( 'Done: %d page(s) updated, %d error(s).', $updated, count( $seed_errors ) ) );
+if ( $seed_errors ) {
 	\WP_CLI::halt( 1 );
 }
 
 /**
  * Convert markdown content to basic WordPress block HTML.
+ *
+ * @param string $markdown Raw markdown template contents.
+ * @return string WordPress block markup.
  */
 function convert_markdown_to_blocks( string $markdown ): string {
 	$lines      = explode( "\n", $markdown );
@@ -140,12 +141,12 @@ function convert_markdown_to_blocks( string $markdown ): string {
 	foreach ( $lines as $line ) {
 		$trimmed = trim( $line );
 
-		// Skip front-matter lines (--- ... ---)
+		// Skip front-matter lines (--- ... ---).
 		if ( '---' === $trimmed ) {
 			continue;
 		}
 
-		// Close any open list
+		// Close any open list.
 		if ( $in_list && ( '' === $trimmed || str_starts_with( $trimmed, '#' ) || str_starts_with( $trimmed, '|' ) ) ) {
 			$blocks[]   = render_list( $list_tag, $list_items );
 			$list_items = array();
@@ -156,7 +157,7 @@ function convert_markdown_to_blocks( string $markdown ): string {
 			continue;
 		}
 
-		// Heading
+		// Heading.
 		if ( str_starts_with( $trimmed, '## ' ) ) {
 			$text     = esc_html( trim( substr( $trimmed, 3 ) ) );
 			$blocks[] = '<!-- wp:heading --><h2 class="wp-block-heading">' . $text . '</h2><!-- /wp:heading -->';
@@ -172,10 +173,10 @@ function convert_markdown_to_blocks( string $markdown ): string {
 			continue;
 		}
 
-		// Table row
+		// Table row.
 		if ( str_starts_with( $trimmed, '|' ) ) {
 			$cells = array_map( 'trim', explode( '|', trim( $trimmed, '|' ) ) );
-			// Skip separator rows (|---|)
+			// Skip separator rows (|---|).
 			if ( preg_match( '/^[:\s\-|]+$/', $trimmed ) ) {
 				continue;
 			}
@@ -190,7 +191,7 @@ function convert_markdown_to_blocks( string $markdown ): string {
 			continue;
 		}
 
-		// List item
+		// List item.
 		if ( str_starts_with( $trimmed, '- ' ) || str_starts_with( $trimmed, '* ' ) ) {
 			if ( ! $in_list ) {
 				$in_list  = true;
@@ -210,23 +211,23 @@ function convert_markdown_to_blocks( string $markdown ): string {
 			continue;
 		}
 
-		// Horizontal rule
+		// Horizontal rule.
 		if ( str_starts_with( $trimmed, '---' ) ) {
 			$blocks[] = '<!-- wp:separator --><hr class="wp-block-separator has-alpha-channel-opacity"/><!-- /wp:separator -->';
 			continue;
 		}
 
-		// Paragraph
+		// Paragraph.
 		$text     = convert_inline_markdown( $trimmed );
 		$blocks[] = '<!-- wp:paragraph --><p>' . $text . '</p><!-- /wp:paragraph -->';
 	}
 
-	// Close any remaining list
+	// Close any remaining list.
 	if ( $in_list && ! empty( $list_items ) ) {
 		$blocks[] = render_list( $list_tag, $list_items );
 	}
 
-	// Render any accumulated table
+	// Render any accumulated table.
 	if ( ! empty( $GLOBALS['_table_header'] ) || ! empty( $GLOBALS['_table_rows'] ) ) {
 		$blocks[] = render_table( $GLOBALS['_table_header'] ?? array(), $GLOBALS['_table_rows'] ?? array() );
 	}
@@ -238,20 +239,27 @@ function convert_markdown_to_blocks( string $markdown ): string {
 
 /**
  * Convert inline markdown (bold, italic, links).
+ *
+ * @param string $text Inline markdown text to convert.
+ * @return string HTML with inline formatting applied.
  */
 function convert_inline_markdown( string $text ): string {
 	$text = esc_html( $text );
-	// Bold
+	// Bold.
 	$text = preg_replace( '/\*\*(.+?)\*\*/', '<strong>$1</strong>', $text );
-	// Italic
+	// Italic.
 	$text = preg_replace( '/\*(.+?)\*/', '<em>$1</em>', $text );
-	// Links
+	// Links.
 	$text = preg_replace( '/\[([^\]]+)\]\(([^)]+)\)/', '<a href="$2">$1</a>', $text );
 	return $text;
 }
 
 /**
  * Render a list block.
+ *
+ * @param string $tag   List tag, either ul or ol.
+ * @param array  $items List item HTML strings.
+ * @return string WordPress list block markup.
  */
 function render_list( string $tag, array $items ): string {
 	$html = '<!-- wp:list --><' . $tag . '>';
@@ -264,6 +272,10 @@ function render_list( string $tag, array $items ): string {
 
 /**
  * Render a table block.
+ *
+ * @param array $header Header cell values.
+ * @param array $rows   Row arrays of cell values.
+ * @return string WordPress table block markup.
  */
 function render_table( array $header, array $rows ): string {
 	$html = '<!-- wp:table --><figure class="wp-block-table"><table><thead><tr>';
