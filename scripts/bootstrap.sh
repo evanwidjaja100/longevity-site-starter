@@ -72,44 +72,16 @@ wp option update blog_public 0 --allow-root
 wp plugin delete akismet hello --allow-root 2>/dev/null || true
 wp theme delete twentytwentyfive twentytwentyfour twentytwentythree --allow-root 2>/dev/null || true
 
-create_page() {
-  title=$1
-  slug=$2
-  status=$3
-  content=$4
-  page_id=$(wp post list --post_type=page --name="$slug" --field=ID --allow-root | head -n1 || true)
-  if [ -z "$page_id" ]; then
-    wp post create --post_type=page --post_status="$status" --post_title="$title" --post_name="$slug" --post_content="$content" --porcelain --allow-root
-  else
-    printf '%s' "$page_id"
-  fi
-}
+# The canonical application bootstrap. Pages, categories, and draft launch
+# records are defined once in longevity-core (Bootstrap_Command) and mirrored
+# by the route-state contract in config/routes.json. The command is
+# idempotent: a second run creates nothing and changes no approval data.
+wp longevity bootstrap all --allow-root
 
-home_content='<!-- wp:heading {"level":1} --><h1>Evaluate health practices and consumer products with better evidence.</h1><!-- /wp:heading --><!-- wp:paragraph {"fontSize":"large"} --><p class="has-large-font-size">Transparent evidence reviews, reproducible testing methods, and clearly stated uncertainty without individualized medical advice or guaranteed longevity outcomes.</p><!-- /wp:paragraph --><!-- wp:buttons --><div class="wp-block-buttons"><!-- wp:button --><div class="wp-block-button"><a class="wp-block-button__link wp-element-button" href="/editorial-policy/">Read our editorial standards</a></div><!-- /wp:button --></div><!-- /wp:buttons -->'
-home_id=$(create_page 'Start Here' 'start-here' publish "$home_content")
-
-editorial_content=$(cat /project-content/editorial-policy.md)
-medical_content=$(cat /project-policies/medical-disclaimer.md)
-affiliate_content=$(cat /project-policies/affiliate-disclosure.md)
-corrections_content=$(cat /project-content/governance/corrections-policy.md)
-testing_content=$(cat /project-content/testing/wearables-protocol.md; printf '\n\n'; cat /project-content/testing/consumer-apps-protocol.md; printf '\n\n'; cat /project-content/testing/home-equipment-protocol.md)
-
-create_page 'About' 'about' draft 'Document ownership, funding, named team members, and governance before publication.' >/dev/null
-create_page 'Editorial Policy' 'editorial-policy' draft "$editorial_content" >/dev/null
-create_page 'Medical Disclaimer' 'medical-disclaimer' draft "$medical_content" >/dev/null
-create_page 'Affiliate Disclosure' 'affiliate-disclosure' draft "$affiliate_content" >/dev/null
-create_page 'Corrections' 'corrections' draft "$corrections_content" >/dev/null
-create_page 'Testing Methodology' 'testing-methodology' draft "$testing_content" >/dev/null
-create_page 'Privacy' 'privacy' draft 'Replace this staging page with jurisdiction-reviewed privacy language that reflects the actual vendors and consent configuration.' >/dev/null
-create_page 'Terms' 'terms' draft 'Add jurisdiction-reviewed terms before production publication.' >/dev/null
-create_page 'Contact' 'contact' draft 'Add monitored editorial, corrections, privacy, and commercial contact channels before production publication.' >/dev/null
-
-wp option update show_on_front page --allow-root
-wp option update page_on_front "$home_id" --allow-root
-
-# Categories are managed by the wp longevity bootstrap categories CLI command
-# (defined in longevity-core). This replaces the old shell-based category creation.
-wp longevity bootstrap categories --allow-root
+# Seed draft trust pages with content from the Git templates. Templates are
+# one-time seeds; the script refuses to overwrite a published or approved
+# page, and publication still requires a named human trust-page approval.
+wp eval-file /scripts/populate-trust-pages.php --user="$WP_ADMIN_USER" --allow-root
 
 if [ "${INSTALL_OPTIONAL_PLUGINS:-0}" = "1" ]; then
   wp plugin install wordpress-seo --activate --allow-root || true

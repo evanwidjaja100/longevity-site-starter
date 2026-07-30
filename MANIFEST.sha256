@@ -14,7 +14,7 @@ cfa2d75ad28f3e20e39f11a15277753a396d2fea81caf1094bf9eb31a2bd1c7c *./.npmrc
 0ea49aabac398228480e719c9615cc3d699a3b20a61be5b317bcbc578b6c1fa6 *./CONTRIBUTING.md
 9447d2299312b00b25a3214d7fcaab49e6f16000ff1b8135b7a46f772da5f16d *./Makefile
 0bd836107a3f6a9dded936a4b050bbf63cf4c558574864cb35fc323f88593555 *./README.md
-fb83a00039993c7c8e055c3ea43980f4e3aa081f19ae65afd13b234e242171f5 *./compose.yaml
+cf959aa3bcd6daf2f2a051458a8a0d5ebafb41b69069a6cbef19e06475632463 *./compose.yaml
 28e58d12ac53bd4320519f343ff3a9d1db6909f15d080c03447473e9c3a294a2 *./composer.json
 5b2377b9a63ada5f82ac2a87972cd50c64501430ec4c0141e009727ff4ad72a0 *./composer.lock
 af08fcf5d1cb826d1898a66f43770bc62c73a7ee410431d21e1fd5e6bb5c872e *./config/content-schema/editorial-meta.schema.json
@@ -281,12 +281,12 @@ b8a2aaa2a0692057c6bc789b6ebbb3b86df5c25518dc946992e1341446e79614 *./policies/med
 57060917b4fac61ab8910a78f51556f396122ef76c78cab116cfd885ad69c300 *./scripts/acceptance-test.sh
 6803da6778ebb1a78fbfa748887c0b0b18ae0f1b418624f1a09b43b1c7e4b11c *./scripts/alert-notify.sh
 b1eb5ae9753d5ca1b30782be85fea4bdfe1ef9b3391e5185fd0b572492e72347 *./scripts/backup-example.sh
-1861ab69f23a2b6ef663b64e13f5ac5555e65c7ac1f5807b973c090907411d47 *./scripts/bootstrap.sh
+f667bfcaee8cc192e7e78e0b1d163c9880af6a92b9f7b5789e4b4ff075f19e3d *./scripts/bootstrap.sh
 0dbbe740164398058d896146e6f72bc26280ef2757dc6f8876b3e7d992b214ac *./scripts/build-release-artifact.sh
 077b542b1666097128f9f1194ceca3cacaea7f1ab58fc81ec03820d8d7a04c93 *./scripts/ci-generate-env.sh
-2cc35585fea1586708d2b5a08cb3424226cff3548484c9acef0ec87bea219bcb *./scripts/ci-setup.sh
-afff1f243c236159e64f9e6321bbfcefef5bbb42531badbdb6176691aadc098b *./scripts/create-test-fixtures.php
-461c62b10830e934da005f1cf6867f3ea8ac8e3de952a00144300c5fe217bd00 *./scripts/create-test-fixtures.sh
+e96dc5db850c65fb529fea189bb45b3e8d43391bb804ee2e3d1b852dbc40e798 *./scripts/ci-setup.sh
+0ba44e540a4abcc09f60feb80ec5e9ec68eaa662da48662ae7535da8633d5f9b *./scripts/create-test-fixtures.php
+7751e7e1f475f7a003a2b2d911d44b1f9450a2650e7689b2beb44db421d88add *./scripts/create-test-fixtures.sh
 b6a9a07fd110664bca9a517ab94ba7114ea0b419e59ea740d22483f3eca41a5a *./scripts/cron-wrapper.sh
 991f9461b92829243ac6278ff8f4d92621159d337c6d5329ef0324fd23e8bc44 *./scripts/e2e-contact-fixture.php
 76f717be8886f84fd12664cfb79e9aa556d17046739c0f791b755ae11f5b9ca8 *./scripts/export-test-data.py
@@ -473,7 +473,7 @@ c61f7833b4ef1022f634bab75047f94950febd9779f2b00592f48109919b6a61 *./tests/php/Sy
 8e58ce6e7287be689ba5c5911f763ada405a3356302fd5dcbf731b3208eeb95f *./tests/php/run-unit-tests.php
 6c4daca1adf2c0208567b38c36f07ec5afd62842915066523fd4fe78b44498ba *./tests/php/stubs/wp-cli-stub.php
 74f7ea35f9e5857b9ad81f05a178e751b67274ce4132df461cc0470025ff962a *./tests/php/stubs/wpdb-stub.php
-0b509cb83f6dd082485d2de1bc16e2d10e022c4980693edcff1a184c93c4381f *./tests/php/support/ArchitectureAssertions.php
+9e3fdf280d88731dbec6a6b41b175a5423cd1b090308f838a439d459cee7caa5 *./tests/php/support/ArchitectureAssertions.php
 0e8cdaf106491eb236ef207989531d9d7aa8a8d202e077591bfd8e0ebbf80f7b *./tests/phpstan-bootstrap.php
 bd48c24ce4500e60d2524571756787283f0d3fbfa50b116331309c09773f0cd1 *./wp-content/index.php
 1b02fbdd8a42b77b6aed57815725257df08706cf7bb98e03e9259ffdac16b225 *./wp-content/mu-plugins/longevity-core.php

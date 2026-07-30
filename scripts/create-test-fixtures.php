@@ -8,8 +8,9 @@
  * @package LongevityCore
  */
 
-if ( 'production' === wp_get_environment_type() ) {
-	WP_CLI::error( 'Synthetic fixtures must never run in production.' );
+$lel_fixture_environment = wp_get_environment_type();
+if ( ! in_array( $lel_fixture_environment, array( 'local', 'development' ), true ) ) {
+	WP_CLI::error( sprintf( 'Synthetic fixtures refuse to run in the "%s" environment. Only local and development environments may host the CI fixture projection; staging and production must never contain synthetic records.', $lel_fixture_environment ) );
 }
 
 $today       = gmdate( 'Y-m-d' );
@@ -672,6 +673,61 @@ wp_update_post(
 );
 if ( 'publish' === get_post_status( $blocked_id ) ) {
 	WP_CLI::error( 'The intentionally incomplete review bypassed publication controls.' );
+}
+
+// --- CI-only public route projection (PRV3-BOOT-03) ---------------------
+// Publishes exactly the draft pages that config/routes.json flags as
+// ci_fixture_public, through the real trust-page approval gate, so browser,
+// accessibility, Lighthouse, and load tests see a deterministic public route
+// set on a clean database. Pages are watermarked with _lel_ci_fixture_published
+// so the projection stays detectable and can never be mistaken for a human
+// production publication.
+
+$lel_contract_path = file_exists( '/project-config/routes.json' )
+	? '/project-config/routes.json'
+	: dirname( __DIR__ ) . '/config/routes.json';
+if ( ! is_readable( $lel_contract_path ) ) {
+	WP_CLI::error( 'Route-state contract config/routes.json is not readable; refusing to guess the public route projection.' );
+}
+$lel_route_contract = json_decode( (string) file_get_contents( $lel_contract_path ), true );
+if ( ! is_array( $lel_route_contract ) || empty( $lel_route_contract['pages'] ) ) {
+	WP_CLI::error( 'Route-state contract config/routes.json is invalid.' );
+}
+
+$trust_approver = lel_fixture_user( 'lel_synthetic_trust_approver', 'trust-approver@example.invalid', '[TEST] Synthetic Trust Page Approver', 'subscriber', array( 'approve_trust_pages' ) );
+
+foreach ( $lel_route_contract['pages'] as $lel_route_key => $lel_route_page ) {
+	if ( 'page' !== ( $lel_route_page['type'] ?? '' ) || empty( $lel_route_page['ci_fixture_public'] ) ) {
+		continue;
+	}
+	$lel_page = get_page_by_path( (string) $lel_route_page['slug'], OBJECT, 'page' );
+	if ( ! $lel_page instanceof WP_Post ) {
+		WP_CLI::error( sprintf( 'Contract route "%s" (/%s/) is missing after bootstrap; run wp longevity bootstrap all first.', $lel_route_key, $lel_route_page['slug'] ) );
+	}
+	if ( 'publish' === $lel_page->post_status ) {
+		continue;
+	}
+	if ( ! empty( $lel_route_page['trust_page'] ) && null === \Longevity\Core\Trust_Pages::approve( (int) $lel_page->ID, (int) $trust_approver->ID ) ) {
+		WP_CLI::error( sprintf( 'Synthetic trust-page approval failed for "%s"; the projection must pass the real gate, not bypass it.', $lel_route_key ) );
+	}
+	$lel_publish_result = wp_update_post(
+		array(
+			'ID'          => $lel_page->ID,
+			'post_status' => 'publish',
+		),
+		true
+	);
+	if ( is_wp_error( $lel_publish_result ) || 'publish' !== get_post_status( $lel_page->ID ) ) {
+		WP_CLI::error( sprintf( 'Contract route "%s" did not pass its publication gates in fixture mode.', $lel_route_key ) );
+	}
+	lel_fixture_meta( (int) $lel_page->ID, array( '_lel_ci_fixture_published' => '1' ) );
+	\Longevity\Core\Meta_Authorization::enter_trusted_scope();
+	try {
+		delete_post_meta( (int) $lel_page->ID, '_longevity_noindex' );
+	} finally {
+		\Longevity\Core\Meta_Authorization::exit_trusted_scope();
+	}
+	WP_CLI::log( sprintf( 'Published CI fixture projection for "%s" (/%s/).', $lel_route_key, $lel_route_page['slug'] ) );
 }
 
 flush_rewrite_rules( false );

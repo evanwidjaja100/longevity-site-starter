@@ -101,6 +101,15 @@ final class ArchitectureAssertions {
 		if ( str_contains( $fixtures, "'editorial_approval_status'    => 'ready'" ) ) {
 			$failures[] = 'Synthetic fixtures manufacture editorial ready state instead of using approval snapshots.';
 		}
+		if ( ! str_contains( $fixtures, "in_array( \$lel_fixture_environment, array( 'local', 'development' ), true )" ) ) {
+			$failures[] = 'Synthetic fixtures lost the local/development environment allowlist; staging and production must refuse fixtures before any write.';
+		}
+		if ( ! str_contains( $fixtures, 'Trust_Pages::approve' ) ) {
+			$failures[] = 'CI fixture route projection no longer routes trust-page publication through Trust_Pages::approve.';
+		}
+		if ( ! str_contains( $fixtures, '_lel_ci_fixture_published' ) ) {
+			$failures[] = 'CI fixture route projection lost its _lel_ci_fixture_published watermark; fixture-published pages must stay detectable.';
+		}
 		return $failures;
 	}
 }

@@ -41,15 +41,51 @@ done
 [[ "$ready" -eq 1 ]] || { echo 'ERROR: WordPress did not become HTTP-ready within the CI budget.' >&2; exit 1; }
 
 docker compose run --rm --entrypoint sh wpcli /scripts/bootstrap.sh
+
+# Runtime truth gate (PRV3-CI-02): the running WordPress/PHP/database stack
+# must satisfy the application platform floor, otherwise image drift would
+# silently invalidate every downstream test result.
+docker compose run --rm wpcli wp longevity preflight --allow-root \
+  || { echo 'ERROR: wp longevity preflight failed — the pinned runtime no longer satisfies Platform_Requirements.' >&2; exit 1; }
+
+# Idempotency gate (PRV3-BOOT-02): a second canonical bootstrap must create
+# nothing and change no approval data.
+second_run=$(docker compose run --rm wpcli wp longevity bootstrap all --allow-root)
+printf '%s\n' "$second_run"
+if printf '%s' "$second_run" | grep -Eq 'Created |[1-9][0-9]* created'; then
+  echo 'ERROR: second bootstrap run created records; canonical bootstrap is not idempotent.' >&2
+  exit 1
+fi
+
 admin_user=$(docker compose run --rm wpcli wp user list --role=administrator --field=ID --allow-root | sed -n '/^[0-9][0-9]*$/ { p; q; }')
 [[ -n "$admin_user" ]] || { echo 'ERROR: No administrator user was discovered for migrations.' >&2; exit 1; }
 docker compose run --rm wpcli wp longevity migrate --user="$admin_user" --allow-root
 docker compose run --rm --entrypoint sh wpcli /scripts/create-test-fixtures.sh
 
-for route in / /test-evidence-guide/ /reviews/; do
-  status=$(curl --fail --silent --show-error --location --output /dev/null --write-out '%{http_code}' "$site_url$route")
-  [[ "$status" = 200 ]] || { echo "ERROR: expected fixture route $route to return 200, got $status." >&2; exit 1; }
-done
+# Route-state contract assertions (config/routes.json): every route the
+# contract declares public in CI fixture mode must be 200, and every draft
+# route must stay 404 anonymously.
+public_routes=$(node -e '
+  const c = require("./config/routes.json");
+  const pub = Object.values(c.pages).filter(p => p.ci_fixture_public).map(p => p.path);
+  console.log([...pub, ...Object.values(c.categories).map(x => x.path), ...c.ci_fixture_content.published_paths].join("\n"));
+')
+draft_routes=$(node -e '
+  const c = require("./config/routes.json");
+  console.log(Object.values(c.pages).filter(p => p.type === "page" && !p.ci_fixture_public).map(p => p.path).join("\n"));
+')
+
+while IFS= read -r route; do
+  [[ -n "$route" ]] || continue
+  status=$(curl --silent --output /dev/null --write-out '%{http_code}' "$site_url$route")
+  [[ "$status" = 200 ]] || { echo "ERROR: expected CI-fixture public route $route to return 200, got $status." >&2; exit 1; }
+done <<< "$public_routes"
+
+while IFS= read -r route; do
+  [[ -n "$route" ]] || continue
+  status=$(curl --silent --output /dev/null --write-out '%{http_code}' "$site_url$route")
+  [[ "$status" = 404 ]] || { echo "ERROR: expected draft route $route to return 404 anonymously, got $status." >&2; exit 1; }
+done <<< "$draft_routes"
 
 published_guides=$(docker compose run --rm wpcli wp post list --post_type=post --post_status=publish --format=count --allow-root | tr -d '[:space:]')
 published_reviews=$(docker compose run --rm wpcli wp post list --post_type=review --post_status=publish --format=count --allow-root | tr -d '[:space:]')

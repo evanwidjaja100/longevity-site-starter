@@ -98,6 +98,7 @@ services:
       - ./scripts:/scripts:ro
       - ./content:/project-content:ro
       - ./policies:/project-policies:ro
+      - ./config:/project-config:ro
       - ./docker/my.cnf:/root/.my.cnf:ro
     security_opt:
       - no-new-privileges:true
