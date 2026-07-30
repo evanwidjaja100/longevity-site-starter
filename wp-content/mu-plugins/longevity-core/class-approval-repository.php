@@ -76,6 +76,7 @@ final class Approval_Repository {
 		);
 		foreach ( $columns as $column => $definition ) {
 			$present = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(1) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = %s AND COLUMN_NAME = %s', $table, $column ) );
+			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name derives from the trusted $wpdb->prefix; column and definition are hardcoded constants above.
 			if ( $present <= 0 && false === $wpdb->query( "ALTER TABLE {$table} ADD {$column} {$definition}" ) ) {
 				return false;
 			}
@@ -86,6 +87,7 @@ final class Approval_Repository {
 		);
 		foreach ( $indexes as $index => $definition ) {
 			$present = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(1) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = %s AND INDEX_NAME = %s', $table, $index ) );
+			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name derives from the trusted $wpdb->prefix; index and definition are hardcoded constants above.
 			if ( $present <= 0 && false === $wpdb->query( "ALTER TABLE {$table} ADD KEY {$index} ({$definition})" ) ) {
 				return false;
 			}
@@ -108,6 +110,7 @@ final class Approval_Repository {
 		}
 		$table = self::table_name();
 		return (int) $wpdb->query(
+			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name derives from the trusted $wpdb->prefix; all values are hardcoded literals.
 			"UPDATE {$table} SET activation_error = 'legacy_pre_pr02', activated_at = approved_at WHERE approval_status = 'approved' AND audit_event_id IS NULL AND activation_error IS NULL"
 		);
 	}
@@ -132,12 +135,14 @@ final class Approval_Repository {
 		global $wpdb;
 		$table = self::table_name();
 		$sql   = $wpdb->prepare(
+			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name derives from the trusted $wpdb->prefix; all values use prepare() placeholders.
 			"UPDATE {$table} SET approval_status = 'approved', audit_event_id = %d, activated_at = %s, activation_error = NULL WHERE id = %d AND approval_status = 'pending_audit' AND combined_hash = %s",
 			$audit_event_id,
 			gmdate( 'Y-m-d H:i:s' ),
 			$id,
 			$combined_hash
 		);
+		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- SQL is fully prepared above.
 		return (int) $wpdb->query( $sql );
 	}
 
@@ -146,10 +151,12 @@ final class Approval_Repository {
 		global $wpdb;
 		$table = self::table_name();
 		$sql   = $wpdb->prepare(
+			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name derives from the trusted $wpdb->prefix; all values use prepare() placeholders.
 			"UPDATE {$table} SET approval_status = 'rejected', activation_error = %s WHERE id = %d AND approval_status = 'pending_audit'",
 			substr( sanitize_text_field( $reason ), 0, 255 ),
 			$id
 		);
+		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- SQL is fully prepared above.
 		return (int) $wpdb->query( $sql );
 	}
 
@@ -158,10 +165,12 @@ final class Approval_Repository {
 		global $wpdb;
 		$table = self::table_name();
 		$sql   = $wpdb->prepare(
+			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name derives from the trusted $wpdb->prefix; all values use prepare() placeholders.
 			"UPDATE {$table} SET activation_error = %s WHERE id = %d AND approval_status = 'pending_audit'",
 			substr( sanitize_text_field( $reason ), 0, 255 ),
 			$id
 		);
+		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- SQL is fully prepared above.
 		return (int) $wpdb->query( $sql );
 	}
 
@@ -175,10 +184,12 @@ final class Approval_Repository {
 		$table = self::table_name();
 		$limit = max( 1, min( 500, $limit ) );
 		$sql   = $wpdb->prepare(
+			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name derives from the trusted $wpdb->prefix; all values use prepare() placeholders.
 			"SELECT * FROM {$table} WHERE approval_status = 'pending_audit' AND id > %d ORDER BY id ASC LIMIT %d",
 			$after_id,
 			$limit
 		);
+		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- SQL is fully prepared above.
 		$rows = $wpdb->get_results( $sql, ARRAY_A );
 		return is_array( $rows ) ? $rows : array();
 	}
@@ -191,6 +202,7 @@ final class Approval_Repository {
 		}
 		$table = self::table_name();
 		return (int) $wpdb->get_var(
+			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name derives from the trusted $wpdb->prefix; all values are hardcoded literals.
 			"SELECT COUNT(1) FROM {$table} WHERE approval_status = 'approved' AND invalidated_at IS NULL AND audit_event_id IS NULL AND activation_error IS NULL"
 		);
 	}
@@ -204,6 +216,7 @@ final class Approval_Repository {
 		$table     = self::table_name();
 		$threshold = gmdate( 'Y-m-d H:i:s', time() - max( 0, $max_age_seconds ) );
 		return (int) $wpdb->get_var(
+			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name derives from the trusted $wpdb->prefix; the value uses a prepare() placeholder.
 			$wpdb->prepare( "SELECT COUNT(1) FROM {$table} WHERE approval_status = 'pending_audit' AND approved_at < %s", $threshold )
 		);
 	}
@@ -215,6 +228,7 @@ final class Approval_Repository {
 			return 0;
 		}
 		$table = self::table_name();
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name derives from the trusted $wpdb->prefix; all values are hardcoded literals.
 		return (int) $wpdb->get_var( "SELECT COUNT(1) FROM {$table} WHERE approval_status = 'pending_audit'" );
 	}
 
@@ -222,7 +236,9 @@ final class Approval_Repository {
 	public static function current( int $post_id, string $approval_type ): ?array {
 		global $wpdb;
 		$table = self::table_name();
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name derives from the trusted $wpdb->prefix; all values use prepare() placeholders.
 		$sql   = $wpdb->prepare( "SELECT * FROM {$table} WHERE post_id = %d AND approval_type = %s AND approval_status = 'approved' AND invalidated_at IS NULL ORDER BY id DESC LIMIT 1", $post_id, $approval_type );
+		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- SQL is fully prepared above.
 		$row   = $wpdb->get_row( $sql, ARRAY_A );
 		return is_array( $row ) ? $row : null;
 	}
@@ -232,6 +248,7 @@ final class Approval_Repository {
 		global $wpdb;
 		$table = self::table_name();
 		$sql   = $wpdb->prepare(
+			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name derives from the trusted $wpdb->prefix; all values use prepare() placeholders.
 			"UPDATE {$table} SET invalidated_at = %s, invalidated_by_user_id = %d, invalidation_reason = %s WHERE post_id = %d AND approval_type = %s AND invalidated_at IS NULL",
 			gmdate( 'Y-m-d H:i:s' ),
 			$actor_id,
@@ -239,6 +256,7 @@ final class Approval_Repository {
 			$post_id,
 			$approval_type
 		);
+		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- SQL is fully prepared above.
 		return (int) $wpdb->query( $sql );
 	}
 

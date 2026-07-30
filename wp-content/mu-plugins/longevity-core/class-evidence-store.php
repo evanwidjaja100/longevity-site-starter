@@ -220,7 +220,7 @@ final class Evidence_Store {
 			);
 		} catch ( \Throwable $error ) {
 			// A record without its mandatory audit link is not evidence.
-			$wpdb->query( $wpdb->prepare( 'DELETE FROM ' . self::table_name() . ' WHERE id = %d', $id ) );
+			$wpdb->query( $wpdb->prepare( 'DELETE FROM ' . self::table_name() . ' WHERE id = %d', $id ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Table name derives from the trusted $wpdb->prefix.
 			return new \WP_Error( 'evidence_audit_failed', $error->getMessage() );
 		}
 		return $id;
@@ -232,7 +232,7 @@ final class Evidence_Store {
 		if ( $id <= 0 || ! self::exists() ) {
 			return null;
 		}
-		$row = $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM ' . self::table_name() . ' WHERE id = %d LIMIT 1', $id ), ARRAY_A );
+		$row = $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM ' . self::table_name() . ' WHERE id = %d LIMIT 1', $id ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Table name derives from the trusted $wpdb->prefix.
 		return is_array( $row ) ? $row : null;
 	}
 
@@ -242,7 +242,7 @@ final class Evidence_Store {
 		if ( ! isset( self::TYPES[ $type ] ) || ! self::exists() ) {
 			return null;
 		}
-		$row = $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM ' . self::table_name() . ' WHERE evidence_type = %s ORDER BY id DESC LIMIT 1', $type ), ARRAY_A );
+		$row = $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM ' . self::table_name() . ' WHERE evidence_type = %s ORDER BY id DESC LIMIT 1', $type ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Table name derives from the trusted $wpdb->prefix.
 		return is_array( $row ) ? $row : null;
 	}
 
@@ -262,7 +262,7 @@ final class Evidence_Store {
 			$sql   .= ' AND artifact_checksum = %s';
 			$args[] = strtolower( $artifact_checksum );
 		}
-		$rows = $wpdb->get_results( $wpdb->prepare( $sql . ' ORDER BY id DESC', $args ), ARRAY_A );
+		$rows = $wpdb->get_results( $wpdb->prepare( $sql . ' ORDER BY id DESC', $args ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare -- Placeholders assembled into $sql above; values bound via prepare( $args ); table name from trusted $wpdb->prefix.
 		foreach ( is_array( $rows ) ? $rows : array() as $row ) {
 			$id = (int) ( $row['id'] ?? 0 );
 			if ( $id > 0 && true === self::validate_stored_record( $row ) && ! self::is_superseded( $id ) ) {
@@ -278,7 +278,7 @@ final class Evidence_Store {
 		if ( ! isset( self::TYPES[ $type ] ) || ! self::exists() ) {
 			return array();
 		}
-		$rows = $wpdb->get_results( $wpdb->prepare( 'SELECT * FROM ' . self::table_name() . ' WHERE evidence_type = %s ORDER BY id DESC LIMIT %d', $type, max( 1, $limit ) ), ARRAY_A );
+		$rows = $wpdb->get_results( $wpdb->prepare( 'SELECT * FROM ' . self::table_name() . ' WHERE evidence_type = %s ORDER BY id DESC LIMIT %d', $type, max( 1, $limit ) ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Table name derives from the trusted $wpdb->prefix.
 		return is_array( $rows ) ? $rows : array();
 	}
 
@@ -394,6 +394,7 @@ final class Evidence_Store {
 		global $wpdb;
 		$rows = $wpdb->get_results(
 			$wpdb->prepare(
+				// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Table name derives from the trusted $wpdb->prefix.
 				'SELECT payload_json FROM ' . Audit_Log::table_name() . ' WHERE event_type = %s AND object_type = %s AND object_id = %d ORDER BY id DESC',
 				'evidence_recorded',
 				'external_evidence',

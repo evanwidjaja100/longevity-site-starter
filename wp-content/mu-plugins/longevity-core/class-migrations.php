@@ -438,7 +438,7 @@ final class Migrations {
 		foreach ( $columns as $column ) {
 			$count = $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(1) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = %s AND COLUMN_NAME = %s', $table, $column ) );
 			if ( 1 !== (int) $count ) {
-				throw new \RuntimeException( sprintf( 'Migration %d postcondition failed: %s.%s column missing.', $version, $table, $column ) );
+				throw new \RuntimeException( esc_html( sprintf( 'Migration %d postcondition failed: %s.%s column missing.', $version, $table, $column ) ) );
 			}
 		}
 		foreach ( $indexes as $index => $unique ) {
@@ -446,9 +446,10 @@ final class Migrations {
 			if ( $unique ) {
 				$sql .= ' AND NON_UNIQUE = 0';
 			}
+			// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- $sql is assembled from literal placeholder fragments above and bound via prepare().
 			$count = $wpdb->get_var( $wpdb->prepare( $sql, $table, $index ) );
 			if ( (int) $count <= 0 ) {
-				throw new \RuntimeException( sprintf( 'Migration %d postcondition failed: %s.%s index missing.', $version, $table, $index ) );
+				throw new \RuntimeException( esc_html( sprintf( 'Migration %d postcondition failed: %s.%s index missing.', $version, $table, $index ) ) );
 			}
 		}
 	}
@@ -458,7 +459,7 @@ final class Migrations {
 		$updated = update_option( 'lel_data_version', $version, false );
 		$stored  = (int) get_option( 'lel_data_version', 0 );
 		if ( ! $updated || $stored !== $version ) {
-			throw new \RuntimeException( sprintf( 'Migration version %d could not be durably confirmed (stored %d).', $version, $stored ) );
+			throw new \RuntimeException( esc_html( sprintf( 'Migration version %d could not be durably confirmed (stored %d).', $version, $stored ) ) );
 		}
 	}
 
@@ -553,14 +554,17 @@ final class Migrations {
 		}
 		$table  = Audit_Log::table_name();
 		$cursor = (int) get_option( 'lel_migration_cursor_8', 0 );
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name derives from the trusted $wpdb->prefix via Audit_Log::table_name().
 		$seq    = (int) $wpdb->get_var( "SELECT COALESCE(MAX(sequence), 0) FROM {$table} WHERE sequence > 0" );
 		while ( true ) {
+			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name derives from the trusted $wpdb->prefix; row values bound via %d.
 			$rows = $wpdb->get_col( $wpdb->prepare( "SELECT id FROM {$table} WHERE sequence = 0 AND id > %d ORDER BY id ASC LIMIT %d", $cursor, self::BATCH_SIZE ) );
 			if ( empty( $rows ) ) {
 				break;
 			}
 			foreach ( $rows as $row_id ) {
 				++$seq;
+				// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name derives from the trusted $wpdb->prefix; row values bound via %d.
 				$wpdb->query( $wpdb->prepare( "UPDATE {$table} SET sequence = %d WHERE id = %d", $seq, (int) $row_id ) );
 			}
 			$cursor = (int) end( $rows );

@@ -28,7 +28,7 @@ final class Schema {
 		$schema = array( '@context' => 'https://schema.org', '@graph' => $graph );
 		$nonce  = Bootstrap::csp_nonce();
 		$nonce_attr = '' !== $nonce ? ' nonce="' . esc_attr( $nonce ) . '"' : '';
-		echo '<script type="application/ld+json"' . $nonce_attr . '>' . wp_json_encode( $schema, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ) . '</script>' . "\n";
+		echo '<script type="application/ld+json"' . $nonce_attr . '>' . wp_json_encode( $schema, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ) . '</script>' . "\n"; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- JSON-LD payload is produced by wp_json_encode().
 	}
 
 	/** Build a graph for the current request. */

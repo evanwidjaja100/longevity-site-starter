@@ -218,7 +218,7 @@ final class SEO {
 		}
 		foreach ( $tags as $tag ) {
 			$attr = isset( $tag['property'] ) ? 'property="' . esc_attr( $tag['property'] ) . '"' : 'name="' . esc_attr( $tag['name'] ) . '"';
-			echo '<meta ' . $attr . ' content="' . esc_attr( wp_strip_all_tags( (string) $tag['content'] ) ) . '">' . "\n";
+			echo '<meta ' . $attr . ' content="' . esc_attr( wp_strip_all_tags( (string) $tag['content'] ) ) . '">' . "\n"; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- $attr is built only from esc_attr()-escaped property/name values; content is esc_attr()-escaped.
 		}
 	}
 }

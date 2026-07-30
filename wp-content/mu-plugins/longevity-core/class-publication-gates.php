@@ -374,7 +374,8 @@ final class Publication_Gates {
 			return $data;
 		}
 		if ( $matches && self::override_allowed_from_request() ) {
-			$reason          = sanitize_textarea_field( wp_unslash( $_POST['longevity_override_reason'] ) );
+			// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Nonce verified in override_allowed_from_request() before this override branch runs.
+			$reason          = isset( $_POST['longevity_override_reason'] ) ? sanitize_textarea_field( wp_unslash( $_POST['longevity_override_reason'] ) ) : '';
 			$correlation_id  = self::classic_correlation_id();
 			$previous_status = get_post_status( $post_id );
 			$previous_status = is_string( $previous_status ) && '' !== $previous_status ? $previous_status : 'draft';
@@ -648,10 +649,8 @@ final class Publication_Gates {
 		if ( isset( $postarr['meta_input'] ) && is_array( $postarr['meta_input'] ) && array_key_exists( '_thumbnail_id', $postarr['meta_input'] ) ) {
 			return absint( $postarr['meta_input']['_thumbnail_id'] );
 		}
-		if ( array_key_exists( '_thumbnail_id', $_POST ) ) {
-			return absint( wp_unslash( $_POST['_thumbnail_id'] ) );
-		}
-		return null;
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Runs inside wp_insert_post_data during a classic-editor save; WordPress core verifies the edit-form nonce upstream.
+		return array_key_exists( '_thumbnail_id', $_POST ) ? absint( wp_unslash( $_POST['_thumbnail_id'] ) ) : null;
 	}
 
 	/** Read authorized metadata submitted by the classic editor for same-request evaluation. */
@@ -661,7 +660,7 @@ final class Publication_Gates {
 		}
 		$overrides   = array();
 		$definitions = Meta_Registry::definitions();
-		$present     = isset( $_POST['lel_present'] ) && is_array( $_POST['lel_present'] ) ? wp_unslash( $_POST['lel_present'] ) : array();
+		$present     = isset( $_POST['lel_present'] ) && is_array( $_POST['lel_present'] ) ? array_map( 'sanitize_text_field', wp_unslash( $_POST['lel_present'] ) ) : array();
 		foreach ( $definitions as $key => $definition ) {
 			if ( empty( $present[ $key ] ) ) {
 				continue;
@@ -670,16 +669,16 @@ final class Publication_Gates {
 				$overrides['__governance_request_denied'] = true;
 				continue;
 			}
-			if ( self::service_only_meta( $key, isset( $_POST[ $key ] ) ? wp_unslash( $_POST[ $key ] ) : '' ) ) {
+			if ( self::service_only_meta( $key, isset( $_POST[ $key ] ) ? sanitize_text_field( wp_unslash( $_POST[ $key ] ) ) : '' ) ) {
 				continue;
 			}
 			if ( isset( $_POST[ $key ] ) ) {
-				$overrides[ $key ] = Meta_Registry::sanitize_by_key( $key, wp_unslash( $_POST[ $key ] ) );
+				$overrides[ $key ] = Meta_Registry::sanitize_by_key( $key, wp_unslash( $_POST[ $key ] ) ); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Sanitized by Meta_Registry::sanitize_by_key() per the registered meta definition.
 			}
 		}
 		if ( in_array( 'review_score_dimensions', array_keys( $present ), true ) && isset( $_POST['review_score_dimensions_rows'] ) && is_array( $_POST['review_score_dimensions_rows'] ) ) {
 			if ( Meta_Authorization::can_write( 'review_score_dimensions', $post_id, get_current_user_id(), 'classic' ) && Meta_Authorization::can_write( 'review_score', $post_id, get_current_user_id(), 'classic' ) ) {
-				$dimensions                           = Review_Methodology::sanitize_dimensions( wp_unslash( $_POST['review_score_dimensions_rows'] ) );
+				$dimensions                           = Review_Methodology::sanitize_dimensions( wp_unslash( $_POST['review_score_dimensions_rows'] ) ); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Sanitized by Review_Methodology::sanitize_dimensions().
 				$overrides['review_score_dimensions'] = $dimensions;
 				try {
 					$overrides['review_score'] = Review_Methodology::calculate_score( $dimensions )['score'];
@@ -742,7 +741,8 @@ final class Publication_Gates {
 
 	/** Stable idempotency key supplied by the classic caller, or this request's correlation ID. */
 	private static function classic_correlation_id(): string {
-		$value = isset( $_POST['longevity_override_correlation_id'] ) ? wp_unslash( $_POST['longevity_override_correlation_id'] ) : Logger::request_id();
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Only reached from the enforce_classic_publish override branch after override_allowed_from_request() verifies the nonce.
+		$value = isset( $_POST['longevity_override_correlation_id'] ) ? sanitize_text_field( wp_unslash( $_POST['longevity_override_correlation_id'] ) ) : Logger::request_id();
 		return sanitize_text_field( (string) $value );
 	}
 

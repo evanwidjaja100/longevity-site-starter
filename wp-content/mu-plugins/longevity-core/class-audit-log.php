@@ -128,8 +128,9 @@ final class Audit_Log {
 		}
 
 		// Ensure the singleton row exists.
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name derives from the trusted $wpdb->prefix; all values are hardcoded literals.
 		if ( false === $wpdb->query( "INSERT IGNORE INTO {$seq_table} (id, current_value) VALUES (1, 0)" ) ) {
-			throw new \RuntimeException( 'Could not initialize the audit sequence allocator: ' . self::database_error( $wpdb ) );
+			throw new \RuntimeException( esc_html( 'Could not initialize the audit sequence allocator: ' . self::database_error( $wpdb ) ) );
 		}
 	}
 
@@ -153,6 +154,7 @@ final class Audit_Log {
 		// Enforce InnoDB (required for the FOR UPDATE row locking used by writes).
 		$engine = (string) $wpdb->get_var( $wpdb->prepare( 'SELECT ENGINE FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = %s', $table ) );
 		if ( '' !== $engine && 0 !== strcasecmp( $engine, 'InnoDB' ) ) {
+			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name derives from the trusted $wpdb->prefix; no user data in the query.
 			if ( false === $wpdb->query( "ALTER TABLE {$table} ENGINE=InnoDB" ) ) {
 				return false;
 			}
@@ -162,6 +164,7 @@ final class Audit_Log {
 		if ( $has_index > 0 ) {
 			return true;
 		}
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name derives from the trusted $wpdb->prefix; no user data in the query.
 		if ( false === $wpdb->query( "ALTER TABLE {$table} ADD UNIQUE KEY previous_event_hash (previous_event_hash)" ) ) {
 			return false;
 		}
@@ -177,10 +180,12 @@ final class Audit_Log {
 		}
 		$table = self::table_name();
 		$column = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(1) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = %s AND COLUMN_NAME = %s', $table, 'idempotency_key' ) );
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name derives from the trusted $wpdb->prefix; no user data in the query.
 		if ( $column <= 0 && false === $wpdb->query( "ALTER TABLE {$table} ADD idempotency_key char(64) DEFAULT NULL" ) ) {
 			return false;
 		}
 		$unique = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(1) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = %s AND INDEX_NAME = %s AND NON_UNIQUE = 0', $table, 'idempotency_key' ) );
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name derives from the trusted $wpdb->prefix; no user data in the query.
 		if ( $unique <= 0 && false === $wpdb->query( "ALTER TABLE {$table} ADD UNIQUE KEY idempotency_key (idempotency_key)" ) ) {
 			return false;
 		}
@@ -205,14 +210,14 @@ final class Audit_Log {
 		if ( ! self::request_is_healthy() ) {
 			$message = 'Governance write blocked because this request has an unknown database outcome: ' . self::$unhealthy_reason;
 			if ( $mandatory ) {
-				throw new \RuntimeException( $message );
+				throw new \RuntimeException( esc_html( $message ) );
 			}
 			return 0;
 		}
 		if ( self::$test_mode ) {
 			if ( in_array( $event_type, self::$test_fail_events, true ) ) {
 				if ( $mandatory ) {
-					throw new \RuntimeException( sprintf( 'Simulated mandatory audit failure for %s (test mode).', $event_type ) );
+					throw new \RuntimeException( esc_html( sprintf( 'Simulated mandatory audit failure for %s (test mode).', $event_type ) ) );
 				}
 				return 0;
 			}
@@ -267,7 +272,7 @@ final class Audit_Log {
 
 		self::record_failure( $event_type, $last_error );
 		if ( $mandatory ) {
-			throw new \RuntimeException( sprintf( 'Mandatory audit write failed after %d attempt(s): %s', $attempts, $last_error ) );
+			throw new \RuntimeException( esc_html( sprintf( 'Mandatory audit write failed after %d attempt(s): %s', $attempts, $last_error ) ) );
 		}
 		return 0;
 	}
@@ -291,6 +296,7 @@ final class Audit_Log {
 		$prev_seq  = 0;
 		while ( true ) {
 			self::clear_database_error( $wpdb );
+			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name derives from the trusted $wpdb->prefix; all values use prepare() placeholders.
 			$rows             = $wpdb->get_results( $wpdb->prepare( "SELECT * FROM {$table} WHERE sequence > %d ORDER BY sequence ASC LIMIT %d", $last_seq, $batch_size ), ARRAY_A );
 			if ( self::database_failed( $wpdb ) ) {
 				$errors[] = 'audit_read_failed:' . substr( (string) $wpdb->last_error, 0, 120 );
@@ -373,6 +379,7 @@ final class Audit_Log {
 		$hashed = hash( 'sha256', $raw_key );
 		$table  = self::table_name();
 		$row    = $wpdb->get_row(
+			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name derives from the trusted $wpdb->prefix; the value uses a prepare() placeholder.
 			$wpdb->prepare( "SELECT id, event_type, object_type, object_id FROM {$table} WHERE idempotency_key = %s LIMIT 1", $hashed ),
 			ARRAY_A
 		);
@@ -390,9 +397,10 @@ final class Audit_Log {
 	/** Allocate the next sequence number atomically via the singleton row. */
 	private static function allocate_sequence( $wpdb ): int {
 		$seq_table = self::sequence_table_name();
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name derives from the trusted $wpdb->prefix; all values are hardcoded literals.
 		$updated = $wpdb->query( "UPDATE {$seq_table} SET current_value = LAST_INSERT_ID(current_value + 1) WHERE id = 1" );
 		if ( false === $updated ) {
-			throw new \RuntimeException( 'Audit sequence update failed: ' . self::database_error( $wpdb ) );
+			throw new \RuntimeException( esc_html( 'Audit sequence update failed: ' . self::database_error( $wpdb ) ) );
 		}
 		// wpdb does not refresh insert_id for UPDATE statements. Read the
 		// connection-local value explicitly or an unrelated insert ID can become
@@ -400,12 +408,14 @@ final class Audit_Log {
 		$seq = (int) $wpdb->get_var( 'SELECT LAST_INSERT_ID()' );
 		if ( 1 !== (int) $updated || $seq <= 0 ) {
 			// Fallback: initialize the row if it does not exist yet.
+			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name derives from the trusted $wpdb->prefix; all values are hardcoded literals.
 			if ( false === $wpdb->query( "INSERT IGNORE INTO {$seq_table} (id, current_value) VALUES (1, 0)" ) ) {
-				throw new \RuntimeException( 'Audit sequence initialization failed: ' . self::database_error( $wpdb ) );
+				throw new \RuntimeException( esc_html( 'Audit sequence initialization failed: ' . self::database_error( $wpdb ) ) );
 			}
+			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name derives from the trusted $wpdb->prefix; all values are hardcoded literals.
 			$updated = $wpdb->query( "UPDATE {$seq_table} SET current_value = LAST_INSERT_ID(current_value + 1) WHERE id = 1" );
 			if ( 1 !== (int) $updated ) {
-				throw new \RuntimeException( 'Audit sequence allocator row is unavailable: ' . self::database_error( $wpdb ) );
+				throw new \RuntimeException( esc_html( 'Audit sequence allocator row is unavailable: ' . self::database_error( $wpdb ) ) );
 			}
 			$seq = (int) $wpdb->get_var( 'SELECT LAST_INSERT_ID()' );
 		}
@@ -436,6 +446,7 @@ final class Audit_Log {
 			}
 			if ( '' !== $idempotency_key ) {
 				self::clear_database_error( $wpdb );
+				// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name derives from the trusted $wpdb->prefix; the value uses a prepare() placeholder.
 				$existing         = (int) $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$table} WHERE idempotency_key = %s LIMIT 1 FOR UPDATE", $idempotency_key ) );
 				if ( self::database_failed( $wpdb ) ) {
 					throw new \RuntimeException( 'Audit idempotency lookup failed: ' . self::database_error( $wpdb ) );
@@ -451,6 +462,7 @@ final class Audit_Log {
 				}
 			}
 			self::clear_database_error( $wpdb );
+			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name derives from the trusted $wpdb->prefix; no user data in the query.
 			$previous         = (string) $wpdb->get_var( "SELECT event_hash FROM {$table} ORDER BY sequence DESC LIMIT 1" );
 			if ( self::database_failed( $wpdb ) ) {
 				throw new \RuntimeException( 'Audit predecessor read failed: ' . self::database_error( $wpdb ) );

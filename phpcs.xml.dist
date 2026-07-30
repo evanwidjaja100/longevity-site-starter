@@ -18,7 +18,10 @@
     <include-pattern>scripts/generate-dependency-sbom.php</include-pattern>
   </rule>
   <rule ref="WordPress.WP.Capabilities">
-    <properties><property name="custom_capabilities" value="approve_publication" /></properties>
+    <!-- Exactly the custom capabilities registered in Roles::ALL_CUSTOM_CAPS
+         (class-roles.php) and enforced through role assignment; keep the two
+         lists in lockstep (PRV3-QA-01). -->
+    <properties><property name="custom_capabilities" value="submit_for_fact_check,complete_fact_check,submit_for_medical_review,complete_medical_review,approve_commercial_disclosure,approve_publication,approve_publication_override,manage_corrections,manage_test_protocols,manage_affiliate_registry,manage_claims,edit_claims,verify_claims,manage_test_records,approve_test_records,manage_affiliate_relationships,verify_reviewer_credentials,view_operational_readiness,view_governance_audit,approve_trust_pages,lel_manage_legal_holds" /></properties>
   </rule>
   <rule ref="PHPCompatibilityWP">
     <properties><property name="testVersion" value="8.3-" /></properties>

@@ -289,9 +289,9 @@ class Public_Content {
 
 	/** Render guide archive with topic filter and sort controls. */
 	public static function render_guide_directory(): string {
-		$page = max( 1, (int) ( $_GET['guide_page'] ?? 1 ) );
-		$sort = sanitize_key( $_GET['guide_sort'] ?? '' );
-		$topic_slug = sanitize_key( $_GET['guide_topic'] ?? '' );
+		$page = isset( $_GET['guide_page'] ) ? max( 1, (int) $_GET['guide_page'] ) : 1; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Anonymous public read; nonces do not apply.
+		$sort = sanitize_key( wp_unslash( $_GET['guide_sort'] ?? '' ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Anonymous public read; nonces do not apply.
+		$topic_slug = sanitize_key( wp_unslash( $_GET['guide_topic'] ?? '' ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Anonymous public read; nonces do not apply.
 
 		$tax_query = array();
 		if ( $topic_slug ) {

@@ -49,13 +49,13 @@ final class Content_Discovery {
 
 	/** Return an allowlisted content type. */
 	public static function requested_content_type(): string {
-		$value = isset( $_GET['content_type'] ) ? sanitize_key( wp_unslash( $_GET['content_type'] ) ) : 'all';
+		$value = isset( $_GET['content_type'] ) ? sanitize_key( wp_unslash( $_GET['content_type'] ) ) : 'all'; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only list filter; value is sanitized and causes no state change.
 		return in_array( $value, array( 'all', 'guide', 'review' ), true ) ? $value : 'all';
 	}
 
 	/** Return an allowlisted category slug from GET, or empty string. */
 	public static function requested_category(): string {
-		$value = isset( $_GET['category'] ) ? sanitize_key( wp_unslash( $_GET['category'] ) ) : '';
+		$value = isset( $_GET['category'] ) ? sanitize_key( wp_unslash( $_GET['category'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only list filter; value is sanitized and causes no state change.
 		if ( '' === $value ) {
 			return '';
 		}
@@ -65,7 +65,7 @@ final class Content_Discovery {
 
 	/** Return an allowlisted sort value. */
 	public static function requested_sort(): string {
-		$value = isset( $_GET['sort'] ) ? sanitize_key( wp_unslash( $_GET['sort'] ) ) : 'relevance';
+		$value = isset( $_GET['sort'] ) ? sanitize_key( wp_unslash( $_GET['sort'] ) ) : 'relevance'; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only list filter; value is sanitized and causes no state change.
 		return in_array( $value, array( 'relevance', 'newest', 'updated' ), true ) ? $value : 'relevance';
 	}
 

@@ -26,10 +26,10 @@ if ($probeStatus !== 0) {
 $command = 'bash ' . escapeshellarg($canonical) . ' 2>&1';
 exec($command, $output, $status);
 foreach ($output as $line) {
-    echo $line, "\n";
+    echo $line, "\n"; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- CLI-only output; no HTML context.
 }
 if ($status !== 0) {
     fwrite(STDERR, "ERROR: canonical manifest regeneration failed (exit {$status}).\n");
-    exit($status);
+    exit($status); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- CLI-only output; no HTML context.
 }
 exit(0);

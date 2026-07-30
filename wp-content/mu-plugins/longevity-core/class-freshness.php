@@ -366,8 +366,8 @@ final class Freshness {
 			return null;
 		}
 		$wpdb->last_error = '';
-		$sql      = array() === $built['params'] ? $built['sql'] : $wpdb->prepare( $built['sql'], $built['params'] );
-		$result   = $wpdb->get_var( $sql );
+		$sql      = array() === $built['params'] ? $built['sql'] : $wpdb->prepare( $built['sql'], $built['params'] ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare -- Placeholders assembled in build_meta_count_query(); values bound via prepare( $built['params'] ); table names from trusted $wpdb->prefix.
+		$result   = $wpdb->get_var( $sql ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- $sql is fully prepared above (or a params-free query over trusted-prefix tables).
 		$db_error = trim( (string) ( $wpdb->last_error ?? '' ) );
 		if ( null === $result || '' !== $db_error ) {
 			Logger::error( 'freshness_count_query_failed', array( 'reason' => '' !== $db_error ? 'db_error' : 'null_result' ) );
@@ -384,6 +384,6 @@ final class Freshness {
 		}
 		$table = Audit_Log::table_name();
 		$sql   = "SELECT COUNT(*) FROM (SELECT object_id FROM {$table} WHERE event_type = 'publication_override_used' AND object_type = 'post' GROUP BY object_id HAVING COUNT(*) >= 2) AS repeated";
-		return (int) $wpdb->get_var( $sql );
+		return (int) $wpdb->get_var( $sql ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Static aggregate whose only interpolation is a table name derived from the trusted $wpdb->prefix.
 	}
 }

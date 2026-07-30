@@ -152,11 +152,11 @@ final class Admin_UI {
 			return;
 		}
 		$user_id = get_current_user_id();
-		$present = isset( $_POST['lel_present'] ) && is_array( $_POST['lel_present'] ) ? array_map( 'sanitize_key', array_keys( wp_unslash( $_POST['lel_present'] ) ) ) : array();
+		$present = isset( $_POST['lel_present'] ) && is_array( $_POST['lel_present'] ) ? array_map( 'sanitize_key', array_keys( wp_unslash( $_POST['lel_present'] ) ) ) : array(); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Only the array keys are used, each sanitized with sanitize_key via array_map().
 
 		if ( 'review' === $post->post_type && in_array( 'review_score_dimensions', $present, true ) && isset( $_POST['review_score_dimensions_rows'] ) && is_array( $_POST['review_score_dimensions_rows'] ) ) {
 			if ( Meta_Authorization::can_write( 'review_score_dimensions', $post_id, $user_id, 'classic' ) && Meta_Authorization::can_write( 'review_score', $post_id, $user_id, 'classic' ) ) {
-				$dimensions = Review_Methodology::sanitize_dimensions( wp_unslash( $_POST['review_score_dimensions_rows'] ) );
+				$dimensions = Review_Methodology::sanitize_dimensions( wp_unslash( $_POST['review_score_dimensions_rows'] ) ); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Array is unslashed and fully sanitized by Review_Methodology::sanitize_dimensions().
 				update_post_meta( $post_id, 'review_score_dimensions', $dimensions );
 				try {
 					$calculated = Review_Methodology::calculate_score( $dimensions );
@@ -193,7 +193,7 @@ final class Admin_UI {
 			if ( ! array_key_exists( $key, $_POST ) ) {
 				continue;
 			}
-			$value     = wp_unslash( $_POST[ $key ] );
+			$value     = wp_unslash( $_POST[ $key ] ); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Unslashed here; sanitized on the next line by Meta_Registry::sanitize_by_key().
 			$sanitized = Meta_Registry::sanitize_by_key( $key, $value );
 			$old       = get_post_meta( $post_id, $key, true );
 			if ( Publication_Gates::service_only_meta( $key, $sanitized ) ) {
@@ -250,7 +250,7 @@ final class Admin_UI {
 		if ( empty( $_POST['longevity_public_results_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['longevity_public_results_nonce'] ) ), 'longevity_save_public_results' ) ) {
 			return;
 		}
-		$rows = isset( $_POST['public_test_results_rows'] ) && is_array( $_POST['public_test_results_rows'] ) ? wp_unslash( $_POST['public_test_results_rows'] ) : array();
+		$rows = isset( $_POST['public_test_results_rows'] ) && is_array( $_POST['public_test_results_rows'] ) ? wp_unslash( $_POST['public_test_results_rows'] ) : array(); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Array is unslashed here; fully sanitized by Review_Methodology::sanitize_public_results() before storage.
 		update_post_meta( $post_id, 'public_test_results', Review_Methodology::sanitize_public_results( $rows ) );
 		if ( ! empty( $_POST['longevity_approve_test_record'] ) ) {
 			Review_Methodology::approve_test_record( $post_id, get_current_user_id() );
@@ -305,7 +305,7 @@ final class Admin_UI {
 					continue;
 				}
 				$rule      = 'professional_profile_url' === $key ? 'url' : 'textarea';
-				$new_value = Meta_Registry::sanitize_value( $rule, wp_unslash( $_POST[ $key ] ) );
+				$new_value = Meta_Registry::sanitize_value( $rule, wp_unslash( $_POST[ $key ] ) ); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Unslashed and sanitized by Meta_Registry::sanitize_value().
 				if ( get_user_meta( $user_id, $key, true ) !== $new_value ) {
 					update_user_meta( $user_id, $key, $new_value );
 					$changed = true;
@@ -319,7 +319,7 @@ final class Admin_UI {
 		if ( Reviewer_Credentials::can_verify( $actor_id, $user_id ) && ! empty( $_POST['longevity_reviewer_verification_nonce'] ) && wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['longevity_reviewer_verification_nonce'] ) ), 'longevity_verify_reviewer_' . $user_id ) ) {
 			$data = array();
 			foreach ( array_keys( self::reviewer_verification_fields() ) as $key ) {
-				$data[ $key ] = isset( $_POST[ $key ] ) ? wp_unslash( $_POST[ $key ] ) : '';
+				$data[ $key ] = isset( $_POST[ $key ] ) ? wp_unslash( $_POST[ $key ] ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Unslashed here; each field is sanitized inside Reviewer_Credentials::verify().
 			}
 			Reviewer_Credentials::verify( $user_id, $data, $actor_id );
 		}
@@ -356,7 +356,7 @@ final class Admin_UI {
 		if ( ! self::can_edit_field( $post_id, 'medical_reviewer_user_id' ) ) { self::readonly_field( $post_id, 'medical_reviewer_user_id', __( 'Medical reviewer', 'longevity-core' ) ); return; }
 		$value = (int) get_post_meta( $post_id, 'medical_reviewer_user_id', true );
 		$users = get_users( array( 'capability' => 'complete_medical_review', 'orderby' => 'display_name' ) );
-		echo self::presence_marker( 'medical_reviewer_user_id' ) . '<p><label for="medical_reviewer_user_id"><strong>' . esc_html__( 'Medical reviewer', 'longevity-core' ) . '</strong></label><br><select class="widefat" id="medical_reviewer_user_id" name="medical_reviewer_user_id"><option value="0">' . esc_html__( 'Select reviewer', 'longevity-core' ) . '</option>';
+		echo self::presence_marker( 'medical_reviewer_user_id' ) . '<p><label for="medical_reviewer_user_id"><strong>' . esc_html__( 'Medical reviewer', 'longevity-core' ) . '</strong></label><br><select class="widefat" id="medical_reviewer_user_id" name="medical_reviewer_user_id"><option value="0">' . esc_html__( 'Select reviewer', 'longevity-core' ) . '</option>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- presence_marker() outputs an input tag whose key is esc_attr()-escaped; remaining output is escaped literals.
 		foreach ( $users as $user ) {
 			$status = (string) get_user_meta( $user->ID, 'credential_verification_status', true );
 			echo '<option value="' . esc_attr( (string) $user->ID ) . '" ' . selected( $value, $user->ID, false ) . '>' . esc_html( sprintf( '%1$s (ID %2$d; %3$s)', $user->display_name, $user->ID, $status ?: __( 'unverified', 'longevity-core' ) ) ) . '</option>';
@@ -369,7 +369,7 @@ final class Admin_UI {
 		if ( ! self::can_edit_field( $post_id, 'test_record_id' ) ) { self::readonly_field( $post_id, 'test_record_id', __( 'Test record', 'longevity-core' ) ); return; }
 		$value   = (int) get_post_meta( $post_id, 'test_record_id', true );
 		$records = get_posts( array( 'post_type' => 'lel_test_record', 'post_status' => 'any', 'posts_per_page' => 100, 'orderby' => array( 'title' => 'ASC', 'ID' => 'ASC' ) ) );
-		echo self::presence_marker( 'test_record_id' ) . '<p><label for="test_record_id"><strong>' . esc_html__( 'Test record', 'longevity-core' ) . '</strong></label><br><select class="widefat" id="test_record_id" name="test_record_id"><option value="0">' . esc_html__( 'Select an approved record', 'longevity-core' ) . '</option>';
+		echo self::presence_marker( 'test_record_id' ) . '<p><label for="test_record_id"><strong>' . esc_html__( 'Test record', 'longevity-core' ) . '</strong></label><br><select class="widefat" id="test_record_id" name="test_record_id"><option value="0">' . esc_html__( 'Select an approved record', 'longevity-core' ) . '</option>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- presence_marker() outputs an input tag whose key is esc_attr()-escaped; remaining output is escaped literals.
 		foreach ( $records as $record ) {
 			$status = (string) get_post_meta( $record->ID, 'approval_status', true );
 			echo '<option value="' . esc_attr( (string) $record->ID ) . '" ' . selected( $value, $record->ID, false ) . '>' . esc_html( sprintf( '%1$s (ID %2$d; %3$s)', get_the_title( $record ), $record->ID, $status ?: __( 'not approved', 'longevity-core' ) ) ) . '</option>';
@@ -413,7 +413,7 @@ final class Admin_UI {
 	/** Render an accessible repeatable dimension editor backed by the existing meta shape. */
 	private static function score_dimensions_editor( int $post_id ): void {
 		if ( ! self::can_edit_field( $post_id, 'review_score_dimensions' ) ) { self::readonly_field( $post_id, 'review_score_dimensions', __( 'Scoring dimensions', 'longevity-core' ) ); return; }
-		echo self::presence_marker( 'review_score_dimensions' );
+		echo self::presence_marker( 'review_score_dimensions' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- presence_marker() outputs an input tag whose key is esc_attr()-escaped.
 		$dimensions = get_post_meta( $post_id, 'review_score_dimensions', true );
 		$dimensions = is_array( $dimensions ) && $dimensions ? $dimensions : array( array( 'name' => '', 'score' => '', 'weight' => '' ) );
 		echo '<fieldset id="review_score_dimensions" class="lel-score-editor"><legend><strong>' . esc_html__( 'Score dimensions', 'longevity-core' ) . '</strong></legend><p class="description">' . esc_html__( 'Weights must total 100%. The calculated score is saved server-side; confidence remains a separate editorial judgment.', 'longevity-core' ) . '</p><div class="lel-score-table-wrap"><table><thead><tr><th scope="col">' . esc_html__( 'Dimension', 'longevity-core' ) . '</th><th scope="col">' . esc_html__( 'Score (0–5)', 'longevity-core' ) . '</th><th scope="col">' . esc_html__( 'Weight %', 'longevity-core' ) . '</th><th scope="col">' . esc_html__( 'Action', 'longevity-core' ) . '</th></tr></thead><tbody data-lel-score-rows>';
@@ -437,7 +437,7 @@ final class Admin_UI {
 			return;
 		}
 		$value = get_post_meta( $post_id, $key, true );
-		echo self::presence_marker( $key ) . '<p><label for="' . esc_attr( $key ) . '"><strong>' . esc_html( $label ) . '</strong></label><br><textarea class="widefat" rows="3" id="' . esc_attr( $key ) . '" name="' . esc_attr( $key ) . '" aria-describedby="' . esc_attr( $key ) . '-help">' . esc_textarea( (string) $value ) . '</textarea>' . self::field_help( $key ) . '</p>';
+		echo self::presence_marker( $key ) . '<p><label for="' . esc_attr( $key ) . '"><strong>' . esc_html( $label ) . '</strong></label><br><textarea class="widefat" rows="3" id="' . esc_attr( $key ) . '" name="' . esc_attr( $key ) . '" aria-describedby="' . esc_attr( $key ) . '-help">' . esc_textarea( (string) $value ) . '</textarea>' . self::field_help( $key ) . '</p>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- presence_marker() and field_help() output markup built only from esc_attr()/esc_html()-escaped values.
 	}
 
 	/** Render one structured public test-result row. */
@@ -464,7 +464,7 @@ final class Admin_UI {
 		$attrs = '';
 		if ( null !== $min ) { $attrs .= ' min="' . esc_attr( (string) $min ) . '"'; }
 		if ( null !== $max ) { $attrs .= ' max="' . esc_attr( (string) $max ) . '"'; }
-		echo self::presence_marker( $key ) . '<p><label for="' . esc_attr( $key ) . '"><strong>' . esc_html( $label ) . '</strong></label><br><input class="widefat" type="number" step="' . esc_attr( (string) $step ) . '"' . $attrs . ' id="' . esc_attr( $key ) . '" name="' . esc_attr( $key ) . '" value="' . esc_attr( (string) $value ) . '"></p>';
+		echo self::presence_marker( $key ) . '<p><label for="' . esc_attr( $key ) . '"><strong>' . esc_html( $label ) . '</strong></label><br><input class="widefat" type="number" step="' . esc_attr( (string) $step ) . '"' . $attrs . ' id="' . esc_attr( $key ) . '" name="' . esc_attr( $key ) . '" value="' . esc_attr( (string) $value ) . '"></p>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- presence_marker() output and $attrs are built only from esc_attr()-escaped values.
 	}
 
 	private static function input( int $post_id, string $key, string $label, string $type ): void {
@@ -473,7 +473,7 @@ final class Admin_UI {
 			return;
 		}
 		$value = get_post_meta( $post_id, $key, true );
-		echo self::presence_marker( $key ) . '<p><label for="' . esc_attr( $key ) . '"><strong>' . esc_html( $label ) . '</strong></label><br><input class="widefat" type="' . esc_attr( $type ) . '" id="' . esc_attr( $key ) . '" name="' . esc_attr( $key ) . '" value="' . esc_attr( (string) $value ) . '" aria-describedby="' . esc_attr( $key ) . '-help">' . self::field_help( $key ) . '</p>';
+		echo self::presence_marker( $key ) . '<p><label for="' . esc_attr( $key ) . '"><strong>' . esc_html( $label ) . '</strong></label><br><input class="widefat" type="' . esc_attr( $type ) . '" id="' . esc_attr( $key ) . '" name="' . esc_attr( $key ) . '" value="' . esc_attr( (string) $value ) . '" aria-describedby="' . esc_attr( $key ) . '-help">' . self::field_help( $key ) . '</p>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- presence_marker() and field_help() output markup built only from esc_attr()/esc_html()-escaped values.
 	}
 
 	private static function checkbox( int $post_id, string $key, string $label ): void {
@@ -482,7 +482,7 @@ final class Admin_UI {
 			return;
 		}
 		$value = (bool) get_post_meta( $post_id, $key, true );
-		echo self::presence_marker( $key ) . '<input type="hidden" name="' . esc_attr( $key ) . '" value="0"><p><label><input type="checkbox" name="' . esc_attr( $key ) . '" value="1" ' . checked( $value, true, false ) . '> ' . esc_html( $label ) . '</label></p>';
+		echo self::presence_marker( $key ) . '<input type="hidden" name="' . esc_attr( $key ) . '" value="0"><p><label><input type="checkbox" name="' . esc_attr( $key ) . '" value="1" ' . checked( $value, true, false ) . '> ' . esc_html( $label ) . '</label></p>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- presence_marker() outputs an input tag whose key is esc_attr()-escaped; remaining output is escaped.
 	}
 
 	/** Render an explicit snapshot-approval action separate from editable workflow state. */
@@ -499,11 +499,11 @@ final class Admin_UI {
 			return;
 		}
 		$value = (string) get_post_meta( $post_id, $key, true );
-		echo self::presence_marker( $key ) . '<p><label for="' . esc_attr( $key ) . '"><strong>' . esc_html( $label ) . '</strong></label><br><select class="widefat" id="' . esc_attr( $key ) . '" name="' . esc_attr( $key ) . '" aria-describedby="' . esc_attr( $key ) . '-help">';
+		echo self::presence_marker( $key ) . '<p><label for="' . esc_attr( $key ) . '"><strong>' . esc_html( $label ) . '</strong></label><br><select class="widefat" id="' . esc_attr( $key ) . '" name="' . esc_attr( $key ) . '" aria-describedby="' . esc_attr( $key ) . '-help">'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- presence_marker() outputs an input tag whose key is esc_attr()-escaped; remaining output is escaped literals.
 		foreach ( $options as $option => $option_label ) {
 			echo '<option value="' . esc_attr( $option ) . '" ' . selected( $value, $option, false ) . '>' . esc_html( $option_label ) . '</option>';
 		}
-		echo '</select>' . self::field_help( $key ) . '</p>';
+		echo '</select>' . self::field_help( $key ) . '</p>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- field_help() outputs markup built only from esc_attr()/esc_html()-escaped values.
 	}
 
 	/** Whether the current actor may edit a field. */

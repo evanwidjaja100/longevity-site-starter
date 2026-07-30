@@ -60,7 +60,7 @@ final class Governed_Query {
 			}
 			if ( count( $ids ) > $hard_cap ) {
 				throw new \RuntimeException(
-					sprintf( 'Governed query for meta %s exceeded the safety cap of %d records; refusing to truncate.', $meta_key, $hard_cap )
+					esc_html( sprintf( 'Governed query for meta %s exceeded the safety cap of %d records; refusing to truncate.', $meta_key, $hard_cap ) )
 				);
 			}
 			$last_id = (int) end( $batch );

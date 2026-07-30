@@ -86,6 +86,7 @@ final class Dependency_Index {
 		$table = self::table_name();
 		$result = $wpdb->query(
 			$wpdb->prepare(
+				// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name derives from the trusted $wpdb->prefix; values use prepared placeholders.
 				"INSERT IGNORE INTO {$table} (dependency_type, dependency_id, parent_post_id, created_at) VALUES (%s, %d, %d, NOW())",
 				$type,
 				$dep_id,
@@ -93,7 +94,7 @@ final class Dependency_Index {
 			)
 		);
 		if ( false === $result ) {
-			throw new \RuntimeException( 'Dependency registration failed: ' . self::database_error( $wpdb ) );
+			throw new \RuntimeException( esc_html( 'Dependency registration failed: ' . self::database_error( $wpdb ) ) );
 		}
 	}
 
@@ -112,6 +113,7 @@ final class Dependency_Index {
 		$table = self::table_name();
 		$result = $wpdb->query(
 			$wpdb->prepare(
+				// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name derives from the trusted $wpdb->prefix; values use prepared placeholders.
 				"DELETE FROM {$table} WHERE dependency_type = %s AND dependency_id = %d AND parent_post_id = %d",
 				$type,
 				$dep_id,
@@ -119,7 +121,7 @@ final class Dependency_Index {
 			)
 		);
 		if ( false === $result ) {
-			throw new \RuntimeException( 'Dependency removal failed: ' . self::database_error( $wpdb ) );
+			throw new \RuntimeException( esc_html( 'Dependency removal failed: ' . self::database_error( $wpdb ) ) );
 		}
 	}
 
@@ -137,13 +139,14 @@ final class Dependency_Index {
 		$table = self::table_name();
 		$result = $wpdb->query(
 			$wpdb->prepare(
+				// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name derives from the trusted $wpdb->prefix; values use prepared placeholders.
 				"DELETE FROM {$table} WHERE dependency_type = %s AND dependency_id = %d",
 				$type,
 				$dep_id
 			)
 		);
 		if ( false === $result ) {
-			throw new \RuntimeException( 'Dependency cleanup failed: ' . self::database_error( $wpdb ) );
+			throw new \RuntimeException( esc_html( 'Dependency cleanup failed: ' . self::database_error( $wpdb ) ) );
 		}
 	}
 
@@ -164,12 +167,13 @@ final class Dependency_Index {
 		}
 		$table = self::table_name();
 		if ( false === $wpdb->query( 'START TRANSACTION' ) ) {
-			throw new \RuntimeException( 'Could not start dependency-index replacement transaction: ' . self::database_error( $wpdb ) );
+			throw new \RuntimeException( esc_html( 'Could not start dependency-index replacement transaction: ' . self::database_error( $wpdb ) ) );
 		}
 		$committed = false;
 		try {
 			$deleted = $wpdb->query(
 				$wpdb->prepare(
+					// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name derives from the trusted $wpdb->prefix; values use prepared placeholders.
 					"DELETE FROM {$table} WHERE dependency_type = %s AND parent_post_id = %d",
 					$type,
 					$parent
@@ -184,6 +188,7 @@ final class Dependency_Index {
 				}
 				$inserted = $wpdb->query(
 					$wpdb->prepare(
+						// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name derives from the trusted $wpdb->prefix; values use prepared placeholders.
 						"INSERT IGNORE INTO {$table} (dependency_type, dependency_id, parent_post_id, created_at) VALUES (%s, %d, %d, NOW())",
 						$type,
 						$dep_id,
@@ -252,7 +257,7 @@ final class Dependency_Index {
 				)
 			);
 			if ( self::database_failed( $wpdb ) ) {
-				throw new \RuntimeException( 'Dependency backfill query failed: ' . (string) $wpdb->last_error );
+				throw new \RuntimeException( esc_html( 'Dependency backfill query failed: ' . (string) $wpdb->last_error ) );
 			}
 			if ( ! is_array( $page ) || array() === $page ) {
 				break;
@@ -323,7 +328,7 @@ final class Dependency_Index {
 			self::clear_database_error( $wpdb );
 			$page             = $wpdb->get_col( $wpdb->prepare( "SELECT ID FROM {$wpdb->posts} WHERE post_type IN ('post','review') AND post_status NOT IN ('trash','auto-draft') AND ID > %d ORDER BY ID ASC LIMIT %d", $cursor, $batch ) );
 			if ( self::database_failed( $wpdb ) ) {
-				throw new \RuntimeException( 'Dependency drift parent query failed: ' . self::database_error( $wpdb ) );
+				throw new \RuntimeException( esc_html( 'Dependency drift parent query failed: ' . self::database_error( $wpdb ) ) );
 			}
 			if ( ! is_array( $page ) || array() === $page ) {
 				break;
@@ -345,9 +350,10 @@ final class Dependency_Index {
 			}
 		}
 		self::clear_database_error( $wpdb );
+		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Table name derives from the trusted $wpdb->prefix; the query has no external values.
 		$parents          = $wpdb->get_col( 'SELECT DISTINCT parent_post_id FROM ' . self::table_name() );
 		if ( self::database_failed( $wpdb ) ) {
-			throw new \RuntimeException( 'Dependency orphan query failed: ' . self::database_error( $wpdb ) );
+			throw new \RuntimeException( esc_html( 'Dependency orphan query failed: ' . self::database_error( $wpdb ) ) );
 		}
 		foreach ( array_unique( array_map( 'intval', is_array( $parents ) ? $parents : array() ) ) as $parent_id ) {
 			if ( ! isset( $seen[ $parent_id ] ) ) {
@@ -377,6 +383,7 @@ final class Dependency_Index {
 			return null;
 		}
 		self::clear_database_error( $wpdb );
+		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Table name derives from the trusted $wpdb->prefix; the predicate is a literal.
 		$count = $wpdb->get_var( 'SELECT COUNT(*) FROM ' . self::table_name() . " WHERE dependency_type = 'lel_affiliate'" );
 		if ( self::database_failed( $wpdb ) || null === $count ) {
 			return null;
@@ -390,7 +397,7 @@ final class Dependency_Index {
 		self::clear_database_error( $wpdb );
 		$claim_ids = Governed_Query::ids_by_meta( array( 'lel_claim' ), 'post_id', (string) $parent );
 		if ( self::database_failed( $wpdb ) ) {
-			throw new \RuntimeException( 'Claim dependency query failed: ' . self::database_error( $wpdb ) );
+			throw new \RuntimeException( esc_html( 'Claim dependency query failed: ' . self::database_error( $wpdb ) ) );
 		}
 		$source_ids = array();
 		foreach ( $claim_ids as $claim_id ) {
@@ -417,9 +424,10 @@ final class Dependency_Index {
 		global $wpdb;
 		$table            = self::table_name();
 		self::clear_database_error( $wpdb );
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name derives from the trusted $wpdb->prefix; the value uses a prepared placeholder.
 		$rows             = $wpdb->get_results( $wpdb->prepare( "SELECT dependency_type, dependency_id FROM {$table} WHERE parent_post_id = %d", $parent ), ARRAY_A );
 		if ( self::database_failed( $wpdb ) ) {
-			throw new \RuntimeException( 'Dependency drift edge query failed: ' . self::database_error( $wpdb ) );
+			throw new \RuntimeException( esc_html( 'Dependency drift edge query failed: ' . self::database_error( $wpdb ) ) );
 		}
 		$sets = array();
 		foreach ( is_array( $rows ) ? $rows : array() as $row ) {
@@ -477,7 +485,7 @@ final class Dependency_Index {
 		self::clear_database_error( $wpdb );
 		$ids              = $wpdb->get_col( "SELECT ID FROM {$wpdb->posts} WHERE post_type = 'lel_affiliate' AND post_status NOT IN ('trash','auto-draft') ORDER BY ID ASC" );
 		if ( self::database_failed( $wpdb ) ) {
-			throw new \RuntimeException( 'Affiliate dependency query failed: ' . self::database_error( $wpdb ) );
+			throw new \RuntimeException( esc_html( 'Affiliate dependency query failed: ' . self::database_error( $wpdb ) ) );
 		}
 		return array_values( array_unique( array_map( 'intval', is_array( $ids ) ? $ids : array() ) ) );
 	}
@@ -485,7 +493,7 @@ final class Dependency_Index {
 	/** Persist an option while distinguishing a no-op from a failed write. */
 	private static function write_option( string $name, $value ): void {
 		if ( ! update_option( $name, $value, false ) && get_option( $name, null ) !== $value ) {
-			throw new \RuntimeException( 'Could not persist dependency backfill option ' . $name . '.' );
+			throw new \RuntimeException( esc_html( 'Could not persist dependency backfill option ' . $name . '.' ) );
 		}
 	}
 
@@ -523,13 +531,14 @@ final class Dependency_Index {
 			self::clear_database_error( $wpdb );
 			$ids = $wpdb->get_col(
 				$wpdb->prepare(
+					// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name derives from the trusted $wpdb->prefix; values use prepared placeholders.
 					"SELECT parent_post_id FROM {$table} WHERE dependency_type = %s AND dependency_id = %d",
 					$type,
 					$dep_id
 				)
 			);
 			if ( self::database_failed( $wpdb ) ) {
-				throw new \RuntimeException( 'Dependency parent lookup failed: ' . self::database_error( $wpdb ) );
+				throw new \RuntimeException( esc_html( 'Dependency parent lookup failed: ' . self::database_error( $wpdb ) ) );
 			}
 		}
 
@@ -608,7 +617,7 @@ final class Dependency_Index {
 		self::clear_database_error( $wpdb );
 		$ids = Governed_Query::ids_by_meta( $post_types, $meta_key, $meta_value );
 		if ( self::database_failed( $wpdb ) ) {
-			throw new \RuntimeException( 'Authoritative dependency lookup failed: ' . self::database_error( $wpdb ) );
+			throw new \RuntimeException( esc_html( 'Authoritative dependency lookup failed: ' . self::database_error( $wpdb ) ) );
 		}
 		return array_map( 'intval', $ids );
 	}

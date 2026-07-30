@@ -125,7 +125,7 @@ final class Approval_Service {
 	 */
 	private static function enqueue_durably( array $parent_ids, string $reason, int $actor_id ): void {
 		if ( ! Audit_Log::request_is_healthy() ) {
-			throw new \RuntimeException( 'Invalidation enqueue blocked: ' . Audit_Log::unhealthy_reason() );
+			throw new \RuntimeException( esc_html( 'Invalidation enqueue blocked: ' . Audit_Log::unhealthy_reason() ) );
 		}
 		try {
 			Invalidation_Queue::enqueue_in_transaction( $parent_ids, $reason, $actor_id );
@@ -326,7 +326,7 @@ final class Approval_Service {
 	/** Invalidate an approval type and project an explicit stale state. */
 	public static function invalidate( int $post_id, string $approval_type, string $reason, int $actor_id = 0 ): void {
 		if ( ! Audit_Log::request_is_healthy() ) {
-			throw new \RuntimeException( 'Approval invalidation blocked: ' . Audit_Log::unhealthy_reason() );
+			throw new \RuntimeException( esc_html( 'Approval invalidation blocked: ' . Audit_Log::unhealthy_reason() ) );
 		}
 		if ( self::$mutating ) {
 			return;
@@ -365,10 +365,10 @@ final class Approval_Service {
 	/** Invalidate snapshots when post content materially changes. */
 	public static function invalidate_direct( int $post_id, string $reason, int $actor_id = 0, bool $check_current = false, string $idempotency_key = '' ): int {
 		if ( ! Audit_Log::request_is_healthy() ) {
-			throw new \RuntimeException( 'Approval invalidation blocked: ' . Audit_Log::unhealthy_reason() );
+			throw new \RuntimeException( esc_html( 'Approval invalidation blocked: ' . Audit_Log::unhealthy_reason() ) );
 		}
 		if ( ! Publication_Lock::acquire( $post_id ) ) {
-			throw new \RuntimeException( sprintf( 'Could not acquire publication lock for post %d.', $post_id ) );
+			throw new \RuntimeException( esc_html( sprintf( 'Could not acquire publication lock for post %d.', $post_id ) ) );
 		}
 		self::$mutating = true;
 		$intent_id      = 0;
@@ -615,7 +615,7 @@ final class Approval_Service {
 		}
 		$changed = Approval_Repository::invalidate( $post_id, $type, $reason, $actor_id );
 		if ( is_object( $wpdb ) && '' !== trim( (string) ( $wpdb->last_error ?? '' ) ) ) {
-			throw new \RuntimeException( 'Approval invalidation persistence failed: ' . substr( (string) $wpdb->last_error, 0, 200 ) );
+			throw new \RuntimeException( esc_html( 'Approval invalidation persistence failed: ' . substr( (string) $wpdb->last_error, 0, 200 ) ) );
 		}
 		return $changed;
 	}
@@ -628,7 +628,7 @@ final class Approval_Service {
 		}
 		update_post_meta( $post_id, $status_key, 'stale' );
 		if ( is_object( $wpdb ) && '' !== trim( (string) ( $wpdb->last_error ?? '' ) ) ) {
-			throw new \RuntimeException( 'Approval status projection failed: ' . substr( (string) $wpdb->last_error, 0, 200 ) );
+			throw new \RuntimeException( esc_html( 'Approval status projection failed: ' . substr( (string) $wpdb->last_error, 0, 200 ) ) );
 		}
 	}
 

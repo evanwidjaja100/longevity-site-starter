@@ -57,7 +57,7 @@ final class Review_Workflow {
 				'meta_value'     => (string) $user_id,
 			)
 		);
-		$selected_id = isset( $_GET['post_id'] ) ? absint( $_GET['post_id'] ) : 0;
+		$selected_id = isset( $_GET['post_id'] ) ? absint( $_GET['post_id'] ) : 0; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only list filter; value is sanitized and causes no state change.
 
 		echo '<div class="wrap"><h1>' . esc_html__( 'Assigned medical reviews', 'longevity-core' ) . '</h1>';
 		self::render_notice();
@@ -87,7 +87,7 @@ final class Review_Workflow {
 				),
 			)
 		);
-		$selected_id = isset( $_GET['post_id'] ) ? absint( $_GET['post_id'] ) : 0;
+		$selected_id = isset( $_GET['post_id'] ) ? absint( $_GET['post_id'] ) : 0; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only list filter; value is sanitized and causes no state change.
 
 		echo '<div class="wrap"><h1>' . esc_html__( 'Fact-check queue', 'longevity-core' ) . '</h1>';
 		self::render_notice();
@@ -279,7 +279,7 @@ final class Review_Workflow {
 
 	/** Display a redirected result message. */
 	private static function render_notice(): void {
-		$message = isset( $_GET['lel_message'] ) ? sanitize_key( $_GET['lel_message'] ) : '';
+		$message = isset( $_GET['lel_message'] ) ? sanitize_key( $_GET['lel_message'] ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only list filter; value is sanitized and causes no state change.
 		$messages = array(
 			'credentials_required' => array( 'error', __( 'Verified credentials are required before completion.', 'longevity-core' ) ),
 			'required_fields'      => array( 'error', __( 'Complete every required field before submitting.', 'longevity-core' ) ),
@@ -304,6 +304,7 @@ final class Review_Workflow {
 
 	/** Read an unslashed scalar POST value. */
 	private static function posted( string $key ): string {
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Raw POST reader; callers submit_medical_review()/submit_fact_check() verify the nonce via check_admin_referer() and sanitize each value with Meta_Registry::sanitize_value()/sanitize_key().
 		return isset( $_POST[ $key ] ) ? (string) wp_unslash( $_POST[ $key ] ) : '';
 	}
 

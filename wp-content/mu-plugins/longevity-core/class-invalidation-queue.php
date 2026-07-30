@@ -137,10 +137,12 @@ final class Invalidation_Queue {
 		}
 		$table = self::table_name();
 		// Backfill the marker on legacy open rows.
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name derives from the trusted $wpdb->prefix; the statement has no external values.
 		if ( false === $wpdb->query( "UPDATE {$table} SET open_marker = 1 WHERE status IN ('pending','processing') AND open_marker IS NULL" ) ) {
 			return false;
 		}
 		// Clear the marker on legacy terminal rows.
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name derives from the trusted $wpdb->prefix; the statement has no external values.
 		if ( false === $wpdb->query( "UPDATE {$table} SET open_marker = NULL WHERE status NOT IN ('pending','processing') AND open_marker IS NOT NULL" ) ) {
 			return false;
 		}
@@ -149,10 +151,12 @@ final class Invalidation_Queue {
 		}
 		// Collapse duplicate open rows: keep the lowest id per parent.
 		if ( false === $wpdb->query(
+			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name derives from the trusted $wpdb->prefix; the statement has no external values.
 			"UPDATE {$table} q INNER JOIN (SELECT parent_post_id, MIN(id) AS keep_id FROM {$table} WHERE open_marker = 1 GROUP BY parent_post_id) k ON q.parent_post_id = k.parent_post_id SET q.open_marker = NULL, q.status = 'superseded', q.processed_at = UTC_TIMESTAMP() WHERE q.open_marker = 1 AND q.id <> k.keep_id"
 		) ) {
 			return false;
 		}
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Schema DDL with identifiers from the trusted $wpdb->prefix; DDL cannot be parameterized.
 		if ( false === $wpdb->query( "ALTER TABLE {$table} ADD UNIQUE KEY uniq_open_parent (parent_post_id, open_marker)" ) ) {
 			return false;
 		}
@@ -210,7 +214,7 @@ final class Invalidation_Queue {
 					Approval_Service::invalidate_direct( $pid, $reason . ':enqueue_fallback', $actor_id );
 				} catch ( \Throwable $error ) {
 					self::record_fallback_failure( $pid, $error->getMessage() );
-					throw new \RuntimeException( sprintf( 'Invalidation could not be queued or applied for post %d.', $pid ), 0, $error );
+					throw new \RuntimeException( esc_html( sprintf( 'Invalidation could not be queued or applied for post %d.', $pid ) ), 0, $error ); // phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- $error is the caught \Throwable passed as the previous exception for chaining, not output.
 				}
 			}
 		}
@@ -229,7 +233,7 @@ final class Invalidation_Queue {
 		$reason = substr( sanitize_text_field( $reason ), 0, 191 );
 		if ( false === self::insert_open_row( $parent_id, $reason, $actor_id ) ) {
 			self::record_enqueue_failure( $parent_id, self::database_error( $GLOBALS['wpdb'] ) );
-			throw new \RuntimeException( sprintf( 'Invalidation reconciliation could not be queued for post %d.', $parent_id ) );
+			throw new \RuntimeException( esc_html( sprintf( 'Invalidation reconciliation could not be queued for post %d.', $parent_id ) ) );
 		}
 		self::schedule_processing( 5 );
 	}
@@ -259,7 +263,7 @@ final class Invalidation_Queue {
 		}
 		$reason = substr( sanitize_text_field( $reason ), 0, 191 );
 		if ( false === $wpdb->query( 'START TRANSACTION' ) ) {
-			throw new \RuntimeException( 'Could not open transaction for invalidation enqueue: ' . self::database_error( $wpdb ) );
+			throw new \RuntimeException( esc_html( 'Could not open transaction for invalidation enqueue: ' . self::database_error( $wpdb ) ) );
 		}
 		$committed = false;
 		try {
@@ -293,6 +297,7 @@ final class Invalidation_Queue {
 		$table = self::table_name();
 		return $wpdb->query(
 			$wpdb->prepare(
+				// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name derives from the trusted $wpdb->prefix; values use prepared placeholders.
 				"INSERT INTO {$table} (parent_post_id, reason, actor_id, status, open_marker, created_at) VALUES (%d, %s, %d, 'pending', 1, UTC_TIMESTAMP()) ON DUPLICATE KEY UPDATE id = id",
 				$parent_id,
 				$reason,
@@ -325,7 +330,7 @@ final class Invalidation_Queue {
 				Approval_Service::invalidate_direct( $post_id, $reason, $actor_id );
 			} catch ( \Throwable $error ) {
 				self::record_fallback_failure( $post_id, $error->getMessage() );
-				throw new \RuntimeException( sprintf( 'Invalidation queue unavailable and synchronous invalidation failed for post %d.', $post_id ), 0, $error );
+				throw new \RuntimeException( esc_html( sprintf( 'Invalidation queue unavailable and synchronous invalidation failed for post %d.', $post_id ) ), 0, $error ); // phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- $error is the caught \Throwable passed as the previous exception for chaining, not output.
 			}
 		}
 	}
@@ -361,13 +366,14 @@ final class Invalidation_Queue {
 		$table   = self::table_name();
 		$claimed = $wpdb->query(
 			$wpdb->prepare(
+				// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name derives from the trusted $wpdb->prefix; values use prepared placeholders.
 				"UPDATE {$table} SET status = 'processing', lease_owner = %s, lease_expires_at = DATE_ADD(UTC_TIMESTAMP(), INTERVAL %d SECOND) WHERE open_marker = 1 AND (status = 'pending' OR (status = 'processing' AND lease_expires_at < UTC_TIMESTAMP())) ORDER BY id ASC LIMIT 1",
 				$worker,
 				self::LEASE_SECONDS
 			)
 		);
 		if ( false === $claimed ) {
-			throw new \RuntimeException( 'Invalidation lease claim failed: ' . self::database_error( $wpdb ) );
+			throw new \RuntimeException( esc_html( 'Invalidation lease claim failed: ' . self::database_error( $wpdb ) ) );
 		}
 		if ( 0 === (int) $claimed ) {
 			return null;
@@ -378,13 +384,14 @@ final class Invalidation_Queue {
 		self::clear_database_error( $wpdb );
 		$row = $wpdb->get_row(
 			$wpdb->prepare(
+				// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name derives from the trusted $wpdb->prefix; the value uses a prepared placeholder.
 				"SELECT * FROM {$table} WHERE lease_owner = %s AND status = 'processing' LIMIT 1",
 				$worker
 			),
 			ARRAY_A
 		);
 		if ( self::database_failed( $wpdb ) ) {
-			throw new \RuntimeException( 'Claimed invalidation row could not be loaded: ' . self::database_error( $wpdb ) );
+			throw new \RuntimeException( esc_html( 'Claimed invalidation row could not be loaded: ' . self::database_error( $wpdb ) ) );
 		}
 		if ( ! is_array( $row ) ) {
 			throw new \RuntimeException( 'Invalidation lease was acquired but its row was not found.' );
@@ -425,6 +432,7 @@ final class Invalidation_Queue {
 				$audit_id    = Approval_Service::invalidate_direct( $post_id, $reason, $actor, true, 'invalidation_queue:' . $job_id );
 				$transitioned = $wpdb->query(
 					$wpdb->prepare(
+						// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name derives from the trusted $wpdb->prefix; values use prepared placeholders.
 						"UPDATE {$table} SET status = 'completed', open_marker = NULL, lease_owner = NULL, lease_expires_at = NULL, audit_event_id = %d, processed_at = UTC_TIMESTAMP() WHERE id = %d AND status = 'processing' AND lease_owner = %s",
 						$audit_id,
 						$job_id,
@@ -445,6 +453,7 @@ final class Invalidation_Queue {
 				if ( $retries >= self::MAX_RETRIES ) {
 					$transitioned = $wpdb->query(
 						$wpdb->prepare(
+							// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name derives from the trusted $wpdb->prefix; values use prepared placeholders.
 							"UPDATE {$table} SET status = 'failed', retry_count = %d, last_error = %s, open_marker = NULL, lease_owner = NULL, lease_expires_at = NULL, processed_at = UTC_TIMESTAMP() WHERE id = %d AND lease_owner = %s",
 							$retries,
 							$error,
@@ -458,7 +467,7 @@ final class Invalidation_Queue {
 					$backoff = min( self::MAX_RETRY_BACKOFF_SECONDS, self::RETRY_BACKOFF_SECONDS * ( 2 ** ( $retries - 1 ) ) );
 					$transitioned = $wpdb->query(
 						$wpdb->prepare(
-							"UPDATE {$table} SET retry_count = %d, last_error = %s, lease_expires_at = DATE_ADD(UTC_TIMESTAMP(), INTERVAL %d SECOND) WHERE id = %d AND lease_owner = %s",
+							"UPDATE {$table} SET retry_count = %d, last_error = %s, lease_expires_at = DATE_ADD(UTC_TIMESTAMP(), INTERVAL %d SECOND) WHERE id = %d AND lease_owner = %s", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Trusted $wpdb->prefix table; values bound via placeholders.
 							$retries,
 							$error,
 							$backoff,
@@ -477,9 +486,9 @@ final class Invalidation_Queue {
 
 		// Reschedule if more work remains.
 		self::clear_database_error( $wpdb );
-		$remaining        = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table} WHERE open_marker = 1" );
+		$remaining        = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table} WHERE open_marker = 1" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Trusted $wpdb->prefix table; no user-supplied values.
 		if ( self::database_failed( $wpdb ) ) {
-			throw new \RuntimeException( 'Could not inspect remaining invalidation work: ' . self::database_error( $wpdb ) );
+			throw new \RuntimeException( esc_html( 'Could not inspect remaining invalidation work: ' . self::database_error( $wpdb ) ) );
 		}
 		if ( $remaining > 0 ) {
 			self::schedule_processing( self::RETRY_BACKOFF_SECONDS );
@@ -523,12 +532,12 @@ final class Invalidation_Queue {
 		$cutoff = gmdate( 'Y-m-d H:i:s', time() - ( $older_than_days * DAY_IN_SECONDS ) );
 		$deleted = $wpdb->query(
 			$wpdb->prepare(
-				"DELETE FROM {$table} WHERE status = 'completed' AND audit_event_id IS NOT NULL AND processed_at < %s",
+				"DELETE FROM {$table} WHERE status = 'completed' AND audit_event_id IS NOT NULL AND processed_at < %s", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Trusted $wpdb->prefix table; cutoff bound via placeholder.
 				$cutoff
 			)
 		);
 		if ( false === $deleted ) {
-			throw new \RuntimeException( 'Could not purge audit-backed invalidation jobs: ' . self::database_error( $wpdb ) );
+			throw new \RuntimeException( esc_html( 'Could not purge audit-backed invalidation jobs: ' . self::database_error( $wpdb ) ) );
 		}
 		return (int) $deleted;
 	}
@@ -537,9 +546,9 @@ final class Invalidation_Queue {
 	private static function scalar( string $sql ): int {
 		global $wpdb;
 		self::clear_database_error( $wpdb );
-		$value            = $wpdb->get_var( $sql );
+		$value            = $wpdb->get_var( $sql ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Callers pass literal COUNT/TIMESTAMPDIFF SQL over the trusted $wpdb->prefix table; no user input.
 		if ( self::database_failed( $wpdb ) ) {
-			throw new \RuntimeException( 'Invalidation queue read failed: ' . self::database_error( $wpdb ) );
+			throw new \RuntimeException( esc_html( 'Invalidation queue read failed: ' . self::database_error( $wpdb ) ) );
 		}
 		return (int) $value;
 	}
