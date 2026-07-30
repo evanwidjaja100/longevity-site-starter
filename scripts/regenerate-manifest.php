@@ -9,27 +9,27 @@
 
 declare(strict_types=1);
 
-$root      = dirname(__DIR__);
+$root      = dirname( __DIR__ );
 $canonical = $root . DIRECTORY_SEPARATOR . 'scripts' . DIRECTORY_SEPARATOR . 'regenerate-manifest.sh';
 
-if (! is_file($canonical)) {
-    fwrite(STDERR, "ERROR: canonical manifest script is missing.\n");
-    exit(1);
+if ( ! is_file( $canonical ) ) {
+	fwrite( STDERR, "ERROR: canonical manifest script is missing.\n" );
+	exit( 1 );
 }
 
-exec('git -C ' . escapeshellarg($root) . ' rev-parse --is-inside-work-tree 2>&1', $probe, $probeStatus);
-if ($probeStatus !== 0) {
-    fwrite(STDERR, "ERROR: not a Git checkout; refusing to write a manifest.\n");
-    exit(1);
+exec( 'git -C ' . escapeshellarg( $root ) . ' rev-parse --is-inside-work-tree 2>&1', $probe, $probeStatus );
+if ( $probeStatus !== 0 ) {
+	fwrite( STDERR, "ERROR: not a Git checkout; refusing to write a manifest.\n" );
+	exit( 1 );
 }
 
-$command = 'bash ' . escapeshellarg($canonical) . ' 2>&1';
-exec($command, $output, $status);
-foreach ($output as $line) {
-    echo $line, "\n"; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- CLI-only output; no HTML context.
+$command = 'bash ' . escapeshellarg( $canonical ) . ' 2>&1';
+exec( $command, $output, $status );
+foreach ( $output as $line ) {
+	echo $line, "\n"; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- CLI-only output; no HTML context.
 }
-if ($status !== 0) {
-    fwrite(STDERR, "ERROR: canonical manifest regeneration failed (exit {$status}).\n");
-    exit($status); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- CLI-only output; no HTML context.
+if ( $status !== 0 ) {
+	fwrite( STDERR, "ERROR: canonical manifest regeneration failed (exit {$status}).\n" );
+	exit( $status ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- CLI-only output; no HTML context.
 }
-exit(0);
+exit( 0 );

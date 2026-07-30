@@ -11,12 +11,24 @@ defined( 'ABSPATH' ) || exit;
 
 /** Identifies due records without rewriting, approving, or publishing content. */
 final class Freshness {
-	private const HOOK = 'lel_daily_freshness';
+	private const HOOK    = 'lel_daily_freshness';
 	private const WORKERS = array(
-		'freshness'    => array( 'hook' => self::HOOK, 'max_age' => 172800 ),
-		'invalidation' => array( 'hook' => 'lel_invalidation_queue_process', 'max_age' => 300 ),
-		'outbox'       => array( 'hook' => 'lel_notification_outbox_send', 'max_age' => 7200 ),
-		'retention'    => array( 'hook' => 'lel_contact_retention_cleanup', 'max_age' => 172800 ),
+		'freshness'    => array(
+			'hook'    => self::HOOK,
+			'max_age' => 172800,
+		),
+		'invalidation' => array(
+			'hook'    => 'lel_invalidation_queue_process',
+			'max_age' => 300,
+		),
+		'outbox'       => array(
+			'hook'    => 'lel_notification_outbox_send',
+			'max_age' => 7200,
+		),
+		'retention'    => array(
+			'hook'    => 'lel_contact_retention_cleanup',
+			'max_age' => 172800,
+		),
 	);
 
 	/** Only these comparison operators are accepted by the operational-count builder. */
@@ -63,10 +75,10 @@ final class Freshness {
 	public static function worker_statuses(): array {
 		$statuses = array();
 		foreach ( self::WORKERS as $worker => $config ) {
-			$scheduled = false !== wp_next_scheduled( $config['hook'] );
-			$heartbeat = (string) get_option( 'lel_worker_heartbeat_' . $worker, '' );
-			$timestamp = '' === $heartbeat ? false : strtotime( $heartbeat );
-			$current   = false !== $timestamp && $timestamp >= time() - $config['max_age'];
+			$scheduled           = false !== wp_next_scheduled( $config['hook'] );
+			$heartbeat           = (string) get_option( 'lel_worker_heartbeat_' . $worker, '' );
+			$timestamp           = '' === $heartbeat ? false : strtotime( $heartbeat );
+			$current             = false !== $timestamp && $timestamp >= time() - $config['max_age'];
 			$statuses[ $worker ] = array(
 				'status'       => $scheduled && $current ? 'ok' : 'blocked',
 				'hook'         => $config['hook'],
@@ -92,20 +104,40 @@ final class Freshness {
 		$lock_name   = Advisory_Lock::namespaced_name( 'freshness_cycle' );
 		$lock_result = Advisory_Lock::acquire( $lock_name, 0 );
 		if ( Advisory_Lock::CONTENDED === $lock_result ) {
-			return array( 'status' => 'locked', 'processed' => 0, 'due' => 0, 'lock_age' => null, 'last_error_code' => 'freshness_locked' );
+			return array(
+				'status'          => 'locked',
+				'processed'       => 0,
+				'due'             => 0,
+				'lock_age'        => null,
+				'last_error_code' => 'freshness_locked',
+			);
 		}
 		if ( Advisory_Lock::ACQUIRED !== $lock_result ) {
 			// Fail closed: never run an unlocked cycle on lock errors.
 			update_option( 'lel_freshness_lock_errors', (int) get_option( 'lel_freshness_lock_errors', 0 ) + 1, false );
 			Logger::warning( 'freshness_lock_error', array( 'lock_result' => $lock_result ) );
-			return array( 'status' => 'lock_error', 'processed' => 0, 'due' => 0, 'lock_age' => null, 'last_error_code' => 'freshness_lock_' . $lock_result );
+			return array(
+				'status'          => 'lock_error',
+				'processed'       => 0,
+				'due'             => 0,
+				'lock_age'        => null,
+				'last_error_code' => 'freshness_lock_' . $lock_result,
+			);
 		}
 		$run_at = gmdate( DATE_W3C );
-		$report = array( 'status' => 'ok', 'processed' => 0, 'due' => 0, 'run_at' => $run_at, 'last_run_at' => $run_at, 'lock_age' => 0, 'last_error_code' => '' );
+		$report = array(
+			'status'          => 'ok',
+			'processed'       => 0,
+			'due'             => 0,
+			'run_at'          => $run_at,
+			'last_run_at'     => $run_at,
+			'lock_age'        => 0,
+			'last_error_code' => '',
+		);
 		try {
-			$batch = min( 250, max( 10, (int) get_option( 'lel_freshness_batch_size', 100 ) ) );
-			$posts = Freshness_Repository::next_batch( $batch );
-			$today = Date_Validator::today();
+			$batch         = min( 250, max( 10, (int) get_option( 'lel_freshness_batch_size', 100 ) ) );
+			$posts         = Freshness_Repository::next_batch( $batch );
+			$today         = Date_Validator::today();
 			$cycle_started = (string) get_option( 'lel_freshness_cycle_started_at', '' );
 			if ( '' === $cycle_started ) {
 				$cycle_started = gmdate( 'Y-m-d H:i:s' );
@@ -132,12 +164,47 @@ final class Freshness {
 					delete_post_meta( (int) $post_id, '_lel_freshness_due_fields' );
 				}
 			}
-			$report['eligible_total'] = Freshness_Repository::eligible_total();
+			$report['eligible_total']   = Freshness_Repository::eligible_total();
 			$report['cycle_started_at'] = $cycle_started;
-			$cycle_scanned = self::count_by_meta_query( array( 'post', 'review' ), array( array( 'key' => '_lel_freshness_last_scanned_at', 'value' => $cycle_started, 'compare' => '>=', 'type' => 'DATETIME' ) ), array( 'publish', 'draft', 'pending', 'future', 'private' ) );
-			$due_total     = self::count_by_meta_query( array( 'post', 'review' ), array( 'relation' => 'OR', array( 'key' => 'next_content_review_date', 'value' => $today, 'compare' => '<=', 'type' => 'DATE' ), array( 'key' => 'next_fact_check_date', 'value' => $today, 'compare' => '<=', 'type' => 'DATE' ), array( 'key' => 'next_medical_review_date', 'value' => $today, 'compare' => '<=', 'type' => 'DATE' ) ), array( 'publish', 'draft', 'pending', 'future', 'private' ) );
-			$report['cycle_scanned'] = $cycle_scanned;
-			$report['due_total']     = $due_total;
+			$cycle_scanned              = self::count_by_meta_query(
+				array( 'post', 'review' ),
+				array(
+					array(
+						'key'     => '_lel_freshness_last_scanned_at',
+						'value'   => $cycle_started,
+						'compare' => '>=',
+						'type'    => 'DATETIME',
+					),
+				),
+				array( 'publish', 'draft', 'pending', 'future', 'private' )
+			);
+			$due_total                  = self::count_by_meta_query(
+				array( 'post', 'review' ),
+				array(
+					'relation' => 'OR',
+					array(
+						'key'     => 'next_content_review_date',
+						'value'   => $today,
+						'compare' => '<=',
+						'type'    => 'DATE',
+					),
+					array(
+						'key'     => 'next_fact_check_date',
+						'value'   => $today,
+						'compare' => '<=',
+						'type'    => 'DATE',
+					),
+					array(
+						'key'     => 'next_medical_review_date',
+						'value'   => $today,
+						'compare' => '<=',
+						'type'    => 'DATE',
+					),
+				),
+				array( 'publish', 'draft', 'pending', 'future', 'private' )
+			);
+			$report['cycle_scanned']    = $cycle_scanned;
+			$report['due_total']        = $due_total;
 			$report['counts_available'] = ( null !== $cycle_scanned ) && ( null !== $due_total );
 			if ( null === $cycle_scanned ) {
 				// An unreadable scan count must never be treated as zero progress or completion.
@@ -149,13 +216,13 @@ final class Freshness {
 			}
 			$report['last_success_at'] = gmdate( DATE_W3C );
 			if ( $report['cycle_complete'] ) {
-				$report['cycle_completed_at'] = gmdate( DATE_W3C );
+				$report['cycle_completed_at']      = gmdate( DATE_W3C );
 				$report['last_cycle_completed_at'] = $report['cycle_completed_at'];
 				update_option( 'lel_freshness_last_cycle_completed_at', $report['cycle_completed_at'], false );
 				delete_option( 'lel_freshness_cycle_started_at' );
 			} else {
 				$report['last_cycle_completed_at'] = (string) get_option( 'lel_freshness_last_cycle_completed_at', '' );
-				$next = wp_next_scheduled( self::HOOK );
+				$next                              = wp_next_scheduled( self::HOOK );
 				if ( ! $next || $next > time() + ( 2 * HOUR_IN_SECONDS ) ) {
 					wp_schedule_single_event( time() + HOUR_IN_SECONDS, self::HOOK );
 				}
@@ -165,12 +232,35 @@ final class Freshness {
 			update_option( 'lel_last_freshness_report', $report, false );
 			delete_option( 'lel_freshness_last_error' );
 		} catch ( \Throwable $error ) {
-			$report['status'] = 'failed';
-			$error_code = sanitize_key( ( new \ReflectionClass( $error ) )->getShortName() );
+			$report['status']          = 'failed';
+			$error_code                = sanitize_key( ( new \ReflectionClass( $error ) )->getShortName() );
 			$report['last_error_code'] = $error_code;
-			Audit_Log::record( 'freshness_cycle_failed', 'system', 0, array( 'error_class' => get_class( $error ), 'error_code' => $error_code ), 0, 'cron' );
-			update_option( 'lel_freshness_last_error', array( 'time' => gmdate( DATE_W3C ), 'code' => $error_code ), false );
-			Logger::error( 'freshness_cycle_failed', array( 'error_code' => $error_code, 'message' => $error->getMessage() ) );
+			Audit_Log::record(
+				'freshness_cycle_failed',
+				'system',
+				0,
+				array(
+					'error_class' => get_class( $error ),
+					'error_code'  => $error_code,
+				),
+				0,
+				'cron'
+			);
+			update_option(
+				'lel_freshness_last_error',
+				array(
+					'time' => gmdate( DATE_W3C ),
+					'code' => $error_code,
+				),
+				false
+			);
+			Logger::error(
+				'freshness_cycle_failed',
+				array(
+					'error_code' => $error_code,
+					'message'    => $error->getMessage(),
+				)
+			);
 		} finally {
 			Advisory_Lock::release( $lock_name );
 		}
@@ -204,15 +294,83 @@ final class Freshness {
 
 	/** Return non-sensitive operational counts for admin and CLI. */
 	public static function status(): array {
-		$last  = get_option( 'lel_last_freshness_report', array() );
-		$today = gmdate( 'Y-m-d' );
-		$counts = array(
-			'overdue_content_reviews' => self::count_by_meta_query( array( 'post', 'review' ), array( 'key' => '_lel_freshness_status', 'value' => 'update_due' ) ),
-			'overdue_fact_checks'     => self::count_by_meta_query( array( 'post', 'review' ), array( array( 'key' => 'next_fact_check_date', 'value' => $today, 'compare' => '<', 'type' => 'DATE' ) ) ),
-			'overdue_medical_reviews' => self::count_by_meta_query( array( 'post', 'review' ), array( array( 'key' => 'next_medical_review_date', 'value' => $today, 'compare' => '<', 'type' => 'DATE' ) ) ),
-			'pending_corrections'     => self::count_by_meta_query( 'lel_correction', array( 'relation' => 'OR', array( 'key' => 'correction_status', 'compare' => 'NOT EXISTS' ), array( 'key' => 'correction_status', 'value' => 'complete', 'compare' => '!=' ) ) ),
-			'unapproved_affiliates'   => self::count_by_meta_query( 'lel_affiliate', array( 'relation' => 'OR', array( 'key' => 'relationship_status', 'compare' => 'NOT EXISTS' ), array( 'key' => 'relationship_status', 'value' => 'active', 'compare' => '!=' ) ) ),
-			'invalid_test_records'    => self::count_by_meta_query( 'lel_test_record', array( 'relation' => 'OR', array( 'key' => 'approval_status', 'compare' => 'NOT EXISTS' ), array( 'key' => 'approval_status', 'value' => 'approved', 'compare' => '!=' ) ) ),
+		$last        = get_option( 'lel_last_freshness_report', array() );
+		$today       = gmdate( 'Y-m-d' );
+		$counts      = array(
+			'overdue_content_reviews' => self::count_by_meta_query(
+				array( 'post', 'review' ),
+				array(
+					'key'   => '_lel_freshness_status',
+					'value' => 'update_due',
+				)
+			),
+			'overdue_fact_checks'     => self::count_by_meta_query(
+				array( 'post', 'review' ),
+				array(
+					array(
+						'key'     => 'next_fact_check_date',
+						'value'   => $today,
+						'compare' => '<',
+						'type'    => 'DATE',
+					),
+				)
+			),
+			'overdue_medical_reviews' => self::count_by_meta_query(
+				array( 'post', 'review' ),
+				array(
+					array(
+						'key'     => 'next_medical_review_date',
+						'value'   => $today,
+						'compare' => '<',
+						'type'    => 'DATE',
+					),
+				)
+			),
+			'pending_corrections'     => self::count_by_meta_query(
+				'lel_correction',
+				array(
+					'relation' => 'OR',
+					array(
+						'key'     => 'correction_status',
+						'compare' => 'NOT EXISTS',
+					),
+					array(
+						'key'     => 'correction_status',
+						'value'   => 'complete',
+						'compare' => '!=',
+					),
+				)
+			),
+			'unapproved_affiliates'   => self::count_by_meta_query(
+				'lel_affiliate',
+				array(
+					'relation' => 'OR',
+					array(
+						'key'     => 'relationship_status',
+						'compare' => 'NOT EXISTS',
+					),
+					array(
+						'key'     => 'relationship_status',
+						'value'   => 'active',
+						'compare' => '!=',
+					),
+				)
+			),
+			'invalid_test_records'    => self::count_by_meta_query(
+				'lel_test_record',
+				array(
+					'relation' => 'OR',
+					array(
+						'key'     => 'approval_status',
+						'compare' => 'NOT EXISTS',
+					),
+					array(
+						'key'     => 'approval_status',
+						'value'   => 'approved',
+						'compare' => '!=',
+					),
+				)
+			),
 		);
 		$unavailable = array_keys( array_filter( $counts, static fn( $value ): bool => null === $value ) );
 		return array(
@@ -226,11 +384,11 @@ final class Freshness {
 			'operational_counts_available' => array() === $unavailable,
 			'unavailable_counts'           => $unavailable,
 			'repeated_emergency_overrides' => self::count_repeated_overrides(),
-			'failed_freshness_jobs'     => get_option( 'lel_freshness_last_error', false ) ? 1 : 0,
-			'last_batch_processed'      => is_array( $last ) ? (int) ( $last['processed'] ?? 0 ) : 0,
-			'cycle_scanned'             => is_array( $last ) ? (int) ( $last['cycle_scanned'] ?? 0 ) : 0,
-			'eligible_total'            => is_array( $last ) ? (int) ( $last['eligible_total'] ?? 0 ) : 0,
-			'cycle_complete'            => is_array( $last ) ? (bool) ( $last['cycle_complete'] ?? false ) : false,
+			'failed_freshness_jobs'        => get_option( 'lel_freshness_last_error', false ) ? 1 : 0,
+			'last_batch_processed'         => is_array( $last ) ? (int) ( $last['processed'] ?? 0 ) : 0,
+			'cycle_scanned'                => is_array( $last ) ? (int) ( $last['cycle_scanned'] ?? 0 ) : 0,
+			'eligible_total'               => is_array( $last ) ? (int) ( $last['eligible_total'] ?? 0 ) : 0,
+			'cycle_complete'               => is_array( $last ) ? (bool) ( $last['cycle_complete'] ?? false ) : false,
 		);
 	}
 
@@ -254,7 +412,11 @@ final class Freshness {
 
 		$types = array_values( array_filter( array_map( 'strval', is_array( $post_type ) ? $post_type : array( $post_type ) ), static fn( string $type ): bool => '' !== $type ) );
 		if ( array() === $types ) {
-			return array( 'sql' => null, 'params' => array(), 'error' => 'empty_post_type' );
+			return array(
+				'sql'    => null,
+				'params' => array(),
+				'error'  => 'empty_post_type',
+			);
 		}
 
 		$statuses   = is_array( $post_status ) ? array_values( array_map( 'strval', $post_status ) ) : array( (string) $post_status );
@@ -281,12 +443,16 @@ final class Freshness {
 		$cond_params = array();
 		$index       = 0;
 		foreach ( $clauses as $clause ) {
-			$alias    = 'pm' . $index;
+			$alias = 'pm' . $index;
 			++$index;
 			$meta_key = (string) $clause['key'];
 			$compare  = isset( $clause['compare'] ) ? strtoupper( trim( (string) $clause['compare'] ) ) : ( isset( $clause['value'] ) ? '=' : 'EXISTS' );
 			if ( ! in_array( $compare, self::META_COMPARE_OPERATORS, true ) ) {
-				return array( 'sql' => null, 'params' => array(), 'error' => 'unsupported_operator:' . $compare );
+				return array(
+					'sql'    => null,
+					'params' => array(),
+					'error'  => 'unsupported_operator:' . $compare,
+				);
 			}
 
 			if ( 'NOT EXISTS' === $compare ) {
@@ -311,7 +477,11 @@ final class Freshness {
 			if ( 'IN' === $compare || 'NOT IN' === $compare ) {
 				$values = array_values( array_map( 'strval', (array) ( $clause['value'] ?? array() ) ) );
 				if ( array() === $values ) {
-					return array( 'sql' => null, 'params' => array(), 'error' => 'empty_in_set' );
+					return array(
+						'sql'    => null,
+						'params' => array(),
+						'error'  => 'empty_in_set',
+					);
 				}
 				$conditions[] = "{$column} {$compare} (" . implode( ', ', array_fill( 0, count( $values ), '%s' ) ) . ')';
 				foreach ( $values as $value ) {
@@ -321,7 +491,11 @@ final class Freshness {
 			}
 
 			if ( ! isset( $clause['value'] ) ) {
-				return array( 'sql' => null, 'params' => array(), 'error' => 'missing_value' );
+				return array(
+					'sql'    => null,
+					'params' => array(),
+					'error'  => 'missing_value',
+				);
 			}
 			$conditions[]  = "{$column} {$compare} %s";
 			$cond_params[] = (string) $clause['value'];
@@ -366,9 +540,9 @@ final class Freshness {
 			return null;
 		}
 		$wpdb->last_error = '';
-		$sql      = array() === $built['params'] ? $built['sql'] : $wpdb->prepare( $built['sql'], $built['params'] ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare -- Placeholders assembled in build_meta_count_query(); values bound via prepare( $built['params'] ); table names from trusted $wpdb->prefix.
-		$result   = $wpdb->get_var( $sql ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- $sql is fully prepared above (or a params-free query over trusted-prefix tables).
-		$db_error = trim( (string) ( $wpdb->last_error ?? '' ) );
+		$sql              = array() === $built['params'] ? $built['sql'] : $wpdb->prepare( $built['sql'], $built['params'] ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare -- Placeholders assembled in build_meta_count_query(); values bound via prepare( $built['params'] ); table names from trusted $wpdb->prefix.
+		$result           = $wpdb->get_var( $sql ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- $sql is fully prepared above (or a params-free query over trusted-prefix tables).
+		$db_error         = trim( (string) ( $wpdb->last_error ?? '' ) );
 		if ( null === $result || '' !== $db_error ) {
 			Logger::error( 'freshness_count_query_failed', array( 'reason' => '' !== $db_error ? 'db_error' : 'null_result' ) );
 			return null;

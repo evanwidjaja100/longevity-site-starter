@@ -47,7 +47,7 @@ final class Approval_Service {
 		$parent_ids = array();
 		if ( 'lel_claim' === $type ) {
 			$previous_parents = Dependency_Index::find_parents( 'lel_claim', $post_id );
-			$pid = (int) get_post_meta( $post_id, 'post_id', true );
+			$pid              = (int) get_post_meta( $post_id, 'post_id', true );
 			Dependency_Index::remove_all_for_dependency( 'lel_claim', $post_id );
 			$parent_ids = $previous_parents;
 			if ( $pid > 0 ) {
@@ -80,7 +80,7 @@ final class Approval_Service {
 		}
 		$pid        = (int) $meta_value;
 		$parent_ids = Dependency_Index::find_parents( 'lel_claim', $post_id );
-		$actor = function_exists( 'get_current_user_id' ) ? get_current_user_id() : 0;
+		$actor      = function_exists( 'get_current_user_id' ) ? get_current_user_id() : 0;
 		if ( $pid > 0 ) {
 			$parent_ids[] = $pid;
 		}
@@ -130,7 +130,13 @@ final class Approval_Service {
 		try {
 			Invalidation_Queue::enqueue_in_transaction( $parent_ids, $reason, $actor_id );
 		} catch ( \Throwable $error ) {
-			Logger::warning( 'invalidation_enqueue_transaction_failed', array( 'reason' => $reason, 'error' => substr( $error->getMessage(), 0, 200 ) ) );
+			Logger::warning(
+				'invalidation_enqueue_transaction_failed',
+				array(
+					'reason' => $reason,
+					'error'  => substr( $error->getMessage(), 0, 200 ),
+				)
+			);
 			Invalidation_Queue::enqueue( $parent_ids, $reason, $actor_id );
 		}
 	}
@@ -141,7 +147,17 @@ final class Approval_Service {
 			return null;
 		}
 		if ( ! Publication_Lock::acquire( $post_id ) ) {
-			Audit_Log::record( 'approval_rejected', 'post', $post_id, array( 'approval_type' => $approval_type, 'reason' => 'publication_lock_unavailable' ), $actor_id, 'workflow' );
+			Audit_Log::record(
+				'approval_rejected',
+				'post',
+				$post_id,
+				array(
+					'approval_type' => $approval_type,
+					'reason'        => 'publication_lock_unavailable',
+				),
+				$actor_id,
+				'workflow'
+			);
 			return null;
 		}
 		try {
@@ -150,14 +166,24 @@ final class Approval_Service {
 				return null;
 			}
 			if ( ! self::state_is_approvable( $post_id, $approval_type ) ) {
-				Audit_Log::record( 'approval_rejected', 'post', $post_id, array( 'approval_type' => $approval_type, 'reason' => 'invalid_or_incomplete_state' ), $actor_id, 'workflow' );
+				Audit_Log::record(
+					'approval_rejected',
+					'post',
+					$post_id,
+					array(
+						'approval_type' => $approval_type,
+						'reason'        => 'invalid_or_incomplete_state',
+					),
+					$actor_id,
+					'workflow'
+				);
 				return null;
 			}
 			$fingerprint = Approval_Fingerprint::build( $post_id, $approval_type );
 			$current     = Approval_Repository::current( $post_id, $approval_type );
 			// Insert quarantined: a snapshot is unusable until its mandatory audit
 			// event is durably confirmed and the row is atomically activated.
-			$record      = array(
+			$record = array(
 				'post_id'                => $post_id,
 				'approval_type'          => $approval_type,
 				'approval_status'        => 'pending_audit',
@@ -169,7 +195,13 @@ final class Approval_Service {
 				'approver_user_id'       => $actor_id,
 				'approved_at'            => gmdate( 'Y-m-d H:i:s' ),
 				'schema_version'         => Approval_Fingerprint::SCHEMA_VERSION,
-				'payload_json'           => (string) wp_json_encode( array( 'approval' => self::sanitize_payload( $approval_payload ), 'fingerprint' => $fingerprint['payload'] ), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ),
+				'payload_json'           => (string) wp_json_encode(
+					array(
+						'approval'    => self::sanitize_payload( $approval_payload ),
+						'fingerprint' => $fingerprint['payload'],
+					),
+					JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
+				),
 				'invalidated_at'         => null,
 				'invalidated_by_user_id' => null,
 				'invalidation_reason'    => null,
@@ -178,7 +210,7 @@ final class Approval_Service {
 				'activated_at'           => null,
 				'activation_error'       => null,
 			);
-			$id = Approval_Repository::insert( $record );
+			$id     = Approval_Repository::insert( $record );
 			if ( $id <= 0 ) {
 				return null;
 			}
@@ -188,14 +220,39 @@ final class Approval_Service {
 			$audit_key      = self::mandatory_audit_key( $id, $approval_type, $fingerprint['combined_hash'] );
 			$audit_event_id = 0;
 			try {
-				$audit_event_id = Audit_Log::record( 'approval_completed', 'post', $post_id, array( 'approval_type' => $approval_type, 'approval_id' => $id, 'combined_hash' => $fingerprint['combined_hash'], 'synthetic_probe' => '1' === (string) get_post_meta( $post_id, '_lel_acceptance_probe', true ) ), $actor_id, 'workflow', true, $audit_key );
+				$audit_event_id = Audit_Log::record(
+					'approval_completed',
+					'post',
+					$post_id,
+					array(
+						'approval_type'   => $approval_type,
+						'approval_id'     => $id,
+						'combined_hash'   => $fingerprint['combined_hash'],
+						'synthetic_probe' => '1' === (string) get_post_meta( $post_id, '_lel_acceptance_probe', true ),
+					),
+					$actor_id,
+					'workflow',
+					true,
+					$audit_key
+				);
 			} catch ( \Throwable $error ) {
 				// A known-failed audit (server did not commit) rejects the pending
 				// snapshot. An unknown COMMIT outcome quarantines the request and
 				// leaves the snapshot pending for reconciliation — never guessed.
 				if ( '' === Audit_Log::unhealthy_reason() ) {
 					Approval_Repository::reject_pending( $id, 'audit_write_failed' );
-					Audit_Log::record( 'approval_rejected', 'post', $post_id, array( 'approval_type' => $approval_type, 'reason' => 'audit_write_failed', 'approval_id' => $id ), $actor_id, 'workflow' );
+					Audit_Log::record(
+						'approval_rejected',
+						'post',
+						$post_id,
+						array(
+							'approval_type' => $approval_type,
+							'reason'        => 'audit_write_failed',
+							'approval_id'   => $id,
+						),
+						$actor_id,
+						'workflow'
+					);
 				}
 				return null;
 			}
@@ -208,7 +265,17 @@ final class Approval_Service {
 			// Atomic activation: the conditional update is the sole promotion gate.
 			if ( Approval_Repository::activate( $id, $fingerprint['combined_hash'], $audit_event_id ) < 1 ) {
 				Approval_Repository::note_activation_error( $id, 'activation_conditional_update_failed' );
-				Audit_Log::record( 'approval_activation_failed', 'post', $post_id, array( 'approval_type' => $approval_type, 'approval_id' => $id ), $actor_id, 'workflow' );
+				Audit_Log::record(
+					'approval_activation_failed',
+					'post',
+					$post_id,
+					array(
+						'approval_type' => $approval_type,
+						'approval_id'   => $id,
+					),
+					$actor_id,
+					'workflow'
+				);
 				return null;
 			}
 			$record['approval_status']  = 'approved';
@@ -340,7 +407,7 @@ final class Approval_Service {
 		$intent_id      = 0;
 		try {
 			$intent_id = self::record_invalidation_intent( $post_id, $approval_type, $reason, $actor_id );
-			$changed = self::invalidate_snapshots( $post_id, $approval_type, $reason, $actor_id );
+			$changed   = self::invalidate_snapshots( $post_id, $approval_type, $reason, $actor_id );
 			if ( $changed > 0 ) {
 				$status_key = self::status_key( $approval_type );
 				if ( $status_key ) {
@@ -352,7 +419,20 @@ final class Approval_Service {
 					}
 				}
 			}
-			Audit_Log::record( 'approval_invalidated', 'post', $post_id, array( 'approval_type' => $approval_type, 'reason' => $reason, 'intent_event_id' => $intent_id, 'changed' => $changed ), $actor_id, 'system', true );
+			Audit_Log::record(
+				'approval_invalidated',
+				'post',
+				$post_id,
+				array(
+					'approval_type'   => $approval_type,
+					'reason'          => $reason,
+					'intent_event_id' => $intent_id,
+					'changed'         => $changed,
+				),
+				$actor_id,
+				'system',
+				true
+			);
 		} catch ( \Throwable $error ) {
 			self::reconcile_invalidation_failure( $post_id, $reason, $actor_id, $intent_id, '', $error );
 			throw $error;
@@ -390,7 +470,20 @@ final class Approval_Service {
 				Meta_Authorization::exit_trusted_scope();
 			}
 			$completion_key = '' === $idempotency_key ? '' : $idempotency_key . ':completed';
-			$event_id       = Audit_Log::record( 'approval_invalidated', 'post', $post_id, array( 'reason' => $reason, 'source' => '' === $idempotency_key ? 'direct' : 'queue', 'intent_event_id' => $intent_id ), $actor_id, 'system', true, $completion_key );
+			$event_id       = Audit_Log::record(
+				'approval_invalidated',
+				'post',
+				$post_id,
+				array(
+					'reason'          => $reason,
+					'source'          => '' === $idempotency_key ? 'direct' : 'queue',
+					'intent_event_id' => $intent_id,
+				),
+				$actor_id,
+				'system',
+				true,
+				$completion_key
+			);
 			Rankings::invalidate_review( $post_id, 'approval_invalidated' );
 			return $event_id;
 		} catch ( \Throwable $error ) {
@@ -472,9 +565,9 @@ final class Approval_Service {
 			if ( ! user_can( $actor_id, 'approve_commercial_disclosure' ) ) {
 				return false;
 			}
-			$post = get_post( $post_id );
+			$post                = get_post( $post_id );
 			$require_independent = (bool) get_option( 'lel_require_independent_commercial_approval', true );
-			$owners = $post ? Affiliate_Registry::relationship_owners_for_content( (string) $post->post_content ) : array();
+			$owners              = $post ? Affiliate_Registry::relationship_owners_for_content( (string) $post->post_content ) : array();
 			return ! $require_independent || ! in_array( $actor_id, $owners, true );
 		}
 		if ( 'editorial' === $type ) {
@@ -589,7 +682,14 @@ final class Approval_Service {
 
 	/** Latest revision ID. */
 	private static function latest_revision_id( int $post_id ): ?int {
-		$revisions = wp_get_post_revisions( $post_id, array( 'posts_per_page' => 1, 'orderby' => 'ID', 'order' => 'DESC' ) );
+		$revisions = wp_get_post_revisions(
+			$post_id,
+			array(
+				'posts_per_page' => 1,
+				'orderby'        => 'ID',
+				'order'          => 'DESC',
+			)
+		);
 		$revision  = $revisions ? reset( $revisions ) : false;
 		return $revision ? (int) $revision->ID : null;
 	}
@@ -635,7 +735,19 @@ final class Approval_Service {
 	/** Durably audit intent before any approval or compatibility state changes. */
 	private static function record_invalidation_intent( int $post_id, string $approval_type, string $reason, int $actor_id, string $idempotency_key = '' ): int {
 		$intent_key = '' === $idempotency_key ? '' : $idempotency_key . ':intent';
-		return Audit_Log::record( 'approval_invalidation_intent', 'post', $post_id, array( 'approval_type' => $approval_type, 'reason' => $reason ), $actor_id, 'system', true, $intent_key );
+		return Audit_Log::record(
+			'approval_invalidation_intent',
+			'post',
+			$post_id,
+			array(
+				'approval_type' => $approval_type,
+				'reason'        => $reason,
+			),
+			$actor_id,
+			'system',
+			true,
+			$intent_key
+		);
 	}
 
 	/** Leave durable retry work when a post-intent invalidation step fails. */

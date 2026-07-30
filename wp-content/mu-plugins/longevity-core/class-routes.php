@@ -111,36 +111,36 @@ final class Routes {
 		self::$category_definitions = (array) apply_filters(
 			'longevity_route_category_definitions',
 			array(
-			'evidence'     => array(
-				'slug'         => 'evidence-literacy',
-				'name'         => 'Evidence Literacy',
-				'legacy_slugs' => array(),
-			),
-			'sleep'        => array(
-				'slug'         => 'sleep',
-				'name'         => 'Sleep and Circadian Health',
-				'legacy_slugs' => array( 'sleep-and-circadian-health' ),
-			),
-			'movement'     => array(
-				'slug'         => 'movement',
-				'name'         => 'Movement and Physical Capacity',
-				'legacy_slugs' => array( 'movement-and-physical-capacity' ),
-			),
-			'nutrition'    => array(
-				'slug'         => 'nutrition',
-				'name'         => 'Nutrition and Healthy Aging',
-				'legacy_slugs' => array( 'nutrition-and-healthy-aging' ),
-			),
-			'wearables'    => array(
-				'slug'         => 'wearables',
-				'name'         => 'Wearables and Consumer Measurement',
-				'legacy_slugs' => array( 'wearables-and-consumer-measurement' ),
-			),
-			'supplements'  => array(
-				'slug'         => 'supplements',
-				'name'         => 'Supplements and High-Uncertainty Interventions',
-				'legacy_slugs' => array( 'supplements-and-high-uncertainty-interventions' ),
-			),
+				'evidence'     => array(
+					'slug'         => 'evidence-literacy',
+					'name'         => 'Evidence Literacy',
+					'legacy_slugs' => array(),
+				),
+				'sleep'        => array(
+					'slug'         => 'sleep',
+					'name'         => 'Sleep and Circadian Health',
+					'legacy_slugs' => array( 'sleep-and-circadian-health' ),
+				),
+				'movement'     => array(
+					'slug'         => 'movement',
+					'name'         => 'Movement and Physical Capacity',
+					'legacy_slugs' => array( 'movement-and-physical-capacity' ),
+				),
+				'nutrition'    => array(
+					'slug'         => 'nutrition',
+					'name'         => 'Nutrition and Healthy Aging',
+					'legacy_slugs' => array( 'nutrition-and-healthy-aging' ),
+				),
+				'wearables'    => array(
+					'slug'         => 'wearables',
+					'name'         => 'Wearables and Consumer Measurement',
+					'legacy_slugs' => array( 'wearables-and-consumer-measurement' ),
+				),
+				'supplements'  => array(
+					'slug'         => 'supplements',
+					'name'         => 'Supplements and High-Uncertainty Interventions',
+					'legacy_slugs' => array( 'supplements-and-high-uncertainty-interventions' ),
+				),
 				'consumer_lab' => array(
 					'slug'         => 'consumer-lab',
 					'name'         => 'Consumer Lab',
@@ -215,7 +215,7 @@ final class Routes {
 			self::$page_id_cache[ $key ] = null;
 			return null;
 		}
-		$page = get_page_by_path( $slug, OBJECT, 'page' );
+		$page                        = get_page_by_path( $slug, OBJECT, 'page' );
 		self::$page_id_cache[ $key ] = $page ? (int) $page->ID : null;
 		return self::$page_id_cache[ $key ];
 	}
@@ -238,7 +238,7 @@ final class Routes {
 			self::$url_cache[ $key ] = null;
 			return null;
 		}
-		$url = get_permalink( $id );
+		$url                     = get_permalink( $id );
 		self::$url_cache[ $key ] = is_string( $url ) ? $url : null;
 		return self::$url_cache[ $key ];
 	}
@@ -288,7 +288,7 @@ final class Routes {
 			self::$url_cache[ $key ] = null;
 			return null;
 		}
-		$url = get_term_link( $id, 'category' );
+		$url                     = get_term_link( $id, 'category' );
 		self::$url_cache[ $key ] = is_string( $url ) ? $url : null;
 		return self::$url_cache[ $key ];
 	}
@@ -386,7 +386,7 @@ final class Routes {
 			self::$status_cache[ $key ] = null;
 			return null;
 		}
-		$status = get_post_status( $id );
+		$status                     = get_post_status( $id );
 		self::$status_cache[ $key ] = is_string( $status ) ? $status : null;
 		return self::$status_cache[ $key ];
 	}

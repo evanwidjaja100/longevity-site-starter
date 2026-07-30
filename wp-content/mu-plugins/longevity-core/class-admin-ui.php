@@ -66,16 +66,59 @@ final class Admin_UI {
 		self::textarea( $post->ID, 'original_contribution', __( 'Original contribution', 'longevity-core' ) );
 		self::input( $post->ID, 'region_scope', __( 'Region or jurisdiction scope', 'longevity-core' ), 'text' );
 		self::input( $post->ID, 'next_content_review_date', __( 'Next content review date', 'longevity-core' ), 'date' );
-		self::select( $post->ID, 'editorial_approval_status', __( 'Editorial workflow state', 'longevity-core' ), array( 'idea' => 'Idea', 'assigned' => 'Assigned', 'researching' => 'Researching', 'drafting' => 'Drafting', 'editorial_review' => 'Editorial review', 'fact_check' => 'Fact-check', 'medical_review' => 'Medical review', 'testing_incomplete' => 'Testing incomplete', 'commercial_review' => 'Commercial review', 'ready' => 'Ready for publication', 'published' => 'Published', 'update_due' => 'Update due', 'correction_pending' => 'Correction pending', 'archived' => 'Archived' ) );
+		self::select(
+			$post->ID,
+			'editorial_approval_status',
+			__( 'Editorial workflow state', 'longevity-core' ),
+			array(
+				'idea'               => 'Idea',
+				'assigned'           => 'Assigned',
+				'researching'        => 'Researching',
+				'drafting'           => 'Drafting',
+				'editorial_review'   => 'Editorial review',
+				'fact_check'         => 'Fact-check',
+				'medical_review'     => 'Medical review',
+				'testing_incomplete' => 'Testing incomplete',
+				'commercial_review'  => 'Commercial review',
+				'ready'              => 'Ready for publication',
+				'published'          => 'Published',
+				'update_due'         => 'Update due',
+				'correction_pending' => 'Correction pending',
+				'archived'           => 'Archived',
+			)
+		);
 		self::approval_action( 'longevity_approve_editorial', 'approve_publication', __( 'Approve this exact editorial snapshot as ready for publication', 'longevity-core' ), __( 'Ready and published states are service projections. Selecting them above does not create approval without this explicit action.', 'longevity-core' ) );
 		self::checkbox( $post->ID, 'uncertainty_statement_present', __( 'Explicit uncertainty statement is present', 'longevity-core' ) );
 
 		echo '</div></details><details class="lel-governance-section" data-lel-section="evidence"><summary><strong>' . esc_html__( 'Evidence and claims', 'longevity-core' ) . '</strong><span>' . esc_html__( 'Evidence grade, linked claims, and fact-checking', 'longevity-core' ) . '</span></summary><div class="lel-governance-fields">';
 		self::checkbox( $post->ID, 'material_health_claims', __( 'Contains material health claims', 'longevity-core' ) );
-		self::select( $post->ID, 'evidence_grade', __( 'Evidence grade', 'longevity-core' ), array( '' => 'Not assigned', 'A' => 'A — Strong', 'B' => 'B — Moderate', 'C' => 'C — Limited', 'D' => 'D — Mechanistic/anecdotal', 'U' => 'U — Unclear' ) );
+		self::select(
+			$post->ID,
+			'evidence_grade',
+			__( 'Evidence grade', 'longevity-core' ),
+			array(
+				''  => 'Not assigned',
+				'A' => 'A — Strong',
+				'B' => 'B — Moderate',
+				'C' => 'C — Limited',
+				'D' => 'D — Mechanistic/anecdotal',
+				'U' => 'U — Unclear',
+			)
+		);
 		self::textarea( $post->ID, 'evidence_grade_rationale', __( 'Evidence-grade rationale', 'longevity-core' ) );
 		self::input( $post->ID, 'evidence_cutoff_date', __( 'Evidence cutoff date', 'longevity-core' ), 'date' );
-		self::select( $post->ID, 'fact_check_status', __( 'Fact-check status', 'longevity-core' ), array( 'not_started' => 'Not started', 'in_progress' => 'In progress', 'revisions_required' => 'Revisions required', 'complete' => 'Complete', 'not_required' => 'Not required' ) );
+		self::select(
+			$post->ID,
+			'fact_check_status',
+			__( 'Fact-check status', 'longevity-core' ),
+			array(
+				'not_started'        => 'Not started',
+				'in_progress'        => 'In progress',
+				'revisions_required' => 'Revisions required',
+				'complete'           => 'Complete',
+				'not_required'       => 'Not required',
+			)
+		);
 		self::input( $post->ID, 'next_fact_check_date', __( 'Next fact-check date', 'longevity-core' ), 'date' );
 		if ( current_user_can( 'manage_claims' ) ) {
 			echo '<p class="description"><a href="' . esc_url( admin_url( 'edit.php?post_type=lel_claim' ) ) . '">' . esc_html__( 'Manage linked claims', 'longevity-core' ) . '</a> &middot; <a href="' . esc_url( admin_url( 'edit.php?post_type=lel_source' ) ) . '">' . esc_html__( 'Manage source records', 'longevity-core' ) . '</a></p>';
@@ -84,32 +127,113 @@ final class Admin_UI {
 		echo '</div></details><details class="lel-governance-section" data-lel-conditional="medical"><summary><strong>' . esc_html__( 'Medical review', 'longevity-core' ) . '</strong><span>' . esc_html__( 'Assignment, exact scope, dates, revisions, and attestation', 'longevity-core' ) . '</span></summary><div class="lel-governance-fields">';
 		self::checkbox( $post->ID, 'medical_review_required', __( 'Medical review is required', 'longevity-core' ) );
 		self::reviewer_select( $post->ID );
-		self::select( $post->ID, 'medical_review_status', __( 'Medical review status', 'longevity-core' ), array( 'not_required' => 'Not required', 'not_started' => 'Not started', 'assigned' => 'Assigned', 'in_review' => 'In review', 'revisions_required' => 'Revisions required', 'complete' => 'Complete' ) );
-		self::select( $post->ID, 'medical_review_scope', __( 'Review scope', 'longevity-core' ), array( '' => 'Select scope', 'full_article' => 'Full article', 'safety_only' => 'Safety sections only', 'contraindications_only' => 'Contraindications only', 'dosage_language_only' => 'Dosage language only', 'product_accuracy_only' => 'Product accuracy language only', 'medical_disclaimer_only' => 'Medical disclaimer only', 'claim_ids' => 'Claims listed by ID' ) );
+		self::select(
+			$post->ID,
+			'medical_review_status',
+			__( 'Medical review status', 'longevity-core' ),
+			array(
+				'not_required'       => 'Not required',
+				'not_started'        => 'Not started',
+				'assigned'           => 'Assigned',
+				'in_review'          => 'In review',
+				'revisions_required' => 'Revisions required',
+				'complete'           => 'Complete',
+			)
+		);
+		self::select(
+			$post->ID,
+			'medical_review_scope',
+			__( 'Review scope', 'longevity-core' ),
+			array(
+				''                        => 'Select scope',
+				'full_article'            => 'Full article',
+				'safety_only'             => 'Safety sections only',
+				'contraindications_only'  => 'Contraindications only',
+				'dosage_language_only'    => 'Dosage language only',
+				'product_accuracy_only'   => 'Product accuracy language only',
+				'medical_disclaimer_only' => 'Medical disclaimer only',
+				'claim_ids'               => 'Claims listed by ID',
+			)
+		);
 		self::input( $post->ID, 'medical_review_claim_ids', __( 'Claim IDs reviewed', 'longevity-core' ), 'text' );
 		self::textarea( $post->ID, 'medical_review_sections', __( 'Sections reviewed', 'longevity-core' ) );
 		self::textarea( $post->ID, 'medical_review_limitations', __( 'Review limitations', 'longevity-core' ) );
 		self::textarea( $post->ID, 'medical_review_required_revisions', __( 'Required revisions', 'longevity-core' ) );
 		self::textarea( $post->ID, 'medical_review_conflicts', __( 'Reviewer conflicts', 'longevity-core' ) );
-		self::select( $post->ID, 'medical_review_revision_status', __( 'Required revision status', 'longevity-core' ), array( 'not_applicable' => 'Not applicable', 'required' => 'Required', 'in_progress' => 'In progress', 'complete' => 'Complete' ) );
+		self::select(
+			$post->ID,
+			'medical_review_revision_status',
+			__( 'Required revision status', 'longevity-core' ),
+			array(
+				'not_applicable' => 'Not applicable',
+				'required'       => 'Required',
+				'in_progress'    => 'In progress',
+				'complete'       => 'Complete',
+			)
+		);
 		self::input( $post->ID, 'next_medical_review_date', __( 'Next medical review date', 'longevity-core' ), 'date' );
 		self::input( $post->ID, 'medical_review_version', __( 'Reviewed content version', 'longevity-core' ), 'text' );
 		self::attestation( $post->ID );
 
 		echo '</div></details><details class="lel-governance-section" data-lel-conditional="testing"><summary><strong>' . esc_html__( 'Testing', 'longevity-core' ) . '</strong><span>' . esc_html__( 'Protocol, approved record, dates, acquisition, and limitations', 'longevity-core' ) . '</span></summary><div class="lel-governance-fields">';
 		self::checkbox( $post->ID, 'testing_required', __( 'Hands-on testing is required', 'longevity-core' ) );
-		self::select( $post->ID, 'testing_status', __( 'Testing status', 'longevity-core' ), array( 'not_required' => 'Not required', 'planned' => 'Planned', 'in_progress' => 'In progress', 'incomplete' => 'Incomplete', 'complete' => 'Complete', 'approved' => 'Approved' ) );
+		self::select(
+			$post->ID,
+			'testing_status',
+			__( 'Testing status', 'longevity-core' ),
+			array(
+				'not_required' => 'Not required',
+				'planned'      => 'Planned',
+				'in_progress'  => 'In progress',
+				'incomplete'   => 'Incomplete',
+				'complete'     => 'Complete',
+				'approved'     => 'Approved',
+			)
+		);
 		self::input( $post->ID, 'testing_start_date', __( 'Testing start date', 'longevity-core' ), 'date' );
 		self::input( $post->ID, 'testing_end_date', __( 'Testing end date', 'longevity-core' ), 'date' );
 		self::input( $post->ID, 'testing_duration', __( 'Testing duration', 'longevity-core' ), 'text' );
 		self::input( $post->ID, 'testing_protocol_version', __( 'Protocol version', 'longevity-core' ), 'text' );
 		self::input( $post->ID, 'testing_methodology_url', __( 'Public methodology URL', 'longevity-core' ), 'url' );
 		self::test_record_select( $post->ID );
-		self::select( $post->ID, 'product_acquisition_method', __( 'Product acquisition', 'longevity-core' ), array( '' => 'Select', 'purchased' => 'Purchased', 'product_supplied' => 'Product supplied', 'loaned' => 'Loaned', 'service_access' => 'Service access', 'independently_verified_only' => 'Independently verified specifications only' ) );
+		self::select(
+			$post->ID,
+			'product_acquisition_method',
+			__( 'Product acquisition', 'longevity-core' ),
+			array(
+				''                            => 'Select',
+				'purchased'                   => 'Purchased',
+				'product_supplied'            => 'Product supplied',
+				'loaned'                      => 'Loaned',
+				'service_access'              => 'Service access',
+				'independently_verified_only' => 'Independently verified specifications only',
+			)
+		);
 		self::approval_action( 'longevity_approve_testing', 'approve_test_records', __( 'Approve this exact testing snapshot', 'longevity-core' ), __( 'The approver must be independent of the selected test record and its testers. Approved status is projected only after the snapshot passes validation.', 'longevity-core' ) );
 		echo '</div></details><details class="lel-governance-section" data-lel-conditional="commercial"><summary><strong>' . esc_html__( 'Commercial disclosure', 'longevity-core' ) . '</strong><span>' . esc_html__( 'Relationship, disclosure approval, and destination registry', 'longevity-core' ) . '</span></summary><div class="lel-governance-fields">';
-		self::select( $post->ID, 'commercial_relationship', __( 'Commercial relationship', 'longevity-core' ), array( 'none' => 'None', 'affiliate' => 'Affiliate', 'product_supplied' => 'Product supplied', 'sponsored' => 'Sponsored' ) );
-		self::select( $post->ID, 'affiliate_disclosure_status', __( 'Affiliate disclosure status', 'longevity-core' ), array( 'not_required' => 'Not required', 'required' => 'Required', 'draft' => 'Draft', 'approved' => 'Approved', 'complete' => 'Complete' ) );
+		self::select(
+			$post->ID,
+			'commercial_relationship',
+			__( 'Commercial relationship', 'longevity-core' ),
+			array(
+				'none'             => 'None',
+				'affiliate'        => 'Affiliate',
+				'product_supplied' => 'Product supplied',
+				'sponsored'        => 'Sponsored',
+			)
+		);
+		self::select(
+			$post->ID,
+			'affiliate_disclosure_status',
+			__( 'Affiliate disclosure status', 'longevity-core' ),
+			array(
+				'not_required' => 'Not required',
+				'required'     => 'Required',
+				'draft'        => 'Draft',
+				'approved'     => 'Approved',
+				'complete'     => 'Complete',
+			)
+		);
 		self::checkbox( $post->ID, 'affiliate_registry_verified', __( 'Affiliate destinations verified in registry', 'longevity-core' ) );
 		self::approval_action( 'longevity_approve_commercial', 'approve_commercial_disclosure', __( 'Approve this exact commercial-disclosure snapshot', 'longevity-core' ), __( 'The relationship owner cannot approve their own commercial disclosure when independence is required.', 'longevity-core' ) );
 
@@ -126,7 +250,18 @@ final class Admin_UI {
 			self::number( $post->ID, 'review_score', __( 'Calculated review score (0–5)', 'longevity-core' ), '0.1', 0, 5 );
 			self::input( $post->ID, 'review_score_version', __( 'Scoring model version', 'longevity-core' ), 'text' );
 			self::textarea( $post->ID, 'review_score_override_reason', __( 'Manual score override reason (only when calculated score differs)', 'longevity-core' ) );
-			self::select( $post->ID, 'review_score_confidence', __( 'Score confidence', 'longevity-core' ), array( '' => 'Select', 'High confidence' => 'High confidence', 'Moderate confidence' => 'Moderate confidence', 'Low confidence' => 'Low confidence', 'Preliminary' => 'Preliminary' ) );
+			self::select(
+				$post->ID,
+				'review_score_confidence',
+				__( 'Score confidence', 'longevity-core' ),
+				array(
+					''                    => 'Select',
+					'High confidence'     => 'High confidence',
+					'Moderate confidence' => 'Moderate confidence',
+					'Low confidence'      => 'Low confidence',
+					'Preliminary'         => 'Preliminary',
+				)
+			);
 			self::input( $post->ID, 'best_for', __( 'Best for', 'longevity-core' ), 'text' );
 			self::input( $post->ID, 'not_for', __( 'Not for', 'longevity-core' ), 'text' );
 			self::input( $post->ID, 'price_checked_date', __( 'Price checked date', 'longevity-core' ), 'date' );
@@ -169,14 +304,14 @@ final class Admin_UI {
 			}
 		}
 
-		$approval_requests = array(
+		$approval_requests             = array(
 			'testing'    => ! empty( $_POST['longevity_approve_testing'] ),
 			'commercial' => ! empty( $_POST['longevity_approve_commercial'] ),
 			'editorial'  => ! empty( $_POST['longevity_approve_editorial'] ),
 		);
 		$medical_attestation_requested = in_array( 'medical_review_attested', $present, true ) && ! empty( $_POST['medical_review_attested'] );
-		$assignment_was_present         = in_array( 'medical_reviewer_user_id', $present, true ) && array_key_exists( 'medical_reviewer_user_id', $_POST );
-		$assignment_before              = (int) get_post_meta( $post_id, 'medical_reviewer_user_id', true );
+		$assignment_was_present        = in_array( 'medical_reviewer_user_id', $present, true ) && array_key_exists( 'medical_reviewer_user_id', $_POST );
+		$assignment_before             = (int) get_post_meta( $post_id, 'medical_reviewer_user_id', true );
 
 		$definitions = Meta_Registry::definitions();
 		foreach ( $present as $key ) {
@@ -198,7 +333,17 @@ final class Admin_UI {
 			$old       = get_post_meta( $post_id, $key, true );
 			if ( Publication_Gates::service_only_meta( $key, $sanitized ) ) {
 				if ( $old !== $sanitized ) {
-					Audit_Log::record( 'workflow_transition_deferred', 'post', $post_id, array( 'field' => $key, 'requested_value' => is_scalar( $sanitized ) ? (string) $sanitized : '' ), $user_id, 'classic' );
+					Audit_Log::record(
+						'workflow_transition_deferred',
+						'post',
+						$post_id,
+						array(
+							'field'           => $key,
+							'requested_value' => is_scalar( $sanitized ) ? (string) $sanitized : '',
+						),
+						$user_id,
+						'classic'
+					);
 				}
 				continue;
 			}
@@ -229,9 +374,18 @@ final class Admin_UI {
 	public static function render_public_test_results_editor( \WP_Post $post ): void {
 		wp_nonce_field( 'longevity_save_public_results', 'longevity_public_results_nonce' );
 		$projection = Review_Methodology::sanitize_public_results( get_post_meta( $post->ID, 'public_test_results', true ) );
-		$rows = $projection['rows'];
+		$rows       = $projection['rows'];
 		if ( empty( $rows ) ) {
-			$rows[] = array( 'label' => '', 'observed_value' => '', 'unit' => '', 'reference_label' => '', 'reference_value' => '', 'status' => 'informational', 'note' => '', 'display_order' => 10 );
+			$rows[] = array(
+				'label'           => '',
+				'observed_value'  => '',
+				'unit'            => '',
+				'reference_label' => '',
+				'reference_value' => '',
+				'status'          => 'informational',
+				'note'            => '',
+				'display_order'   => 10,
+			);
 		}
 		echo '<p>' . esc_html__( 'Only approved, non-sensitive observations belong here. Raw notes, tester identities, account data, serial numbers, and private evidence locations must remain in the protected record.', 'longevity-core' ) . '</p>';
 		echo '<div class="lel-results-editor"><div class="table-scroll"><table class="widefat striped"><thead><tr><th>' . esc_html__( 'Metric', 'longevity-core' ) . '</th><th>' . esc_html__( 'Observed', 'longevity-core' ) . '</th><th>' . esc_html__( 'Unit', 'longevity-core' ) . '</th><th>' . esc_html__( 'Reference label', 'longevity-core' ) . '</th><th>' . esc_html__( 'Reference value', 'longevity-core' ) . '</th><th>' . esc_html__( 'Status', 'longevity-core' ) . '</th><th>' . esc_html__( 'Interpretation note', 'longevity-core' ) . '</th><th>' . esc_html__( 'Order', 'longevity-core' ) . '</th><th>' . esc_html__( 'Actions', 'longevity-core' ) . '</th></tr></thead><tbody data-lel-result-rows>';
@@ -353,9 +507,16 @@ final class Admin_UI {
 
 	/** Render a reviewer selector. */
 	private static function reviewer_select( int $post_id ): void {
-		if ( ! self::can_edit_field( $post_id, 'medical_reviewer_user_id' ) ) { self::readonly_field( $post_id, 'medical_reviewer_user_id', __( 'Medical reviewer', 'longevity-core' ) ); return; }
+		if ( ! self::can_edit_field( $post_id, 'medical_reviewer_user_id' ) ) {
+			self::readonly_field( $post_id, 'medical_reviewer_user_id', __( 'Medical reviewer', 'longevity-core' ) );
+			return; }
 		$value = (int) get_post_meta( $post_id, 'medical_reviewer_user_id', true );
-		$users = get_users( array( 'capability' => 'complete_medical_review', 'orderby' => 'display_name' ) );
+		$users = get_users(
+			array(
+				'capability' => 'complete_medical_review',
+				'orderby'    => 'display_name',
+			)
+		);
 		echo self::presence_marker( 'medical_reviewer_user_id' ) . '<p><label for="medical_reviewer_user_id"><strong>' . esc_html__( 'Medical reviewer', 'longevity-core' ) . '</strong></label><br><select class="widefat" id="medical_reviewer_user_id" name="medical_reviewer_user_id"><option value="0">' . esc_html__( 'Select reviewer', 'longevity-core' ) . '</option>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- presence_marker() outputs an input tag whose key is esc_attr()-escaped; remaining output is escaped literals.
 		foreach ( $users as $user ) {
 			$status = (string) get_user_meta( $user->ID, 'credential_verification_status', true );
@@ -366,9 +527,21 @@ final class Admin_UI {
 
 	/** Render approved test records with human-readable titles and stable IDs. */
 	private static function test_record_select( int $post_id ): void {
-		if ( ! self::can_edit_field( $post_id, 'test_record_id' ) ) { self::readonly_field( $post_id, 'test_record_id', __( 'Test record', 'longevity-core' ) ); return; }
+		if ( ! self::can_edit_field( $post_id, 'test_record_id' ) ) {
+			self::readonly_field( $post_id, 'test_record_id', __( 'Test record', 'longevity-core' ) );
+			return; }
 		$value   = (int) get_post_meta( $post_id, 'test_record_id', true );
-		$records = get_posts( array( 'post_type' => 'lel_test_record', 'post_status' => 'any', 'posts_per_page' => 100, 'orderby' => array( 'title' => 'ASC', 'ID' => 'ASC' ) ) );
+		$records = get_posts(
+			array(
+				'post_type'      => 'lel_test_record',
+				'post_status'    => 'any',
+				'posts_per_page' => 100,
+				'orderby'        => array(
+					'title' => 'ASC',
+					'ID'    => 'ASC',
+				),
+			)
+		);
 		echo self::presence_marker( 'test_record_id' ) . '<p><label for="test_record_id"><strong>' . esc_html__( 'Test record', 'longevity-core' ) . '</strong></label><br><select class="widefat" id="test_record_id" name="test_record_id"><option value="0">' . esc_html__( 'Select an approved record', 'longevity-core' ) . '</option>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- presence_marker() outputs an input tag whose key is esc_attr()-escaped; remaining output is escaped literals.
 		foreach ( $records as $record ) {
 			$status = (string) get_post_meta( $record->ID, 'approval_status', true );
@@ -397,8 +570,8 @@ final class Admin_UI {
 	/** Map gate codes to the nearest actionable field. */
 	private static function readiness_field( string $code ): string {
 		$map = array(
-			'missing_summary'                 => 'content_summary',
-			'missing_limitations'             => 'content_limitations',
+			'missing_summary'                  => 'content_summary',
+			'missing_limitations'              => 'content_limitations',
 			'claims_unverified'                => 'material_health_claims',
 			'fact_check_incomplete'            => 'fact_check_status',
 			'medical_review_incomplete'        => 'medical_review_status',
@@ -412,10 +585,18 @@ final class Admin_UI {
 
 	/** Render an accessible repeatable dimension editor backed by the existing meta shape. */
 	private static function score_dimensions_editor( int $post_id ): void {
-		if ( ! self::can_edit_field( $post_id, 'review_score_dimensions' ) ) { self::readonly_field( $post_id, 'review_score_dimensions', __( 'Scoring dimensions', 'longevity-core' ) ); return; }
+		if ( ! self::can_edit_field( $post_id, 'review_score_dimensions' ) ) {
+			self::readonly_field( $post_id, 'review_score_dimensions', __( 'Scoring dimensions', 'longevity-core' ) );
+			return; }
 		echo self::presence_marker( 'review_score_dimensions' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- presence_marker() outputs an input tag whose key is esc_attr()-escaped.
 		$dimensions = get_post_meta( $post_id, 'review_score_dimensions', true );
-		$dimensions = is_array( $dimensions ) && $dimensions ? $dimensions : array( array( 'name' => '', 'score' => '', 'weight' => '' ) );
+		$dimensions = is_array( $dimensions ) && $dimensions ? $dimensions : array(
+			array(
+				'name'   => '',
+				'score'  => '',
+				'weight' => '',
+			),
+		);
 		echo '<fieldset id="review_score_dimensions" class="lel-score-editor"><legend><strong>' . esc_html__( 'Score dimensions', 'longevity-core' ) . '</strong></legend><p class="description">' . esc_html__( 'Weights must total 100%. The calculated score is saved server-side; confidence remains a separate editorial judgment.', 'longevity-core' ) . '</p><div class="lel-score-table-wrap"><table><thead><tr><th scope="col">' . esc_html__( 'Dimension', 'longevity-core' ) . '</th><th scope="col">' . esc_html__( 'Score (0–5)', 'longevity-core' ) . '</th><th scope="col">' . esc_html__( 'Weight %', 'longevity-core' ) . '</th><th scope="col">' . esc_html__( 'Action', 'longevity-core' ) . '</th></tr></thead><tbody data-lel-score-rows>';
 		foreach ( $dimensions as $index => $dimension ) {
 			self::score_dimension_row( (int) $index, is_array( $dimension ) ? $dimension : array() );
@@ -448,7 +629,13 @@ final class Admin_UI {
 			echo '<td><label class="screen-reader-text" for="lel-result-' . esc_attr( $field . '-' . $index ) . '">' . esc_html( str_replace( '_', ' ', ucfirst( $field ) ) ) . '</label><input id="lel-result-' . esc_attr( $field . '-' . $index ) . '" type="text" name="public_test_results_rows[' . esc_attr( (string) $index ) . '][' . esc_attr( $field ) . ']" value="' . esc_attr( (string) ( $row[ $field ] ?? '' ) ) . '"></td>';
 		}
 		echo '<td><label class="screen-reader-text" for="lel-result-status-' . esc_attr( (string) $index ) . '">' . esc_html__( 'Status', 'longevity-core' ) . '</label><select id="lel-result-status-' . esc_attr( (string) $index ) . '" name="public_test_results_rows[' . esc_attr( (string) $index ) . '][status]">';
-		foreach ( array( 'meets' => 'Meets reference', 'partially_meets' => 'Partially meets', 'does_not_meet' => 'Does not meet', 'informational' => 'Informational', 'not_applicable' => 'Not applicable' ) as $value => $label ) {
+		foreach ( array(
+			'meets'           => 'Meets reference',
+			'partially_meets' => 'Partially meets',
+			'does_not_meet'   => 'Does not meet',
+			'informational'   => 'Informational',
+			'not_applicable'  => 'Not applicable',
+		) as $value => $label ) {
 			echo '<option value="' . esc_attr( $value ) . '" ' . selected( $row['status'] ?? 'informational', $value, false ) . '>' . esc_html( $label ) . '</option>';
 		}
 		echo '</select></td><td><label class="screen-reader-text" for="lel-result-note-' . esc_attr( (string) $index ) . '">' . esc_html__( 'Interpretation note', 'longevity-core' ) . '</label><textarea id="lel-result-note-' . esc_attr( (string) $index ) . '" name="public_test_results_rows[' . esc_attr( (string) $index ) . '][note]" rows="2">' . esc_textarea( (string) ( $row['note'] ?? '' ) ) . '</textarea></td><td><label class="screen-reader-text" for="lel-result-order-' . esc_attr( (string) $index ) . '">' . esc_html__( 'Display order', 'longevity-core' ) . '</label><input id="lel-result-order-' . esc_attr( (string) $index ) . '" type="number" min="0" max="999" name="public_test_results_rows[' . esc_attr( (string) $index ) . '][display_order]" value="' . esc_attr( (string) ( $row['display_order'] ?? ( $index + 1 ) * 10 ) ) . '"></td><td><button type="button" class="button-link" data-lel-result-up aria-label="' . esc_attr__( 'Move row up', 'longevity-core' ) . '">↑</button> <button type="button" class="button-link" data-lel-result-down aria-label="' . esc_attr__( 'Move row down', 'longevity-core' ) . '">↓</button> <button type="button" class="button-link-delete" data-lel-remove-result>' . esc_html__( 'Remove', 'longevity-core' ) . '</button></td></tr>';
@@ -462,8 +649,10 @@ final class Admin_UI {
 		}
 		$value = get_post_meta( $post_id, $key, true );
 		$attrs = '';
-		if ( null !== $min ) { $attrs .= ' min="' . esc_attr( (string) $min ) . '"'; }
-		if ( null !== $max ) { $attrs .= ' max="' . esc_attr( (string) $max ) . '"'; }
+		if ( null !== $min ) {
+			$attrs .= ' min="' . esc_attr( (string) $min ) . '"'; }
+		if ( null !== $max ) {
+			$attrs .= ' max="' . esc_attr( (string) $max ) . '"'; }
 		echo self::presence_marker( $key ) . '<p><label for="' . esc_attr( $key ) . '"><strong>' . esc_html( $label ) . '</strong></label><br><input class="widefat" type="number" step="' . esc_attr( (string) $step ) . '"' . $attrs . ' id="' . esc_attr( $key ) . '" name="' . esc_attr( $key ) . '" value="' . esc_attr( (string) $value ) . '"></p>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- presence_marker() output and $attrs are built only from esc_attr()-escaped values.
 	}
 
@@ -519,7 +708,8 @@ final class Admin_UI {
 	/** Read-only representation for actors lacking the write policy. */
 	private static function readonly_field( int $post_id, string $key, string $label ): void {
 		$value = get_post_meta( $post_id, $key, true );
-		if ( is_array( $value ) ) { $value = wp_json_encode( $value ); }
+		if ( is_array( $value ) ) {
+			$value = wp_json_encode( $value ); }
 		echo '<p><strong>' . esc_html( $label ) . '</strong><br><span class="description">' . esc_html( '' === (string) $value ? __( 'Not set', 'longevity-core' ) : (string) $value ) . '</span></p>';
 	}
 
@@ -534,10 +724,10 @@ final class Admin_UI {
 	private static function reviewer_claimed_profile_fields(): array {
 		return array(
 			'professional_credentials' => __( 'Claimed professional credentials', 'longevity-core' ),
-			'professional_profile_url'  => __( 'Professional profile URL', 'longevity-core' ),
-			'review_scope'              => __( 'Claimed review scope', 'longevity-core' ),
-			'jurisdictions'             => __( 'Claimed jurisdictions', 'longevity-core' ),
-			'conflict_disclosure'       => __( 'Conflict disclosure', 'longevity-core' ),
+			'professional_profile_url' => __( 'Professional profile URL', 'longevity-core' ),
+			'review_scope'             => __( 'Claimed review scope', 'longevity-core' ),
+			'jurisdictions'            => __( 'Claimed jurisdictions', 'longevity-core' ),
+			'conflict_disclosure'      => __( 'Conflict disclosure', 'longevity-core' ),
 		);
 	}
 
@@ -552,5 +742,4 @@ final class Admin_UI {
 			'verified_jurisdictions'               => __( 'Verified jurisdictions', 'longevity-core' ),
 		);
 	}
-
 }

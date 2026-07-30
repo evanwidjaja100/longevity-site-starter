@@ -50,11 +50,11 @@ $longevity_core_files = array(
 	'class-content-discovery.php',
 	'class-public-nav.php',
 	'class-public-contact.php',
-		'class-public-content.php',
-		'class-public-trust.php',
-		'class-trust-pages.php',
-		'class-public-rankings.php',
-		'class-blocks.php',
+	'class-public-content.php',
+	'class-public-trust.php',
+	'class-trust-pages.php',
+	'class-public-rankings.php',
+	'class-blocks.php',
 	'class-admin-assets.php',
 	'class-admin-ui.php',
 	'class-shortcodes.php',
@@ -264,7 +264,7 @@ final class Bootstrap {
 
 	/** Build a Content Security Policy with nonce-based script/style allowance. */
 	public static function content_security_policy(): string {
-		$nonce = self::csp_nonce();
+		$nonce      = self::csp_nonce();
 		$report_uri = rest_url( 'longevity/v1/csp-report' );
 
 		$directives = array(

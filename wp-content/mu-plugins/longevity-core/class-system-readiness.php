@@ -55,37 +55,41 @@ final class System_Readiness {
 	/** Build a non-secret readiness report. */
 	public static function report(): array {
 		$checks = array(
-			'database'             => self::safely( static fn(): array => self::check( self::database_reachable(), 'ok', 'blocked', 'Database connectivity.' ) ),
-			'environment'          => self::safely( static fn(): array => Platform_Requirements::readiness_check() ),
-			'migrations'           => self::safely( static fn(): array => self::migration_check() ),
-			'scoring_model'        => self::safely(
+			'database'              => self::safely( static fn(): array => self::check( self::database_reachable(), 'ok', 'blocked', 'Database connectivity.' ) ),
+			'environment'           => self::safely( static fn(): array => Platform_Requirements::readiness_check() ),
+			'migrations'            => self::safely( static fn(): array => self::migration_check() ),
+			'scoring_model'         => self::safely(
 				static function (): array {
 					$config = Runtime_Config::scoring_model_status();
-					return array( 'status' => $config['valid'] ? 'ok' : 'blocked', 'code' => $config['code'], 'message' => $config['message'] );
+					return array(
+						'status'  => $config['valid'] ? 'ok' : 'blocked',
+						'code'    => $config['code'],
+						'message' => $config['message'],
+					);
 				}
 			),
-			'freshness'            => self::safely( static fn(): array => self::freshness_check() ),
-			'cron_heartbeat'       => self::safely( static fn(): array => self::cron_check() ),
-			'worker_heartbeats'    => self::safely( static fn(): array => self::worker_heartbeat_check() ),
-			'uploads'              => self::safely( static fn(): array => self::uploads_check() ),
-			'approval_table'       => self::safely( static fn(): array => self::check( Approval_Repository::exists(), 'ok', 'blocked', 'Approval snapshot table.' ) ),
-			'approval_integrity'   => self::safely( static fn(): array => self::approval_integrity_check() ),
-			'audit_table'          => self::safely( static fn(): array => self::check( Audit_Log::exists(), 'ok', 'blocked', 'Governance audit table.' ) ),
-			'audit_write_failures' => self::safely( static fn(): array => self::audit_failure_check() ),
+			'freshness'             => self::safely( static fn(): array => self::freshness_check() ),
+			'cron_heartbeat'        => self::safely( static fn(): array => self::cron_check() ),
+			'worker_heartbeats'     => self::safely( static fn(): array => self::worker_heartbeat_check() ),
+			'uploads'               => self::safely( static fn(): array => self::uploads_check() ),
+			'approval_table'        => self::safely( static fn(): array => self::check( Approval_Repository::exists(), 'ok', 'blocked', 'Approval snapshot table.' ) ),
+			'approval_integrity'    => self::safely( static fn(): array => self::approval_integrity_check() ),
+			'audit_table'           => self::safely( static fn(): array => self::check( Audit_Log::exists(), 'ok', 'blocked', 'Governance audit table.' ) ),
+			'audit_write_failures'  => self::safely( static fn(): array => self::audit_failure_check() ),
 			'credential_expiration' => self::safely( static fn(): array => self::credential_expiration_check() ),
-			'publication_lock'     => self::safely( static fn(): array => self::lock_check() ),
-			'csp_mode'             => self::safely( static fn(): array => self::csp_mode_check() ),
-			'invalidation_queue'   => self::safely( static fn(): array => self::queue_check() ),
-			'dependency_index'     => self::safely( static fn(): array => self::dependency_index_check() ),
-			'rankings_projection'  => self::safely( static fn(): array => self::rankings_projection_check() ),
-			'operational_counts'   => self::safely( static fn(): array => self::operational_counts_check() ),
-			'contact_rate_limiter' => self::safely( static fn(): array => self::check( Public_Contact::rate_table_exists(), 'ok', 'blocked', 'Contact rate-limit table (public submissions fail closed without it).' ) ),
-			'contact_idempotency'  => self::safely( static fn(): array => self::contact_idempotency_check() ),
-			'notification_outbox'  => self::safely( static fn(): array => self::notification_outbox_check() ),
-			'mail_transport'       => self::safely( static fn(): array => self::store_evidence( 'mail', 'lel_mail_transport_evidence', 'Mail transport evidence has not been supplied by an operator.' ) ),
-			'last_backup'          => self::safely( static fn(): array => self::store_evidence( 'backup', 'lel_last_backup_evidence', 'Backup evidence has not been supplied by an operator.' ) ),
-			'last_restore_drill'   => self::safely( static fn(): array => self::store_evidence( 'restore', 'lel_last_restore_drill_evidence', 'Restore-drill evidence has not been supplied by an operator.' ) ),
-			'release_evidence'     => self::safely( static fn(): array => self::release_evidence_check() ),
+			'publication_lock'      => self::safely( static fn(): array => self::lock_check() ),
+			'csp_mode'              => self::safely( static fn(): array => self::csp_mode_check() ),
+			'invalidation_queue'    => self::safely( static fn(): array => self::queue_check() ),
+			'dependency_index'      => self::safely( static fn(): array => self::dependency_index_check() ),
+			'rankings_projection'   => self::safely( static fn(): array => self::rankings_projection_check() ),
+			'operational_counts'    => self::safely( static fn(): array => self::operational_counts_check() ),
+			'contact_rate_limiter'  => self::safely( static fn(): array => self::check( Public_Contact::rate_table_exists(), 'ok', 'blocked', 'Contact rate-limit table (public submissions fail closed without it).' ) ),
+			'contact_idempotency'   => self::safely( static fn(): array => self::contact_idempotency_check() ),
+			'notification_outbox'   => self::safely( static fn(): array => self::notification_outbox_check() ),
+			'mail_transport'        => self::safely( static fn(): array => self::store_evidence( 'mail', 'lel_mail_transport_evidence', 'Mail transport evidence has not been supplied by an operator.' ) ),
+			'last_backup'           => self::safely( static fn(): array => self::store_evidence( 'backup', 'lel_last_backup_evidence', 'Backup evidence has not been supplied by an operator.' ) ),
+			'last_restore_drill'    => self::safely( static fn(): array => self::store_evidence( 'restore', 'lel_last_restore_drill_evidence', 'Restore-drill evidence has not been supplied by an operator.' ) ),
+			'release_evidence'      => self::safely( static fn(): array => self::release_evidence_check() ),
 		);
 		foreach ( $checks as $name => $check ) {
 			$raw        = isset( $check['status'] ) ? (string) $check['status'] : '';
@@ -107,10 +111,16 @@ final class System_Readiness {
 	private static function safely( callable $producer ): array {
 		try {
 			$result = $producer();
-			return is_array( $result ) ? $result : array( 'status' => 'error', 'message' => 'Readiness producer returned a malformed result.' );
+			return is_array( $result ) ? $result : array(
+				'status'  => 'error',
+				'message' => 'Readiness producer returned a malformed result.',
+			);
 		} catch ( \Throwable $error ) {
 			error_log( '[longevity-core] readiness producer failed: ' . $error->getMessage() );
-			return array( 'status' => 'error', 'message' => 'Readiness producer failed internally.' );
+			return array(
+				'status'  => 'error',
+				'message' => 'Readiness producer failed internally.',
+			);
 		}
 	}
 
@@ -479,7 +489,7 @@ final class System_Readiness {
 
 	/** Invalidation queue depth and age. */
 	private static function queue_check(): array {
-		$stats = Invalidation_Queue::stats();
+		$stats            = Invalidation_Queue::stats();
 		$enqueue_failures = Invalidation_Queue::enqueue_failure_count();
 		if ( ! empty( $stats['table_missing'] ) ) {
 			return array(
@@ -568,7 +578,10 @@ final class System_Readiness {
 				return $validated;
 			}
 			if ( is_array( Evidence_Store::latest( 'release-artifact' ) ) ) {
-				return array( 'status' => 'blocked', 'message' => 'No valid active release evidence matches the deployed environment, source SHA, and artifact checksum.' );
+				return array(
+					'status'  => 'blocked',
+					'message' => 'No valid active release evidence matches the deployed environment, source SHA, and artifact checksum.',
+				);
 			}
 		}
 		return array(
@@ -587,26 +600,49 @@ final class System_Readiness {
 		$expires_at = (string) ( $record['expires_at'] ?? '' );
 		$record_id  = (int) ( $record['id'] ?? 0 );
 		if ( $record_id < 1 || true !== Evidence_Store::validate_stored_record( $record ) || Evidence_Store::is_superseded( $record_id ) ) {
-			return array( 'status' => 'error', 'message' => 'Evidence integrity, attachment, or supersession validation failed.', 'evidence_id' => $record_id );
+			return array(
+				'status'      => 'error',
+				'message'     => 'Evidence integrity, attachment, or supersession validation failed.',
+				'evidence_id' => $record_id,
+			);
 		}
 		if ( in_array( $result, array( 'fail', 'error' ), true ) ) {
-			return array( 'status' => 'blocked', 'message' => sprintf( 'Evidence reports failure: %s.', $result ), 'evidence_id' => $record_id );
+			return array(
+				'status'      => 'blocked',
+				'message'     => sprintf( 'Evidence reports failure: %s.', $result ),
+				'evidence_id' => $record_id,
+			);
 		}
 		if ( '' !== $expires_at ) {
 			$expires_ts = strtotime( $expires_at . ' UTC' );
 			if ( false === $expires_ts || $expires_ts <= time() ) {
-				return array( 'status' => 'blocked', 'message' => 'Evidence has expired.', 'evidence_id' => $record_id );
+				return array(
+					'status'      => 'blocked',
+					'message'     => 'Evidence has expired.',
+					'evidence_id' => $record_id,
+				);
 			}
 		}
 		$produced_at = strtotime( (string) ( $record['produced_at'] ?? '' ) . ' UTC' );
 		if ( false === $produced_at || $produced_at > time() + HOUR_IN_SECONDS ) {
-			return array( 'status' => 'error', 'message' => 'Evidence production time is missing, invalid, or in the future.', 'evidence_id' => $record_id );
+			return array(
+				'status'      => 'error',
+				'message'     => 'Evidence production time is missing, invalid, or in the future.',
+				'evidence_id' => $record_id,
+			);
 		}
 		$current_env = function_exists( 'wp_get_environment_type' ) ? wp_get_environment_type() : '';
 		if ( $current_env !== (string) ( $record['environment'] ?? '' ) ) {
-			return array( 'status' => 'blocked', 'message' => 'Evidence was produced for a different environment.', 'evidence_id' => $record_id );
+			return array(
+				'status'      => 'blocked',
+				'message'     => 'Evidence was produced for a different environment.',
+				'evidence_id' => $record_id,
+			);
 		}
-		return array( 'status' => 'ok', 'message' => 'Valid structured evidence.', 'evidence_id' => $record_id );
+		return array(
+			'status'      => 'ok',
+			'message'     => 'Valid structured evidence.',
+			'evidence_id' => $record_id,
+		);
 	}
-
 }

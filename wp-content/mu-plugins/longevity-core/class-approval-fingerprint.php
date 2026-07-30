@@ -26,16 +26,20 @@ final class Approval_Fingerprint {
 
 	/** Build all hashes for an approval type. */
 	public static function build( int $post_id, string $approval_type, array $prospective = array() ): array {
-		$content      = self::content_payload( $post_id, $prospective );
-		$governed     = self::governed_meta_payload( $post_id, $approval_type, $prospective );
-		$dependencies = self::dependency_payload( $post_id, $approval_type, $prospective );
-		$hashes       = array(
+		$content                 = self::content_payload( $post_id, $prospective );
+		$governed                = self::governed_meta_payload( $post_id, $approval_type, $prospective );
+		$dependencies            = self::dependency_payload( $post_id, $approval_type, $prospective );
+		$hashes                  = array(
 			'content_hash'       => self::hash( $content ),
 			'governed_meta_hash' => self::hash( $governed ),
 			'dependency_hash'    => self::hash( $dependencies ),
 		);
 		$hashes['combined_hash'] = self::hash( array( 'schema_version' => self::SCHEMA_VERSION ) + $hashes );
-		$hashes['payload']       = array( 'content' => $content, 'governed_meta' => $governed, 'dependencies' => $dependencies );
+		$hashes['payload']       = array(
+			'content'       => $content,
+			'governed_meta' => $governed,
+			'dependencies'  => $dependencies,
+		);
 		return $hashes;
 	}
 
@@ -43,7 +47,10 @@ final class Approval_Fingerprint {
 	private static function content_payload( int $post_id, array $prospective = array() ): array {
 		$post = get_post( $post_id );
 		if ( ! $post ) {
-			return array( 'post_id' => $post_id, 'missing' => true );
+			return array(
+				'post_id' => $post_id,
+				'missing' => true,
+			);
 		}
 		$thumbnail_id = function_exists( 'get_post_thumbnail_id' ) ? (int) get_post_thumbnail_id( $post_id ) : 0;
 		if ( array_key_exists( 'featured_image_id', $prospective ) ) {
@@ -56,8 +63,8 @@ final class Approval_Fingerprint {
 			'excerpt'            => (string) ( $prospective['post_excerpt'] ?? $post->post_excerpt ),
 			'content'            => (string) ( $prospective['post_content'] ?? $post->post_content ),
 			'author_id'          => (int) ( $prospective['post_author'] ?? $post->post_author ),
-			'featured_image_id' => $thumbnail_id,
-			'featured_image_alt'=> $thumbnail_id ? (string) get_post_meta( $thumbnail_id, '_wp_attachment_image_alt', true ) : '',
+			'featured_image_id'  => $thumbnail_id,
+			'featured_image_alt' => $thumbnail_id ? (string) get_post_meta( $thumbnail_id, '_wp_attachment_image_alt', true ) : '',
 		);
 	}
 
@@ -87,17 +94,17 @@ final class Approval_Fingerprint {
 		if ( in_array( $approval_type, array( 'fact_check', 'medical' ), true ) ) {
 			$data = self::claim_dependency_payload( $post_id );
 			if ( 'medical' === $approval_type ) {
-				$reviewer_id        = (int) self::prospective_meta( $post_id, 'medical_reviewer_user_id', $prospective );
-				$data['reviewer']   = Reviewer_Credentials::public_snapshot( $reviewer_id );
+				$reviewer_id      = (int) self::prospective_meta( $post_id, 'medical_reviewer_user_id', $prospective );
+				$data['reviewer'] = Reviewer_Credentials::public_snapshot( $reviewer_id );
 			}
 			return $data;
 		}
 		if ( 'testing' === $approval_type ) {
 			$record_id = (int) self::prospective_meta( $post_id, 'test_record_id', $prospective );
 			return array(
-				'record_id'       => $record_id,
-				'record'          => self::post_meta_subset( $record_id, array( 'protocol_id', 'protocol_version', 'test_start_date', 'test_end_date', 'acquisition_method', 'tester_user_ids', 'public_test_results', 'approval_status', 'approved_by', 'approved_at', 'approval_date' ) ),
-				'scoring_model'   => Runtime_Config::scoring_model_status()['valid'] ? Runtime_Config::scoring_model() : array(),
+				'record_id'     => $record_id,
+				'record'        => self::post_meta_subset( $record_id, array( 'protocol_id', 'protocol_version', 'test_start_date', 'test_end_date', 'acquisition_method', 'tester_user_ids', 'public_test_results', 'approval_status', 'approved_by', 'approved_at', 'approval_date' ) ),
+				'scoring_model' => Runtime_Config::scoring_model_status()['valid'] ? Runtime_Config::scoring_model() : array(),
 			);
 		}
 		if ( 'commercial' === $approval_type ) {
@@ -108,9 +115,12 @@ final class Approval_Fingerprint {
 			$data = array( 'claims' => self::claim_dependency_payload( $post_id ) );
 			foreach ( array( 'fact_check', 'medical', 'testing', 'commercial' ) as $type ) {
 				$current       = Approval_Repository::current( $post_id, $type );
-				$data[ $type ] = $current ? array( 'id' => (int) $current['id'], 'combined_hash' => (string) $current['combined_hash'] ) : null;
+				$data[ $type ] = $current ? array(
+					'id'            => (int) $current['id'],
+					'combined_hash' => (string) $current['combined_hash'],
+				) : null;
 			}
-			$data['commercial_relationship']      = self::prospective_meta( $post_id, 'commercial_relationship', $prospective );
+			$data['commercial_relationship']       = self::prospective_meta( $post_id, 'commercial_relationship', $prospective );
 			$data['affiliate_disclosure_required'] = self::prospective_meta( $post_id, 'affiliate_disclosure_required', $prospective );
 			return $data;
 		}
@@ -141,7 +151,11 @@ final class Approval_Fingerprint {
 					$record[ $field ] = get_post_meta( $merchant->ID, $field, true );
 				}
 			}
-			$data[] = array( 'destination' => $normalized, 'registered' => (bool) $merchant, 'record' => $record );
+			$data[] = array(
+				'destination' => $normalized,
+				'registered'  => (bool) $merchant,
+				'record'      => $record,
+			);
 		}
 		return $data;
 	}
@@ -149,9 +163,9 @@ final class Approval_Fingerprint {
 	/** Snapshot claim and linked-source inputs used by every public approval. */
 	private static function claim_dependency_payload( int $post_id ): array {
 		// Complete retrieval: every linked claim participates in the fingerprint.
-		$claim_ids = Governed_Query::ids_by_meta( array( 'lel_claim' ), 'post_id', (string) $post_id );
-		$data   = array();
-		$fields = array( 'post_id', 'claim_id', 'claim_text', 'claim_category', 'claim_importance', 'claim_location', 'source_id', 'source_type', 'source_title', 'source_authors', 'source_url', 'source_identifier', 'publication_date', 'accessed_date', 'jurisdiction', 'population', 'intervention', 'comparator', 'outcome', 'evidence_design', 'evidence_grade', 'conflict_notes', 'evidence_notes', 'verified_by', 'verified_at', 'verification_date', 'verification_status', 'verification_snapshot_hash', 'recheck_date', 'superseded_by', 'archive_url' );
+		$claim_ids     = Governed_Query::ids_by_meta( array( 'lel_claim' ), 'post_id', (string) $post_id );
+		$data          = array();
+		$fields        = array( 'post_id', 'claim_id', 'claim_text', 'claim_category', 'claim_importance', 'claim_location', 'source_id', 'source_type', 'source_title', 'source_authors', 'source_url', 'source_identifier', 'publication_date', 'accessed_date', 'jurisdiction', 'population', 'intervention', 'comparator', 'outcome', 'evidence_design', 'evidence_grade', 'conflict_notes', 'evidence_notes', 'verified_by', 'verified_at', 'verification_date', 'verification_status', 'verification_snapshot_hash', 'recheck_date', 'superseded_by', 'archive_url' );
 		$source_fields = array( 'source_id', 'source_type', 'source_title', 'source_authors', 'source_url', 'source_identifier', 'publication_date', 'accessed_date', 'archive_url', 'rights_notes', 'source_notes', 'validation_status', 'recheck_date' );
 		foreach ( $claim_ids as $claim_id ) {
 			$row = array( 'id' => (int) $claim_id );

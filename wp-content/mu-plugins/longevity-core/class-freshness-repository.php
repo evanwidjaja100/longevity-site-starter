@@ -24,7 +24,12 @@ final class Freshness_Repository {
 				'order'                  => 'ASC',
 				'no_found_rows'          => true,
 				'update_post_term_cache' => false,
-				'meta_query'             => array( array( 'key' => '_lel_freshness_last_scanned_at', 'compare' => 'NOT EXISTS' ) ),
+				'meta_query'             => array(
+					array(
+						'key'     => '_lel_freshness_last_scanned_at',
+						'compare' => 'NOT EXISTS',
+					),
+				),
 			)
 		);
 		if ( count( $never ) >= $batch_size ) {
@@ -38,7 +43,10 @@ final class Freshness_Repository {
 				'posts_per_page'         => $remaining,
 				'fields'                 => 'ids',
 				'meta_key'               => '_lel_freshness_last_scanned_at',
-				'orderby'                => array( 'meta_value' => 'ASC', 'ID' => 'ASC' ),
+				'orderby'                => array(
+					'meta_value' => 'ASC',
+					'ID'         => 'ASC',
+				),
 				'order'                  => 'ASC',
 				'no_found_rows'          => true,
 				'update_post_term_cache' => false,
@@ -71,7 +79,15 @@ final class Freshness_Repository {
 
 	/** Count all eligible records. */
 	public static function eligible_total(): int {
-		$query = new \WP_Query( array( 'post_type' => array( 'post', 'review' ), 'post_status' => array( 'publish', 'draft', 'pending', 'future', 'private' ), 'fields' => 'ids', 'posts_per_page' => 1, 'no_found_rows' => false ) );
+		$query = new \WP_Query(
+			array(
+				'post_type'      => array( 'post', 'review' ),
+				'post_status'    => array( 'publish', 'draft', 'pending', 'future', 'private' ),
+				'fields'         => 'ids',
+				'posts_per_page' => 1,
+				'no_found_rows'  => false,
+			)
+		);
 		return (int) $query->found_posts;
 	}
 }

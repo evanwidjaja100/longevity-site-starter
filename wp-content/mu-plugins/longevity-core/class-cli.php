@@ -388,7 +388,15 @@ final class Preflight_Command {
 		$failed = array_values( array_filter( $results, static fn( array $r ): bool => ! $r['satisfied'] ) );
 		$format = isset( $assoc_args['format'] ) ? (string) $assoc_args['format'] : 'table';
 		if ( 'json' === $format ) {
-			\WP_CLI::line( (string) wp_json_encode( array( 'satisfied' => ! $failed, 'results' => $results ), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+			\WP_CLI::line(
+				(string) wp_json_encode(
+					array(
+						'satisfied' => ! $failed,
+						'results'   => $results,
+					),
+					JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES
+				)
+			);
 		} else {
 			foreach ( $results as $result ) {
 				\WP_CLI::line( sprintf( '%s  %-14s %s', $result['satisfied'] ? 'PASS' : 'FAIL', $result['requirement'], $result['detail'] ) );
@@ -666,9 +674,9 @@ final class Bootstrap_Command {
 		$errors   = array();
 
 		foreach ( self::CANONICAL_CATEGORIES as $key => $def ) {
-			$slug      = $def['slug'];
-			$term      = term_exists( $slug, 'category' );
-			$term_id   = 0;
+			$slug    = $def['slug'];
+			$term    = term_exists( $slug, 'category' );
+			$term_id = 0;
 
 			if ( $term ) {
 				if ( is_array( $term ) ) {
@@ -723,49 +731,49 @@ final class Bootstrap_Command {
 		$errors   = array();
 
 		$post_blueprints = array(
-			'LEL-001'     => array(
+			'LEL-001' => array(
 				'post_type'    => 'post',
 				'post_title'   => 'What Longevity Evidence Lab Does—and Does Not Claim',
 				'post_name'    => 'what-we-do-and-do-not-claim',
 				'post_content' => '<!-- wp:paragraph --><p>Longevity Evidence Lab evaluates products, practices, and interventions that claim to support healthy aging. This page explains what we do—and what we do not—claim, so you can make an informed decision about whether to trust and use this publication.</p><!-- /wp:paragraph --><!-- wp:heading --><h2>What we do</h2><!-- /wp:heading --><!-- wp:list --><ul><li>Register every material health or performance claim before publication.</li><li>Assign evidence grades (A–U) using a defined scale.</li><li>Disclose commercial relationships and affiliate links per content item.</li><li>Publish correction notices for substantive errors.</li><li>Set a scheduled review date for all content.</li></ul><!-- /wp:list --><!-- wp:heading --><h2>What we do not do</h2><!-- /wp:heading --><!-- wp:list --><ul><li>We do not provide individual medical advice, diagnosis, or treatment recommendations.</li><li>We do not guarantee outcomes from any product or practice.</li><li>We do not claim superiority over other publications or methodologies.</li><li>We do not accept payment for positive coverage.</li></ul><!-- /wp:list --><!-- wp:heading --><h2>How to use this site</h2><!-- /wp:heading --><!-- wp:paragraph --><p>Start with our Start Here page for a guided introduction. Use the Topics hub to explore by subject area. Our Evidence and Testing Methodology pages explain how we produce scores and grades.</p><!-- /wp:paragraph -->',
 			),
-			'LEL-002'     => array(
+			'LEL-002' => array(
 				'post_type'    => 'post',
 				'post_title'   => 'What Is Biohacking? An Evidence and Risk Framework',
 				'post_name'    => 'biohacking-evidence-risk-framework',
 				'post_content' => '<!-- wp:paragraph --><p>Biohacking covers a wide range of self-experimentation practices, from supplements and nootropics to light therapy and wearable devices. This framework helps you assess any biohacking practice by its evidence level and risk profile.</p><!-- /wp:paragraph --><!-- wp:heading --><h2>The evidence-risk matrix</h2><!-- /wp:heading --><!-- wp:table --><figure class="wp-block-table"><table><thead><tr><th>Risk level</th><th>Strong evidence</th><th>Moderate evidence</th><th>Limited evidence</th></tr></thead><tbody><tr><td>Low</td><td>Proceed with confidence</td><td>Proceed with awareness</td><td>Proceed cautiously</td></tr><tr><td>Medium</td><td>Proceed with monitoring</td><td>Proceed with caution</td><td>Avoid or consult expert</td></tr><tr><td>High</td><td>Consult expert</td><td>Avoid</td><td>Avoid</td></tr></tbody></table></figure><!-- /wp:table --><!-- wp:heading --><h2>How to use this framework</h2><!-- /wp:heading --><!-- wp:paragraph --><p>For any intervention: (1) identify the risk level based on known side effects and regulatory status, (2) assess the evidence quality independently, (3) plot the intersection on the matrix above, and (4) decide accordingly.</p><!-- /wp:paragraph --><!-- wp:paragraph --><p><strong>Medical review note:</strong> This content discusses safety boundaries and escalation indicators. Medical review is pending before publication.</p><!-- /wp:paragraph -->',
 			),
-			'LEL-003'     => array(
+			'LEL-003' => array(
 				'post_type'    => 'post',
 				'post_title'   => 'How to Read a Health Study Without Being Misled',
 				'post_name'    => 'how-to-read-a-health-study',
 				'post_content' => '<!-- wp:paragraph --><p>Health studies appear in headlines every day. Many are reliable; some are misleading. This guide provides a simple worksheet you can apply to any study to decide how much confidence to place in its findings.</p><!-- /wp:paragraph --><!-- wp:heading --><h2>Six questions for any study</h2><!-- /wp:heading --><!-- wp:list {"ordered":true} --><ol><li><strong>What study design was used?</strong> Randomised trials are stronger than observational studies for causal questions.</li><li><strong>How large was the sample?</strong> Small studies produce less precise estimates.</li><li><strong>Who was in the study?</strong> Does the population match your situation?</li><li><strong>How long did it last?</strong> Short durations may miss long-term effects.</li><li><strong>What was measured?</strong> Did they measure the outcome directly or by proxy?</li><li><strong>Who funded it?</strong> Consider potential conflicts of interest.</li></ol><!-- /wp:list --><!-- wp:heading --><h2>Study appraisal worksheet</h2><!-- /wp:heading --><!-- wp:paragraph --><p>Download or copy the worksheet below to evaluate any study. Each question maps to a domain: design, sample, relevance, duration, measurement, and sponsorship.</p><!-- /wp:paragraph -->',
 			),
-			'LEL-004'     => array(
+			'LEL-004' => array(
 				'post_type'    => 'post',
 				'post_title'   => 'How We Grade Evidence and Test Consumer Products',
 				'post_name'    => 'how-we-grade-evidence-and-test-products',
 				'post_content' => '<!-- wp:paragraph --><p>Every material claim on this site is assigned an evidence grade. Product reviews carry a Consumer Lab score. This page explains how both are produced so you can interpret them with confidence.</p><!-- /wp:paragraph --><!-- wp:heading --><h2>Evidence grades</h2><!-- /wp:heading --><!-- wp:paragraph --><p>Grades follow a defined scale: A (strong), B (moderate), C (limited), D (mechanistic or anecdotal), and U (unclear). Each grade is specific to a single claim, not an entire article. Grades are assigned conservatively and include a rationale.</p><!-- /wp:paragraph --><!-- wp:heading --><h2>Product scores</h2><!-- /wp:heading --><!-- wp:paragraph --><p>Consumer Lab scores use a multi-category buyer-facts framework. Each product is evaluated on the categories that matter for its type. Scores are calculated using the methodology published on our Testing Methodology page.</p><!-- /wp:paragraph --><!-- wp:heading --><h2>Protocol index</h2><!-- /wp:heading --><!-- wp:paragraph --><p>All test protocols are registered before testing begins. Protocol documents include measurement devices, test procedures, sample sizes, and statistical approaches. Deviations from registered protocols are noted in final reports.</p><!-- /wp:paragraph -->',
 			),
-			'LEL-005'     => array(
+			'LEL-005' => array(
 				'post_type'    => 'post',
 				'post_title'   => 'How to Improve Sleep Before Buying Another Device',
 				'post_name'    => 'improve-sleep-before-buying-device',
 				'post_content' => '<!-- wp:paragraph --><p>Sleep trackers and smart devices promise better rest, but the fundamentals of sleep hygiene cost little and are backed by stronger evidence. This guide helps you decide whether to invest in fundamentals or a device.</p><!-- /wp:paragraph --><!-- wp:heading --><h2>Sleep fundamentals with strong evidence</h2><!-- /wp:heading --><!-- wp:list --><ul><li><strong>Consistent schedule:</strong> Going to bed and waking at the same time supports circadian alignment.</li><li><strong>Light management:</strong> Bright light exposure in the morning; dim, blue-reduced light in the evening.</li><li><strong>Temperature:</strong> A cool room (16–19°C) promotes sleep onset.</li><li><strong>Wind-down routine:</strong> 30 minutes of low-arousal activity before bed.</li><li><strong>Caffeine timing:</strong> Avoid caffeine within 8–10 hours of bedtime.</li></ul><!-- /wp:list --><!-- wp:heading --><h2>When to consider a device</h2><!-- /wp:heading --><!-- wp:paragraph --><p>After consistent application of fundamentals for 4–6 weeks, if sleep difficulties persist, a device that provides measurement and feedback may help identify patterns. Our decision tool below helps you assess whether you are ready to escalate.</p><!-- /wp:paragraph --><!-- wp:paragraph --><p><strong>Medical review note:</strong> This content includes safety boundaries and sleep-disorder red flags. Medical review is pending before publication.</p><!-- /wp:paragraph -->',
 			),
-		'LEL-006'     => array(
-			'post_type'    => 'review',
-			'post_title'   => 'How Accurate Are Consumer Sleep Trackers?',
-			'post_name'    => 'consumer-sleep-tracker-accuracy',
+			'LEL-006' => array(
+				'post_type'    => 'review',
+				'post_title'   => 'How Accurate Are Consumer Sleep Trackers?',
+				'post_name'    => 'consumer-sleep-tracker-accuracy',
 				'post_content' => '<!-- wp:paragraph --><p>Consumer sleep trackers from brands like Oura, Fitbit, Apple, and Whoop claim to measure sleep stages, heart rate, and recovery. This page summarises the published evidence for what these devices can and cannot measure reliably.</p><!-- /wp:paragraph --><!-- wp:heading --><h2>Evidence matrix by metric</h2><!-- /wp:heading --><!-- wp:table --><figure class="wp-block-table"><table><thead><tr><th>Metric</th><th>Evidence level</th><th>Notes</th></tr></thead><tbody><tr><td>Heart rate (night)</td><td>B (Moderate)</td><td>Good agreement with ECG at group level; lower accuracy at individual level</td></tr><tr><td>Total sleep time</td><td>B (Moderate)</td><td>Generally reliable for longer sleep periods; less accurate with frequent awakenings</td></tr><tr><td>Sleep stages (NREM/REM)</td><td>C (Limited)</td><td>Limited agreement with polysomnography; misclassification of light sleep common</td></tr><tr><td>Sleep onset / offset</td><td>C (Limited)</td><td>Variable across devices; tends to overestimate sleep time</td></tr><tr><td>HRV</td><td>C (Limited)</td><td>Night-time HRV correlates with reference measures; daytime not well validated</td></tr></tbody></table></figure><!-- /wp:table --><!-- wp:heading --><h2>Key limitations</h2><!-- /wp:heading --><!-- wp:paragraph --><p>Consumer devices are not medical-grade. They can provide useful trend data but should not be used for diagnosis or clinical decision-making. Accuracy varies by device firmware version, user characteristics, and sleeping environment.</p><!-- /wp:paragraph --><p><strong>Medical review note:</strong> This content interprets accuracy data in clinical context. Medical review is pending before publication.</p><!-- /wp:paragraph -->',
 			),
-			'LEL-007'     => array(
+			'LEL-007' => array(
 				'post_type'    => 'post',
 				'post_title'   => 'Resistance Training for Healthy Aging: A Beginner Framework',
 				'post_name'    => 'resistance-training-healthy-aging',
 				'post_content' => '<!-- wp:paragraph --><p>Resistance training is one of the most evidence-supported interventions for healthy aging. This guide provides a progression framework for beginners, with safety boundaries and referral indicators.</p><!-- /wp:paragraph --><!-- wp:heading --><h2>Getting started (weeks 1–4)</h2><!-- /wp:heading --><!-- wp:list --><ul><li>Bodyweight exercises: squats, wall push-ups, glute bridges, planks.</li><li>2 sessions per week, 1 set of 10–15 repetitions per exercise.</li><li>Focus on form and controlled movement, not load.</li></ul><!-- /wp:list --><!-- wp:heading --><h2>Building consistency (weeks 5–12)</h2><!-- /wp:heading --><!-- wp:list --><ul><li>Add resistance bands or light dumbbells.</li><li>2–3 sessions per week, 2–3 sets of 10–12 repetitions.</li><li>Increase load when 12 repetitions become easy across all sets.</li></ul><!-- /wp:list --><!-- wp:heading --><h2>Safety and referral boundaries</h2><!-- /wp:heading --><!-- wp:paragraph --><p>Consult a healthcare professional before starting if you have: uncontrolled hypertension, recent joint surgery, hernia, chronic pain conditions, or any condition that affects balance. Stop any exercise that causes sharp or persistent pain.</p><!-- /wp:paragraph --><!-- wp:paragraph --><p><strong>Medical review note:</strong> This content includes safety screening guidance and contraindications. Medical review is pending before publication.</p><!-- /wp:paragraph -->',
 			),
-			'LEL-008'     => array(
+			'LEL-008' => array(
 				'post_type'    => 'post',
 				'post_title'   => 'Foods and Dietary Patterns Associated With Healthy Aging',
 				'post_name'    => 'foods-dietary-patterns-healthy-aging',
@@ -1315,7 +1323,15 @@ final class Legal_Hold_Command {
 
 		if ( 'list' === $action ) {
 			$held = Legal_Hold::held_message_ids();
-			\WP_CLI::line( wp_json_encode( array( 'held_post_ids' => $held, 'count' => count( $held ) ), JSON_PRETTY_PRINT ) );
+			\WP_CLI::line(
+				wp_json_encode(
+					array(
+						'held_post_ids' => $held,
+						'count'         => count( $held ),
+					),
+					JSON_PRETTY_PRINT
+				)
+			);
 			return;
 		}
 		if ( 'report' === $action ) {
@@ -1391,7 +1407,7 @@ final class Acceptance_Command {
 		$checks[] = $this->run_check( 'preflight', fn(): array => $this->preflight_check() );
 		$checks[] = $this->run_check( 'migrations', fn(): array => $this->migration_check() );
 
-		$report = System_Readiness::report();
+		$report   = System_Readiness::report();
 		$checks[] = array(
 			'name'   => 'system_readiness',
 			'status' => System_Readiness::normalize_status( (string) ( $report['status'] ?? '' ) ),
@@ -1412,10 +1428,18 @@ final class Acceptance_Command {
 		}
 		$checks[] = $this->run_check( 'role_matrix', fn(): array => $this->role_matrix_check() );
 		$checks[] = $this->run_check( 'synthetic_code_workflow', fn(): array => $this->synthetic_code_workflow_check() );
-		$checks[] = array( 'name' => 'synthetic_contact_delivery', 'status' => 'unknown_external', 'detail' => 'Requires an explicitly isolated synthetic contact route and mail sink/provider test; this command will not write contact data or send mail.' );
+		$checks[] = array(
+			'name'   => 'synthetic_contact_delivery',
+			'status' => 'unknown_external',
+			'detail' => 'Requires an explicitly isolated synthetic contact route and mail sink/provider test; this command will not write contact data or send mail.',
+		);
 		foreach ( $checks as $index => $check ) {
 			if ( ! isset( $check['status'] ) ) {
-				$checks[ $index ] = array( 'name' => 'malformed_check_' . $index, 'status' => 'error', 'detail' => 'Acceptance producer returned no status.' );
+				$checks[ $index ] = array(
+					'name'   => 'malformed_check_' . $index,
+					'status' => 'error',
+					'detail' => 'Acceptance producer returned no status.',
+				);
 				continue;
 			}
 			$checks[ $index ]['status'] = System_Readiness::normalize_status( (string) $check['status'] );
@@ -1426,7 +1450,15 @@ final class Acceptance_Command {
 
 		$format = isset( $assoc_args['format'] ) ? (string) $assoc_args['format'] : 'table';
 		if ( 'json' === $format ) {
-			\WP_CLI::line( (string) wp_json_encode( array( 'status' => $overall, 'checks' => $checks ), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+			\WP_CLI::line(
+				(string) wp_json_encode(
+					array(
+						'status' => $overall,
+						'checks' => $checks,
+					),
+					JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES
+				)
+			);
 		} else {
 			foreach ( $checks as $check ) {
 				\WP_CLI::line( sprintf( '%-9s %-20s %s', strtoupper( $check['status'] ), $check['name'], $check['detail'] ) );
@@ -1448,7 +1480,11 @@ final class Acceptance_Command {
 			return $producer();
 		} catch ( \Throwable $error ) {
 			error_log( '[longevity-core] acceptance check failed: ' . $name . ': ' . $error->getMessage() );
-			return array( 'name' => $name, 'status' => 'error', 'detail' => 'Acceptance check failed internally.' );
+			return array(
+				'name'   => $name,
+				'status' => 'error',
+				'detail' => 'Acceptance check failed internally.',
+			);
 		}
 	}
 
@@ -1469,12 +1505,20 @@ final class Acceptance_Command {
 	private function migration_check(): array {
 		$current = (int) get_option( 'lel_data_version', 0 );
 		if ( null !== Migrations::error_state() ) {
-			return array( 'name' => 'migrations', 'status' => 'blocked', 'detail' => 'A migration error is recorded.' );
+			return array(
+				'name'   => 'migrations',
+				'status' => 'blocked',
+				'detail' => 'A migration error is recorded.',
+			);
 		}
 		if ( Migrations::is_pending() || $current < Migrations::CURRENT_VERSION ) {
-			return array( 'name' => 'migrations', 'status' => 'blocked', 'detail' => sprintf( 'Pending: at %d of %d.', $current, Migrations::CURRENT_VERSION ) );
+			return array(
+				'name'   => 'migrations',
+				'status' => 'blocked',
+				'detail' => sprintf( 'Pending: at %d of %d.', $current, Migrations::CURRENT_VERSION ),
+			);
 		}
-		$tables = array(
+		$tables  = array(
 			'approval snapshots'  => Approval_Repository::exists(),
 			'audit log'           => Audit_Log::exists(),
 			'invalidation queue'  => ! empty( Invalidation_Queue::stats()['table_missing'] ) ? false : true,
@@ -1485,9 +1529,17 @@ final class Acceptance_Command {
 		);
 		$missing = array_keys( array_filter( $tables, static fn( bool $present ): bool => ! $present ) );
 		if ( $missing ) {
-			return array( 'name' => 'migrations', 'status' => 'blocked', 'detail' => 'Missing tables: ' . implode( ', ', $missing ) . '.' );
+			return array(
+				'name'   => 'migrations',
+				'status' => 'blocked',
+				'detail' => 'Missing tables: ' . implode( ', ', $missing ) . '.',
+			);
 		}
-		return array( 'name' => 'migrations', 'status' => 'ok', 'detail' => sprintf( 'At version %d with all governed tables present.', $current ) );
+		return array(
+			'name'   => 'migrations',
+			'status' => 'ok',
+			'detail' => sprintf( 'At version %d with all governed tables present.', $current ),
+		);
 	}
 
 	/** Audit hash-chain integrity. */
@@ -1495,9 +1547,17 @@ final class Acceptance_Command {
 		$result = Audit_Log::verify_chain();
 		if ( empty( $result['valid'] ) ) {
 			$errors = isset( $result['errors'] ) && is_array( $result['errors'] ) ? implode( ', ', array_slice( $result['errors'], 0, 3 ) ) : 'unknown';
-			return array( 'name' => 'audit_chain', 'status' => 'blocked', 'detail' => sprintf( 'Chain invalid after %d event(s): %s.', (int) ( $result['checked'] ?? 0 ), $errors ) );
+			return array(
+				'name'   => 'audit_chain',
+				'status' => 'blocked',
+				'detail' => sprintf( 'Chain invalid after %d event(s): %s.', (int) ( $result['checked'] ?? 0 ), $errors ),
+			);
 		}
-		return array( 'name' => 'audit_chain', 'status' => 'ok', 'detail' => sprintf( 'Verified %d audit event(s).', (int) ( $result['checked'] ?? 0 ) ) );
+		return array(
+			'name'   => 'audit_chain',
+			'status' => 'ok',
+			'detail' => sprintf( 'Verified %d audit event(s).', (int) ( $result['checked'] ?? 0 ) ),
+		);
 	}
 
 	/** One-line summary of any non-ok readiness sub-checks. */
@@ -1520,17 +1580,33 @@ final class Acceptance_Command {
 	private function artifact_identity_check( string $source_sha, string $artifact_checksum ): array {
 		if ( 1 !== preg_match( '/\A(?:[a-f0-9]{40}|[a-f0-9]{64})\z/', $source_sha )
 			|| 1 !== preg_match( '/\A[a-f0-9]{64}\z/', $artifact_checksum ) ) {
-			return array( 'name' => 'artifact_identity', 'status' => 'blocked', 'detail' => 'Exact candidate source SHA and artifact SHA-256 are required.' );
+			return array(
+				'name'   => 'artifact_identity',
+				'status' => 'blocked',
+				'detail' => 'Exact candidate source SHA and artifact SHA-256 are required.',
+			);
 		}
 		$runtime = Evidence_Store::runtime_release_identity();
 		if ( empty( $runtime['valid'] ) ) {
-			return array( 'name' => 'artifact_identity', 'status' => 'error', 'detail' => 'Immutable deployed release identity is missing or malformed.' );
+			return array(
+				'name'   => 'artifact_identity',
+				'status' => 'error',
+				'detail' => 'Immutable deployed release identity is missing or malformed.',
+			);
 		}
 		if ( ! hash_equals( (string) $runtime['release_sha'], $source_sha )
 			|| ! hash_equals( (string) $runtime['artifact_checksum'], $artifact_checksum ) ) {
-			return array( 'name' => 'artifact_identity', 'status' => 'blocked', 'detail' => 'Candidate identity does not exactly match the deployed artifact.' );
+			return array(
+				'name'   => 'artifact_identity',
+				'status' => 'blocked',
+				'detail' => 'Candidate identity does not exactly match the deployed artifact.',
+			);
 		}
-		return array( 'name' => 'artifact_identity', 'status' => 'ok', 'detail' => 'Candidate and deployed source/artifact identity match exactly.' );
+		return array(
+			'name'   => 'artifact_identity',
+			'status' => 'ok',
+			'detail' => 'Candidate and deployed source/artifact identity match exactly.',
+		);
 	}
 
 	/** Required recurring workers need independent schedules and recent heartbeats. */
@@ -1560,19 +1636,39 @@ final class Acceptance_Command {
 			true
 		);
 		if ( is_wp_error( $post_id ) || (int) $post_id < 1 ) {
-			return array( 'name' => 'synthetic_code_workflow', 'status' => 'blocked', 'detail' => 'Could not create an isolated draft fixture.' );
+			return array(
+				'name'   => 'synthetic_code_workflow',
+				'status' => 'blocked',
+				'detail' => 'Could not create an isolated draft fixture.',
+			);
 		}
 		$post_id = (int) $post_id;
-		$result  = array( 'name' => 'synthetic_code_workflow', 'status' => 'ok', 'detail' => 'Draft creation, mandatory-audit invalidation, private projection, and cleanup succeeded.' );
+		$result  = array(
+			'name'   => 'synthetic_code_workflow',
+			'status' => 'ok',
+			'detail' => 'Draft creation, mandatory-audit invalidation, private projection, and cleanup succeeded.',
+		);
 		try {
 			if ( array() !== Rest_API::public_projection( $post_id ) ) {
-				$result = array( 'name' => 'synthetic_code_workflow', 'status' => 'blocked', 'detail' => 'Draft fixture leaked into the public projection.' );
+				$result = array(
+					'name'   => 'synthetic_code_workflow',
+					'status' => 'blocked',
+					'detail' => 'Draft fixture leaked into the public projection.',
+				);
 			} elseif ( Approval_Service::invalidate_direct( $post_id, $token, get_current_user_id(), false, $token ) < 1 ) {
-				$result = array( 'name' => 'synthetic_code_workflow', 'status' => 'blocked', 'detail' => 'Synthetic invalidation lacked a durable audit event.' );
+				$result = array(
+					'name'   => 'synthetic_code_workflow',
+					'status' => 'blocked',
+					'detail' => 'Synthetic invalidation lacked a durable audit event.',
+				);
 			}
 		} finally {
 			if ( ! wp_delete_post( $post_id, true ) ) {
-				$result = array( 'name' => 'synthetic_code_workflow', 'status' => 'blocked', 'detail' => 'Synthetic fixture cleanup failed.' );
+				$result = array(
+					'name'   => 'synthetic_code_workflow',
+					'status' => 'blocked',
+					'detail' => 'Synthetic fixture cleanup failed.',
+				);
 			}
 		}
 		return $result;
@@ -1584,8 +1680,16 @@ final class Acceptance_Command {
 		$current = (string) get_option( 'lel_roles_reconciled_version', '' );
 		$changed = count( $drift['added'] ) + count( $drift['removed'] ) + count( $drift['missing_roles'] );
 		if ( Roles::MATRIX_VERSION !== $current || $changed > 0 ) {
-			return array( 'name' => 'role_matrix', 'status' => 'blocked', 'detail' => sprintf( 'Expected matrix %s; configured %s with %d drift item(s).', Roles::MATRIX_VERSION, '' === $current ? 'missing' : $current, $changed ) );
+			return array(
+				'name'   => 'role_matrix',
+				'status' => 'blocked',
+				'detail' => sprintf( 'Expected matrix %s; configured %s with %d drift item(s).', Roles::MATRIX_VERSION, '' === $current ? 'missing' : $current, $changed ),
+			);
 		}
-		return array( 'name' => 'role_matrix', 'status' => 'ok', 'detail' => 'Role capabilities match matrix ' . Roles::MATRIX_VERSION . '.' );
+		return array(
+			'name'   => 'role_matrix',
+			'status' => 'ok',
+			'detail' => 'Role capabilities match matrix ' . Roles::MATRIX_VERSION . '.',
+		);
 	}
 }

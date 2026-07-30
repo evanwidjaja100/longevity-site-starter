@@ -16,16 +16,16 @@ class Public_Trust {
 		if ( $post_id <= 0 || ! get_post( $post_id ) ) {
 			return '';
 		}
-		$author_id      = (int) get_post_field( 'post_author', $post_id );
-		$reviewer_id    = (int) get_post_meta( $post_id, 'medical_reviewer_user_id', true );
-		$review_date    = (string) get_post_meta( $post_id, 'medical_review_date', true );
+		$author_id       = (int) get_post_field( 'post_author', $post_id );
+		$reviewer_id     = (int) get_post_meta( $post_id, 'medical_reviewer_user_id', true );
+		$review_date     = (string) get_post_meta( $post_id, 'medical_review_date', true );
 		$review_attested = Approval_Service::is_current( $post_id, 'medical' );
-		$fact_date      = (string) get_post_meta( $post_id, 'fact_checked_date', true );
-		$fact_user      = (int) get_post_meta( $post_id, 'fact_checked_by', true );
-		$cutoff         = (string) get_post_meta( $post_id, 'evidence_cutoff_date', true );
-		$correction     = (string) get_post_meta( $post_id, 'correction_status', true );
-		$word_count     = str_word_count( wp_strip_all_tags( get_post_field( 'post_content', $post_id ) ) );
-		$reading_time   = max( 1, (int) ceil( $word_count / 200 ) );
+		$fact_date       = (string) get_post_meta( $post_id, 'fact_checked_date', true );
+		$fact_user       = (int) get_post_meta( $post_id, 'fact_checked_by', true );
+		$cutoff          = (string) get_post_meta( $post_id, 'evidence_cutoff_date', true );
+		$correction      = (string) get_post_meta( $post_id, 'correction_status', true );
+		$word_count      = str_word_count( wp_strip_all_tags( get_post_field( 'post_content', $post_id ) ) );
+		$reading_time    = max( 1, (int) ceil( $word_count / 200 ) );
 
 		$html = '<div class="longevity-article-meta">';
 
@@ -54,8 +54,13 @@ class Public_Trust {
 		}
 		$html .= '<span class="longevity-meta-reading">' . sprintf( '<span class="longevity-meta-label">%s</span> %s', esc_html__( 'Reading time', 'longevity-core' ), esc_html( sprintf( _n( '%s min', '%s min', $reading_time, 'longevity-core' ), number_format_i18n( $reading_time ) ) ) ) . '</span>';
 		if ( 'none' !== $correction ) {
-			$labels = array( 'reported' => __( 'Correction reported', 'longevity-core' ), 'investigating' => __( 'Correction under review', 'longevity-core' ), 'pending' => __( 'Correction pending', 'longevity-core' ), 'complete' => __( 'Correction published', 'longevity-core' ) );
-			$html .= '<span class="longevity-meta-correction">' . esc_html( $labels[ $correction ] ?? $correction ) . '</span>';
+			$labels = array(
+				'reported'      => __( 'Correction reported', 'longevity-core' ),
+				'investigating' => __( 'Correction under review', 'longevity-core' ),
+				'pending'       => __( 'Correction pending', 'longevity-core' ),
+				'complete'      => __( 'Correction published', 'longevity-core' ),
+			);
+			$html  .= '<span class="longevity-meta-correction">' . esc_html( $labels[ $correction ] ?? $correction ) . '</span>';
 		}
 		$html .= '</div>';
 
@@ -85,8 +90,14 @@ class Public_Trust {
 			$html .= '<p><strong>' . esc_html__( 'Scope:', 'longevity-core' ) . '</strong> ' . esc_html( $scope ) . '</p>';
 		}
 		if ( $grade ) {
-			$grade_labels = array( 'A' => __( 'Strong', 'longevity-core' ), 'B' => __( 'Moderate', 'longevity-core' ), 'C' => __( 'Limited', 'longevity-core' ), 'D' => __( 'Mechanistic or anecdotal', 'longevity-core' ), 'U' => __( 'Unclear', 'longevity-core' ) );
-			$html .= '<div class="longevity-evidence-grade"><span class="longevity-badge" data-grade="' . esc_attr( $grade ) . '">' . esc_html( sprintf( __( 'Confidence in the main conclusion: %s', 'longevity-core' ), $grade_labels[ $grade ] ?? __( 'Unclassified', 'longevity-core' ) ) ) . '</span>';
+			$grade_labels = array(
+				'A' => __( 'Strong', 'longevity-core' ),
+				'B' => __( 'Moderate', 'longevity-core' ),
+				'C' => __( 'Limited', 'longevity-core' ),
+				'D' => __( 'Mechanistic or anecdotal', 'longevity-core' ),
+				'U' => __( 'Unclear', 'longevity-core' ),
+			);
+			$html        .= '<div class="longevity-evidence-grade"><span class="longevity-badge" data-grade="' . esc_attr( $grade ) . '">' . esc_html( sprintf( __( 'Confidence in the main conclusion: %s', 'longevity-core' ), $grade_labels[ $grade ] ?? __( 'Unclassified', 'longevity-core' ) ) ) . '</span>';
 			if ( $rationale ) {
 				$html .= '<p>' . esc_html( $rationale ) . '</p>';
 			}
@@ -96,7 +107,11 @@ class Public_Trust {
 			$html .= '<div class="longevity-limitations" role="note"><h3>' . esc_html__( 'Limitations and uncertainty', 'longevity-core' ) . '</h3><p>' . esc_html( $limitations ) . '</p></div>';
 		}
 		if ( ! in_array( $relationship, array( '', 'none' ), true ) ) {
-			$labels = array( 'affiliate' => __( 'This page contains affiliate relationships.', 'longevity-core' ), 'product_supplied' => __( 'A product or access was supplied for evaluation.', 'longevity-core' ), 'sponsored' => __( 'This content has a disclosed sponsorship relationship.', 'longevity-core' ) );
+			$labels = array(
+				'affiliate'        => __( 'This page contains affiliate relationships.', 'longevity-core' ),
+				'product_supplied' => __( 'A product or access was supplied for evaluation.', 'longevity-core' ),
+				'sponsored'        => __( 'This content has a disclosed sponsorship relationship.', 'longevity-core' ),
+			);
 			$html  .= '<p class="longevity-disclosure"><strong>' . esc_html__( 'Commercial disclosure:', 'longevity-core' ) . '</strong> ' . esc_html( $labels[ $relationship ] ?? $relationship ) . ' ' . esc_html__( 'Commercial relationships do not determine editorial conclusions.', 'longevity-core' ) . '</p>';
 		}
 		return $html . '</section>';
@@ -155,7 +170,15 @@ class Public_Trust {
 
 	/** Human-readable, deliberately scoped medical-review label. */
 	private static function scope_label( string $scope ): string {
-		$labels = array( 'full_article' => __( 'Medically reviewed for the full article scope recorded by the reviewer.', 'longevity-core' ), 'safety_only' => __( 'Medically reviewed for safety language.', 'longevity-core' ), 'contraindications_only' => __( 'Medically reviewed for contraindication language.', 'longevity-core' ), 'dosage_language_only' => __( 'Medically reviewed for dosage-language accuracy and boundaries.', 'longevity-core' ), 'product_accuracy_only' => __( 'Medically reviewed for product accuracy language and non-diagnostic limitations.', 'longevity-core' ), 'medical_disclaimer_only' => __( 'Medically reviewed only for the medical disclaimer.', 'longevity-core' ), 'claim_ids' => __( 'Medically reviewed only for the recorded claim IDs.', 'longevity-core' ) );
+		$labels = array(
+			'full_article'            => __( 'Medically reviewed for the full article scope recorded by the reviewer.', 'longevity-core' ),
+			'safety_only'             => __( 'Medically reviewed for safety language.', 'longevity-core' ),
+			'contraindications_only'  => __( 'Medically reviewed for contraindication language.', 'longevity-core' ),
+			'dosage_language_only'    => __( 'Medically reviewed for dosage-language accuracy and boundaries.', 'longevity-core' ),
+			'product_accuracy_only'   => __( 'Medically reviewed for product accuracy language and non-diagnostic limitations.', 'longevity-core' ),
+			'medical_disclaimer_only' => __( 'Medically reviewed only for the medical disclaimer.', 'longevity-core' ),
+			'claim_ids'               => __( 'Medically reviewed only for the recorded claim IDs.', 'longevity-core' ),
+		);
 		return $labels[ $scope ] ?? __( 'Medically reviewed for the scope recorded on this page.', 'longevity-core' );
 	}
 }

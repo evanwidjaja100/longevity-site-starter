@@ -19,18 +19,18 @@ final class Affiliate_Registry {
 	/** Register registry metadata. */
 	public static function register_meta(): void {
 		$fields = array(
-			'merchant_id'              => 'text',
-			'merchant_name'            => 'text',
-			'merchant_domain'          => 'text',
-			'program_name'             => 'text',
-			'relationship_status'      => 'status',
-			'effective_date'           => 'date',
-			'expiration_date'          => 'date',
-			'disclosure_language'      => 'textarea',
+			'merchant_id'                 => 'text',
+			'merchant_name'               => 'text',
+			'merchant_domain'             => 'text',
+			'program_name'                => 'text',
+			'relationship_status'         => 'status',
+			'effective_date'              => 'date',
+			'expiration_date'             => 'date',
+			'disclosure_language'         => 'textarea',
 			'editorial_independence_note' => 'textarea',
-			'owner_user_id'            => 'absint',
-			'last_verified_date'       => 'date',
-			'allow_subdomains'         => 'boolean',
+			'owner_user_id'               => 'absint',
+			'last_verified_date'          => 'date',
+			'allow_subdomains'            => 'boolean',
 		);
 		foreach ( $fields as $key => $rule ) {
 			register_post_meta(
@@ -40,7 +40,7 @@ final class Affiliate_Registry {
 					'type'              => 'boolean' === $rule ? 'boolean' : ( 'absint' === $rule ? 'integer' : 'string' ),
 					'single'            => true,
 					'show_in_rest'      => false,
-				'sanitize_callback' => static fn( $value ) => Meta_Registry::sanitize_value( $rule, $value ),
+					'sanitize_callback' => static fn( $value ) => Meta_Registry::sanitize_value( $rule, $value ),
 					'auth_callback'     => static fn() => current_user_can( 'manage_affiliate_relationships' ),
 				)
 			);
@@ -226,12 +226,12 @@ final class Affiliate_Registry {
 		$matches = array();
 		foreach ( self::active_merchant_ids() as $post_id ) {
 			$record = array(
-				'merchant_domain'    => (string) get_post_meta( $post_id, 'merchant_domain', true ),
+				'merchant_domain'     => (string) get_post_meta( $post_id, 'merchant_domain', true ),
 				'relationship_status' => (string) get_post_meta( $post_id, 'relationship_status', true ),
-				'effective_date'     => (string) get_post_meta( $post_id, 'effective_date', true ),
-				'expiration_date'    => (string) get_post_meta( $post_id, 'expiration_date', true ),
-				'last_verified_date' => (string) get_post_meta( $post_id, 'last_verified_date', true ),
-				'allow_subdomains'   => (bool) get_post_meta( $post_id, 'allow_subdomains', true ),
+				'effective_date'      => (string) get_post_meta( $post_id, 'effective_date', true ),
+				'expiration_date'     => (string) get_post_meta( $post_id, 'expiration_date', true ),
+				'last_verified_date'  => (string) get_post_meta( $post_id, 'last_verified_date', true ),
+				'allow_subdomains'    => (bool) get_post_meta( $post_id, 'allow_subdomains', true ),
 			);
 			if ( self::relationship_is_eligible( $record, $url ) ) {
 				$matches[] = $post_id;
@@ -271,7 +271,12 @@ final class Affiliate_Registry {
 				'orderby'        => 'ID',
 				'order'          => 'ASC',
 				'no_found_rows'  => true,
-				'meta_query'     => array( array( 'key' => 'relationship_status', 'value' => 'active' ) ), // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query
+				'meta_query'     => array(
+					array(
+						'key'   => 'relationship_status',
+						'value' => 'active',
+					),
+				), // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query
 			)
 		);
 		return array_map( 'intval', $ids );
@@ -292,7 +297,11 @@ final class Affiliate_Registry {
 			return null;
 		}
 		$host = self::normalize_domain( (string) $parts['host'] );
-		return '' === $host ? null : array( 'scheme' => $scheme, 'host' => $host, 'port' => $port );
+		return '' === $host ? null : array(
+			'scheme' => $scheme,
+			'host'   => $host,
+			'port'   => $port,
+		);
 	}
 
 	/** Evaluate dates, verification recency and exact/subdomain policy. */
@@ -359,7 +368,7 @@ final class Affiliate_Registry {
 			'data-placement' => sanitize_key( $placement ),
 			'data-merchant'  => sanitize_text_field( (string) get_post_meta( $merchant->ID, 'merchant_id', true ) ),
 		);
-		$html = '';
+		$html       = '';
 		foreach ( $attributes as $name => $value ) {
 			$html .= sprintf( ' %s="%s"', esc_attr( $name ), esc_attr( $value ) );
 		}

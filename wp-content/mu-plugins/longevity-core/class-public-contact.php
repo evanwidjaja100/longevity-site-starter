@@ -11,11 +11,11 @@ defined( 'ABSPATH' ) || exit;
 
 /** Renders contact form and handles submissions with abuse protection. */
 class Public_Contact {
-	private const RETENTION_HOOK         = 'lel_contact_retention_cleanup';
-	private const SUBJECTS               = array( 'general', 'correction', 'privacy', 'commercial', 'other' );
-	private const MAX_REQUEST_BYTES      = 16384;
-	private const PRIVACY_NOTICE_VERSION = '2026-07';
-	private const RECONCILIATION_PREFIX  = 'lel_contact_reconciliation_';
+	private const RETENTION_HOOK             = 'lel_contact_retention_cleanup';
+	private const SUBJECTS                   = array( 'general', 'correction', 'privacy', 'commercial', 'other' );
+	private const MAX_REQUEST_BYTES          = 16384;
+	private const PRIVACY_NOTICE_VERSION     = '2026-07';
+	private const RECONCILIATION_PREFIX      = 'lel_contact_reconciliation_';
 	private const IDEMPOTENCY_RETENTION_DAYS = 7;
 
 	/** Canonical, authoritative per-record retention deadline (UTC `Y-m-d H:i:s`). */

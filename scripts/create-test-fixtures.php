@@ -126,8 +126,16 @@ function lel_fixture_approve( int $post_id, string $type, int $actor_id, array $
 	if ( \Longevity\Core\Approval_Service::is_current( $post_id, $type ) ) {
 		$projection = array(
 			'editorial'  => array( 'editorial_approval_status' => 'ready' ),
-			'fact_check' => array( 'fact_check_status' => 'complete', 'fact_checked_by' => $actor_id, 'fact_checked_date' => gmdate( 'Y-m-d' ) ),
-			'medical'    => array( 'medical_review_status' => 'complete', 'medical_review_attested' => true, 'medical_review_date' => gmdate( 'Y-m-d' ) ),
+			'fact_check' => array(
+				'fact_check_status' => 'complete',
+				'fact_checked_by'   => $actor_id,
+				'fact_checked_date' => gmdate( 'Y-m-d' ),
+			),
+			'medical'    => array(
+				'medical_review_status'   => 'complete',
+				'medical_review_attested' => true,
+				'medical_review_date'     => gmdate( 'Y-m-d' ),
+			),
 			'testing'    => array( 'testing_status' => 'approved' ),
 			'commercial' => array( 'affiliate_disclosure_status' => 'approved' ),
 		);

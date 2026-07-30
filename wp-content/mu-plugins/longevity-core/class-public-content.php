@@ -91,7 +91,10 @@ class Public_Content {
 				'post_status'         => 'publish',
 				'post__not_in'        => array( $post_id ),
 				'posts_per_page'      => min( 6, max( 1, $limit ) ),
-				'orderby'             => array( 'date' => 'DESC', 'ID' => 'DESC' ),
+				'orderby'             => array(
+					'date' => 'DESC',
+					'ID'   => 'DESC',
+				),
 				'ignore_sticky_posts' => true,
 				'no_found_rows'       => true,
 			);
@@ -112,7 +115,7 @@ class Public_Content {
 		foreach ( $posts as $related ) {
 			$guide_event = 'review' === $related->post_type ? 'ranking_report_open' : 'guide_open';
 			$guide_attr  = 'guide_open' === $guide_event ? 'data-lel-event="guide_open" data-guide-id="' . esc_attr( (string) $related->ID ) . '" data-placement="related-content"' : '';
-			$html .= '<li><a href="' . esc_url( get_permalink( $related ) ) . '" ' . $guide_attr . '>' . esc_html( get_the_title( $related ) ) . '</a> <span class="longevity-small">' . esc_html( 'review' === $related->post_type ? __( 'Consumer Lab review', 'longevity-core' ) : __( 'Evidence guide', 'longevity-core' ) ) . '</span></li>';
+			$html       .= '<li><a href="' . esc_url( get_permalink( $related ) ) . '" ' . $guide_attr . '>' . esc_html( get_the_title( $related ) ) . '</a> <span class="longevity-small">' . esc_html( 'review' === $related->post_type ? __( 'Consumer Lab review', 'longevity-core' ) : __( 'Evidence guide', 'longevity-core' ) ) . '</span></li>';
 		}
 		return $html . '</ul></section>';
 	}
@@ -125,10 +128,16 @@ class Public_Content {
 		$items   = array();
 		$items[] = '<span><strong>' . esc_html( 'review' === get_post_type( $post_id ) ? __( 'Review', 'longevity-core' ) : __( 'Guide', 'longevity-core' ) ) . '</strong></span>';
 		$items[] = '<time datetime="' . esc_attr( get_the_modified_date( DATE_W3C, $post_id ) ) . '">' . esc_html( sprintf( __( 'Updated %s', 'longevity-core' ), get_the_modified_date( '', $post_id ) ) ) . '</time>';
-		$grade = (string) get_post_meta( $post_id, 'evidence_grade', true );
+		$grade   = (string) get_post_meta( $post_id, 'evidence_grade', true );
 		if ( $grade ) {
-			$grade_labels = array( 'A' => __( 'Strong', 'longevity-core' ), 'B' => __( 'Moderate', 'longevity-core' ), 'C' => __( 'Limited', 'longevity-core' ), 'D' => __( 'Mechanistic', 'longevity-core' ), 'U' => __( 'Unclear', 'longevity-core' ) );
-			$items[] = '<span>' . esc_html( sprintf( __( 'Main conclusion: %s', 'longevity-core' ), $grade_labels[ $grade ] ?? __( 'Unclassified', 'longevity-core' ) ) ) . '</span>';
+			$grade_labels = array(
+				'A' => __( 'Strong', 'longevity-core' ),
+				'B' => __( 'Moderate', 'longevity-core' ),
+				'C' => __( 'Limited', 'longevity-core' ),
+				'D' => __( 'Mechanistic', 'longevity-core' ),
+				'U' => __( 'Unclear', 'longevity-core' ),
+			);
+			$items[]      = '<span>' . esc_html( sprintf( __( 'Main conclusion: %s', 'longevity-core' ), $grade_labels[ $grade ] ?? __( 'Unclassified', 'longevity-core' ) ) ) . '</span>';
 		}
 		if ( 'review' === get_post_type( $post_id ) && Runtime_Config::scoring_model_status()['valid'] && Approval_Service::is_current( $post_id, 'testing' ) && Review_Methodology::valid_test_record( (int) get_post_meta( $post_id, 'test_record_id', true ), (string) get_post_meta( $post_id, 'testing_protocol_version', true ) ) ) {
 			$items[] = '<span>' . esc_html__( 'Tested', 'longevity-core' ) . '</span>';
@@ -148,7 +157,14 @@ class Public_Content {
 		$count        = isset( $GLOBALS['wp_query'] ) ? (int) $GLOBALS['wp_query']->found_posts : 0;
 		$html         = '<p class="longevity-result-count" aria-live="polite">' . esc_html( sprintf( _n( '%s result', '%s results', $count, 'longevity-core' ), number_format_i18n( $count ) ) ) . '</p><form class="longevity-search-form" role="search" method="get" action="' . esc_url( home_url( '/' ) ) . '">';
 		$html        .= '<label>' . esc_html__( 'Search terms', 'longevity-core' ) . '<input type="search" name="s" value="' . esc_attr( $query ) . '"></label>';
-		$html        .= '<label>' . esc_html__( 'Content type', 'longevity-core' ) . '<select name="content_type">' . self::options( array( 'all' => __( 'All content', 'longevity-core' ), 'guide' => __( 'Evidence guides', 'longevity-core' ), 'review' => __( 'Consumer Lab reviews', 'longevity-core' ) ), $content_type ) . '</select></label>';
+		$html        .= '<label>' . esc_html__( 'Content type', 'longevity-core' ) . '<select name="content_type">' . self::options(
+			array(
+				'all'    => __( 'All content', 'longevity-core' ),
+				'guide'  => __( 'Evidence guides', 'longevity-core' ),
+				'review' => __( 'Consumer Lab reviews', 'longevity-core' ),
+			),
+			$content_type
+		) . '</select></label>';
 
 		$cat_options = array( '' => __( 'All topics', 'longevity-core' ) );
 		$categories  = get_categories( array( 'hide_empty' => false ) );
@@ -157,8 +173,15 @@ class Public_Content {
 		}
 		$html .= '<label>' . esc_html__( 'Topic', 'longevity-core' ) . '<select name="category">' . self::options( $cat_options, $category ) . '</select></label>';
 
-		$html        .= '<label>' . esc_html__( 'Sort', 'longevity-core' ) . '<select name="sort">' . self::options( array( 'relevance' => __( 'Relevance', 'longevity-core' ), 'newest' => __( 'Newest', 'longevity-core' ), 'updated' => __( 'Recently updated', 'longevity-core' ) ), $sort ) . '</select></label>';
-		$has_filters  = ( 'all' !== $content_type || '' !== $category || 'relevance' !== $sort );
+		$html       .= '<label>' . esc_html__( 'Sort', 'longevity-core' ) . '<select name="sort">' . self::options(
+			array(
+				'relevance' => __( 'Relevance', 'longevity-core' ),
+				'newest'    => __( 'Newest', 'longevity-core' ),
+				'updated'   => __( 'Recently updated', 'longevity-core' ),
+			),
+			$sort
+		) . '</select></label>';
+		$has_filters = ( 'all' !== $content_type || '' !== $category || 'relevance' !== $sort );
 		if ( $has_filters ) {
 			$html .= ' <a class="longevity-clear-filters" href="' . esc_url( home_url( '/?s=' . rawurlencode( $query ) ) ) . '">' . esc_html__( 'Clear filters', 'longevity-core' ) . '</a>';
 		}
@@ -206,27 +229,27 @@ class Public_Content {
 				'desc'    => __( 'Learn how to evaluate health claims and interpret study quality.', 'longevity-core' ),
 				'example' => __( 'How do I know whether a health claim is supported?', 'longevity-core' ),
 			),
-			'sleep' => array(
+			'sleep'             => array(
 				'label'   => __( 'Sleep', 'longevity-core' ),
 				'desc'    => __( 'Evidence-led sleep guidance and measurement literacy.', 'longevity-core' ),
 				'example' => __( 'How can I improve sleep before buying a device?', 'longevity-core' ),
 			),
-			'movement' => array(
+			'movement'          => array(
 				'label'   => __( 'Movement', 'longevity-core' ),
 				'desc'    => __( 'Resistance training, physical capacity, and healthy aging.', 'longevity-core' ),
 				'example' => __( 'How should a beginner structure resistance training?', 'longevity-core' ),
 			),
-			'nutrition' => array(
+			'nutrition'         => array(
 				'label'   => __( 'Nutrition', 'longevity-core' ),
 				'desc'    => __( 'Dietary patterns and foods associated with healthy aging.', 'longevity-core' ),
 				'example' => __( 'Which dietary patterns have the strongest human evidence?', 'longevity-core' ),
 			),
-			'wearables' => array(
+			'wearables'         => array(
 				'label'   => __( 'Wearables', 'longevity-core' ),
 				'desc'    => __( 'Consumer measurement devices and data interpretation.', 'longevity-core' ),
 				'example' => __( 'What can a sleep tracker measure reliably?', 'longevity-core' ),
 			),
-			'supplements' => array(
+			'supplements'       => array(
 				'label'   => __( 'Supplements', 'longevity-core' ),
 				'desc'    => __( 'Ingredients, labels, third-party testing, and marketing red flags.', 'longevity-core' ),
 				'example' => __( 'How can I screen supplement marketing and labels?', 'longevity-core' ),
@@ -244,7 +267,7 @@ class Public_Content {
 
 			$guide_count = (int) $term->count;
 
-			$review_args = array(
+			$review_args  = array(
 				'post_type'      => 'review',
 				'post_status'    => 'publish',
 				'posts_per_page' => 1,
@@ -289,8 +312,8 @@ class Public_Content {
 
 	/** Render guide archive with topic filter and sort controls. */
 	public static function render_guide_directory(): string {
-		$page = isset( $_GET['guide_page'] ) ? max( 1, (int) $_GET['guide_page'] ) : 1; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Anonymous public read; nonces do not apply.
-		$sort = sanitize_key( wp_unslash( $_GET['guide_sort'] ?? '' ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Anonymous public read; nonces do not apply.
+		$page       = isset( $_GET['guide_page'] ) ? max( 1, (int) $_GET['guide_page'] ) : 1; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Anonymous public read; nonces do not apply.
+		$sort       = sanitize_key( wp_unslash( $_GET['guide_sort'] ?? '' ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Anonymous public read; nonces do not apply.
 		$topic_slug = sanitize_key( wp_unslash( $_GET['guide_topic'] ?? '' ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Anonymous public read; nonces do not apply.
 
 		$tax_query = array();
@@ -316,7 +339,7 @@ class Public_Content {
 			$order   = 'ASC';
 		}
 
-		$args = array(
+		$args  = array(
 			'post_type'      => 'post',
 			'post_status'    => 'publish',
 			'posts_per_page' => 12,
@@ -330,12 +353,12 @@ class Public_Content {
 
 		$html = '<section class="longevity-guide-directory" aria-labelledby="lel-guide-directory-title"><div class="longevity-section-header"><p class="longevity-kicker">' . esc_html__( 'Guides', 'longevity-core' ) . '</p><h2 id="lel-guide-directory-title">' . esc_html__( 'Evidence guides', 'longevity-core' ) . '</h2></div>';
 
-		$html .= '<form class="longevity-guide-filters" method="get" action=""><label>' . esc_html__( 'Topic', 'longevity-core' ) . ' <select name="guide_topic">';
-		$html .= '<option value="">' . esc_html__( 'All topics', 'longevity-core' ) . '</option>';
+		$html      .= '<form class="longevity-guide-filters" method="get" action=""><label>' . esc_html__( 'Topic', 'longevity-core' ) . ' <select name="guide_topic">';
+		$html      .= '<option value="">' . esc_html__( 'All topics', 'longevity-core' ) . '</option>';
 		$categories = get_categories( array( 'hide_empty' => true ) );
 		foreach ( $categories as $cat ) {
 			$selected = selected( $topic_slug, $cat->slug, false );
-			$html .= '<option value="' . esc_attr( $cat->slug ) . '" ' . $selected . '>' . esc_html( $cat->name ) . '</option>';
+			$html    .= '<option value="' . esc_attr( $cat->slug ) . '" ' . $selected . '>' . esc_html( $cat->name ) . '</option>';
 		}
 		$html .= '</select></label>';
 
@@ -354,7 +377,7 @@ class Public_Content {
 			$html .= '<div class="longevity-card-grid">';
 			while ( $query->have_posts() ) {
 				$query->the_post();
-				$html .= '<article class="longevity-card"><h3><a href="' . esc_url( get_permalink() ) . '" data-lel-event="guide_open" data-guide-id="' . esc_attr( (string) get_the_ID() ) . '" data-placement="guide-directory">' . esc_html( get_the_title() ) . '</a></h3>';
+				$html   .= '<article class="longevity-card"><h3><a href="' . esc_url( get_permalink() ) . '" data-lel-event="guide_open" data-guide-id="' . esc_attr( (string) get_the_ID() ) . '" data-placement="guide-directory">' . esc_html( get_the_title() ) . '</a></h3>';
 				$excerpt = get_the_excerpt();
 				if ( $excerpt ) {
 					$html .= '<p>' . esc_html( wp_trim_words( $excerpt, 30 ) ) . '</p>';
@@ -369,7 +392,7 @@ class Public_Content {
 
 			$html .= '</div>';
 
-			$total   = $query->max_num_pages;
+			$total = $query->max_num_pages;
 			if ( $total > 1 ) {
 				$html .= '<nav class="longevity-pagination" aria-label="' . esc_attr__( 'Guide pagination', 'longevity-core' ) . '">';
 				for ( $i = 1; $i <= $total; ++$i ) {
@@ -418,7 +441,11 @@ class Public_Content {
 				++$i;
 			}
 			$used[ $id ] = true;
-			$headings[]  = array( 'level' => (int) $match[1], 'id' => $id, 'text' => $text );
+			$headings[]  = array(
+				'level' => (int) $match[1],
+				'id'    => $id,
+				'text'  => $text,
+			);
 		}
 		return $headings;
 	}
@@ -441,7 +468,7 @@ class Public_Content {
 
 	/** Return a page-unique heading ID. */
 	public static function unique_id( string $component, int $post_id ): string {
-		$key = $component . '-' . $post_id;
+		$key                           = $component . '-' . $post_id;
 		self::$instance_counts[ $key ] = ( self::$instance_counts[ $key ] ?? 0 ) + 1;
 		return 'lel-' . sanitize_html_class( $key ) . '-' . self::$instance_counts[ $key ];
 	}

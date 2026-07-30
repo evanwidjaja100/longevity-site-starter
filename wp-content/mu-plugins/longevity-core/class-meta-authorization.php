@@ -16,8 +16,12 @@ final class Meta_Authorization {
 
 	/** Workflow state fields that only first-party services may write. */
 	private const WORKFLOW_STATE_FIELDS = array(
-		'fact_check_status', 'medical_review_status', 'medical_review_attested',
-		'testing_status', 'affiliate_disclosure_status', 'editorial_approval_status',
+		'fact_check_status',
+		'medical_review_status',
+		'medical_review_attested',
+		'testing_status',
+		'affiliate_disclosure_status',
+		'editorial_approval_status',
 	);
 
 	/** Depth counter for the trusted scope. */
@@ -178,11 +182,18 @@ final class Meta_Authorization {
 	/** Audit a denied write without exposing sensitive attempted values. */
 	private static function audit_denial( string $operation, string $meta_key, int $object_id, int $user_id ): void {
 		if ( class_exists( Audit_Log::class ) ) {
-			Audit_Log::record( 'metadata_write_denied', 'post', $object_id, array(
-				'operation' => $operation,
-				'meta_key'  => substr( sanitize_key( $meta_key ), 0, 64 ),
-				'actor'     => $user_id,
-			), $user_id, 'persistence' );
+			Audit_Log::record(
+				'metadata_write_denied',
+				'post',
+				$object_id,
+				array(
+					'operation' => $operation,
+					'meta_key'  => substr( sanitize_key( $meta_key ), 0, 64 ),
+					'actor'     => $user_id,
+				),
+				$user_id,
+				'persistence'
+			);
 		}
 	}
 

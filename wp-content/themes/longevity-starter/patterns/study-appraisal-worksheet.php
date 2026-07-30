@@ -5,6 +5,7 @@
  * Categories: featured
  * Inserter: false
  * Description: Evaluate individual studies against methodological criteria. Quarantined from the inserter: ratings and notes must come from a real appraisal, never sample values.
+ *
  * @package LongevityStarter
  */
 

@@ -5,6 +5,7 @@
  * Categories: featured
  * Inserter: true
  * Description: Assess claims by evidence strength and potential impact.
+ *
  * @package LongevityStarter
  */
 

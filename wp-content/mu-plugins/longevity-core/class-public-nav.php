@@ -33,27 +33,44 @@ class Public_Nav {
 
 	/** Get deterministic visible breadcrumb facts. */
 	public static function breadcrumb_items( int $post_id = 0 ): array {
-		$items = array( array( 'name' => get_bloginfo( 'name' ), 'url' => home_url( '/' ) ) );
+		$items = array(
+			array(
+				'name' => get_bloginfo( 'name' ),
+				'url'  => home_url( '/' ),
+			),
+		);
 		if ( is_search() ) {
-			$items[] = array( 'name' => __( 'Search', 'longevity-core' ), 'url' => '' );
+			$items[] = array(
+				'name' => __( 'Search', 'longevity-core' ),
+				'url'  => '',
+			);
 			return $items;
 		}
 		if ( is_category() ) {
 			$term = get_queried_object();
 			if ( $term instanceof \WP_Term ) {
-				$items[] = array( 'name' => $term->name, 'url' => '' );
+				$items[] = array(
+					'name' => $term->name,
+					'url'  => '',
+				);
 			}
 			return $items;
 		}
 		if ( is_author() ) {
 			$user = get_queried_object();
 			if ( $user instanceof \WP_User ) {
-				$items[] = array( 'name' => $user->display_name, 'url' => '' );
+				$items[] = array(
+					'name' => $user->display_name,
+					'url'  => '',
+				);
 			}
 			return $items;
 		}
 		if ( is_post_type_archive( 'review' ) ) {
-			$items[] = array( 'name' => __( 'Consumer Lab', 'longevity-core' ), 'url' => '' );
+			$items[] = array(
+				'name' => __( 'Consumer Lab', 'longevity-core' ),
+				'url'  => '',
+			);
 			return $items;
 		}
 		$post_id = $post_id > 0 ? $post_id : get_queried_object_id();
@@ -61,32 +78,41 @@ class Public_Nav {
 			return $items;
 		}
 		if ( 'review' === get_post_type( $post_id ) ) {
-			$items[] = array( 'name' => __( 'Consumer Lab', 'longevity-core' ), 'url' => get_post_type_archive_link( 'review' ) );
+			$items[] = array(
+				'name' => __( 'Consumer Lab', 'longevity-core' ),
+				'url'  => get_post_type_archive_link( 'review' ),
+			);
 		} else {
 			$categories = get_the_category( $post_id );
 			if ( $categories ) {
-				$items[] = array( 'name' => $categories[0]->name, 'url' => get_category_link( $categories[0]->term_id ) );
+				$items[] = array(
+					'name' => $categories[0]->name,
+					'url'  => get_category_link( $categories[0]->term_id ),
+				);
 			}
 		}
-		$items[] = array( 'name' => get_the_title( $post_id ), 'url' => '' );
+		$items[] = array(
+			'name' => get_the_title( $post_id ),
+			'url'  => '',
+		);
 		return $items;
 	}
 
 	/** Render route-aware footer navigation. */
 	public static function render_footer_nav(): string {
 		$groups = array(
-			'Explore' => array(
+			'Explore'     => array(
 				'start_here' => __( 'Start Here', 'longevity-core' ),
 			),
 			'How We Work' => array(
 				'evidence_methodology' => __( 'Evidence Methodology', 'longevity-core' ),
 				'testing_methodology'  => __( 'Testing Methodology', 'longevity-core' ),
 			),
-			'About' => array(
-				'about'  => __( 'About the publication', 'longevity-core' ),
+			'About'       => array(
+				'about'   => __( 'About the publication', 'longevity-core' ),
 				'contact' => __( 'Contact', 'longevity-core' ),
 			),
-			'Policies' => array(
+			'Policies'    => array(
 				'editorial_policy'     => __( 'Editorial Policy', 'longevity-core' ),
 				'medical_disclaimer'   => __( 'Medical Disclaimer', 'longevity-core' ),
 				'affiliate_disclosure' => __( 'Affiliate Disclosure', 'longevity-core' ),
@@ -96,7 +122,7 @@ class Public_Nav {
 			),
 		);
 
-		$html = '<div class="longevity-footer-grid alignwide">';
+		$html  = '<div class="longevity-footer-grid alignwide">';
 		$html .= '<div class="longevity-footer-intro">';
 		$html .= '<p class="longevity-kicker">' . esc_html__( 'Longevity Evidence Lab', 'longevity-core' ) . '</p>';
 		$html .= '<h2>' . esc_html__( 'Decisions grounded in evidence you can inspect.', 'longevity-core' ) . '</h2>';
@@ -131,7 +157,17 @@ class Public_Nav {
 
 	/** Render portable policy links. */
 	public static function render_policy_links(): string {
-		$links = array( 'about' => __( 'About', 'longevity-core' ), 'editorial-policy' => __( 'Editorial Policy', 'longevity-core' ), 'medical-disclaimer' => __( 'Medical Disclaimer', 'longevity-core' ), 'affiliate-disclosure' => __( 'Affiliate Disclosure', 'longevity-core' ), 'corrections' => __( 'Corrections', 'longevity-core' ), 'testing-methodology' => __( 'Testing Methodology', 'longevity-core' ), 'privacy' => __( 'Privacy', 'longevity-core' ), 'terms' => __( 'Terms', 'longevity-core' ), 'contact' => __( 'Contact', 'longevity-core' ) );
+		$links = array(
+			'about'                => __( 'About', 'longevity-core' ),
+			'editorial-policy'     => __( 'Editorial Policy', 'longevity-core' ),
+			'medical-disclaimer'   => __( 'Medical Disclaimer', 'longevity-core' ),
+			'affiliate-disclosure' => __( 'Affiliate Disclosure', 'longevity-core' ),
+			'corrections'          => __( 'Corrections', 'longevity-core' ),
+			'testing-methodology'  => __( 'Testing Methodology', 'longevity-core' ),
+			'privacy'              => __( 'Privacy', 'longevity-core' ),
+			'terms'                => __( 'Terms', 'longevity-core' ),
+			'contact'              => __( 'Contact', 'longevity-core' ),
+		);
 		$html  = '<nav class="longevity-policy-nav" aria-label="' . esc_attr__( 'Publication policies', 'longevity-core' ) . '"><ul>';
 		foreach ( $links as $slug => $label ) {
 			$url = Routes::public_page_url( $slug );

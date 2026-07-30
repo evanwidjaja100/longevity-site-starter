@@ -17,7 +17,7 @@ defined( 'ABSPATH' ) || exit;
  * raw message and email never enter this table.
  */
 final class Contact_Idempotency {
-	public const SCHEMA_VERSION  = 1;
+	public const SCHEMA_VERSION   = 1;
 	public const STATE_PROCESSING = 'processing';
 	public const STATE_COMPLETED  = 'completed';
 	public const STATE_FAILED     = 'failed';
@@ -99,44 +99,74 @@ final class Contact_Idempotency {
 			)
 		);
 		if ( 1 === (int) $inserted && '' === (string) $wpdb->last_error ) {
-			return array( 'state' => 'reserved', 'post_id' => 0 );
+			return array(
+				'state'   => 'reserved',
+				'post_id' => 0,
+			);
 		}
 		if ( false !== stripos( (string) $wpdb->last_error, 'duplicate' ) ) {
 			return self::resolve_existing( $key );
 		}
 		self::report_sql_failure( 'reserve' );
-		return array( 'state' => 'unavailable', 'post_id' => 0 );
+		return array(
+			'state'   => 'unavailable',
+			'post_id' => 0,
+		);
 	}
 
 	/** Resolve the state of an already-present reservation. */
 	private static function resolve_existing( string $key ): array {
 		$row = self::find( $key );
 		if ( ! is_array( $row ) ) {
-			return array( 'state' => 'unavailable', 'post_id' => 0 );
+			return array(
+				'state'   => 'unavailable',
+				'post_id' => 0,
+			);
 		}
 		$state   = (string) ( $row['state'] ?? '' );
 		$post_id = (int) ( $row['message_post_id'] ?? 0 );
 		if ( self::STATE_COMPLETED === $state ) {
-			return array( 'state' => 'completed', 'post_id' => $post_id );
+			return array(
+				'state'   => 'completed',
+				'post_id' => $post_id,
+			);
 		}
 		if ( self::STATE_PROCESSING === $state && ! self::lease_expired( $row ) ) {
-			return array( 'state' => 'in_progress', 'post_id' => $post_id );
+			return array(
+				'state'   => 'in_progress',
+				'post_id' => $post_id,
+			);
 		}
 		$reclaimed = self::reclaim( $key );
 		if ( 1 === $reclaimed ) {
 			if ( self::STATE_PROCESSING === $state && $post_id > 0 ) {
-				return array( 'state' => 'resume', 'post_id' => $post_id );
+				return array(
+					'state'   => 'resume',
+					'post_id' => $post_id,
+				);
 			}
-			return array( 'state' => 'reclaimed', 'post_id' => 0 );
+			return array(
+				'state'   => 'reclaimed',
+				'post_id' => 0,
+			);
 		}
 		if ( false === $reclaimed ) {
-			return array( 'state' => 'unavailable', 'post_id' => 0 );
+			return array(
+				'state'   => 'unavailable',
+				'post_id' => 0,
+			);
 		}
 		$row = self::find( $key );
 		if ( is_array( $row ) && self::STATE_COMPLETED === (string) ( $row['state'] ?? '' ) ) {
-			return array( 'state' => 'completed', 'post_id' => (int) ( $row['message_post_id'] ?? 0 ) );
+			return array(
+				'state'   => 'completed',
+				'post_id' => (int) ( $row['message_post_id'] ?? 0 ),
+			);
 		}
-		return array( 'state' => 'in_progress', 'post_id' => $post_id );
+		return array(
+			'state'   => 'in_progress',
+			'post_id' => $post_id,
+		);
 	}
 
 	/** One-winner conditional reclaim of an expired-processing or failed row. */

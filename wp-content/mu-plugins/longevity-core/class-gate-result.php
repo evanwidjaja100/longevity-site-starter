@@ -33,14 +33,21 @@ final class Gate_Result {
 	);
 
 	private function push( string $category, string $code, string $message ): void {
-		$prop = self::BUCKETS[ $category ];
-		$this->$prop[] = array( 'code' => $code, 'message' => $message );
+		$prop          = self::BUCKETS[ $category ];
+		$this->$prop[] = array(
+			'code'    => $code,
+			'message' => $message,
+		);
 	}
 
-	public function block( string $code, string $message ): void { $this->push( 'block', $code, $message ); }
-	public function warn( string $code, string $message ): void { $this->push( 'warn', $code, $message ); }
-	public function pass( string $code, string $message ): void { $this->push( 'pass', $code, $message ); }
-	public function skip( string $code, string $message ): void { $this->push( 'skip', $code, $message ); }
+	public function block( string $code, string $message ): void {
+		$this->push( 'block', $code, $message ); }
+	public function warn( string $code, string $message ): void {
+		$this->push( 'warn', $code, $message ); }
+	public function pass( string $code, string $message ): void {
+		$this->push( 'pass', $code, $message ); }
+	public function skip( string $code, string $message ): void {
+		$this->push( 'skip', $code, $message ); }
 
 	/** Whether publication is blocked. */
 	public function is_blocked(): bool {

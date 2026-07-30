@@ -35,7 +35,7 @@ $posts = get_posts(
 	)
 );
 // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited
-$post  = ! empty( $posts ) ? $posts[0] : null;
+$post = ! empty( $posts ) ? $posts[0] : null;
 if ( ! $post ) {
 	\WP_CLI::error( 'Contact page not found.' );
 }

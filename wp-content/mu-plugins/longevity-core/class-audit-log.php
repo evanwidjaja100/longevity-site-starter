@@ -178,7 +178,7 @@ final class Audit_Log {
 		if ( ! isset( $wpdb ) || ! is_object( $wpdb ) || ! self::exists() ) {
 			return false;
 		}
-		$table = self::table_name();
+		$table  = self::table_name();
 		$column = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(1) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = %s AND COLUMN_NAME = %s', $table, 'idempotency_key' ) );
 		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name derives from the trusted $wpdb->prefix; no user data in the query.
 		if ( $column <= 0 && false === $wpdb->query( "ALTER TABLE {$table} ADD idempotency_key char(64) DEFAULT NULL" ) ) {
@@ -201,11 +201,11 @@ final class Audit_Log {
 	 */
 	public static function record( string $event_type, string $object_type, int $object_id, array $payload = array(), int $actor_id = 0, string $source_channel = 'system', bool $mandatory = false, string $idempotency_key = '' ): int {
 		global $wpdb;
-		$event_type     = substr( sanitize_key( $event_type ), 0, 64 );
-		$object_type    = substr( sanitize_key( $object_type ), 0, 40 );
-		$source_channel = substr( sanitize_key( $source_channel ), 0, 32 );
-		$payload        = self::sanitize_payload( $payload );
-		$request_id     = self::request_id();
+		$event_type      = substr( sanitize_key( $event_type ), 0, 64 );
+		$object_type     = substr( sanitize_key( $object_type ), 0, 40 );
+		$source_channel  = substr( sanitize_key( $source_channel ), 0, 32 );
+		$payload         = self::sanitize_payload( $payload );
+		$request_id      = self::request_id();
 		$idempotency_key = '' === $idempotency_key ? '' : hash( 'sha256', $idempotency_key );
 		if ( ! self::request_is_healthy() ) {
 			$message = 'Governance write blocked because this request has an unknown database outcome: ' . self::$unhealthy_reason;
@@ -285,10 +285,14 @@ final class Audit_Log {
 	 */
 	public static function verify_chain( int $batch_size = 500 ): array {
 		global $wpdb;
-		$errors = array();
+		$errors  = array();
 		$checked = 0;
 		if ( ! isset( $wpdb ) || ! is_object( $wpdb ) || ! method_exists( $wpdb, 'get_results' ) || ! self::exists() ) {
-			return array( 'valid' => false, 'checked' => 0, 'errors' => array( 'audit_table_unavailable' ) );
+			return array(
+				'valid'   => false,
+				'checked' => 0,
+				'errors'  => array( 'audit_table_unavailable' ),
+			);
 		}
 		$table     = self::table_name();
 		$last_seq  = 0;
@@ -297,7 +301,7 @@ final class Audit_Log {
 		while ( true ) {
 			self::clear_database_error( $wpdb );
 			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name derives from the trusted $wpdb->prefix; all values use prepare() placeholders.
-			$rows             = $wpdb->get_results( $wpdb->prepare( "SELECT * FROM {$table} WHERE sequence > %d ORDER BY sequence ASC LIMIT %d", $last_seq, $batch_size ), ARRAY_A );
+			$rows = $wpdb->get_results( $wpdb->prepare( "SELECT * FROM {$table} WHERE sequence > %d ORDER BY sequence ASC LIMIT %d", $last_seq, $batch_size ), ARRAY_A );
 			if ( self::database_failed( $wpdb ) ) {
 				$errors[] = 'audit_read_failed:' . substr( (string) $wpdb->last_error, 0, 120 );
 				break;
@@ -323,7 +327,11 @@ final class Audit_Log {
 			}
 			$last_seq = $prev_seq;
 		}
-		return array( 'valid' => empty( $errors ), 'checked' => $checked, 'errors' => array_slice( $errors, 0, 50 ) );
+		return array(
+			'valid'   => empty( $errors ),
+			'checked' => $checked,
+			'errors'  => array_slice( $errors, 0, 50 ),
+		);
 	}
 
 	/** Recompute the event hash from stored row data for tamper detection. */
@@ -447,7 +455,7 @@ final class Audit_Log {
 			if ( '' !== $idempotency_key ) {
 				self::clear_database_error( $wpdb );
 				// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name derives from the trusted $wpdb->prefix; the value uses a prepare() placeholder.
-				$existing         = (int) $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$table} WHERE idempotency_key = %s LIMIT 1 FOR UPDATE", $idempotency_key ) );
+				$existing = (int) $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$table} WHERE idempotency_key = %s LIMIT 1 FOR UPDATE", $idempotency_key ) );
 				if ( self::database_failed( $wpdb ) ) {
 					throw new \RuntimeException( 'Audit idempotency lookup failed: ' . self::database_error( $wpdb ) );
 				}
@@ -463,11 +471,11 @@ final class Audit_Log {
 			}
 			self::clear_database_error( $wpdb );
 			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name derives from the trusted $wpdb->prefix; no user data in the query.
-			$previous         = (string) $wpdb->get_var( "SELECT event_hash FROM {$table} ORDER BY sequence DESC LIMIT 1" );
+			$previous = (string) $wpdb->get_var( "SELECT event_hash FROM {$table} ORDER BY sequence DESC LIMIT 1" );
 			if ( self::database_failed( $wpdb ) ) {
 				throw new \RuntimeException( 'Audit predecessor read failed: ' . self::database_error( $wpdb ) );
 			}
-			$record = array(
+			$record               = array(
 				'sequence'            => $next_seq,
 				'occurred_at'         => gmdate( 'Y-m-d H:i:s' ),
 				'event_type'          => $event_type,
@@ -485,7 +493,7 @@ final class Audit_Log {
 			if ( '' === $idempotency_key ) {
 				unset( $record['idempotency_key'] );
 			}
-			$inserted             = $wpdb->insert( $table, $record );
+			$inserted = $wpdb->insert( $table, $record );
 			if ( false === $inserted ) {
 				return 0;
 			}
@@ -530,14 +538,26 @@ final class Audit_Log {
 		if ( ! update_option( 'lel_audit_write_failures', $count + 1, false ) && (int) get_option( 'lel_audit_write_failures', 0 ) !== $count + 1 ) {
 			error_log( 'Longevity audit failure counter could not be persisted.' ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
 		}
-		Logger::error( 'audit_write_failure', array( 'event_type' => $event_type, 'reason' => substr( $reason, 0, 200 ) ) );
+		Logger::error(
+			'audit_write_failure',
+			array(
+				'event_type' => $event_type,
+				'reason'     => substr( $reason, 0, 200 ),
+			)
+		);
 	}
 
 	/** Quarantine the request after an unknown transaction outcome. */
 	private static function mark_request_unhealthy( string $reason, $wpdb ): void {
 		if ( '' === self::$unhealthy_reason ) {
 			self::$unhealthy_reason = $reason . ':' . substr( self::database_error( $wpdb ), 0, 120 );
-			Logger::error( 'governance_request_unhealthy', array( 'reason' => self::$unhealthy_reason, 'request_id' => self::request_id() ) );
+			Logger::error(
+				'governance_request_unhealthy',
+				array(
+					'reason'     => self::$unhealthy_reason,
+					'request_id' => self::request_id(),
+				)
+			);
 		}
 	}
 

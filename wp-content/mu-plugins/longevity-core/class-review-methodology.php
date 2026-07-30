@@ -55,7 +55,11 @@ final class Review_Methodology {
 			if ( '' === $name ) {
 				continue;
 			}
-			$sanitized[] = array( 'name' => $name, 'score' => $score, 'weight' => $weight );
+			$sanitized[] = array(
+				'name'   => $name,
+				'score'  => $score,
+				'weight' => $weight,
+			);
 		}
 		return $sanitized;
 	}
@@ -69,15 +73,15 @@ final class Review_Methodology {
 		if ( ! is_array( $value ) ) {
 			return array();
 		}
-		$allowed_statuses = array( 'meets', 'partially_meets', 'does_not_meet', 'informational', 'not_applicable' );
-		$sanitized        = array();
-		$metadata         = array(
+		$allowed_statuses       = array( 'meets', 'partially_meets', 'does_not_meet', 'informational', 'not_applicable' );
+		$sanitized              = array();
+		$metadata               = array(
 			'deviations' => '',
 			'failures'   => '',
 		);
 		$metadata['deviations'] = substr( sanitize_textarea_field( (string) ( $value['deviations'] ?? '' ) ), 0, 1000 );
 		$metadata['failures']   = substr( sanitize_textarea_field( (string) ( $value['failures'] ?? '' ) ), 0, 1000 );
-		$rows = isset( $value['rows'] ) && is_array( $value['rows'] ) ? $value['rows'] : $value;
+		$rows                   = isset( $value['rows'] ) && is_array( $value['rows'] ) ? $value['rows'] : $value;
 		foreach ( array_slice( $rows, 0, 30 ) as $index => $row ) {
 			if ( ! is_array( $row ) ) {
 				continue;
@@ -100,7 +104,11 @@ final class Review_Methodology {
 			);
 		}
 		usort( $sanitized, static fn( $left, $right ) => $left['display_order'] <=> $right['display_order'] );
-		return array( 'rows' => $sanitized, 'deviations' => $metadata['deviations'], 'failures' => $metadata['failures'] );
+		return array(
+			'rows'       => $sanitized,
+			'deviations' => $metadata['deviations'],
+			'failures'   => $metadata['failures'],
+		);
 	}
 
 	/** Load and validate the review model from config. */
@@ -142,10 +150,10 @@ final class Review_Methodology {
 
 	/** Formatted scoring sensitivity disclosure for ranking pages. */
 	public static function scoring_sensitivity_note(): string {
-		$model      = self::model();
-		$version    = (string) ( $model['version'] ?? '' );
-		$threshold  = self::minimum_meaningful_difference();
-		$parts      = array();
+		$model     = self::model();
+		$version   = (string) ( $model['version'] ?? '' );
+		$threshold = self::minimum_meaningful_difference();
+		$parts     = array();
 		if ( $version ) {
 			$parts[] = sprintf( __( 'Scoring model version %s', 'longevity-core' ), $version );
 		}
@@ -288,12 +296,12 @@ final class Review_Methodology {
 			}
 			$data[ $key ] = get_post_meta( $record_id, $key, true );
 		}
-		$protocol_info = self::approved_protocol_exists(
+		$protocol_info                  = self::approved_protocol_exists(
 			(string) get_post_meta( $record_id, 'protocol_id', true ),
 			(string) get_post_meta( $record_id, 'protocol_version', true ),
 			(string) get_post_meta( $record_id, 'test_end_date', true )
 		);
-		$data['protocol_post_id'] = $protocol_info['protocol_post_id'] ?? 0;
+		$data['protocol_post_id']       = $protocol_info['protocol_post_id'] ?? 0;
 		$data['protocol_approval_hash'] = $protocol_info['protocol_approval_hash'] ?? '';
 		return hash( 'sha256', Approval_Fingerprint::canonical_json( $data ) );
 	}
@@ -350,14 +358,55 @@ final class Review_Methodology {
 	/** Registered protocol fields, kept in one exact inventory. */
 	private static function protocol_fields(): array {
 		return array(
-			'protocol_id' => 'text', 'protocol_version' => 'version', 'product_category' => 'text', 'effective_date' => 'date', 'retired_date' => 'date', 'minimum_test_duration' => 'text', 'required_observations' => 'textarea', 'required_comparison_methods' => 'textarea', 'required_environmental_conditions' => 'textarea', 'required_disclosure_fields' => 'textarea', 'scoring_dimensions' => 'dimensions', 'known_limitations' => 'textarea', 'protocol_reviewer_user_id' => 'absint', 'approval_date' => 'date', 'approval_status' => 'text', 'approval_snapshot_id' => 'absint', 'approval_snapshot_hash' => 'text',
+			'protocol_id'                       => 'text',
+			'protocol_version'                  => 'version',
+			'product_category'                  => 'text',
+			'effective_date'                    => 'date',
+			'retired_date'                      => 'date',
+			'minimum_test_duration'             => 'text',
+			'required_observations'             => 'textarea',
+			'required_comparison_methods'       => 'textarea',
+			'required_environmental_conditions' => 'textarea',
+			'required_disclosure_fields'        => 'textarea',
+			'scoring_dimensions'                => 'dimensions',
+			'known_limitations'                 => 'textarea',
+			'protocol_reviewer_user_id'         => 'absint',
+			'approval_date'                     => 'date',
+			'approval_status'                   => 'text',
+			'approval_snapshot_id'              => 'absint',
+			'approval_snapshot_hash'            => 'text',
 		);
 	}
 
 	/** Registered test-record fields, kept in one exact inventory. */
 	private static function test_record_fields(): array {
 		return array(
-			'product_name' => 'text', 'unit_identifier' => 'text', 'acquisition_method' => 'acquisition', 'tester_user_ids' => 'csv_ids', 'test_start_date' => 'date', 'test_end_date' => 'date', 'protocol_id' => 'text', 'protocol_version' => 'version', 'protocol_post_id' => 'absint', 'protocol_approval_hash' => 'text', 'raw_observations' => 'textarea', 'public_test_results' => 'public_results', 'measurement_equipment' => 'textarea', 'failures' => 'textarea', 'deviations' => 'textarea', 'comparison_devices' => 'textarea', 'environment' => 'textarea', 'evidence_references' => 'textarea', 'conflicts' => 'textarea', 'approval_status' => 'text', 'submitted_by' => 'absint', 'submitted_at' => 'datetime', 'approved_by' => 'absint', 'approval_date' => 'date', 'approval_snapshot_id' => 'absint', 'approval_snapshot_hash' => 'text',
+			'product_name'           => 'text',
+			'unit_identifier'        => 'text',
+			'acquisition_method'     => 'acquisition',
+			'tester_user_ids'        => 'csv_ids',
+			'test_start_date'        => 'date',
+			'test_end_date'          => 'date',
+			'protocol_id'            => 'text',
+			'protocol_version'       => 'version',
+			'protocol_post_id'       => 'absint',
+			'protocol_approval_hash' => 'text',
+			'raw_observations'       => 'textarea',
+			'public_test_results'    => 'public_results',
+			'measurement_equipment'  => 'textarea',
+			'failures'               => 'textarea',
+			'deviations'             => 'textarea',
+			'comparison_devices'     => 'textarea',
+			'environment'            => 'textarea',
+			'evidence_references'    => 'textarea',
+			'conflicts'              => 'textarea',
+			'approval_status'        => 'text',
+			'submitted_by'           => 'absint',
+			'submitted_at'           => 'datetime',
+			'approved_by'            => 'absint',
+			'approval_date'          => 'date',
+			'approval_snapshot_id'   => 'absint',
+			'approval_snapshot_hash' => 'text',
 		);
 	}
 
@@ -413,11 +462,13 @@ final class Review_Methodology {
 			return false;
 		}
 
-		return ! empty( self::approved_protocol_exists(
-			(string) get_post_meta( $record_id, 'protocol_id', true ),
-			$protocol_version,
-			$end
-		) );
+		return ! empty(
+			self::approved_protocol_exists(
+				(string) get_post_meta( $record_id, 'protocol_id', true ),
+				$protocol_version,
+				$end
+			)
+		);
 	}
 
 	/** Verify that the record points to an approved protocol version effective during testing. */
@@ -429,9 +480,18 @@ final class Review_Methodology {
 				'fields'         => 'ids',
 				'posts_per_page' => 1,
 				'meta_query'     => array(
-					array( 'key' => 'protocol_id', 'value' => $protocol_id ),
-					array( 'key' => 'protocol_version', 'value' => $protocol_version ),
-					array( 'key' => 'approval_status', 'value' => 'approved' ),
+					array(
+						'key'   => 'protocol_id',
+						'value' => $protocol_id,
+					),
+					array(
+						'key'   => 'protocol_version',
+						'value' => $protocol_version,
+					),
+					array(
+						'key'   => 'approval_status',
+						'value' => 'approved',
+					),
 				),
 			)
 		);
@@ -446,15 +506,18 @@ final class Review_Methodology {
 		if ( '' === $stored_hash || ! hash_equals( $stored_hash, self::protocol_fingerprint( $protocol_id_post ) ) || $reviewer_id <= 0 || ( $protocol_post && (int) $protocol_post->post_author === $reviewer_id ) ) {
 			return array();
 		}
-		$effective        = (string) get_post_meta( $protocol_id_post, 'effective_date', true );
-		$retired          = (string) get_post_meta( $protocol_id_post, 'retired_date', true );
+		$effective = (string) get_post_meta( $protocol_id_post, 'effective_date', true );
+		$retired   = (string) get_post_meta( $protocol_id_post, 'retired_date', true );
 		if ( ! Date_Validator::is_valid( $effective ) || ! Date_Validator::is_valid( $test_end_date ) || Date_Validator::compare( $effective, $test_end_date ) > 0 ) {
 			return array();
 		}
 		if ( '' !== $retired && ( ! Date_Validator::is_valid( $retired ) || Date_Validator::compare( $retired, $test_end_date ) >= 0 ) ) {
 			return array();
 		}
-		return array( 'protocol_post_id' => $protocol_id_post, 'protocol_approval_hash' => $stored_hash );
+		return array(
+			'protocol_post_id'       => $protocol_id_post,
+			'protocol_approval_hash' => $stored_hash,
+		);
 	}
 
 	/** Register private meta consistently. */

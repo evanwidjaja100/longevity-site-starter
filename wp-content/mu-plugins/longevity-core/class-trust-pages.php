@@ -125,7 +125,10 @@ final class Trust_Pages {
 				'trust_page_publication_blocked',
 				'post',
 				max( 0, $post_id ),
-				array( 'slug' => $slug, 'reason' => self::has_placeholders( $incoming ) ? 'placeholder_content' : 'missing_or_stale_trust_approval' ),
+				array(
+					'slug'   => $slug,
+					'reason' => self::has_placeholders( $incoming ) ? 'placeholder_content' : 'missing_or_stale_trust_approval',
+				),
 				function_exists( 'get_current_user_id' ) ? get_current_user_id() : 0,
 				'workflow'
 			);

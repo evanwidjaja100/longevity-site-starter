@@ -35,9 +35,21 @@ final class Content_Discovery {
 			}
 			$sort = self::requested_sort();
 			if ( 'newest' === $sort ) {
-				$query->set( 'orderby', array( 'date' => 'DESC', 'ID' => 'DESC' ) );
+				$query->set(
+					'orderby',
+					array(
+						'date' => 'DESC',
+						'ID'   => 'DESC',
+					)
+				);
 			} elseif ( 'updated' === $sort ) {
-				$query->set( 'orderby', array( 'modified' => 'DESC', 'ID' => 'DESC' ) );
+				$query->set(
+					'orderby',
+					array(
+						'modified' => 'DESC',
+						'ID'       => 'DESC',
+					)
+				);
 			}
 			return;
 		}

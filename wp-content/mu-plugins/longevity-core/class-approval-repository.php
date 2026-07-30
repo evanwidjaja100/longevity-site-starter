@@ -237,9 +237,9 @@ final class Approval_Repository {
 		global $wpdb;
 		$table = self::table_name();
 		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name derives from the trusted $wpdb->prefix; all values use prepare() placeholders.
-		$sql   = $wpdb->prepare( "SELECT * FROM {$table} WHERE post_id = %d AND approval_type = %s AND approval_status = 'approved' AND invalidated_at IS NULL ORDER BY id DESC LIMIT 1", $post_id, $approval_type );
+		$sql = $wpdb->prepare( "SELECT * FROM {$table} WHERE post_id = %d AND approval_type = %s AND approval_status = 'approved' AND invalidated_at IS NULL ORDER BY id DESC LIMIT 1", $post_id, $approval_type );
 		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- SQL is fully prepared above.
-		$row   = $wpdb->get_row( $sql, ARRAY_A );
+		$row = $wpdb->get_row( $sql, ARRAY_A );
 		return is_array( $row ) ? $row : null;
 	}
 

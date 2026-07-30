@@ -51,7 +51,7 @@ final class Migrations {
 				'lock_state' => '',
 			);
 		}
-		$observed = (int) get_option( 'lel_data_version', 0 );
+		$observed   = (int) get_option( 'lel_data_version', 0 );
 		$lock_name  = Advisory_Lock::namespaced_name( 'migration' );
 		$lock_state = Advisory_Lock::acquire( $lock_name, 0 );
 		if ( Advisory_Lock::ACQUIRED !== $lock_state ) {
@@ -353,55 +353,99 @@ final class Migrations {
 	private static function schema_contracts( int $version ): array {
 		global $wpdb;
 		$contracts = array(
-			'approval' => array(
+			'approval'            => array(
 				'table'   => Approval_Repository::table_name(),
 				'columns' => array( 'id', 'post_id', 'approval_type', 'approval_status', 'revision_id', 'content_hash', 'governed_meta_hash', 'dependency_hash', 'combined_hash', 'approver_user_id', 'approved_at', 'schema_version', 'payload_json', 'invalidated_at', 'invalidated_by_user_id', 'invalidation_reason', 'supersedes_approval_id' ),
-				'indexes' => array( 'PRIMARY' => true, 'post_type_status' => false, 'post_approved' => false, 'combined_hash' => false, 'approver_approved' => false ),
+				'indexes' => array(
+					'PRIMARY'           => true,
+					'post_type_status'  => false,
+					'post_approved'     => false,
+					'combined_hash'     => false,
+					'approver_approved' => false,
+				),
 			),
-			'audit' => array(
+			'audit'               => array(
 				'table'   => Audit_Log::table_name(),
 				'columns' => array( 'id', 'sequence', 'occurred_at', 'event_type', 'actor_user_id', 'object_type', 'object_id', 'request_id', 'source_channel', 'payload_json', 'previous_event_hash', 'event_hash', 'idempotency_key', 'schema_version' ),
-				'indexes' => array( 'PRIMARY' => true, 'sequence' => true, 'previous_event_hash' => true, 'idempotency_key' => true, 'object_time' => false, 'actor_time' => false, 'event_type' => false ),
+				'indexes' => array(
+					'PRIMARY'             => true,
+					'sequence'            => true,
+					'previous_event_hash' => true,
+					'idempotency_key'     => true,
+					'object_time'         => false,
+					'actor_time'          => false,
+					'event_type'          => false,
+				),
 			),
-			'audit_sequence' => array(
+			'audit_sequence'      => array(
 				'table'   => Audit_Log::sequence_table_name(),
 				'columns' => array( 'id', 'current_value' ),
 				'indexes' => array( 'PRIMARY' => true ),
 			),
-			'dependency' => array(
+			'dependency'          => array(
 				'table'   => Dependency_Index::table_name(),
 				'columns' => array( 'id', 'dependency_type', 'dependency_id', 'parent_post_id', 'created_at' ),
-				'indexes' => array( 'PRIMARY' => true, 'dep_parent' => true, 'parent_lookup' => false, 'dep_lookup' => false ),
+				'indexes' => array(
+					'PRIMARY'       => true,
+					'dep_parent'    => true,
+					'parent_lookup' => false,
+					'dep_lookup'    => false,
+				),
 			),
-			'queue' => array(
+			'queue'               => array(
 				'table'   => Invalidation_Queue::table_name(),
 				'columns' => array( 'id', 'parent_post_id', 'reason', 'actor_id', 'status', 'retry_count', 'open_marker', 'lease_owner', 'lease_expires_at', 'created_at', 'processed_at', 'last_error', 'audit_event_id' ),
-				'indexes' => array( 'PRIMARY' => true, 'uniq_open_parent' => true, 'status_created' => false, 'lease_expiry' => false ),
+				'indexes' => array(
+					'PRIMARY'          => true,
+					'uniq_open_parent' => true,
+					'status_created'   => false,
+					'lease_expiry'     => false,
+				),
 			),
-			'rate' => array(
+			'rate'                => array(
 				'table'   => $wpdb->prefix . 'lel_rate_limits',
 				'columns' => array( 'rate_key', 'hit_count', 'expires_at' ),
-				'indexes' => array( 'PRIMARY' => true, 'expires_at' => false ),
+				'indexes' => array(
+					'PRIMARY'    => true,
+					'expires_at' => false,
+				),
 			),
-			'override' => array(
+			'override'            => array(
 				'table'   => Override_Intent::table_name(),
 				'columns' => array( 'id', 'request_id', 'post_id', 'previous_status', 'requested_status', 'user_id', 'capability_snapshot', 'fingerprint', 'approval_state', 'state', 'reason', 'channel', 'source_sha', 'plugin_version', 'requested_at', 'authorized_at', 'applied_at', 'failed_at', 'compensated_at', 'result', 'expires_at' ),
-				'indexes' => array( 'PRIMARY' => true, 'uniq_request' => true, 'post_state' => false ),
+				'indexes' => array(
+					'PRIMARY'      => true,
+					'uniq_request' => true,
+					'post_state'   => false,
+				),
 			),
-			'outbox' => array(
+			'outbox'              => array(
 				'table'   => Notification_Outbox::table_name(),
 				'columns' => array( 'id', 'notification_type', 'object_id', 'dedupe_key', 'recipient', 'payload_json', 'status', 'attempts', 'last_error', 'lease_owner', 'lease_expires_at', 'next_attempt_at', 'created_at', 'sent_at' ),
-				'indexes' => array( 'PRIMARY' => true, 'dedupe_key' => true, 'state_due' => false, 'object_type' => false ),
+				'indexes' => array(
+					'PRIMARY'     => true,
+					'dedupe_key'  => true,
+					'state_due'   => false,
+					'object_type' => false,
+				),
 			),
-			'evidence' => array(
+			'evidence'            => array(
 				'table'   => Evidence_Store::table_name(),
 				'columns' => array( 'id', 'evidence_type', 'release_sha', 'artifact_checksum', 'result', 'environment', 'produced_at', 'expires_at', 'payload_json', 'record_hash', 'recorded_by', 'recorded_at' ),
-				'indexes' => array( 'PRIMARY' => true, 'type_id' => false, 'release_sha' => false ),
+				'indexes' => array(
+					'PRIMARY'     => true,
+					'type_id'     => false,
+					'release_sha' => false,
+				),
 			),
 			'contact_idempotency' => array(
 				'table'   => Contact_Idempotency::table_name(),
 				'columns' => array( 'id', 'request_key_hash', 'state', 'message_post_id', 'lease_expires_at', 'created_at', 'updated_at', 'completed_at', 'schema_version' ),
-				'indexes' => array( 'PRIMARY' => true, 'request_key_hash' => true, 'state_lease' => false ),
+				'indexes' => array(
+					'PRIMARY'          => true,
+					'request_key_hash' => true,
+					'state_lease'      => false,
+				),
 			),
 		);
 		if ( $version >= 17 ) {
@@ -555,7 +599,7 @@ final class Migrations {
 		$table  = Audit_Log::table_name();
 		$cursor = (int) get_option( 'lel_migration_cursor_8', 0 );
 		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name derives from the trusted $wpdb->prefix via Audit_Log::table_name().
-		$seq    = (int) $wpdb->get_var( "SELECT COALESCE(MAX(sequence), 0) FROM {$table} WHERE sequence > 0" );
+		$seq = (int) $wpdb->get_var( "SELECT COALESCE(MAX(sequence), 0) FROM {$table} WHERE sequence > 0" );
 		while ( true ) {
 			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name derives from the trusted $wpdb->prefix; row values bound via %d.
 			$rows = $wpdb->get_col( $wpdb->prepare( "SELECT id FROM {$table} WHERE sequence = 0 AND id > %d ORDER BY id ASC LIMIT %d", $cursor, self::BATCH_SIZE ) );

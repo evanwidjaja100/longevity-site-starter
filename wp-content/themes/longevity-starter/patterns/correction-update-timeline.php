@@ -5,6 +5,7 @@
  * Categories: featured
  * Inserter: true
  * Description: Public record of corrections, updates, and content changes.
+ *
  * @package LongevityStarter
  */
 

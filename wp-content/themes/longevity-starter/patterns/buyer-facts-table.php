@@ -5,6 +5,7 @@
  * Categories: featured
  * Inserter: false
  * Description: Structured product comparison with key decision factors. Quarantined from the inserter: all cells must be filled from verified product data, never sample values.
+ *
  * @package LongevityStarter
  */
 

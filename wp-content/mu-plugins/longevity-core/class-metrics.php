@@ -106,7 +106,10 @@ final class Metrics {
 		// Per-check readiness one-hot state gauges and an overall gauge.
 		// One time series per (check, state) with value 0 or 1 replaces the
 		// former changing-status-label gauge, which broke series continuity.
-		$report = class_exists( System_Readiness::class ) ? System_Readiness::report() : array( 'status' => 'blocked', 'checks' => array() );
+		$report  = class_exists( System_Readiness::class ) ? System_Readiness::report() : array(
+			'status' => 'blocked',
+			'checks' => array(),
+		);
 		$lines[] = '# HELP lel_readiness_check_state Readiness check state one-hot: exactly one state is 1 per check.';
 		$lines[] = '# TYPE lel_readiness_check_state gauge';
 		foreach ( (array) ( $report['checks'] ?? array() ) as $name => $check ) {

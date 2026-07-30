@@ -137,11 +137,11 @@ $articles = array(
 
 $updated = 0;
 // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited
-$errors  = array();
+$errors = array();
 
 foreach ( $articles as $article ) {
 // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited
-$posts = get_posts(
+	$posts = get_posts(
 		array(
 			'name'           => $article['post_name'],
 			'post_type'      => 'post',
@@ -151,7 +151,7 @@ $posts = get_posts(
 		)
 	);
 // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited
-$post  = ! empty( $posts ) ? $posts[0] : null;
+	$post = ! empty( $posts ) ? $posts[0] : null;
 	if ( ! $post ) {
 		$errors[] = "Post not found: /{$article['post_name']}/";
 		\WP_CLI::warning( "Post not found: /{$article['post_name']}/" );

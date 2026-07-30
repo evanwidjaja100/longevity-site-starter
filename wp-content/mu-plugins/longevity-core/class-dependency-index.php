@@ -83,7 +83,7 @@ final class Dependency_Index {
 		if ( ! self::exists() || $dep_id <= 0 || $parent <= 0 ) {
 			return;
 		}
-		$table = self::table_name();
+		$table  = self::table_name();
 		$result = $wpdb->query(
 			$wpdb->prepare(
 				// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name derives from the trusted $wpdb->prefix; values use prepared placeholders.
@@ -110,7 +110,7 @@ final class Dependency_Index {
 		if ( ! self::exists() ) {
 			return;
 		}
-		$table = self::table_name();
+		$table  = self::table_name();
 		$result = $wpdb->query(
 			$wpdb->prepare(
 				// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name derives from the trusted $wpdb->prefix; values use prepared placeholders.
@@ -136,7 +136,7 @@ final class Dependency_Index {
 		if ( ! self::exists() ) {
 			return;
 		}
-		$table = self::table_name();
+		$table  = self::table_name();
 		$result = $wpdb->query(
 			$wpdb->prepare(
 				// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name derives from the trusted $wpdb->prefix; values use prepared placeholders.
@@ -205,7 +205,14 @@ final class Dependency_Index {
 			$committed = true;
 		} finally {
 			if ( ! $committed && false === $wpdb->query( 'ROLLBACK' ) ) {
-				Logger::error( 'dependency_transaction_rollback_failed', array( 'parent_post_id' => $parent, 'dependency_type' => $type, 'error' => self::database_error( $wpdb ) ) );
+				Logger::error(
+					'dependency_transaction_rollback_failed',
+					array(
+						'parent_post_id'  => $parent,
+						'dependency_type' => $type,
+						'error'           => self::database_error( $wpdb ),
+					)
+				);
 			}
 		}
 	}
@@ -229,13 +236,19 @@ final class Dependency_Index {
 			'ambiguous'       => 0,
 			'broad_fallbacks' => 0,
 		);
-		$result = array(
+		$result                = array(
 			'parents_scanned'      => 0,
 			'dependencies_indexed' => 0,
 			'complete'             => false,
 			'dry_run'              => $dry_run,
 			'generation'           => self::DATA_GENERATION,
-			'drift'                => array( 'valid' => false, 'parents_checked' => 0, 'missing' => 0, 'stale' => 0, 'orphans' => 0 ),
+			'drift'                => array(
+				'valid'           => false,
+				'parents_checked' => 0,
+				'missing'         => 0,
+				'stale'           => 0,
+				'orphans'         => 0,
+			),
 			'affiliate'            => self::$affiliate_stats,
 		);
 		if ( ! self::exists() && ! $dry_run ) {
@@ -249,7 +262,7 @@ final class Dependency_Index {
 		$cursor = $dry_run ? 0 : (int) get_option( 'lel_dependency_backfill_cursor', 0 );
 		while ( true ) {
 			self::clear_database_error( $wpdb );
-			$page             = $wpdb->get_col(
+			$page = $wpdb->get_col(
 				$wpdb->prepare(
 					"SELECT ID FROM {$wpdb->posts} WHERE post_type IN ('post','review') AND post_status NOT IN ('trash','auto-draft') AND ID > %d ORDER BY ID ASC LIMIT %d",
 					$cursor,
@@ -318,7 +331,13 @@ final class Dependency_Index {
 	public static function verify_drift( int $batch = 200 ): array {
 		global $wpdb;
 		$batch  = min( 500, max( 10, $batch ) );
-		$result = array( 'valid' => false, 'parents_checked' => 0, 'missing' => 0, 'stale' => 0, 'orphans' => 0 );
+		$result = array(
+			'valid'           => false,
+			'parents_checked' => 0,
+			'missing'         => 0,
+			'stale'           => 0,
+			'orphans'         => 0,
+		);
 		if ( ! self::exists() ) {
 			return $result;
 		}
@@ -326,7 +345,7 @@ final class Dependency_Index {
 		$seen   = array();
 		while ( true ) {
 			self::clear_database_error( $wpdb );
-			$page             = $wpdb->get_col( $wpdb->prepare( "SELECT ID FROM {$wpdb->posts} WHERE post_type IN ('post','review') AND post_status NOT IN ('trash','auto-draft') AND ID > %d ORDER BY ID ASC LIMIT %d", $cursor, $batch ) );
+			$page = $wpdb->get_col( $wpdb->prepare( "SELECT ID FROM {$wpdb->posts} WHERE post_type IN ('post','review') AND post_status NOT IN ('trash','auto-draft') AND ID > %d ORDER BY ID ASC LIMIT %d", $cursor, $batch ) );
 			if ( self::database_failed( $wpdb ) ) {
 				throw new \RuntimeException( esc_html( 'Dependency drift parent query failed: ' . self::database_error( $wpdb ) ) );
 			}
@@ -351,7 +370,7 @@ final class Dependency_Index {
 		}
 		self::clear_database_error( $wpdb );
 		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Table name derives from the trusted $wpdb->prefix; the query has no external values.
-		$parents          = $wpdb->get_col( 'SELECT DISTINCT parent_post_id FROM ' . self::table_name() );
+		$parents = $wpdb->get_col( 'SELECT DISTINCT parent_post_id FROM ' . self::table_name() );
 		if ( self::database_failed( $wpdb ) ) {
 			throw new \RuntimeException( esc_html( 'Dependency orphan query failed: ' . self::database_error( $wpdb ) ) );
 		}
@@ -422,10 +441,10 @@ final class Dependency_Index {
 	/** Read all indexed edges for one parent. */
 	private static function indexed_sets( int $parent ): array {
 		global $wpdb;
-		$table            = self::table_name();
+		$table = self::table_name();
 		self::clear_database_error( $wpdb );
 		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name derives from the trusted $wpdb->prefix; the value uses a prepared placeholder.
-		$rows             = $wpdb->get_results( $wpdb->prepare( "SELECT dependency_type, dependency_id FROM {$table} WHERE parent_post_id = %d", $parent ), ARRAY_A );
+		$rows = $wpdb->get_results( $wpdb->prepare( "SELECT dependency_type, dependency_id FROM {$table} WHERE parent_post_id = %d", $parent ), ARRAY_A );
 		if ( self::database_failed( $wpdb ) ) {
 			throw new \RuntimeException( esc_html( 'Dependency drift edge query failed: ' . self::database_error( $wpdb ) ) );
 		}
@@ -483,7 +502,7 @@ final class Dependency_Index {
 	private static function affiliate_registry_ids(): array {
 		global $wpdb;
 		self::clear_database_error( $wpdb );
-		$ids              = $wpdb->get_col( "SELECT ID FROM {$wpdb->posts} WHERE post_type = 'lel_affiliate' AND post_status NOT IN ('trash','auto-draft') ORDER BY ID ASC" );
+		$ids = $wpdb->get_col( "SELECT ID FROM {$wpdb->posts} WHERE post_type = 'lel_affiliate' AND post_status NOT IN ('trash','auto-draft') ORDER BY ID ASC" );
 		if ( self::database_failed( $wpdb ) ) {
 			throw new \RuntimeException( esc_html( 'Affiliate dependency query failed: ' . self::database_error( $wpdb ) ) );
 		}
@@ -553,7 +572,7 @@ final class Dependency_Index {
 	/**
 	 * Find all parent post IDs that depend on any of the given entities.
 	 *
-	 * @param string   $type    Dependency type.
+	 * @param string    $type    Dependency type.
 	 * @param list<int> $dep_ids The dependency post/user IDs.
 	 * @return list<int> Unique parent post IDs.
 	 */

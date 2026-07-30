@@ -44,14 +44,14 @@ $page_map = array(
 
 $updated = 0;
 // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited
-$errors  = array();
+$errors = array();
 
 foreach ( $page_map as $filename => $slug ) {
 	$filepath = $template_dir . '/' . $filename;
 
 	if ( ! file_exists( $filepath ) ) {
 	// phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited
-$errors[] = "Template not found: {$filename}";
+		$errors[] = "Template not found: {$filename}";
 		\WP_CLI::warning( "Template not found: {$filepath}" );
 		continue;
 	}

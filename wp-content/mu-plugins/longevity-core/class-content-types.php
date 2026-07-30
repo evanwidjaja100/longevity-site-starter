@@ -46,17 +46,17 @@ final class Content_Types {
 		self::register_private_type( 'longevity_message', __( 'Messages', 'longevity-core' ), __( 'Message', 'longevity-core' ), 'dashicons-email-alt', 'manage_options' );
 
 		$statuses = array(
-			'lel_assigned'          => __( 'Assigned', 'longevity-core' ),
-			'lel_researching'       => __( 'Researching', 'longevity-core' ),
-			'lel_editorial_review'  => __( 'Editorial review', 'longevity-core' ),
-			'lel_fact_check'        => __( 'Fact-check', 'longevity-core' ),
-			'lel_medical_review'    => __( 'Medical review', 'longevity-core' ),
-			'lel_testing_incomplete'=> __( 'Testing incomplete', 'longevity-core' ),
-			'lel_commercial_review' => __( 'Commercial review', 'longevity-core' ),
-			'lel_ready'             => __( 'Ready for publication', 'longevity-core' ),
-			'lel_update_due'        => __( 'Update due', 'longevity-core' ),
-			'lel_correction_pending'=> __( 'Correction pending', 'longevity-core' ),
-			'lel_archived'          => __( 'Archived', 'longevity-core' ),
+			'lel_assigned'           => __( 'Assigned', 'longevity-core' ),
+			'lel_researching'        => __( 'Researching', 'longevity-core' ),
+			'lel_editorial_review'   => __( 'Editorial review', 'longevity-core' ),
+			'lel_fact_check'         => __( 'Fact-check', 'longevity-core' ),
+			'lel_medical_review'     => __( 'Medical review', 'longevity-core' ),
+			'lel_testing_incomplete' => __( 'Testing incomplete', 'longevity-core' ),
+			'lel_commercial_review'  => __( 'Commercial review', 'longevity-core' ),
+			'lel_ready'              => __( 'Ready for publication', 'longevity-core' ),
+			'lel_update_due'         => __( 'Update due', 'longevity-core' ),
+			'lel_correction_pending' => __( 'Correction pending', 'longevity-core' ),
+			'lel_archived'           => __( 'Archived', 'longevity-core' ),
 		);
 
 		foreach ( $statuses as $key => $label ) {
@@ -80,7 +80,10 @@ final class Content_Types {
 		register_post_type(
 			$post_type,
 			array(
-				'labels'              => array( 'name' => $plural, 'singular_name' => $singular ),
+				'labels'              => array(
+					'name'          => $plural,
+					'singular_name' => $singular,
+				),
 				'public'              => false,
 				'publicly_queryable'  => false,
 				'show_ui'             => true,

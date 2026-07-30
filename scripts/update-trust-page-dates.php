@@ -39,7 +39,7 @@ $pages = array(
 $updated = 0;
 foreach ( $pages as $slug ) {
 // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited
-$posts = get_posts(
+	$posts = get_posts(
 		array(
 			'name'           => $slug,
 			'post_type'      => 'page',
@@ -49,7 +49,7 @@ $posts = get_posts(
 		)
 	);
 // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited
-$post  = ! empty( $posts ) ? $posts[0] : null;
+	$post = ! empty( $posts ) ? $posts[0] : null;
 	if ( ! $post ) {
 		\WP_CLI::warning( "Page not found: /{$slug}/" );
 		continue;

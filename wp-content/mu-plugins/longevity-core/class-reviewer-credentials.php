@@ -84,15 +84,15 @@ final class Reviewer_Credentials {
 		}
 
 		$values = array(
-			'credential_verification_status'     => 'verified',
-			'credential_verification_date'       => $verified_on,
-			'credential_expiration_date'         => $expires_on,
-			'credential_verified_by_user_id'     => $actor_id,
-			'credential_verification_evidence_ref'=> $evidence,
-			'verified_professional_credentials'  => $credentials,
-			'verified_review_scope'              => $scope,
-			'verified_jurisdictions'             => $regions,
-			'credential_verification_version'    => self::VERSION,
+			'credential_verification_status'       => 'verified',
+			'credential_verification_date'         => $verified_on,
+			'credential_expiration_date'           => $expires_on,
+			'credential_verified_by_user_id'       => $actor_id,
+			'credential_verification_evidence_ref' => $evidence,
+			'verified_professional_credentials'    => $credentials,
+			'verified_review_scope'                => $scope,
+			'verified_jurisdictions'               => $regions,
+			'credential_verification_version'      => self::VERSION,
 		);
 		// Coalesce the nine per-field meta hooks into one cascade after the audit.
 		Approval_Service::suppress_credential_hook( true );
@@ -188,8 +188,8 @@ final class Reviewer_Credentials {
 		if ( '' === $as_of || ! function_exists( 'get_users' ) ) {
 			return array();
 		}
-		$limit = max( 1, min( 500, $limit ) );
-		$ids   = get_users(
+		$limit   = max( 1, min( 500, $limit ) );
+		$ids     = get_users(
 			array(
 				'fields'     => 'ids',
 				'number'     => $limit,
@@ -197,8 +197,17 @@ final class Reviewer_Credentials {
 				'order'      => 'ASC',
 				'meta_query' => array(
 					'relation' => 'AND',
-					array( 'key' => 'credential_verification_status', 'value' => 'verified', 'compare' => '=' ),
-					array( 'key' => 'credential_expiration_date', 'value' => $as_of, 'compare' => '<=', 'type' => 'DATE' ),
+					array(
+						'key'     => 'credential_verification_status',
+						'value'   => 'verified',
+						'compare' => '=',
+					),
+					array(
+						'key'     => 'credential_expiration_date',
+						'value'   => $as_of,
+						'compare' => '<=',
+						'type'    => 'DATE',
+					),
 				),
 			)
 		);
@@ -229,7 +238,12 @@ final class Reviewer_Credentials {
 	public static function run_expiration_sweep( string $as_of = '', int $limit = 50 ): array {
 		$as_of  = Date_Validator::normalize( '' === $as_of ? Date_Validator::today() : $as_of );
 		$limit  = max( 1, min( 500, $limit ) );
-		$report = array( 'as_of' => $as_of, 'scanned' => 0, 'expired' => 0, 'failed' => 0 );
+		$report = array(
+			'as_of'   => $as_of,
+			'scanned' => 0,
+			'expired' => 0,
+			'failed'  => 0,
+		);
 		if ( '' === $as_of ) {
 			return $report;
 		}
@@ -278,13 +292,13 @@ final class Reviewer_Credentials {
 		}
 		$user = function_exists( 'get_userdata' ) ? get_userdata( $reviewer_id ) : null;
 		return array(
-			'display_name' => $user ? (string) $user->display_name : '',
-			'credentials'  => (string) get_user_meta( $reviewer_id, 'verified_professional_credentials', true ),
-			'scope'        => (string) get_user_meta( $reviewer_id, 'verified_review_scope', true ),
-			'jurisdictions'=> (string) get_user_meta( $reviewer_id, 'verified_jurisdictions', true ),
-			'verified_on'  => (string) get_user_meta( $reviewer_id, 'credential_verification_date', true ),
-			'expires_on'   => (string) get_user_meta( $reviewer_id, 'credential_expiration_date', true ),
-			'version'      => (string) get_user_meta( $reviewer_id, 'credential_verification_version', true ),
+			'display_name'  => $user ? (string) $user->display_name : '',
+			'credentials'   => (string) get_user_meta( $reviewer_id, 'verified_professional_credentials', true ),
+			'scope'         => (string) get_user_meta( $reviewer_id, 'verified_review_scope', true ),
+			'jurisdictions' => (string) get_user_meta( $reviewer_id, 'verified_jurisdictions', true ),
+			'verified_on'   => (string) get_user_meta( $reviewer_id, 'credential_verification_date', true ),
+			'expires_on'    => (string) get_user_meta( $reviewer_id, 'credential_expiration_date', true ),
+			'version'       => (string) get_user_meta( $reviewer_id, 'credential_verification_version', true ),
 		);
 	}
 

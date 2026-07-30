@@ -317,7 +317,13 @@ final class Invalidation_Queue {
 	private static function record_fallback_failure( int $post_id, string $reason ): void {
 		$count = (int) get_option( 'lel_invalidation_fallback_failures', 0 );
 		self::write_counter( 'lel_invalidation_fallback_failures', $count + 1 );
-		Logger::warning( 'invalidation_fallback_failure', array( 'post_id' => $post_id, 'reason' => substr( $reason, 0, 200 ) ) );
+		Logger::warning(
+			'invalidation_fallback_failure',
+			array(
+				'post_id' => $post_id,
+				'reason'  => substr( $reason, 0, 200 ),
+			)
+		);
 	}
 
 	/** Apply invalidation immediately when its durable queue cannot be trusted. */
@@ -339,7 +345,13 @@ final class Invalidation_Queue {
 	private static function record_enqueue_failure( int $post_id, string $reason ): void {
 		$count = (int) get_option( 'lel_invalidation_enqueue_failures', 0 );
 		self::write_counter( 'lel_invalidation_enqueue_failures', $count + 1 );
-		Logger::error( 'invalidation_enqueue_failed', array( 'post_id' => $post_id, 'reason' => substr( $reason, 0, 200 ) ) );
+		Logger::error(
+			'invalidation_enqueue_failed',
+			array(
+				'post_id' => $post_id,
+				'reason'  => substr( $reason, 0, 200 ),
+			)
+		);
 	}
 
 	/** Current synchronous fallback failure count. */
@@ -429,7 +441,7 @@ final class Invalidation_Queue {
 			$actor   = (int) $job['actor_id'];
 
 			try {
-				$audit_id    = Approval_Service::invalidate_direct( $post_id, $reason, $actor, true, 'invalidation_queue:' . $job_id );
+				$audit_id     = Approval_Service::invalidate_direct( $post_id, $reason, $actor, true, 'invalidation_queue:' . $job_id );
 				$transitioned = $wpdb->query(
 					$wpdb->prepare(
 						// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name derives from the trusted $wpdb->prefix; values use prepared placeholders.
@@ -444,7 +456,14 @@ final class Invalidation_Queue {
 				}
 			} catch ( \Throwable $e ) {
 				if ( '' !== Audit_Log::unhealthy_reason() ) {
-					Logger::error( 'invalidation_request_quarantined', array( 'job_id' => $job_id, 'post_id' => $post_id, 'error' => substr( $e->getMessage(), 0, 200 ) ) );
+					Logger::error(
+						'invalidation_request_quarantined',
+						array(
+							'job_id'  => $job_id,
+							'post_id' => $post_id,
+							'error'   => substr( $e->getMessage(), 0, 200 ),
+						)
+					);
 					++$processed;
 					break;
 				}
@@ -461,10 +480,17 @@ final class Invalidation_Queue {
 							$worker
 						)
 					);
-					Logger::error( 'invalidation_job_failed', array( 'job_id' => $job_id, 'post_id' => $post_id, 'error' => substr( (string) $error, 0, 200 ) ) );
+					Logger::error(
+						'invalidation_job_failed',
+						array(
+							'job_id'  => $job_id,
+							'post_id' => $post_id,
+							'error'   => substr( (string) $error, 0, 200 ),
+						)
+					);
 				} else {
 					// Keep the open slot; the lease acts as retry backoff.
-					$backoff = min( self::MAX_RETRY_BACKOFF_SECONDS, self::RETRY_BACKOFF_SECONDS * ( 2 ** ( $retries - 1 ) ) );
+					$backoff      = min( self::MAX_RETRY_BACKOFF_SECONDS, self::RETRY_BACKOFF_SECONDS * ( 2 ** ( $retries - 1 ) ) );
 					$transitioned = $wpdb->query(
 						$wpdb->prepare(
 							"UPDATE {$table} SET retry_count = %d, last_error = %s, lease_expires_at = DATE_ADD(UTC_TIMESTAMP(), INTERVAL %d SECOND) WHERE id = %d AND lease_owner = %s", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Trusted $wpdb->prefix table; values bound via placeholders.
@@ -486,7 +512,7 @@ final class Invalidation_Queue {
 
 		// Reschedule if more work remains.
 		self::clear_database_error( $wpdb );
-		$remaining        = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table} WHERE open_marker = 1" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Trusted $wpdb->prefix table; no user-supplied values.
+		$remaining = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table} WHERE open_marker = 1" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Trusted $wpdb->prefix table; no user-supplied values.
 		if ( self::database_failed( $wpdb ) ) {
 			throw new \RuntimeException( esc_html( 'Could not inspect remaining invalidation work: ' . self::database_error( $wpdb ) ) );
 		}
@@ -505,7 +531,14 @@ final class Invalidation_Queue {
 	public static function stats(): array {
 		global $wpdb;
 		if ( ! self::exists() ) {
-			return array( 'pending' => 0, 'processing' => 0, 'completed' => 0, 'failed' => 0, 'oldest_pending_age_seconds' => 0, 'table_missing' => true );
+			return array(
+				'pending'                    => 0,
+				'processing'                 => 0,
+				'completed'                  => 0,
+				'failed'                     => 0,
+				'oldest_pending_age_seconds' => 0,
+				'table_missing'              => true,
+			);
 		}
 		$table      = self::table_name();
 		$pending    = self::scalar( "SELECT COUNT(*) FROM {$table} WHERE status = 'pending'" );
@@ -528,8 +561,8 @@ final class Invalidation_Queue {
 		if ( ! self::exists() ) {
 			return 0;
 		}
-		$table  = self::table_name();
-		$cutoff = gmdate( 'Y-m-d H:i:s', time() - ( $older_than_days * DAY_IN_SECONDS ) );
+		$table   = self::table_name();
+		$cutoff  = gmdate( 'Y-m-d H:i:s', time() - ( $older_than_days * DAY_IN_SECONDS ) );
 		$deleted = $wpdb->query(
 			$wpdb->prepare(
 				"DELETE FROM {$table} WHERE status = 'completed' AND audit_event_id IS NOT NULL AND processed_at < %s", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Trusted $wpdb->prefix table; cutoff bound via placeholder.
@@ -546,7 +579,7 @@ final class Invalidation_Queue {
 	private static function scalar( string $sql ): int {
 		global $wpdb;
 		self::clear_database_error( $wpdb );
-		$value            = $wpdb->get_var( $sql ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Callers pass literal COUNT/TIMESTAMPDIFF SQL over the trusted $wpdb->prefix table; no user input.
+		$value = $wpdb->get_var( $sql ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Callers pass literal COUNT/TIMESTAMPDIFF SQL over the trusted $wpdb->prefix table; no user input.
 		if ( self::database_failed( $wpdb ) ) {
 			throw new \RuntimeException( esc_html( 'Invalidation queue read failed: ' . self::database_error( $wpdb ) ) );
 		}

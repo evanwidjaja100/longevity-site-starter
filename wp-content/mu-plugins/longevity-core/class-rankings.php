@@ -11,12 +11,12 @@ defined( 'ABSPATH' ) || exit;
 
 /** Keeps every public ranking representation behind the same governance rules. */
 final class Rankings {
-	private const CACHE_GROUP      = 'longevity_rankings';
-	private const ELIGIBLE_CACHE   = 'lel_rankings_eligible';
-	private const RANKING_VERSION  = '2';
+	private const CACHE_GROUP             = 'longevity_rankings';
+	private const ELIGIBLE_CACHE          = 'lel_rankings_eligible';
+	private const RANKING_VERSION         = '2';
 	private const RANKING_BATCH_DEFAULT   = 200;
 	private const RANKING_CEILING_DEFAULT = 5000;
-	private const CONFIDENCE_ORDER = array(
+	private const CONFIDENCE_ORDER        = array(
 		'High confidence'     => 4,
 		'Moderate confidence' => 3,
 		'Low confidence'      => 2,
@@ -47,7 +47,15 @@ final class Rankings {
 		$next = (int) get_option( 'lel_rankings_generation', 1 ) + 1;
 		update_option( 'lel_rankings_generation', $next, false );
 		update_option( 'lel_rankings_cache_version', (string) $next, false );
-		Logger::log( Logger::INFO, 'rankings_cache_invalidated', array( 'scope' => 'all', 'reason' => self::sanitize_reason( $reason ), 'generation' => $next ) );
+		Logger::log(
+			Logger::INFO,
+			'rankings_cache_invalidated',
+			array(
+				'scope'      => 'all',
+				'reason'     => self::sanitize_reason( $reason ),
+				'generation' => $next,
+			)
+		);
 	}
 
 	/**
@@ -109,7 +117,14 @@ final class Rankings {
 			return array();
 		}
 		$eligible = array_values( array_filter( $candidates, static fn( int $id ) => self::is_eligible( $id ) ) );
-		set_transient( self::ELIGIBLE_CACHE, array( 'signature' => $signature, 'ids' => $eligible ), 6 * HOUR_IN_SECONDS );
+		set_transient(
+			self::ELIGIBLE_CACHE,
+			array(
+				'signature' => $signature,
+				'ids'       => $eligible,
+			),
+			6 * HOUR_IN_SECONDS
+		);
 		return $eligible;
 	}
 
@@ -197,7 +212,14 @@ final class Rankings {
 	/** Record a bounded, privacy-safe diagnostic and mark rankings degraded. */
 	private static function mark_degraded( int $count, int $ceiling ): void {
 		update_option( 'lel_rankings_degraded', 1, false );
-		Logger::log( Logger::WARNING, 'rankings_population_ceiling_exceeded', array( 'population' => $count, 'ceiling' => $ceiling ) );
+		Logger::log(
+			Logger::WARNING,
+			'rankings_population_ceiling_exceeded',
+			array(
+				'population' => $count,
+				'ceiling'    => $ceiling,
+			)
+		);
 	}
 
 	/** Clear the degraded flag once a projection completes within budget. */
@@ -233,7 +255,14 @@ final class Rankings {
 		if ( $rejected > 0 ) {
 			$total = (int) get_option( 'lel_rankings_cache_rejections', 0 ) + $rejected;
 			update_option( 'lel_rankings_cache_rejections', $total, false );
-			Logger::log( Logger::WARNING, 'rankings_cache_stale_rejected', array( 'rejected' => $rejected, 'total' => $total ) );
+			Logger::log(
+				Logger::WARNING,
+				'rankings_cache_stale_rejected',
+				array(
+					'rejected' => $rejected,
+					'total'    => $total,
+				)
+			);
 			self::invalidate_all( 'live_revalidation_rejected' );
 		}
 		return $live;
@@ -555,18 +584,18 @@ final class Rankings {
 		if ( empty( $posts ) ) {
 			return array();
 		}
-		$threshold = Review_Methodology::minimum_meaningful_difference();
-		$bands     = array();
-		$current   = array();
+		$threshold  = Review_Methodology::minimum_meaningful_difference();
+		$bands      = array();
+		$current    = array();
 		$prev_score = null;
 		foreach ( $posts as $post ) {
 			$score = (float) get_post_meta( $post->ID, 'review_score', true );
 			if ( null !== $prev_score && ( $prev_score - $score ) > $threshold ) {
-				$bands[]  = $current;
-				$current  = array();
+				$bands[] = $current;
+				$current = array();
 			}
-			$current[]   = $post;
-			$prev_score  = $score;
+			$current[]  = $post;
+			$prev_score = $score;
 		}
 		$bands[] = $current;
 		return $bands;

@@ -12,11 +12,11 @@ defined( 'ABSPATH' ) || exit;
 /** Correction lifecycle service. */
 final class Corrections {
 	private const VALID_TRANSITIONS = array(
-		'reported'     => array( 'investigating', 'rejected' ),
+		'reported'      => array( 'investigating', 'rejected' ),
 		'investigating' => array( 'in_progress', 'rejected' ),
-		'in_progress'  => array( 'complete', 'rejected' ),
-		'rejected'     => array(),
-		'complete'     => array(),
+		'in_progress'   => array( 'complete', 'rejected' ),
+		'rejected'      => array(),
+		'complete'      => array(),
 	);
 
 	/** Register hooks. */
@@ -72,22 +72,22 @@ final class Corrections {
 	/** Register correction metadata. */
 	public static function register_meta(): void {
 		$fields = array(
-			'corrected_post_id'      => 'absint',
-			'reported_date'          => 'date',
-			'reported_by'            => 'text',
-			'issue_category'         => 'category',
-			'issue_description'      => 'textarea',
-			'severity'               => 'severity',
-			'public_impact'          => 'textarea',
-			'assigned_editor_user_id'=> 'absint',
-			'correction_status'      => 'status',
-			'resolution'             => 'textarea',
-			'corrected_date'         => 'date',
-			'public_correction_note' => 'textarea',
-			'claim_ids_affected'     => 'csv_ids',
-			'reviewer_required'      => 'boolean',
-			'medical_rereviewed'     => 'boolean',
-			'conclusion_changed'     => 'boolean',
+			'corrected_post_id'       => 'absint',
+			'reported_date'           => 'date',
+			'reported_by'             => 'text',
+			'issue_category'          => 'category',
+			'issue_description'       => 'textarea',
+			'severity'                => 'severity',
+			'public_impact'           => 'textarea',
+			'assigned_editor_user_id' => 'absint',
+			'correction_status'       => 'status',
+			'resolution'              => 'textarea',
+			'corrected_date'          => 'date',
+			'public_correction_note'  => 'textarea',
+			'claim_ids_affected'      => 'csv_ids',
+			'reviewer_required'       => 'boolean',
+			'medical_rereviewed'      => 'boolean',
+			'conclusion_changed'      => 'boolean',
 		);
 		foreach ( $fields as $key => $rule ) {
 			$show_in_rest = 'correction_status' === $key || 'resolution' === $key || 'corrected_date' === $key;
@@ -108,7 +108,18 @@ final class Corrections {
 	/** Transition a correction to a new status with validation. */
 	public static function transition( int $post_id, string $new_status, int $actor_id ): bool {
 		if ( $actor_id <= 0 || ! function_exists( 'user_can' ) || ! user_can( $actor_id, 'manage_corrections' ) ) {
-			Audit_Log::record( 'correction_transition', 'correction', $post_id, array( 'to' => $new_status, 'actor' => $actor_id, 'reason' => 'unauthorized' ), $actor_id, 'workflow' );
+			Audit_Log::record(
+				'correction_transition',
+				'correction',
+				$post_id,
+				array(
+					'to'     => $new_status,
+					'actor'  => $actor_id,
+					'reason' => 'unauthorized',
+				),
+				$actor_id,
+				'workflow'
+			);
 			return false;
 		}
 		$current = (string) get_post_meta( $post_id, 'correction_status', true );
@@ -119,12 +130,12 @@ final class Corrections {
 			return false;
 		}
 		if ( 'complete' === $new_status ) {
-			$post       = get_post( $post_id );
-			$post_id_ref = (int) get_post_meta( $post_id, 'corrected_post_id', true );
-			$description = (string) get_post_meta( $post_id, 'issue_description', true );
-			$severity   = (string) get_post_meta( $post_id, 'severity', true );
-			$resolution = (string) get_post_meta( $post_id, 'resolution', true );
-			$public_note = (string) get_post_meta( $post_id, 'public_correction_note', true );
+			$post           = get_post( $post_id );
+			$post_id_ref    = (int) get_post_meta( $post_id, 'corrected_post_id', true );
+			$description    = (string) get_post_meta( $post_id, 'issue_description', true );
+			$severity       = (string) get_post_meta( $post_id, 'severity', true );
+			$resolution     = (string) get_post_meta( $post_id, 'resolution', true );
+			$public_note    = (string) get_post_meta( $post_id, 'public_correction_note', true );
 			$corrected_date = (string) get_post_meta( $post_id, 'corrected_date', true );
 
 			if ( ! $post || $post_id_ref <= 0 || '' === $description || '' === $resolution || '' === $public_note || '' === $corrected_date ) {
@@ -140,7 +151,7 @@ final class Corrections {
 				return false;
 			}
 			// Build immutable completion snapshot.
-			$snapshot = array(
+			$snapshot      = array(
 				'corrected_post_id'      => $post_id_ref,
 				'issue_description'      => $description,
 				'severity'               => $severity,
@@ -161,7 +172,19 @@ final class Corrections {
 		Meta_Authorization::enter_trusted_scope();
 		try {
 			update_post_meta( $post_id, 'correction_status', $new_status );
-			Audit_Log::record( 'correction_transition', 'correction', $post_id, array( 'from' => $current, 'to' => $new_status, 'actor' => $actor_id ), $actor_id, 'workflow', true );
+			Audit_Log::record(
+				'correction_transition',
+				'correction',
+				$post_id,
+				array(
+					'from'  => $current,
+					'to'    => $new_status,
+					'actor' => $actor_id,
+				),
+				$actor_id,
+				'workflow',
+				true
+			);
 			if ( 'complete' === $new_status ) {
 				$parent_id = (int) get_post_meta( $post_id, 'corrected_post_id', true );
 				if ( $parent_id > 0 ) {
@@ -171,7 +194,19 @@ final class Corrections {
 			}
 		} catch ( \Throwable $error ) {
 			update_post_meta( $post_id, 'correction_status', $current );
-			Audit_Log::record( 'correction_transition', 'correction', $post_id, array( 'from' => $new_status, 'to' => $current, 'actor' => $actor_id, 'reason' => 'audit_write_failed' ), $actor_id, 'workflow' );
+			Audit_Log::record(
+				'correction_transition',
+				'correction',
+				$post_id,
+				array(
+					'from'   => $new_status,
+					'to'     => $current,
+					'actor'  => $actor_id,
+					'reason' => 'audit_write_failed',
+				),
+				$actor_id,
+				'workflow'
+			);
 			Meta_Authorization::exit_trusted_scope();
 			return false;
 		}
@@ -212,9 +247,19 @@ final class Corrections {
 				'meta_key'       => 'corrected_date',
 				'order'          => 'DESC',
 				'meta_query'     => array(
-					array( 'key' => 'corrected_post_id', 'value' => $post_id, 'type' => 'NUMERIC' ),
-					array( 'key' => 'correction_status', 'value' => 'complete' ),
-					array( 'key' => 'public_correction_note', 'compare' => 'EXISTS' ),
+					array(
+						'key'   => 'corrected_post_id',
+						'value' => $post_id,
+						'type'  => 'NUMERIC',
+					),
+					array(
+						'key'   => 'correction_status',
+						'value' => 'complete',
+					),
+					array(
+						'key'     => 'public_correction_note',
+						'compare' => 'EXISTS',
+					),
 				),
 			)
 		);
@@ -229,13 +274,13 @@ final class Corrections {
 			return '';
 		}
 		$heading_id = wp_unique_id( 'longevity-corrections-' );
-		$html = '<section class="longevity-update-history" aria-labelledby="' . esc_attr( $heading_id ) . '"><h2 id="' . esc_attr( $heading_id ) . '">' . esc_html__( 'Corrections and material updates', 'longevity-core' ) . '</h2><ol>';
+		$html       = '<section class="longevity-update-history" aria-labelledby="' . esc_attr( $heading_id ) . '"><h2 id="' . esc_attr( $heading_id ) . '">' . esc_html__( 'Corrections and material updates', 'longevity-core' ) . '</h2><ol>';
 		foreach ( $records as $record ) {
-			$date = get_post_meta( $record->ID, 'corrected_date', true );
-			$note = get_post_meta( $record->ID, 'public_correction_note', true );
-			$changed = get_post_meta( $record->ID, 'conclusion_changed', true ) ? __( 'The conclusion changed.', 'longevity-core' ) : __( 'The overall conclusion did not change.', 'longevity-core' );
+			$date     = get_post_meta( $record->ID, 'corrected_date', true );
+			$note     = get_post_meta( $record->ID, 'public_correction_note', true );
+			$changed  = get_post_meta( $record->ID, 'conclusion_changed', true ) ? __( 'The conclusion changed.', 'longevity-core' ) : __( 'The overall conclusion did not change.', 'longevity-core' );
 			$rereview = get_post_meta( $record->ID, 'medical_rereviewed', true ) ? __( 'Medical re-review was completed.', 'longevity-core' ) : '';
-			$html .= '<li><time datetime="' . esc_attr( $date ) . '">' . esc_html( $date ) . '</time><p>' . esc_html( $note ) . '</p><p class="longevity-small">' . esc_html( trim( $changed . ' ' . $rereview ) ) . '</p></li>';
+			$html    .= '<li><time datetime="' . esc_attr( $date ) . '">' . esc_html( $date ) . '</time><p>' . esc_html( $note ) . '</p><p class="longevity-small">' . esc_html( trim( $changed . ' ' . $rereview ) ) . '</p></li>';
 		}
 		return $html . '</ol></section>';
 	}

@@ -156,9 +156,9 @@ final class SEO {
 		if ( self::provider_active() ) {
 			return;
 		}
-		$post_id     = is_singular() ? get_queried_object_id() : 0;
-		$title       = $post_id ? get_the_title( $post_id ) : wp_get_document_title();
-		$url         = self::canonical_url();
+		$post_id = is_singular() ? get_queried_object_id() : 0;
+		$title   = $post_id ? get_the_title( $post_id ) : wp_get_document_title();
+		$url     = self::canonical_url();
 		if ( '' === $url ) {
 			$url = $post_id ? (string) get_permalink( $post_id ) : home_url( '/' );
 		}

@@ -23,7 +23,40 @@ final class Claims {
 	/** Register private claim and source metadata. */
 	public static function register_meta(): void {
 		$claim_fields = array(
-			'claim_id', 'claim_text', 'claim_category', 'claim_importance', 'claim_location', 'source_id', 'source_type', 'source_title', 'source_authors', 'source_url', 'source_identifier', 'publication_date', 'accessed_date', 'jurisdiction', 'population', 'intervention', 'comparator', 'outcome', 'evidence_design', 'evidence_grade', 'conflict_notes', 'evidence_notes', 'verified_by', 'verified_at', 'verification_date', 'verification_status', 'verification_snapshot_hash', 'recheck_date', 'superseded_by', 'archive_url', 'prepared_by', 'prepared_at', 'last_edited_by', 'last_edited_at',
+			'claim_id',
+			'claim_text',
+			'claim_category',
+			'claim_importance',
+			'claim_location',
+			'source_id',
+			'source_type',
+			'source_title',
+			'source_authors',
+			'source_url',
+			'source_identifier',
+			'publication_date',
+			'accessed_date',
+			'jurisdiction',
+			'population',
+			'intervention',
+			'comparator',
+			'outcome',
+			'evidence_design',
+			'evidence_grade',
+			'conflict_notes',
+			'evidence_notes',
+			'verified_by',
+			'verified_at',
+			'verification_date',
+			'verification_status',
+			'verification_snapshot_hash',
+			'recheck_date',
+			'superseded_by',
+			'archive_url',
+			'prepared_by',
+			'prepared_at',
+			'last_edited_by',
+			'last_edited_at',
 		);
 
 		foreach ( $claim_fields as $field ) {
@@ -103,9 +136,9 @@ final class Claims {
 
 	/** Verify the exact current claim snapshot through an explicit workflow service. */
 	public static function verify( int $post_id, int $actor_id ): bool {
-		$prepared_by = (int) get_post_meta( $post_id, 'prepared_by', true );
+		$prepared_by    = (int) get_post_meta( $post_id, 'prepared_by', true );
 		$last_edited_by = (int) get_post_meta( $post_id, 'last_edited_by', true );
-		$preparer = $prepared_by > 0 ? $prepared_by : $last_edited_by;
+		$preparer       = $prepared_by > 0 ? $prepared_by : $last_edited_by;
 		if ( 'lel_claim' !== get_post_type( $post_id ) || $actor_id <= 0 || ! user_can( $actor_id, 'verify_claims' ) || $preparer === $actor_id || $last_edited_by === $actor_id ) {
 			Audit_Log::record( 'metadata_write_denied', 'claim', $post_id, array( 'field' => 'verification_status' ), $actor_id, 'workflow' );
 			return false;
@@ -131,7 +164,7 @@ final class Claims {
 			'source_identifier' => $identifier,
 			'status'            => 'verified',
 		);
-		$hash = hash( 'sha256', Approval_Fingerprint::canonical_json( $payload ) );
+		$hash    = hash( 'sha256', Approval_Fingerprint::canonical_json( $payload ) );
 		Meta_Authorization::enter_trusted_scope();
 		self::$tracking = true;
 		try {
@@ -148,7 +181,17 @@ final class Claims {
 			Audit_Log::record( 'claim_verified', 'claim', $post_id, array( 'snapshot_hash' => $hash ), $actor_id, 'workflow', true );
 		} catch ( \Throwable $error ) {
 			update_post_meta( $post_id, 'verification_status', 'stale' );
-			Audit_Log::record( 'metadata_write_denied', 'claim', $post_id, array( 'field' => 'verification_status', 'reason' => 'audit_write_failed' ), $actor_id, 'workflow' );
+			Audit_Log::record(
+				'metadata_write_denied',
+				'claim',
+				$post_id,
+				array(
+					'field'  => 'verification_status',
+					'reason' => 'audit_write_failed',
+				),
+				$actor_id,
+				'workflow'
+			);
 			return false;
 		}
 		return true;
@@ -170,10 +213,10 @@ final class Claims {
 			if ( 'verification_status' === $meta_key && 'verified' === (string) $meta_value ) {
 				if ( self::can_write_field( $meta_key, $post_id, $actor ) ) {
 					$payload = array(
-						'claim_id'  => (string) get_post_meta( $post_id, 'claim_id', true ),
-						'claim_text'=> (string) get_post_meta( $post_id, 'claim_text', true ),
-						'source_id' => (string) get_post_meta( $post_id, 'source_id', true ),
-						'status'    => 'verified',
+						'claim_id'   => (string) get_post_meta( $post_id, 'claim_id', true ),
+						'claim_text' => (string) get_post_meta( $post_id, 'claim_text', true ),
+						'source_id'  => (string) get_post_meta( $post_id, 'source_id', true ),
+						'status'     => 'verified',
 					);
 					update_post_meta( $post_id, 'verified_by', $actor );
 					update_post_meta( $post_id, 'verified_at', gmdate( DATE_ATOM ) );
@@ -183,11 +226,31 @@ final class Claims {
 						Audit_Log::record( 'claim_verified', 'claim', $post_id, array( 'snapshot_hash' => hash( 'sha256', Approval_Fingerprint::canonical_json( $payload ) ) ), $actor, 'workflow', true );
 					} catch ( \Throwable $error ) {
 						update_post_meta( $post_id, 'verification_status', 'stale' );
-						Audit_Log::record( 'metadata_write_denied', 'claim', $post_id, array( 'field' => 'verification_status', 'reason' => 'audit_write_failed' ), $actor, 'workflow' );
+						Audit_Log::record(
+							'metadata_write_denied',
+							'claim',
+							$post_id,
+							array(
+								'field'  => 'verification_status',
+								'reason' => 'audit_write_failed',
+							),
+							$actor,
+							'workflow'
+						);
 					}
 				} else {
 					update_post_meta( $post_id, 'verification_status', 'stale' );
-					Audit_Log::record( 'metadata_write_denied', 'claim', $post_id, array( 'field' => 'verification_status', 'reason' => 'direct_write_bypass' ), $actor, 'workflow' );
+					Audit_Log::record(
+						'metadata_write_denied',
+						'claim',
+						$post_id,
+						array(
+							'field'  => 'verification_status',
+							'reason' => 'direct_write_bypass',
+						),
+						$actor,
+						'workflow'
+					);
 				}
 			} elseif ( ! in_array( $meta_key, array( 'prepared_by', 'prepared_at', 'last_edited_by', 'last_edited_at', 'verified_by', 'verified_at', 'verification_date', 'verification_snapshot_hash' ), true ) ) {
 				if ( '' === (string) get_post_meta( $post_id, 'prepared_by', true ) ) {
@@ -215,11 +278,19 @@ final class Claims {
 			'posts_per_page' => 1,
 			'no_found_rows'  => false,
 			'meta_query'     => array(
-				array( 'key' => 'post_id', 'value' => $post_id, 'compare' => '=', 'type' => 'NUMERIC' ),
+				array(
+					'key'     => 'post_id',
+					'value'   => $post_id,
+					'compare' => '=',
+					'type'    => 'NUMERIC',
+				),
 			),
 		);
 		if ( '' !== $status ) {
-			$args['meta_query'][] = array( 'key' => 'verification_status', 'value' => $status );
+			$args['meta_query'][] = array(
+				'key'   => 'verification_status',
+				'value' => $status,
+			);
 		}
 		$query = new \WP_Query( $args );
 		return (int) $query->found_posts;
@@ -227,7 +298,7 @@ final class Claims {
 
 	/** Get public citation URLs/identifiers for an article. */
 	public static function citations_for_post( int $post_id, int $limit = 20 ): array {
-		$claims = get_posts(
+		$claims    = get_posts(
 			array(
 				'post_type'      => 'lel_claim',
 				'post_status'    => 'any',
@@ -235,8 +306,16 @@ final class Claims {
 				'orderby'        => 'ID',
 				'order'          => 'ASC',
 				'meta_query'     => array(
-					array( 'key' => 'post_id', 'value' => $post_id, 'compare' => '=', 'type' => 'NUMERIC' ),
-					array( 'key' => 'verification_status', 'value' => 'verified' ),
+					array(
+						'key'     => 'post_id',
+						'value'   => $post_id,
+						'compare' => '=',
+						'type'    => 'NUMERIC',
+					),
+					array(
+						'key'   => 'verification_status',
+						'value' => 'verified',
+					),
 				),
 			)
 		);
@@ -262,7 +341,7 @@ final class Claims {
 		if ( $post_id <= 0 ) {
 			return array();
 		}
-		$claims = get_posts(
+		$claims  = get_posts(
 			array(
 				'post_type'              => 'lel_claim',
 				'post_status'            => 'any',
@@ -271,8 +350,16 @@ final class Claims {
 				'no_found_rows'          => true,
 				'update_post_term_cache' => false,
 				'meta_query'             => array(
-					array( 'key' => 'post_id', 'value' => $post_id, 'compare' => '=', 'type' => 'NUMERIC' ),
-					array( 'key' => 'verification_status', 'value' => 'verified' ),
+					array(
+						'key'     => 'post_id',
+						'value'   => $post_id,
+						'compare' => '=',
+						'type'    => 'NUMERIC',
+					),
+					array(
+						'key'   => 'verification_status',
+						'value' => 'verified',
+					),
 				),
 			)
 		);

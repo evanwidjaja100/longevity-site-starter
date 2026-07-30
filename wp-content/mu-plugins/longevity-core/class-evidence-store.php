@@ -16,10 +16,22 @@ final class Evidence_Store {
 
 	/** @var array<string, array{release_scoped: bool, expiry_required: bool}> */
 	private const TYPES = array(
-		'backup'           => array( 'release_scoped' => false, 'expiry_required' => true ),
-		'restore'          => array( 'release_scoped' => false, 'expiry_required' => true ),
-		'mail'             => array( 'release_scoped' => false, 'expiry_required' => true ),
-		'release-artifact' => array( 'release_scoped' => true, 'expiry_required' => false ),
+		'backup'           => array(
+			'release_scoped'  => false,
+			'expiry_required' => true,
+		),
+		'restore'          => array(
+			'release_scoped'  => false,
+			'expiry_required' => true,
+		),
+		'mail'             => array(
+			'release_scoped'  => false,
+			'expiry_required' => true,
+		),
+		'release-artifact' => array(
+			'release_scoped'  => true,
+			'expiry_required' => false,
+		),
 	);
 
 	private const HASHED_FIELDS = array(
@@ -181,7 +193,7 @@ final class Evidence_Store {
 			return new \WP_Error( 'evidence_payload_invalid', 'Evidence payload could not be encoded as JSON.' );
 		}
 
-		$row = array(
+		$row                = array(
 			'evidence_type'     => $type,
 			'release_sha'       => $release_sha,
 			'artifact_checksum' => $checksum,
