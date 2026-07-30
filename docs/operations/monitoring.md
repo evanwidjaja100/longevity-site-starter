@@ -1,7 +1,7 @@
 # Monitoring
 
 **Owner:** Operations
-**Last reviewed:** 2026-07-28
+**Last reviewed:** 2026-07-30
 
 ## Application health endpoint (liveness)
 
@@ -104,18 +104,32 @@ The plugin exposes Prometheus text-format (`0.0.4`) metrics for an external, aut
 
 - **Pull (REST):** `GET /wp-json/longevity/v1/metrics` — gated by the `view_operational_readiness` capability. Scrape with an external authenticated collector (see `ops/monitoring/prometheus-scrape.yml`, `basic_auth`). Returns `Content-Type: text/plain; version=0.0.4`.
 
-Exposed series:
+Exposed series (catalog generated from `class-metrics.php`; a doc/code mismatch is a defect):
 
 | Metric | Type | Meaning |
 |---|---|---|
 | `lel_audit_write_failures_total` | counter | Append-only audit write failures |
-| `lel_csp_violations_total` | counter | CSP violation reports received |
+| `lel_csp_violations_total` | counter | CSP violation reports received (sampled) |
 | `lel_invalidation_fallback_failures_total` | counter | Synchronous fallback purge failures |
 | `lel_publication_lock_failures_total` | counter | Publication lock acquisition failures |
-| `lel_readiness_check{check,status}` | gauge | Per-check readiness (1 = active status) |
+| `lel_rankings_cache_rejected_total` | counter | Cached ranking IDs rejected by live eligibility revalidation |
+| `lel_affiliate_dependency_edges` | gauge | Materialized affiliate dependency edges; `-1` when the index is unavailable |
+| `lel_affiliate_unresolved_destinations` | gauge | Destinations with no registry match in the last completed backfill; `-1` before any backfill |
+| `lel_affiliate_ambiguous_destinations` | gauge | Destinations matching multiple registry rows; `-1` before any backfill |
+| `lel_affiliate_broad_fallbacks` | gauge | Parents bound to every registry row after failed edge extraction; `-1` before any backfill |
+| `lel_dependency_backfill_pending` | gauge | `1` while the current-generation dependency backfill is incomplete |
+| `lel_csp_mode_state{mode}` | gauge | One-hot effective CSP delivery mode |
+| `lel_csp_mode_explicit` | gauge | `1` when `LEL_CSP_MODE` is explicitly configured |
+| `lel_build_info{environment,source_sha,artifact_sha256}` | gauge | Immutable deployed build identity (`1`) |
+| `lel_readiness_check_state{check,state}` | gauge | Per-check readiness one-hot: exactly one state is `1` per check |
 | `lel_readiness_overall` | gauge | Overall readiness: `1` ok, `0.5` degraded, `0` blocked |
+| `lel_readiness_overall_state{state}` | gauge | Overall readiness one-hot |
 
-Alert rules ship in `ops/monitoring/alert-rules.yml` (load into Prometheus). Each alert carries a runbook annotation pointing at an anchor in `docs/operations/incident-response.md`. To fan out firing alerts to a chat channel, point Alertmanager's webhook receiver at `scripts/alert-notify.sh` (reads Alertmanager JSON on stdin, forwards to `ALERT_WEBHOOK_URL`).
+Counter values are lifetime totals persisted in `wp_options`; alert on them
+with reset-aware `increase()` windows, never with `> 0` on the raw lifetime
+value, so a single historical increment cannot page forever.
+
+Alert rules ship in `ops/monitoring/alert-rules.yml` (load into Prometheus). Each alert carries a `runbook` annotation pointing at the dedicated runbook under `operations/runbooks/` (or `docs/operations/incident-response.md` for general triage). `LongevityReadinessBlocked` should inhibit `LongevityReadinessDegraded` via Alertmanager (see the inhibition contract comment in the rules file). To fan out firing alerts to a chat channel, point Alertmanager's webhook receiver at `scripts/alert-notify.sh` (reads Alertmanager JSON on stdin, forwards to `ALERT_WEBHOOK_URL`).
 
 ## Backup monitoring
 
