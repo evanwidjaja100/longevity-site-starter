@@ -1,10 +1,10 @@
 # syntax=docker/dockerfile:1
 # Local/CI WP-CLI image. Production is managed-host-only; this pinned base
 # does not define or claim the host's runtime image.
-# wordpress:7.0.1-php8.3-cli
-# BASELINE NOTE (PR-01): the platform baseline is WordPress >= 7.0.2 / PHP >= 8.3.
-# This digest predates 7.0.2; preflight correctly fails on it. The release owner
-# must repin to the 7.0.2+ digest from a network-connected environment.
+# wordpress:cli-2.12.0-php8.3 — WP-CLI tool image. The WordPress core version
+# under test comes from the shared wordpress_data volume provisioned by the
+# wordpress service image (7.0.2), and wp longevity preflight enforces the
+# >= 7.0.2 / PHP 8.3 floor against that runtime in ci-setup (PRV3-CI-02).
 FROM wordpress@sha256:f8aeb68164c6a04f5dcc91da30d8ffa096b0f7fafb7a65f144c2dd62587caca0
 
 USER root

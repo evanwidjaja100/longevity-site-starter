@@ -120,8 +120,8 @@ a9c2aacf7ab2e207cde75c3d31f09e8b78d4a8b55cb50d892fdccf3b72b22363 *./content/temp
 4032a9e238a60ef0d95160cc2699790622bb319c04e2424bfc2b32278770e6c0 *./content/testing/consumer-apps-protocol.md
 3e1acaed45fa844fc077632daa87903617a35bca445f8158e9a02de91650c1b8 *./content/testing/home-equipment-protocol.md
 19866564b5dca1e0278458f641fae270bc59b6b74ed24e7e8c68631a24d3ecdb *./content/testing/wearables-protocol.md
-64dd0a59c7f773acb4f7b8439861bd55f30f6008bc78e4d80b181ecc1d166fd0 *./docker/development/Dockerfile
-f01bd35b6ed5784136e402ea1c81784f1620b4d9681fe3bae83e40e321433c9d *./docker/development/Dockerfile.wpcli
+1168115383c24ff64b0f66a5753be4ddb88ab6808c2d44f593f84cc17c79451c *./docker/development/Dockerfile
+d8075590e93ba7e1a33be1c201d4185d309d8f6526eda6ffb9fc75b3a09ce6b8 *./docker/development/Dockerfile.wpcli
 e6261c89407e909391125c65987199789c75f57fa787774b24d3c6c55a2d6cdc *./docker/development/README.md
 0a3aa76c8b47f05cb67f55cd19c092d11d513e7c92ca758434563055930734c7 *./docker/my.cnf
 b7f4950159ead3ae45f64aa22a8448da55273ae1e1354c6985d056f4c2d26a5f *./docker/uploads.ini
@@ -469,7 +469,7 @@ c078563eec20818eacbc5ae0d8e34940f1c4af23e9e8128946ff3fb7d197e750 *./tests/php/Ru
 c61f7833b4ef1022f634bab75047f94950febd9779f2b00592f48109919b6a61 *./tests/php/SystemReadinessTest.php
 328f3e09b8eea632865cb1b064dccadde8577c6d25a411e7e99b2ff2ec11d3ec *./tests/php/TestRecordApprovalTest.php
 6a1615511f1e69e033417f0b40fea90dd152d530371ddbd7c7ed56ad57e78e45 *./tests/php/TrustPagesTest.php
-df7431e90d13c99f353686d7e08788359180c94d4b8a726dfa130482d04aad2d *./tests/php/bootstrap.php
+924fd3cff6380b509dd309541919825fd32ad8182a1417cee09872cd9d8bdaac *./tests/php/bootstrap.php
 8e58ce6e7287be689ba5c5911f763ada405a3356302fd5dcbf731b3208eeb95f *./tests/php/run-unit-tests.php
 6c4daca1adf2c0208567b38c36f07ec5afd62842915066523fd4fe78b44498ba *./tests/php/stubs/wp-cli-stub.php
 74f7ea35f9e5857b9ad81f05a178e751b67274ce4132df461cc0470025ff962a *./tests/php/stubs/wpdb-stub.php
