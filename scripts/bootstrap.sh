@@ -72,6 +72,11 @@ wp option update blog_public 0 --allow-root
 wp plugin delete akismet hello --allow-root 2>/dev/null || true
 wp theme delete twentytwentyfive twentytwentyfour twentytwentythree --allow-root 2>/dev/null || true
 
+# Schema migrations must precede content bootstrap: they create the audit
+# tables and register role capabilities. On a fresh database the trust-page
+# guard (approve_publication) and mandatory audit writes fail without them.
+wp longevity migrate --user="$WP_ADMIN_USER" --allow-root
+
 # The canonical application bootstrap. Pages, categories, and draft launch
 # records are defined once in longevity-core (Bootstrap_Command) and mirrored
 # by the route-state contract in config/routes.json. The command is

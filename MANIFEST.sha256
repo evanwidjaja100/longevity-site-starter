@@ -283,7 +283,7 @@ b8a2aaa2a0692057c6bc789b6ebbb3b86df5c25518dc946992e1341446e79614 *./policies/med
 57060917b4fac61ab8910a78f51556f396122ef76c78cab116cfd885ad69c300 *./scripts/acceptance-test.sh
 6803da6778ebb1a78fbfa748887c0b0b18ae0f1b418624f1a09b43b1c7e4b11c *./scripts/alert-notify.sh
 b1eb5ae9753d5ca1b30782be85fea4bdfe1ef9b3391e5185fd0b572492e72347 *./scripts/backup-example.sh
-f667bfcaee8cc192e7e78e0b1d163c9880af6a92b9f7b5789e4b4ff075f19e3d *./scripts/bootstrap.sh
+dc2b85fe6f4a8a728291e7dc0d437f3e2cc862d922f9969a6d0dd49cb8a5f3a7 *./scripts/bootstrap.sh
 0dbbe740164398058d896146e6f72bc26280ef2757dc6f8876b3e7d992b214ac *./scripts/build-release-artifact.sh
 077b542b1666097128f9f1194ceca3cacaea7f1ab58fc81ec03820d8d7a04c93 *./scripts/ci-generate-env.sh
 e96dc5db850c65fb529fea189bb45b3e8d43391bb804ee2e3d1b852dbc40e798 *./scripts/ci-setup.sh
@@ -537,7 +537,7 @@ c44f36582c975a2bdde3273bf852638ccfa4f48c72fc3fdf8180851a09459726 *./wp-content/m
 565fd4e8e89db490c566a926c0e16f73334b38f4157227fcb0f3562cf3d76add *./wp-content/mu-plugins/longevity-core/class-meta-authorization.php
 7949816744bf5d8c91fb7cf9fce536368c1010327136eaabff0164e8887f1eb4 *./wp-content/mu-plugins/longevity-core/class-meta-registry.php
 e2a3c5e0e3aa8ea2484d3a3e281227652d9911720ee378291003a7596907d6a3 *./wp-content/mu-plugins/longevity-core/class-metrics.php
-367cc954a4028ace8b5cdf6db8ac42ceac46c20a98ef56b2432f8e175c8aaebb *./wp-content/mu-plugins/longevity-core/class-migrations.php
+08616366d7daa90b6b94c207a2836ee26257e1b5e500d96aea524d1314401f43 *./wp-content/mu-plugins/longevity-core/class-migrations.php
 bd6f10b085fca31bc350deb2e163f5fcaf0d63671c20659bac477380d6394a4b *./wp-content/mu-plugins/longevity-core/class-notification-outbox.php
 8d6275672b93d839d827ad779fa6fb6c094ff763c28ac5123df99be60a8ac5f3 *./wp-content/mu-plugins/longevity-core/class-override-intent.php
 db6a9c889e42faa473a3b521b6053a7dc904798149d9c94e98671b59196bbacf *./wp-content/mu-plugins/longevity-core/class-platform-requirements.php

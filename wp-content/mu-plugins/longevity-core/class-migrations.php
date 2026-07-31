@@ -470,7 +470,10 @@ final class Migrations {
 			$contracts['approval']['indexes']['approval_state'] = false;
 			$contracts['approval']['indexes']['approval_audit'] = false;
 		}
-		$names = array(
+		// The contact_idempotency table is introduced by version 19; earlier
+		// repair versions must not assert it on a fresh database.
+		$pre_19 = array_diff( array_keys( $contracts ), array( 'contact_idempotency' ) );
+		$names  = array(
 			3  => array( 'approval', 'audit', 'audit_sequence' ),
 			8  => array( 'audit', 'audit_sequence' ),
 			9  => array( 'dependency', 'queue', 'rate' ),
@@ -480,9 +483,9 @@ final class Migrations {
 			13 => array( 'outbox' ),
 			14 => array( 'evidence' ),
 			15 => array( 'override' ),
-			16 => array_keys( $contracts ),
-			17 => array_keys( $contracts ),
-			18 => array_keys( $contracts ),
+			16 => $pre_19,
+			17 => $pre_19,
+			18 => $pre_19,
 			19 => array_keys( $contracts ),
 		)[ $version ] ?? array();
 
