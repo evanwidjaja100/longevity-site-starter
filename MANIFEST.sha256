@@ -301,7 +301,7 @@ a6ed5bc52f4d92fbb18cd10fcb9717f8c3d20c79d66d44d16cb01de37831e89b *./scripts/gene
 d75141593c482ffeb354e385f9b007a7b08457964df6c30d912892e8a273eb4b *./scripts/regenerate-manifest.php
 447492c270ff53503e0341fd86a3aa839ae0bbfc652e001528dc8221c0b2a3b6 *./scripts/regenerate-manifest.sh
 ebfb194c42461631d19ecd7f899fa442591dccba08d3d4ec02af4c7ed76fa0c6 *./scripts/release-file-list.sh
-8f3a80550e1ac5ec57517a377d4e75422ac3c90b95672facd7c5198694f782cc *./scripts/restore-test-example.sh
+1c359ca0f00fd2245200db2172c2587459c1d29c6f9da466002a37ea48b4f179 *./scripts/restore-test-example.sh
 e31bc1dab704f4fa1f00f303fad93d4efd52a62ad12059150c6ed27464fe32fa *./scripts/smoke-test.sh
 5721c53e6771ca9e88a80aac27eb92bb2d821bac53d23df0b489e5b163f25a34 *./scripts/start-here-content.txt
 35b362347ae9226683aed40fc8897b3c205295efde0e2947f132e8a8ec648251 *./scripts/update-article-metadata.php
