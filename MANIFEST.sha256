@@ -168,7 +168,7 @@ d2a7d368585a68e85e6b34cb2b7baaf16d32413cbec30e302a1e6fa58960bfb8 *./docs/operati
 11cbb1b9b1b0a8c439f211d8c4e44630b12447fd317921c881443b65af0e4bb8 *./docs/operations/database-privileges.md
 e3c751f038941ae186c91f73a4972619b0f2c71eed6e7a2e2ae3fcd1cb3ca97e *./docs/operations/dependency-governance.md
 90923c94e202e65892a9b582134fc8d72a63e5ac4a21092829b6a651116019fb *./docs/operations/incident-response.md
-8d5dbb7c01236f63d57619967a594159e94d89d063dd2cbaa2f224df8658ec65 *./docs/operations/incidents/2026-07-18-credential-incident.md
+62fc88062e3ce407525ea52e66e852e14ef1768fe8f5902a0e1f7a22e0394c1c *./docs/operations/incidents/2026-07-18-credential-incident.md
 5c2f2399236bb5d449b8807cd51ab1cd5302441ae3a80b53a6f8b095590f7401 *./docs/operations/local-development.md
 77e7a200ac5145398643d8edee32cfb7cbfd98fc4589892c363d4476ff9cce2a *./docs/operations/managed-wordpress-deployment.md
 d17a7e5088cea834574aee59e77918a1f5919d5c90519066552548f85a97fb75 *./docs/operations/monitoring.md
@@ -242,7 +242,7 @@ b5568f1a3fd250a167eaa20604e5df5905cc1d6e74cf8697cf53c86bd32674db *./docs/testing
 2ea7958d920ec5fe7f29787afe6f8b6498c0dc804255595844613c145c5cecdf *./docs/testing/production-readiness-remediation-evidence.md
 cbcf34bcf76b02d06d9a121b759cbfcbb288ceb0003ccc90887bd0d9f74f9f7c *./docs/testing/production-readiness-v2-baseline.md
 fce45a7e5d7ed3dd57d94149d12837625b4712dde6b28ba37018f5f58f69c02a *./docs/testing/production-readiness-v2-evidence-reconciliation.md
-a21f6f184d37d92c8a95848f9fa9952b5f6ad746bde0c68b965866355bf87412 *./docs/testing/production-readiness-v3-status.md
+c82c208bac155327f0889fc8c8740dfe1151959b0c828e5e330a5295feed1156 *./docs/testing/production-readiness-v3-status.md
 b83bc73896abb9a39ff10873d1b075f680d7598515773a70a6c0110f53eccdbc *./docs/testing/release-acceptance.md
 6cdfb6ce5a4b9eb87355a1e17b50378fbf0aaec3fe5e15de449522823ea0bf24 *./docs/testing/test-strategy.md
 9547fffdd3aa50d2a9a2aaf071c9b1886e63149cd5795014d7f07d2729e684b6 *./docs/testing/v3-preimplementation-baseline.md

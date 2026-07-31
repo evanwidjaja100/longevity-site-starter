@@ -35,17 +35,27 @@ decision remains **NO-GO** until every mandatory gate in the plan's
 | PRV3-QA-01 | PHPCS `custom_capabilities` allowlist bound to `Roles::ALL_CUSTOM_CAPS`; all security-significant SQL/escaping/nonce/input findings in reachable first-party code remediated (escaped exceptions, documented trusted-prefix interpolation and fully-prepared SQL, boundary unslash+sanitize). | `tests/php/CapabilitiesConfigTest.php` keeps the allowlist in lockstep with registered roles; a targeted security-sniff scan reports zero findings. |
 | PRV3-QA-02 | Mechanical/docblock PHPCS debt cleared: `phpcbf` formatting pass, accurate PHPDoc across first-party classes/scripts, translators comments, Yoda conditions, and semantics-preserving code fixes (short-ternary hoisting, count-out-of-loop, brace syntax, seed-script global renames). Two narrow documented sniff exclusions (`bootstrap.php` filename; `class-cli.php` command registry). | `composer phpcs` exits zero on first-party scope; `composer test` (419), `phpstan` level 5, `psalm --taint-analysis`, and `composer test:fallback` remain green. |
 
+## Completed with repository-owner authority (2026-07-31)
+
+These required the repository owner acting as incident lead / administrator,
+not an automated agent alone. They were executed and independently verified.
+
+| Ticket | Change | Verification |
+|---|---|---|
+| PRV3-IR-01 | Rotated all affected local credentials (DB app/root, WP admin) and destroyed every credential-bearing Docker volume; rotated the GitHub account password and enabled 2FA. | `scripts/validate-env.sh` passes; from-scratch `make bootstrap` + `make smoke` green. See `docs/operations/incidents/2026-07-18-credential-incident.md`. |
+| PRV3-IR-02 | Removed `.env.ci` and the two pre-v2 backup artifacts from all 97 commits with `git-filter-repo`; force-pushed the rewrite. | Fresh clone from the remote shows no secret paths or blobs; repo `fsck` clean; manifest valid. |
+| PRV3-IR-03 | Incident closed with post-mortem; push-time prevention enabled. | Secret scanning, push protection, and Dependabot verified enabled via the GitHub API. |
+| PRV3-GOV-01 | Branch protection on `main`: pull request required, all 15 CI status checks required and strict, force-push and deletion blocked. | Settings read back via the GitHub API confirm 15 required contexts, `strict=true`, force-push/deletion disabled. |
+
+Owner-retained follow-ups: enable "Include administrators" on the `main` rule
+before launch, and delete the local pre-rewrite mirror backup once satisfied.
+
 ## Open — human or external authority required (still NO-GO)
 
 These tickets are intentionally **not** implemented or signed here. An
 automated agent may prepare templates and report observations, but must not
 execute or attest them.
 
-- **PRV3-IR-01/02/03** — Credential rotation, full-history secret purge, and
-  incident closure. Destructive history rewriting and rotation require the
-  named incident lead and repository administrator.
-- **PRV3-GOV-01** — Branch-protection and required-check enforcement on the
-  remote (repository administrator).
 - **PRV3-CI-01/03/04** — Publishing/reconciling the audited branch and proving
   required CI is green on the exact candidate on the remote runner.
 - **PRV3-HOST-01 / STG-01/02** — Managed-host qualification and private
