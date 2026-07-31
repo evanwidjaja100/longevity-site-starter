@@ -2,7 +2,7 @@
 # Build deterministic runtime bytes from a committed Git tree, never the workspace.
 set -euo pipefail
 
-ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+ROOT=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$ROOT"
 export LC_ALL=C TZ=UTC
 

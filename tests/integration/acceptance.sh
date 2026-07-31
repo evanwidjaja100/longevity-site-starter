@@ -1,5 +1,7 @@
 #!/bin/sh
 # Real-DB negative acceptance tests. Every assertion parses JSON strictly.
+# Single-quoted php/awk/jq snippets below are intentional (no shell expansion).
+# shellcheck disable=SC2016
 set -eu
 ROOT=$(CDPATH='' cd -- "$(dirname -- "$0")/../.." && pwd)
 cd "$ROOT"

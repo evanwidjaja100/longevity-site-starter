@@ -7,8 +7,10 @@
 #   2. Reverse lookup targets invalidation precisely: find_parents(A) lists
 #      the parent, find_parents(B) does not.
 #   3. Removing the link and reindexing removes the obsolete edge.
+# Single-quoted php/awk/jq snippets below are intentional (no shell expansion).
+# shellcheck disable=SC2016
 set -eu
-ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
+ROOT=$(CDPATH='' cd -- "$(dirname -- "$0")/../.." && pwd)
 cd "$ROOT"
 
 run() { docker compose run --rm wpcli wp eval "$1" --allow-root; }

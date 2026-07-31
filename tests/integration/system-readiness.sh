@@ -1,6 +1,6 @@
 #!/bin/sh
 set -eu
-ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
+ROOT=$(CDPATH='' cd -- "$(dirname -- "$0")/../.." && pwd)
 SITE_URL=${WP_SITE_URL:-http://localhost:8080}
 
 status=$(curl --silent --output /tmp/lel-readiness-anonymous.json --write-out '%{http_code}' "$SITE_URL/wp-json/longevity/v1/system-readiness")

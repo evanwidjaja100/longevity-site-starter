@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Verify and index immutable upstream CI evidence; never convert unavailable work into a pass.
 set -euo pipefail
-ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+ROOT=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$ROOT"
 
 REPORTS=${EVIDENCE_REPORTS_DIR:-reports}

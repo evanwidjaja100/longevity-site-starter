@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
+ROOT=$(CDPATH='' cd -- "$(dirname -- "$0")/../.." && pwd)
 TMP=$(mktemp -d "${TMPDIR:-/tmp}/lel-artifact-test.XXXXXXXX")
 trap 'rm -rf "$TMP"' EXIT
 mkdir -p "$TMP/repo/scripts" "$TMP/repo/wp-content/mu-plugins/longevity-core" "$TMP/repo/wp-content/themes/longevity-starter"
@@ -36,5 +36,5 @@ LINK_BLOB=$(printf '../../outside' | git -C "$TMP/repo" hash-object -w --stdin)
 git -C "$TMP/repo" update-index --add --cacheinfo "120000,$LINK_BLOB,wp-content/themes/longevity-starter/escape"
 git -C "$TMP/repo" -c user.name=Test -c user.email=test@example.invalid commit -qm symlink
 LINK_SHA=$(git -C "$TMP/repo" rev-parse HEAD)
-if (cd "$TMP/repo" && RELEASE_OUT_DIR=link bash scripts/build-release-artifact.sh "$LINK_SHA" >/dev/null 2>&1); then echo 'FAIL: Git symlink accepted' >&2; exit 1; fi
+if (cd "$TMP/repo" && RELEASE_OUT_DIR='link' bash scripts/build-release-artifact.sh "$LINK_SHA" >/dev/null 2>&1); then echo 'FAIL: Git symlink accepted' >&2; exit 1; fi
 echo 'Release artifact tests passed.'

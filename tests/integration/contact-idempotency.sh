@@ -8,7 +8,7 @@
 #      aggregate post ID and no second reservation row exists.
 #   3. An expired-processing lease is reclaimed by exactly one contender.
 set -eu
-ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
+ROOT=$(CDPATH='' cd -- "$(dirname -- "$0")/../.." && pwd)
 cd "$ROOT"
 
 run() { docker compose run --rm wpcli wp eval "$1" --allow-root; }

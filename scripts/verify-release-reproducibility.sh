@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Build twice with independent temporary output trees and compare exact bytes.
 set -euo pipefail
-ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+ROOT=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$ROOT"
 source_sha=$(git rev-parse --verify "${1:-HEAD}^{commit}")
 source_date_epoch=$(git show -s --format=%ct "$source_sha")

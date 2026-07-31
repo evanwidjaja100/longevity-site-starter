@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Manifest verification contract tests (PR-00).
 set -euo pipefail
-ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
+ROOT=$(CDPATH='' cd -- "$(dirname -- "$0")/../.." && pwd)
 TMP=$(mktemp -d "${TMPDIR:-/tmp}/lel-manifest-test.XXXXXXXX")
 trap 'rm -rf "$TMP"' EXIT
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -eu
-ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+ROOT=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$ROOT"
 
 if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then

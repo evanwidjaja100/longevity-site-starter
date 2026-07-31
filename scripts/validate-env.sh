@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -eu
 
-ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+ROOT=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 ENV_FILE=${1:-"$ROOT/.env"}
 case "$ENV_FILE" in /*) : ;; *) ENV_FILE="$(pwd)/$ENV_FILE" ;; esac
 

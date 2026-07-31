@@ -2,7 +2,7 @@
 # Real-DB audit-chain integration test: deterministic assertions plus a
 # concurrent-writer test proving the hash chain cannot fork.
 set -eu
-ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
+ROOT=$(CDPATH='' cd -- "$(dirname -- "$0")/../.." && pwd)
 
 # 1. Deterministic assertions (append-only, verify, tamper detection, constraint).
 docker compose run --rm -v "$ROOT/tests:/tests:ro" wpcli wp eval-file /tests/integration/audit-chain.php --allow-root

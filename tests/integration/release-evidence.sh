@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # Positive and fail-closed matrix for release evidence provenance and schemas.
+# Single-quoted php/awk/jq snippets below are intentional (no shell expansion).
+# shellcheck disable=SC2016
 set -uo pipefail
-ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
-cd "$ROOT"
+ROOT=$(CDPATH='' cd -- "$(dirname -- "$0")/../.." && pwd)
+cd "$ROOT" || exit 1
 SANDBOX=build/release-evidence-test
 R="$SANDBOX/reports"
 SHA=$(git rev-parse HEAD)

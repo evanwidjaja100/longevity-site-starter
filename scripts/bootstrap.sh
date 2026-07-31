@@ -1,4 +1,6 @@
 #!/bin/sh
+# Single-quoted php/awk/jq snippets below are intentional (no shell expansion).
+# shellcheck disable=SC2016
 set -eu
 
 required="WP_SITE_URL WP_SITE_TITLE WP_ADMIN_USER WP_ADMIN_PASSWORD WP_ADMIN_EMAIL WP_ENVIRONMENT_TYPE WP_TIMEZONE WP_LOCALE"

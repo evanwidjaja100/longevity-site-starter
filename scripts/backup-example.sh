@@ -1,6 +1,6 @@
 #!/bin/sh
 set -eu
-ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+ROOT=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 DEST=${1:-"$ROOT/build/backups"}
 mkdir -p "$DEST"
 stamp=$(date -u +%Y%m%dT%H%M%SZ)

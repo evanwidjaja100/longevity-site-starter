@@ -1,7 +1,9 @@
 #!/bin/sh
 # Real-DB advisory-lock mutual-exclusion test (T01-01 / A1-A2).
+# Single-quoted php/awk/jq snippets below are intentional (no shell expansion).
+# shellcheck disable=SC2016
 set -eu
-ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
+ROOT=$(CDPATH='' cd -- "$(dirname -- "$0")/../.." && pwd)
 cd "$ROOT"
 
 TOKEN=$$

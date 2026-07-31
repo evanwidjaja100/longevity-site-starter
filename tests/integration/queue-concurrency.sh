@@ -8,7 +8,7 @@
 #      UPDATE claim means the combined processed count equals the number of
 #      seeded jobs (never more), and every job reaches a terminal state.
 set -eu
-ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
+ROOT=$(CDPATH='' cd -- "$(dirname -- "$0")/../.." && pwd)
 cd "$ROOT"
 
 run() { docker compose run --rm wpcli wp eval "$1" --allow-root; }

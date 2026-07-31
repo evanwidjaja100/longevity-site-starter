@@ -4,9 +4,11 @@
 # Runs `wp longevity acceptance` as an administrator and surfaces its result.
 # The command exits non-zero unless every check is exactly ok. Works both on a managed host where
 # `wp` is on PATH and inside the project's Docker toolchain.
+# Single-quoted php/awk/jq snippets below are intentional (no shell expansion).
+# shellcheck disable=SC2016
 set -eu
 
-ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+ROOT=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 
 # Resolve a WP-CLI runner: an explicit override, a `wp` on PATH, or the
 # project's wpcli container.

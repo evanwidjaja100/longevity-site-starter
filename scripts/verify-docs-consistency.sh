@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Keep supported topology, commands, CI registry, and operational symbols aligned.
+# Single-quoted php/awk/jq snippets below are intentional (no shell expansion).
+# shellcheck disable=SC2016
 set -euo pipefail
-ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+ROOT=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$ROOT"
 failures=0
 fail() { printf 'ERROR: %s\n' "$1" >&2; failures=1; }
@@ -40,7 +42,7 @@ php -r '
 ' || fail 'operational docs reference a nonexistent WP-CLI command'
 
 for symbol in audit_write_failure migration_failed freshness_cycle_failed invalidation_job_failed invalidation_fallback_failure csp_violation approve_publication view_operational_readiness complete_medical_review approve_commercial_disclosure; do
-  grep -Rqs --include='*.php' "['\"]$symbol['\"]" wp-content/mu-plugins/longevity-core || fail "documented event/capability is absent from code: $symbol"
+  grep -Rqs --include='*.php' "['\"]${symbol}['\"]" wp-content/mu-plugins/longevity-core || fail "documented event/capability is absent from code: $symbol"
 done
 
 today=$(date -u +%s)

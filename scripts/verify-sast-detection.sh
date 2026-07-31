@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Prove Psalm detects a controlled taint and enforce time-bounded suppressions.
 set -euo pipefail
-ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+ROOT=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$ROOT"
 
 scope=${SAST_SUPPRESSION_SCOPE:-}

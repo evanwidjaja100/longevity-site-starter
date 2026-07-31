@@ -1,6 +1,6 @@
 #!/bin/sh
 set -eu
-ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
+ROOT=$(CDPATH='' cd -- "$(dirname -- "$0")/../.." && pwd)
 rm -f /tmp/lel_env_parser_executed
 # Generate an ephemeral CI env from the tracked non-secret template and validate
 # it. Secrets are never committed (see scripts/ci-generate-env.sh).

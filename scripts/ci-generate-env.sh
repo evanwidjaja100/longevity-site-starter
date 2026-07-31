@@ -8,7 +8,7 @@
 # exported so later steps can reference them.
 set -euo pipefail
 
-ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+ROOT=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 TEMPLATE="$ROOT/.env.ci.template"
 OUT=${1:-"$ROOT/.env"}
 

@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
+# Single-quoted php/awk/jq snippets below are intentional (no shell expansion).
+# shellcheck disable=SC2016
 set -euo pipefail
-ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
+ROOT=$(CDPATH='' cd -- "$(dirname -- "$0")/../.." && pwd)
 TMP=$(mktemp -d "${TMPDIR:-/tmp}/lel-sbom-test.XXXXXXXX")
 trap 'rm -rf "$TMP"' EXIT
 cp "$ROOT/scripts/generate-dependency-sbom.php" "$TMP/generate.php"

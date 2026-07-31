@@ -1,6 +1,6 @@
 #!/bin/sh
 set -eu
-ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+ROOT=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 SITE_URL=${WP_SITE_URL:-}
 if [ -z "$SITE_URL" ] && [ -f "$ROOT/.env" ]; then
   SITE_URL=$(sed -n 's/^WP_SITE_URL=//p' "$ROOT/.env" | tail -n1)

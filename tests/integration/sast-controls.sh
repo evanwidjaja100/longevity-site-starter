@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
+ROOT=$(CDPATH='' cd -- "$(dirname -- "$0")/../.." && pwd)
 TMP=$(mktemp -d "${TMPDIR:-/tmp}/lel-sast-test.XXXXXXXX")
 trap 'rm -rf "$TMP"' EXIT
 printf '<?php /** @psalm-suppress TaintedHtml */\n' > "$TMP/missing.php"
