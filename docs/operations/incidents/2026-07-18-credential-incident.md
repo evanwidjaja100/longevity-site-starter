@@ -2,7 +2,7 @@
 
 **Owner:** Security and editorial operations
 **Incident lead:** evanwidjaja100 (repository owner)
-**Status:** Contained — rotation complete (IR-01); history purge (IR-02) and closure review (IR-03) open
+**Status:** Contained — rotation (IR-01) and history purge (IR-02) complete; closure review (IR-03) open
 **Last reviewed:** 2026-07-31
 
 ## Summary
@@ -31,7 +31,7 @@ values are recorded here or anywhere in Git.
 ### Collateral findings
 
 Rebuilding from an empty database exposed two fresh-install defects that
-long-lived volumes had masked; both are fixed in commit `1badd2e`:
+long-lived volumes had masked; both are fixed in commit `4f01281`:
 
 1. `scripts/bootstrap.sh` never ran `wp longevity migrate`, so audit tables
    and role capabilities were absent on a new database and trust-page seeding
@@ -39,13 +39,26 @@ long-lived volumes had masked; both are fixed in commit `1badd2e`:
 2. Migrations 16–18 asserted the `contact_idempotency` table contract although
    that table is only created by migration 19.
 
+## IR-02 — History purge (completed 2026-07-31)
+
+The three secret-bearing paths were removed from all Git history with
+`git-filter-repo` and the rewrite was published.
+
+| Action | Detail | Verification |
+|---|---|---|
+| Backed up pre-rewrite history | `git clone --mirror` to `D:\Desktop\test\longevity-backup-mirror.git` (local only; still contains the old secrets — delete once satisfied) | Mirror clone succeeded |
+| Purged paths | `.env.ci`, `docs/testing/artifacts/pre-v2-backup/database-2026-07-18.sql`, `docs/testing/artifacts/pre-v2-backup/wp-content-2026-07-18.tgz` across all 97 commits and all refs | `git rev-list --all --objects` shows no secret blobs; repo `fsck` clean; manifest valid |
+| Published rewrite | Force-pushed the 5 first-party branches; the 10 stale `dependabot/*` branches are no longer present on the remote (their PRs were invalidated by the base rewrite) | Remote lists only the 5 first-party branches |
+| Confirmed remote clean | Fresh `git clone` from GitHub + full-ref scan | No secret paths and no secret blobs in any remote ref |
+
+Residual note: GitHub retains unreachable objects for a background window
+before garbage collection, and any pre-existing fork or cached view may still
+reference old commits. Because every affected credential was already rotated
+(IR-01), the residual objects carry no usable secret. GitHub Support can be
+asked to expedite GC if required.
+
 ## Open follow-ups
 
-- **IR-02 — History purge:** historical secret-bearing blobs remain reachable
-  in Git history until a `git filter-repo` rewrite is executed and
-  force-pushed by the repository administrator, followed by full-history
-  secret scans and re-clones. The rotated values render the leaked material
-  unusable in the meantime.
 - **IR-03 — Closure:** post-mortem, prevention actions (push protection,
   scheduled full-history scans), and incident sign-off.
 
