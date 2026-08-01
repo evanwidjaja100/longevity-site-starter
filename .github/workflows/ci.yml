@@ -252,6 +252,16 @@ jobs:
       - run: bash scripts/ci-generate-env.sh && npm ci
       - run: docker compose up -d db wordpress
       - run: bash scripts/ci-setup.sh
+      - name: Diagnose fixture review and test record state
+        run: |
+          REVIEW_ID=$(docker compose run --rm wpcli wp post list --post_type=review --name=test-valid-review --field=ID --format=csv | tail -n1)
+          echo "REVIEW_ID=$REVIEW_ID"
+          docker compose run --rm wpcli wp post meta list "$REVIEW_ID" --fields=meta_key,meta_value | grep -E 'test_record_id|testing_protocol_version|testing_status|testing_required' || true
+          RECORD_ID=$(docker compose run --rm wpcli wp post meta get "$REVIEW_ID" test_record_id)
+          echo "RECORD_ID=$RECORD_ID"
+          docker compose run --rm wpcli wp post meta list "$RECORD_ID" --fields=meta_key,meta_value | grep -E 'approval_status|approval_snapshot_hash|protocol_version|public_test_results' || true
+          docker compose run --rm wpcli wp eval 'echo "RENDER_METHOD=" . strlen(\Longevity\Core\Public_Rankings::render_test_method((int) get_page_by_path("reviews/test-valid-review", OBJECT, "review")->ID)) . PHP_EOL; echo "RENDER_RESULTS=" . strlen(\Longevity\Core\Public_Rankings::render_test_results((int) get_page_by_path("reviews/test-valid-review", OBJECT, "review")->ID)) . PHP_EOL;'
+          curl -s http://localhost:8080/reviews/test-valid-review/ | grep -o -E 'longevity-(test-results|test-method|review-score-card|product-summary)' | sort | uniq -c || true
       - run: npx playwright install --with-deps chromium
       - name: Initialize evidence directory
         run: mkdir -p reports/playwright-chromium
@@ -267,7 +277,9 @@ jobs:
         if: always()
         with:
           name: playwright-chromium-evidence
-          path: reports/playwright-chromium/
+          path: |
+            reports/playwright-chromium/
+            reports/playwright-artifacts/
           if-no-files-found: error
       - if: always()
         run: docker compose down -v
