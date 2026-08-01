@@ -534,21 +534,33 @@ final class Routes {
 	 * parameters are stripped by default.
 	 */
 	public static function redirect_legacy_category(): void {
-		if ( ! is_category() ) {
-			return;
-		}
-		$term = get_queried_object();
-		if ( ! ( $term instanceof \WP_Term ) ) {
-			return;
-		}
-		$current_slug = $term->slug;
-
-		// Never redirect canonical slugs — only actual legacy slugs.
-		if ( ! self::is_legacy_slug( $current_slug ) ) {
-			return;
+		if ( empty( self::$category_definitions ) ) {
+			self::init();
 		}
 
-		$canonical = self::canonical_url_for_slug( $current_slug );
+		// Resolve the requested category slug. When the legacy term exists it
+		// comes from the queried object; when it does not (fresh installs only
+		// create canonical slugs) WordPress 404s but the rewrite still
+		// populates the category_name query var, so the redirect can fire
+		// without a resolved term.
+		$slug = null;
+		if ( is_category() ) {
+			$term = get_queried_object();
+			if ( $term instanceof \WP_Term ) {
+				$slug = $term->slug;
+			}
+		}
+		if ( null === $slug ) {
+			$requested = (string) get_query_var( 'category_name', '' );
+			if ( '' !== $requested ) {
+				$slug = basename( untrailingslashit( $requested ) );
+			}
+		}
+		if ( null === $slug || ! self::is_legacy_slug( $slug ) ) {
+			return;
+		}
+
+		$canonical = self::canonical_url_for_slug( $slug );
 		if ( null === $canonical ) {
 			return;
 		}

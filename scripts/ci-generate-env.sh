@@ -14,6 +14,11 @@ OUT=${1:-"$ROOT/.env"}
 
 [ -f "$TEMPLATE" ] || { echo "ERROR: $TEMPLATE not found." >&2; exit 1; }
 
+# Non-secret database name from the template. Exported to $GITHUB_ENV below so
+# later steps (e.g. the contact E2E fixture's exact-database confirmation) can
+# target the same database this run actually uses, instead of a hardcoded default.
+DB_NAME=$(sed -n 's/^WORDPRESS_DB_NAME=//p' "$TEMPLATE" | tail -n 1)
+
 gen_secret() {
   # 48 hex chars: well above the 16-char minimum, no placeholder words.
   openssl rand -hex 24
@@ -38,6 +43,7 @@ chmod 600 "$OUT" 2>/dev/null || true
 
 if [ -n "${GITHUB_ENV:-}" ]; then
   {
+    printf 'WORDPRESS_DB_NAME=%s\n' "$DB_NAME"
     printf 'WORDPRESS_DB_PASSWORD=%s\n' "$DB_PASSWORD"
     printf 'WORDPRESS_DB_ROOT_PASSWORD=%s\n' "$DB_ROOT_PASSWORD"
     printf 'WP_ADMIN_PASSWORD=%s\n' "$ADMIN_PASSWORD"

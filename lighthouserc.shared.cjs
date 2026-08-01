@@ -38,10 +38,15 @@ const okPaths = [
   `${contract.search.path}nonexistent`,
 ];
 
-/** The themed 404 state is audited deliberately and must return HTTP 404. */
+/**
+ * The themed 404 state must return HTTP 404, verified by the preflight
+ * (scripts/lighthouse-preflight.mjs) via notFoundPaths. It is intentionally
+ * excluded from the scored `urls` below: Lighthouse cannot score a document
+ * that returns 404 (ERRORED_DOCUMENT_REQUEST), which would fail the run.
+ */
 const notFoundPaths = ['/this-route-does-not-exist/'];
 
-const urls = [...okPaths, ...notFoundPaths].map((path) => BASE_URL + path);
+const urls = okPaths.map((path) => BASE_URL + path);
 
 const assertions = {
   'categories:performance': ['error', { minScore: 0.9 }],

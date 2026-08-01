@@ -784,5 +784,15 @@ foreach ( $lel_route_contract['pages'] as $lel_route_key => $lel_route_page ) {
 	WP_CLI::log( sprintf( 'Published CI fixture projection for "%s" (/%s/).', $lel_route_key, $lel_route_page['slug'] ) );
 }
 
+// bootstrap.sh sets blog_public=0 as a safety default so a fresh site is never
+// indexed. CI fixture mode must mirror production-with-indexing-enabled:
+// with blog_public=1 WordPress's own noindex logic (drafts, reviews archive,
+// search, per-page _longevity_noindex) becomes the only noindex source, which
+// is exactly what production-readiness-audit.spec.js verifies. This file is
+// refused by the environment guard above on staging/production, so the
+// projection can never enable indexing there.
+update_option( 'blog_public', 1 );
+WP_CLI::log( 'Enabled search-engine visibility for the CI fixture projection (blog_public=1).' );
+
 flush_rewrite_rules( false );
 WP_CLI::success( 'Synthetic local/CI fixtures are ready; the incomplete review remained blocked.' );

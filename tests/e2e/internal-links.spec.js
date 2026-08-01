@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { ALL_PUBLIC_ROUTES } from './support/route-expectations.js';
+import { ALL_PUBLIC_ROUTES, ALL_PRIVATE_ROUTES } from './support/route-expectations.js';
 
 const EXCLUDED_PREFIXES = [
   'mailto:', 'tel:', 'sms:', 'fax:',
@@ -9,6 +9,14 @@ const EXCLUDED_PREFIXES = [
   '/feed/', '/trackback/',
   '#',
 ];
+
+/**
+ * Contract routes that are intentionally unpublished in CI fixture mode
+ * (draft pages return 404 by design). Links to them are not broken: they
+ * resolve in production once the human approval gates pass. Built from
+ * ALL_PRIVATE_ROUTES so typos/deleted pages outside the contract still fail.
+ */
+const CONTRACT_DRAFT_PATHS = new Set(ALL_PRIVATE_ROUTES.map((r) => normalizePath(r.path)));
 
 /**
  * Normalize a URL path for comparison: remove trailing slash and fragment.
@@ -75,6 +83,11 @@ test.describe('runtime internal link crawl', () => {
         const normalized = normalizePath(url.pathname);
 
         if (normalized === '/wp-content' || normalized.startsWith('/wp-content/')) continue;
+
+        if (CONTRACT_DRAFT_PATHS.has(normalized)) {
+          results.push({ source: path, linkText: text, target: trimmed, status: 'expected-draft', redirects: 0 });
+          continue;
+        }
 
         linkCount++;
         let linkResponse;
