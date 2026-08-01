@@ -4,7 +4,7 @@ f47c059e7c00c6c18557084cfd9573197e795dc7b6d3969b945893cb686c66d2 *./.env.example
 ab784e205ddc66f723a611a866f1c48d930d3e0af446e65a33726c680321d86c *./.env.production.example
 8579dfc77acfbbc24ae474ae8a7397cf868c6fc0cfedd5d579714d004c7729e2 *./.gitattributes
 b37a107785de2cf26c10906292db47c266d668fdd3b131bd670645c424547852 *./.github/dependabot.yml
-37abf52550e6b36dc4dcdcdcf7912369939e7672e3cad993d94b0be8582d2eb1 *./.github/workflows/ci.yml
+05466127539a29afd8d1c9b5a2ccb62ec8b7151318be91731e453840b240438b *./.github/workflows/ci.yml
 c2911c77c7804b1482bbf1f0f2c5d0b0f34ca81aa51b8c71d083f84afdd7b473 *./.github/workflows/scheduled-content-validation.yml
 f62e0dfd685dcd1bc596336b1364fc4a1e1cf6ba892b4a449ed98637da4fb6b5 *./.github/workflows/security.yml
 92c2384c236c6a0c7c50e79a2075f19c260a6bec1869ce6bec7632892f0ae06b *./.gitignore
