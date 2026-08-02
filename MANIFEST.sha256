@@ -296,7 +296,7 @@ b6a9a07fd110664bca9a517ab94ba7114ea0b419e59ea740d22483f3eca41a5a *./scripts/cron
 d885e4ca622ac902db3018de1181ee7c6222effb367ea64eea1af1a33e266a80 *./scripts/generate-dependency-sbom.php
 a6ed5bc52f4d92fbb18cd10fcb9717f8c3d20c79d66d44d16cb01de37831e89b *./scripts/generate-release-evidence.sh
 1bb22096b48162fe3bf02729ffec6046bea42ed5cc07e92d9131717d5dcdf059 *./scripts/lighthouse-preflight.mjs
-6c5e51f6052a7a7f7e17d915a8c7571adf9eed6ff3c756fb42eca2f2a87e3a0c *./scripts/merge-codeql-sarif.php
+2f907ac8e982f57952ef47746254fb902aa96a5ca341b75de58fcad9c498bbd7 *./scripts/merge-codeql-sarif.php
 3ece357410ef7960b0cf5aa2afaa25c3231dc0a41b141b361f4a2adbdcf638f5 *./scripts/p0-3-baseline-screenshots.mjs
 88e18c462ca55282a9be7ab0342828537aaaaf637deab04d936a9eb8ae800193 *./scripts/populate-trust-pages.php
 d75141593c482ffeb354e385f9b007a7b08457964df6c30d912892e8a273eb4b *./scripts/regenerate-manifest.php

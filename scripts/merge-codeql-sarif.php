@@ -1,14 +1,15 @@
 #!/usr/bin/env php
 <?php
-
-declare(strict_types=1);
-
 /**
  * Merge CodeQL SARIF runs into a single evidence file, keeping only the
  * rule metadata referenced by results. Static rule documentation (help,
  * descriptions, unused rules) is excluded so evidence reflects findings.
  * The raw per-language SARIF files are preserved alongside.
+ *
+ * @package LongevityEvidenceLab
  */
+
+declare(strict_types=1);
 
 $runs  = array();
 $files = glob( dirname( __DIR__ ) . '/reports/codeql/raw/*.sarif' );
