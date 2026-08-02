@@ -4,7 +4,7 @@ f47c059e7c00c6c18557084cfd9573197e795dc7b6d3969b945893cb686c66d2 *./.env.example
 ab784e205ddc66f723a611a866f1c48d930d3e0af446e65a33726c680321d86c *./.env.production.example
 8579dfc77acfbbc24ae474ae8a7397cf868c6fc0cfedd5d579714d004c7729e2 *./.gitattributes
 b37a107785de2cf26c10906292db47c266d668fdd3b131bd670645c424547852 *./.github/dependabot.yml
-ee4efa46c044d57bcba48bb49a6cdb1c3bd1794326989e67e36c0d060d26bdf2 *./.github/workflows/ci.yml
+7ecad9c1419b4123e6b724037970b2a4c69c1a3bb90d0addc74b893147d7c787 *./.github/workflows/ci.yml
 c2911c77c7804b1482bbf1f0f2c5d0b0f34ca81aa51b8c71d083f84afdd7b473 *./.github/workflows/scheduled-content-validation.yml
 f62e0dfd685dcd1bc596336b1364fc4a1e1cf6ba892b4a449ed98637da4fb6b5 *./.github/workflows/security.yml
 92c2384c236c6a0c7c50e79a2075f19c260a6bec1869ce6bec7632892f0ae06b *./.gitignore
@@ -547,7 +547,7 @@ b1a632204dcda4f7d868b253adc054e313d967110a97ae866faf47662256925c *./wp-content/m
 d0973ce1cb1d1f1d4f210f31610bcc93d861507ae023398cd801fe360f9dc2a2 *./wp-content/mu-plugins/longevity-core/class-public-contact.php
 3cae6de1ca9f5e9985dc15f843e94988aaa0b42205d51252b4561fd80743a402 *./wp-content/mu-plugins/longevity-core/class-public-content.php
 6bd4cb2ffdcb4625cf2a51df60e01e923cdee30ae951cba5a05be162d904b62c *./wp-content/mu-plugins/longevity-core/class-public-nav.php
-41fc83a8abb3ac62e53533bbe5663d0cd0ea19bef4fac37ae73b692b2c427abb *./wp-content/mu-plugins/longevity-core/class-public-rankings.php
+274e28b70f4f3c656c3c84543ebe81d42c65f42a864ed53184aa76b2303a9d0a *./wp-content/mu-plugins/longevity-core/class-public-rankings.php
 b22f02a6dcf3aef1702b5129750c0bf10eebe16b3cc9ca83b7fd342c826e444a *./wp-content/mu-plugins/longevity-core/class-public-trust.php
 70366bc72d868c1ea865a714cb2c21328fe12d1d4a82b7d5123777bece116abc *./wp-content/mu-plugins/longevity-core/class-rankings.php
 984a44ba7a4a43a96e32a9be132c79536d03306b51970520a859f1b80854a645 *./wp-content/mu-plugins/longevity-core/class-rest-api.php
