@@ -49,8 +49,9 @@ final class CspReportTest extends TestCase {
 				array(
 					"default-src 'self'",
 					"script-src 'self' 'nonce-{$nonce}'",
-					"style-src 'self' 'nonce-{$nonce}'",
+					"style-src 'self' 'unsafe-inline'",
 					"style-src-attr 'unsafe-inline'",
+					"worker-src 'self' blob:",
 					"img-src 'self' data: https:",
 					"font-src 'self' data:",
 					"connect-src 'self'",
