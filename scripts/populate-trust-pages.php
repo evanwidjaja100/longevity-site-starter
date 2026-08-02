@@ -61,7 +61,7 @@ foreach ( $page_map as $filename => $slug ) {
 		continue;
 	}
 
-	if ( Trust_Pages::has_placeholders( $markdown ) ) {
+	if ( Trust_Pages::has_unresolved_markers( $markdown ) ) {
 		$seed_errors[] = "Placeholder markers remain in template: {$filename}";
 		\WP_CLI::warning( "Template {$filename} still contains placeholder markers ([date], TODO, etc.). Fix the template before seeding." );
 		continue;

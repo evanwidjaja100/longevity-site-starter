@@ -738,7 +738,7 @@ final class Approval_Service {
 			return $post
 				&& Trust_Pages::is_trust_page( $post_id )
 				&& '' !== trim( (string) $post->post_content )
-				&& ! Trust_Pages::has_placeholders( (string) $post->post_content );
+				&& ! Trust_Pages::has_unresolved_markers( (string) $post->post_content );
 		}
 		return false;
 	}

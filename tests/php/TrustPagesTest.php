@@ -9,11 +9,11 @@ final class TrustPagesTest extends TestCase {
 	}
 
 	public function test_placeholder_markers_are_detected(): void {
-		self::assertTrue( Trust_Pages::has_placeholders( '**Last reviewed:** [date]' ) );
-		self::assertTrue( Trust_Pages::has_placeholders( 'TODO: legal must confirm this' ) );
-		self::assertTrue( Trust_Pages::has_placeholders( 'Some Lorem Ipsum filler' ) );
-		self::assertTrue( Trust_Pages::has_placeholders( '[PLACEHOLDER for counsel]' ) );
-		self::assertFalse( Trust_Pages::has_placeholders( 'We review every article before publication.' ) );
+		self::assertTrue( Trust_Pages::has_unresolved_markers( '**Last reviewed:** [date]' ) );
+		self::assertTrue( Trust_Pages::has_unresolved_markers( 'TODO: legal must confirm this' ) );
+		self::assertTrue( Trust_Pages::has_unresolved_markers( 'Some Lorem Ipsum filler' ) );
+		self::assertTrue( Trust_Pages::has_unresolved_markers( '[PLACEHOLDER for counsel]' ) );
+		self::assertFalse( Trust_Pages::has_unresolved_markers( 'We review every article before publication.' ) );
 	}
 
 	public function test_trust_slugs_are_recognized(): void {

@@ -83,7 +83,7 @@ final class Trust_Pages {
 	 *
 	 * @param string $content Page content to scan.
 	 */
-	public static function has_placeholders( string $content ): bool {
+	public static function has_unresolved_markers( string $content ): bool {
 		$normalized = strtolower( $content );
 		foreach ( self::PLACEHOLDER_MARKERS as $marker ) {
 			if ( false !== strpos( $normalized, $marker ) ) {
@@ -142,7 +142,7 @@ final class Trust_Pages {
 		$incoming = (string) wp_unslash( (string) ( $data['post_content'] ?? '' ) );
 		$stored   = $post_id > 0 ? (string) ( get_post( $post_id )->post_content ?? '' ) : '';
 		$blocked  = $post_id <= 0
-			|| self::has_placeholders( $incoming )
+			|| self::has_unresolved_markers( $incoming )
 			|| $incoming !== $stored
 			|| ! self::is_approved( $post_id );
 		if ( $blocked ) {
@@ -153,7 +153,7 @@ final class Trust_Pages {
 				max( 0, $post_id ),
 				array(
 					'slug'   => $slug,
-					'reason' => self::has_placeholders( $incoming ) ? 'placeholder_content' : 'missing_or_stale_trust_approval',
+					'reason' => self::has_unresolved_markers( $incoming ) ? 'placeholder_content' : 'missing_or_stale_trust_approval',
 				),
 				function_exists( 'get_current_user_id' ) ? get_current_user_id() : 0,
 				'workflow'

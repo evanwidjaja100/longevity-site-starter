@@ -297,7 +297,7 @@ d885e4ca622ac902db3018de1181ee7c6222effb367ea64eea1af1a33e266a80 *./scripts/gene
 a6ed5bc52f4d92fbb18cd10fcb9717f8c3d20c79d66d44d16cb01de37831e89b *./scripts/generate-release-evidence.sh
 1bb22096b48162fe3bf02729ffec6046bea42ed5cc07e92d9131717d5dcdf059 *./scripts/lighthouse-preflight.mjs
 3ece357410ef7960b0cf5aa2afaa25c3231dc0a41b141b361f4a2adbdcf638f5 *./scripts/p0-3-baseline-screenshots.mjs
-1081894aaa10fcdd43218b13af6fea65dc34d1e4271c7435508b5b2ddb8f4f36 *./scripts/populate-trust-pages.php
+88e18c462ca55282a9be7ab0342828537aaaaf637deab04d936a9eb8ae800193 *./scripts/populate-trust-pages.php
 d75141593c482ffeb354e385f9b007a7b08457964df6c30d912892e8a273eb4b *./scripts/regenerate-manifest.php
 447492c270ff53503e0341fd86a3aa839ae0bbfc652e001528dc8221c0b2a3b6 *./scripts/regenerate-manifest.sh
 ebfb194c42461631d19ecd7f899fa442591dccba08d3d4ec02af4c7ed76fa0c6 *./scripts/release-file-list.sh
@@ -479,7 +479,7 @@ c078563eec20818eacbc5ae0d8e34940f1c4af23e9e8128946ff3fb7d197e750 *./tests/php/Ru
 9e3fdf280d88731dbec6a6b41b175a5423cd1b090308f838a439d459cee7caa5 *./tests/php/support/ArchitectureAssertions.php
 c61f7833b4ef1022f634bab75047f94950febd9779f2b00592f48109919b6a61 *./tests/php/SystemReadinessTest.php
 328f3e09b8eea632865cb1b064dccadde8577c6d25a411e7e99b2ff2ec11d3ec *./tests/php/TestRecordApprovalTest.php
-6a1615511f1e69e033417f0b40fea90dd152d530371ddbd7c7ed56ad57e78e45 *./tests/php/TrustPagesTest.php
+7cb792ed7d248f4d53a9f995037d3f71f920a5dd958a8cfce4e0905f0a8f81fc *./tests/php/TrustPagesTest.php
 0e8cdaf106491eb236ef207989531d9d7aa8a8d202e077591bfd8e0ebbf80f7b *./tests/phpstan-bootstrap.php
 bd48c24ce4500e60d2524571756787283f0d3fbfa50b116331309c09773f0cd1 *./wp-content/index.php
 1b02fbdd8a42b77b6aed57815725257df08706cf7bb98e03e9259ffdac16b225 *./wp-content/mu-plugins/longevity-core.php
@@ -509,7 +509,7 @@ be5b44cfb569519be73a5fb13535e4b4237577027cf240f722f008ace1eba867 *./wp-content/m
 92f5450de21d24ed3f4465c78e717e2ca2a8f969b11523ab62df1ad97b4bd28e *./wp-content/mu-plugins/longevity-core/blocks/test-results/block.json
 3dbe30d242128f9c968d0da9acdef633e8cf325bfd1d243bd2f2944d4f063af8 *./wp-content/mu-plugins/longevity-core/blocks/topic-directory/block.json
 6bdd2d60e29e26346b321f468de2265e3dc9103ac2408d26e2d9fcf1b53a8be1 *./wp-content/mu-plugins/longevity-core/blocks/trust-summary/block.json
-436b742c6b83cf8f27fd7cf02c6ecef7c876c6709531370dbeda3ab7f3fa2b16 *./wp-content/mu-plugins/longevity-core/bootstrap.php
+e7eb64f6af1c435d6c508f393a186ee17113b2d93eaeb468598a9071d5923cf8 *./wp-content/mu-plugins/longevity-core/bootstrap.php
 245ef10acc5fecf5f7ca3b85e94cdb2f472d6220c89b3e95a61980032cf5a568 *./wp-content/mu-plugins/longevity-core/class-admin-assets.php
 6733c5925de977ea2858ccaa160d08ad6555e4be8bf2c748cc89ff7a52c61079 *./wp-content/mu-plugins/longevity-core/class-admin-ui.php
 2cdbed705ded5a87799621ad15be4bf712efc0eaee31f4f2f0deb1c57b7899f5 *./wp-content/mu-plugins/longevity-core/class-advisory-lock.php
@@ -517,7 +517,7 @@ be5b44cfb569519be73a5fb13535e4b4237577027cf240f722f008ace1eba867 *./wp-content/m
 cfee1cc883dc8155238caf4e06c7613efcac11c26584cb579c9bb39f2bd3846d *./wp-content/mu-plugins/longevity-core/class-analytics.php
 dc2cee4d92994a7ba8371e3d2cf0444939037a323cac98d9c3f11866add7679c *./wp-content/mu-plugins/longevity-core/class-approval-fingerprint.php
 37dcfb74b303193270c6346c18d51fa950198dc898a6ac4f063bfe5c9c98746e *./wp-content/mu-plugins/longevity-core/class-approval-repository.php
-f68d3b4b1943d969c81e326fdaa65bbf76ebeffe0f1e710932fbf267e1c77dc9 *./wp-content/mu-plugins/longevity-core/class-approval-service.php
+6083025a5927b1b716592038cffad32aa93131c791552ebdf077bb8aab213d6a *./wp-content/mu-plugins/longevity-core/class-approval-service.php
 8ce48ddff2ec49d3b01ff2ae8096e0268fa88da89aa3054282f416c77f36f296 *./wp-content/mu-plugins/longevity-core/class-audit-log.php
 6cd6c2b5510490d7ec5f798b30bfd672b9cc6b58817b64893bd0e3a9d6dffc29 *./wp-content/mu-plugins/longevity-core/class-blocks.php
 4f83ad6c9a3d2aecbaa739ab49a1a4fc72e581ed42d07be4311444f770985763 *./wp-content/mu-plugins/longevity-core/class-claims.php
@@ -562,7 +562,7 @@ a1c7f531cb8f454ad5d7f2daf47b834bb2b53b8f3a0d3f2dfba22fd0c769dccc *./wp-content/m
 284f9d10bb1a0b22b511eb5b6fd804b79930326b82be8f29b5bc2660fb8b80e4 *./wp-content/mu-plugins/longevity-core/class-seo.php
 ac2f73c3f636737f2eaf0b5a778e7c158048c99eb74b1ec2475e7a86cb636c0c *./wp-content/mu-plugins/longevity-core/class-shortcodes.php
 29eaf7af72baf080fba1f7787faa78c2bff20cd4d364e3bdbe5d8c5cbaf6c749 *./wp-content/mu-plugins/longevity-core/class-system-readiness.php
-13be5474e0e48696c89788066e97457ab966cc0476742c76b1f3987e4d39bf55 *./wp-content/mu-plugins/longevity-core/class-trust-pages.php
+531d06f03727c5636a490fa2054e6d0b178027ebf997dd7d22ce207de86ea22b *./wp-content/mu-plugins/longevity-core/class-trust-pages.php
 b51caa98c4030a206bdbee89fb72ae638331007c4f3b37b7e10173ee825fd038 *./wp-content/mu-plugins/longevity-core/config/scoring/default-review-model.json
 de4a727464eb9c1d4159f5a8ab83059392f722fe4c72f8b1ba5dd64ac2df0c82 *./wp-content/mu-plugins/longevity-core/config/scoring/review-model.schema.json
 bd48c24ce4500e60d2524571756787283f0d3fbfa50b116331309c09773f0cd1 *./wp-content/plugins/index.php

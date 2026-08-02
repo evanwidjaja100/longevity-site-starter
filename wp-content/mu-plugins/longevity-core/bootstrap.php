@@ -128,7 +128,7 @@ final class Bootstrap {
 		add_action( 'admin_post_nopriv_longevity_contact_submit', array( Public_Contact::class, 'handle_contact_submission' ) );
 
 		add_filter( 'the_generator', '__return_empty_string' );
-		add_filter( 'wp_robots', array( self::class, 'filter_noindex_placeholder_pages' ) );
+		add_filter( 'wp_robots', array( self::class, 'filter_noindex_unready_pages' ) );
 		add_action( 'template_redirect', array( Routes::class, 'redirect_legacy_category' ), 10 );
 		add_action( 'send_headers', array( self::class, 'send_security_headers' ) );
 		add_filter( 'wp_inline_script_attributes', array( self::class, 'add_csp_nonce_attribute' ), 10, 1 );
@@ -159,7 +159,7 @@ final class Bootstrap {
 	 * @param array $robots Current robots directives.
 	 * @return array Filtered robots directives.
 	 */
-	public static function filter_noindex_placeholder_pages( array $robots ): array {
+	public static function filter_noindex_unready_pages( array $robots ): array {
 		if ( ! is_singular( 'page' ) ) {
 			return $robots;
 		}
