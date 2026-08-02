@@ -4,7 +4,7 @@ f47c059e7c00c6c18557084cfd9573197e795dc7b6d3969b945893cb686c66d2 *./.env.example
 ab784e205ddc66f723a611a866f1c48d930d3e0af446e65a33726c680321d86c *./.env.production.example
 8579dfc77acfbbc24ae474ae8a7397cf868c6fc0cfedd5d579714d004c7729e2 *./.gitattributes
 b37a107785de2cf26c10906292db47c266d668fdd3b131bd670645c424547852 *./.github/dependabot.yml
-53e740ed3a9b6f64ac61446c62c0b31fe06f2e403bd522972f5f02224dfa9682 *./.github/workflows/ci.yml
+5f35e811319f0c7957987dc86706eb83915d0855cec6895157b02aa2038cc2bb *./.github/workflows/ci.yml
 c2911c77c7804b1482bbf1f0f2c5d0b0f34ca81aa51b8c71d083f84afdd7b473 *./.github/workflows/scheduled-content-validation.yml
 f62e0dfd685dcd1bc596336b1364fc4a1e1cf6ba892b4a449ed98637da4fb6b5 *./.github/workflows/security.yml
 8f15eb79e608a5ee4445cb0c6fe52c7a1d598bbd35216e993f1b4cb9913e65be *./.gitignore
@@ -296,6 +296,7 @@ b6a9a07fd110664bca9a517ab94ba7114ea0b419e59ea740d22483f3eca41a5a *./scripts/cron
 d885e4ca622ac902db3018de1181ee7c6222effb367ea64eea1af1a33e266a80 *./scripts/generate-dependency-sbom.php
 a6ed5bc52f4d92fbb18cd10fcb9717f8c3d20c79d66d44d16cb01de37831e89b *./scripts/generate-release-evidence.sh
 1bb22096b48162fe3bf02729ffec6046bea42ed5cc07e92d9131717d5dcdf059 *./scripts/lighthouse-preflight.mjs
+6c5e51f6052a7a7f7e17d915a8c7571adf9eed6ff3c756fb42eca2f2a87e3a0c *./scripts/merge-codeql-sarif.php
 3ece357410ef7960b0cf5aa2afaa25c3231dc0a41b141b361f4a2adbdcf638f5 *./scripts/p0-3-baseline-screenshots.mjs
 88e18c462ca55282a9be7ab0342828537aaaaf637deab04d936a9eb8ae800193 *./scripts/populate-trust-pages.php
 d75141593c482ffeb354e385f9b007a7b08457964df6c30d912892e8a273eb4b *./scripts/regenerate-manifest.php
@@ -331,10 +332,10 @@ af0009d24b2922b9898b19d84b39fb82f44afbb7449fdc2fa6919ba6f10c996d *./tests/e2e/cr
 442027a28ea82d79ae8153729f09fe4d8e29ae3e4410ef5d59722ccca5288e22 *./tests/e2e/debug.spec.js
 04dd558063b3d28d1ca73adb2c99d1143bdc32ca2503f7e059acff743156bf55 *./tests/e2e/internal-links.spec.js
 8f5caf3fc36110dec5a5db4410a7c62ba9a68bee6b549a1f7a44ecc8eb5ebac3 *./tests/e2e/page-readiness.spec.js
-5a9f790ff6ba4bf7ac8cdcf841ff7ec6da86cd65b30c5f19abd03bb36ea616fb *./tests/e2e/production-readiness-audit.spec.js
+4ffd1578397b2e7fd839208c03e8bcb0bca76d794d8efd15c5e03c00d881981a *./tests/e2e/production-readiness-audit.spec.js
 bed0156e33afb7779775cf3b7cde308c21b8807fe41fd11d0a3a083e02660a08 *./tests/e2e/rest-public-boundary.spec.js
 56daea4c86b7ea310159e0dc32a15fe3926113d3a56baebf453bea9234ee9a20 *./tests/e2e/routes.spec.js
-ef7b74c7de6538ec8f15349b077483e569720923b6c0da2fd349626754f68258 *./tests/e2e/seo.spec.js
+260af19380c3517e1b88b58e7c6c236fac2a3e9018f45a61316afe31bffc4906 *./tests/e2e/seo.spec.js
 5b228a35ca808c631d094a37b3513ac7ed510923fa424760bed6160909cb10af *./tests/e2e/snapshots/visual.spec.js-snapshots/404-desktop-chromium-win32.png
 891d21efb37681ac99d6fe1793f61ccdc439386d4fe3b00d3ad2da6da8028455 *./tests/e2e/snapshots/visual.spec.js-snapshots/404-mobile-chromium-win32.png
 208ec031eba5a25242b38bac5ff8cb871764083bc428e66e1d8fae9e0bba71b9 *./tests/e2e/snapshots/visual.spec.js-snapshots/404-tablet-chromium-win32.png
@@ -448,7 +449,7 @@ d0549fa6522d91711547b782d473211fdd1932d404f902ac5a7ae96be2494036 *./tests/php/Ev
 104d7c1864ade977d799293f9ae05ef348a09296890fcac1818b46ea3ca6b075 *./tests/php/FingerprintCompletenessTest.php
 acbbf26dfd2353020dc719de64f8212654c755184d5e39bf2153dedfa20bca44 *./tests/php/FreshnessLockTest.php
 a6c7cc09f167ebc63dcc9616e74b37bd03cfb6770ad5dc451a2bd10948761f52 *./tests/php/FreshnessRepositoryTest.php
-290e8af8444d65f193bfa016e4dc0ee35689b66edcd22df4d744a8fd19ea218f *./tests/php/FreshnessTest.php
+2fdeebce91a75bd8bf1ee92c7c43a1cf1217b531f94194341773bf357c6d199f *./tests/php/FreshnessTest.php
 c0264fecf842d17c4edd2acb7508b8266361e37d9eed6c8107d5bb962bbd9faa *./tests/php/InvalidationQueueTest.php
 b3f6660e5d9157033f36ebde3e1f626600bf623f57eda743145e76efccb10783 *./tests/php/LegalHoldTest.php
 70b496d694d1ac452e04999e97506c8340b85c62ade5b1cfbb1966e2df35d486 *./tests/php/MetaAuthorizationTest.php
@@ -479,7 +480,7 @@ c078563eec20818eacbc5ae0d8e34940f1c4af23e9e8128946ff3fb7d197e750 *./tests/php/Ru
 9e3fdf280d88731dbec6a6b41b175a5423cd1b090308f838a439d459cee7caa5 *./tests/php/support/ArchitectureAssertions.php
 c61f7833b4ef1022f634bab75047f94950febd9779f2b00592f48109919b6a61 *./tests/php/SystemReadinessTest.php
 328f3e09b8eea632865cb1b064dccadde8577c6d25a411e7e99b2ff2ec11d3ec *./tests/php/TestRecordApprovalTest.php
-7cb792ed7d248f4d53a9f995037d3f71f920a5dd958a8cfce4e0905f0a8f81fc *./tests/php/TrustPagesTest.php
+12b4a7182cee5f4fd50c147c2856494804605a0b101086fc8856ffeca4565e8d *./tests/php/TrustPagesTest.php
 0e8cdaf106491eb236ef207989531d9d7aa8a8d202e077591bfd8e0ebbf80f7b *./tests/phpstan-bootstrap.php
 bd48c24ce4500e60d2524571756787283f0d3fbfa50b116331309c09773f0cd1 *./wp-content/index.php
 1b02fbdd8a42b77b6aed57815725257df08706cf7bb98e03e9259ffdac16b225 *./wp-content/mu-plugins/longevity-core.php

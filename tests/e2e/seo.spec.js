@@ -47,7 +47,7 @@ test.describe('SEO metadata', () => {
     expect(robots).toContain('noindex');
   });
 
-  test('draft placeholder page returns 404 with noindex', async ({ page }) => {
+  test('draft page returns 404 with noindex', async ({ page }) => {
     const response = await page.goto('/guides/');
     expect(response?.status()).toBe(404);
     const robots = await page.locator('meta[name="robots"]').getAttribute('content');

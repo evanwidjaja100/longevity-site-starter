@@ -101,7 +101,7 @@ test.describe('structured data (ld+json)', () => {
   }
 });
 
-test.describe('no placeholder or not-configured text', () => {
+test.describe('no seed markers or not-configured text', () => {
   const PLACEHOLDER_PATTERNS = [
     /not configured/i,
     /\[placeholder\]/i,
@@ -112,7 +112,7 @@ test.describe('no placeholder or not-configured text', () => {
   ];
 
   for (const { key, path } of PUBLIC_URLS) {
-    test(`${key} has no placeholder text`, async ({ page }) => {
+    test(`${key} has no seed markers`, async ({ page }) => {
       await page.goto(path);
       const body = await page.locator('body').textContent();
       for (const pattern of PLACEHOLDER_PATTERNS) {

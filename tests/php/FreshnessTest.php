@@ -46,7 +46,7 @@ final class FreshnessTest extends TestCase {
 		self::assertStringNotContainsString( 'INNER JOIN', $built['sql'] );
 	}
 
-	public function test_any_status_emits_no_status_placeholder(): void {
+	public function test_any_status_emits_no_status_marker(): void {
 		$built = Freshness::build_meta_count_query( array( 'post', 'review' ), array( 'key' => 'k', 'value' => 'v' ), 'any' );
 		self::assertSame( '', $built['error'] );
 		self::assertStringNotContainsString( 'post_status', $built['sql'] );
@@ -73,7 +73,7 @@ final class FreshnessTest extends TestCase {
 		self::assertNotSame( '', $built['error'] );
 	}
 
-	public function test_in_operator_expands_placeholder_list(): void {
+	public function test_in_operator_expands_marker_list(): void {
 		$built = Freshness::build_meta_count_query( array( 'post' ), array( array( 'key' => 'k', 'value' => array( 'a', 'b', 'c' ), 'compare' => 'IN' ) ) );
 		self::assertSame( '', $built['error'] );
 		self::assertStringContainsString( 'IN (%s, %s, %s)', $built['sql'] );

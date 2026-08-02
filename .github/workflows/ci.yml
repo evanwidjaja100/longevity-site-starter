@@ -267,10 +267,14 @@ jobs:
         if: always()
         with:
           name: playwright-chromium-evidence
-          path: |
-            reports/playwright-chromium/
-            reports/playwright-artifacts/
+          path: reports/playwright-chromium/
           if-no-files-found: error
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: playwright-chromium-artifacts
+          path: reports/playwright-artifacts/
+          if-no-files-found: warn
       - if: always()
         run: docker compose down -v
 
@@ -541,9 +545,7 @@ jobs:
           output: reports/codeql/raw
       - name: Finalize evidence
         run: |
-          # shellcheck disable=SC2016
-          # PHP variables are intentionally protected from the shell.
-          php -r '$runs=[];$files=glob("reports/codeql/raw/*.sarif");if(!$files){fwrite(STDERR,"No CodeQL SARIF found\n");exit(1);}foreach($files as $f){$d=json_decode(file_get_contents($f),true);if(($d["version"]??"")!=="2.1.0"||!is_array($d["runs"]??null))exit(1);$runs=array_merge($runs,$d["runs"]);}file_put_contents("reports/codeql/codeql.sarif",json_encode([chr(36)."schema"=>"https://json.schemastore.org/sarif-2.1.0.json","version"=>"2.1.0","runs"=>$runs],JSON_UNESCAPED_SLASHES));'
+          php scripts/merge-codeql-sarif.php
           php scripts/write-release-evidence-metadata.php codeql codeql-evidence reports/codeql success sarif:codeql.sarif
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()
