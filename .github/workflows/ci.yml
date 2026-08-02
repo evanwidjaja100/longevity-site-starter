@@ -292,7 +292,7 @@ jobs:
       - run: docker compose up -d db wordpress
       - run: bash scripts/ci-setup.sh
       - name: Initialize evidence directory
-        run: mkdir -p reports/load-smoke
+        run: mkdir -p reports/load-smoke && chmod -R a+rwX reports
       - name: k6 candidate smoke gate (blocking; threshold failure fails this job)
         env:
           WP_SITE_URL: http://localhost:8080
