@@ -201,10 +201,6 @@ class Public_Rankings {
 	 * @param int $post_id Review post ID.
 	 */
 	public static function render_test_results( int $post_id ): string {
-		$dbg_version   = (string) get_post_meta( $post_id, 'testing_protocol_version', true );
-		$dbg_record_id = (int) get_post_meta( $post_id, 'test_record_id', true );
-		$dbg_rows      = count( (array) ( Review_Methodology::sanitize_public_results( get_post_meta( $dbg_record_id, 'public_test_results', true ) )['rows'] ?? array() ) );
-		error_log( 'DBG_RESULTS post=' . $post_id . ' type=' . get_post_type( $post_id ) . ' current=' . ( Approval_Service::is_current( $post_id, 'testing' ) ? '1' : '0' ) . ' record=' . $dbg_record_id . ' valid=' . ( Review_Methodology::valid_test_record( $dbg_record_id, $dbg_version ) ? '1' : '0' ) . ' rows=' . $dbg_rows, 3, '/var/www/html/wp-content/render-debug.log' );
 		if ( $post_id <= 0 || 'review' !== get_post_type( $post_id ) || ! Approval_Service::is_current( $post_id, 'testing' ) ) {
 			return '';
 		}
@@ -319,9 +315,6 @@ class Public_Rankings {
 	 * @param int $post_id Reviewed post ID.
 	 */
 	public static function render_test_method( int $post_id ): string {
-		$dbg_version   = (string) get_post_meta( $post_id, 'testing_protocol_version', true );
-		$dbg_record_id = (int) get_post_meta( $post_id, 'test_record_id', true );
-		error_log( 'DBG_METHOD post=' . $post_id . ' required=' . ( get_post_meta( $post_id, 'testing_required', true ) ? '1' : '0' ) . ' current=' . ( Approval_Service::is_current( $post_id, 'testing' ) ? '1' : '0' ) . ' status=' . get_post_meta( $post_id, 'testing_status', true ) . ' valid=' . ( Review_Methodology::valid_test_record( $dbg_record_id, $dbg_version ) ? '1' : '0' ), 3, '/var/www/html/wp-content/render-debug.log' );
 		if ( $post_id <= 0 || ! get_post_meta( $post_id, 'testing_required', true ) || ! Approval_Service::is_current( $post_id, 'testing' ) ) {
 			return '';
 		}

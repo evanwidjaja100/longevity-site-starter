@@ -252,25 +252,6 @@ jobs:
       - run: bash scripts/ci-generate-env.sh && npm ci
       - run: docker compose up -d db wordpress
       - run: bash scripts/ci-setup.sh
-      - name: Diagnose fixture review and test record state
-        run: |
-          REVIEW_ID=$(docker compose run --rm wpcli wp post list --post_type=review --name=test-valid-review --field=ID --format=csv --allow-root | tail -n1)
-          echo "REVIEW_ID=$REVIEW_ID"
-          docker compose run --rm wpcli wp post meta list "$REVIEW_ID" --fields=meta_key,meta_value --allow-root | grep -E 'test_record_id|testing_protocol_version|testing_status|testing_required' || true
-          RECORD_ID=$(docker compose run --rm wpcli wp post meta get "$REVIEW_ID" test_record_id --allow-root)
-          echo "RECORD_ID=$RECORD_ID"
-          docker compose run --rm wpcli wp post meta list "$RECORD_ID" --fields=meta_key,meta_value --allow-root | grep -E 'approval_status|approval_snapshot_hash|protocol_version|public_test_results' || true
-          docker compose run --rm wpcli wp eval 'echo "RESULTS_LEN=" . strlen(\Longevity\Core\Public_Rankings::render_test_results('"$REVIEW_ID"')) . PHP_EOL; echo "METHOD_LEN=" . strlen(\Longevity\Core\Public_Rankings::render_test_method('"$REVIEW_ID"')) . PHP_EOL;' --allow-root
-          docker compose run --rm wpcli wp eval 'var_export(\Longevity\Core\Approval_Repository::current('"$REVIEW_ID"', "testing")); echo PHP_EOL;' --allow-root
-          docker compose run --rm wpcli wp eval 'var_dump(WP_Block_Type_Registry::get_instance()->is_registered("longevity/test-results")); var_dump(WP_Block_Type_Registry::get_instance()->is_registered("longevity/test-method"));' --allow-root
-          curl -s http://localhost:8080/reviews/test-valid-review/ -o /tmp/page.html
-          echo "RAW section grep:"
-          grep -o -E 'longevity-(test-results|test-method|review-score-card|product-summary)' /tmp/page.html | sort | uniq -c || true
-          echo "RAW block comment grep:"
-          grep -c 'wp:longevity/test-results' /tmp/page.html || echo "NO_RESULTS_BLOCK_COMMENT"
-          grep -c 'wp:longevity/test-method' /tmp/page.html || echo "NO_METHOD_BLOCK_COMMENT"
-          echo "Render debug log:"
-          curl -s http://localhost:8080/wp-content/render-debug.log | tail -n 30 || true
       - run: npx playwright install --with-deps chromium
       - name: Initialize evidence directory
         run: mkdir -p reports/playwright-chromium
@@ -315,15 +296,14 @@ jobs:
       - name: k6 candidate smoke gate (blocking; threshold failure fails this job)
         env:
           WP_SITE_URL: http://localhost:8080
-          PLAYWRIGHT_JUNIT_OUTPUT_FILE: reports/load-smoke/k6-junit.xml
         run: |
           docker run --rm --network host \
             -e WP_SITE_URL=http://localhost:8080 \
             -v "$PWD:/work" -w /work \
             grafana/k6:2.1.0@sha256:65c920dc067d5e2e00befbf982af6ad6ad0117034e8b1c65817c7975c52d4669 \
-            run tests/load/k6-scenario.js
+            run --summary-export=reports/load-smoke/k6-summary.json tests/load/k6-scenario.js
       - name: Finalize evidence
-        run: php scripts/write-release-evidence-metadata.php load-smoke load-smoke-evidence reports/load-smoke success
+        run: php scripts/write-release-evidence-metadata.php load-smoke load-smoke-evidence reports/load-smoke success json:k6-summary.json
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()
         with:
