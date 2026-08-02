@@ -447,11 +447,14 @@ jobs:
           WP_SITE_URL: http://localhost:8080
         run: npm run test:lighthouse
       - name: Finalize evidence
+        # Retain reports on failure so failed runs stay diagnosable; the
+        # release-evidence index still fails closed on the job result.
+        if: always()
         run: |
           # shellcheck disable=SC2016
           # PHP variables are intentionally protected from the shell.
-          php -r '$it=new RecursiveIteratorIterator(new RecursiveDirectoryIterator("reports/lighthouse/mobile")); foreach($it as $f){if($f->isFile()&&$f->getExtension()==="json"){$d=json_decode(file_get_contents($f->getPathname()),true);if(isset($d["lighthouseVersion"],$d["categories"])){copy($f->getPathname(),"reports/lighthouse-mobile/lighthouse.json");exit(0);}}}fwrite(STDERR,"No Lighthouse result found\n");exit(1);'
-          php scripts/write-release-evidence-metadata.php lighthouse-mobile lighthouse-evidence reports/lighthouse-mobile success json:lighthouse.json
+          php -r '$found=false; $it=new RecursiveIteratorIterator(new RecursiveDirectoryIterator("reports/lighthouse/mobile")); foreach($it as $f){if($f->isFile()&&$f->getExtension()==="json"){$d=json_decode(file_get_contents($f->getPathname()),true);if(isset($d["lighthouseVersion"],$d["categories"])){copy($f->getPathname(),"reports/lighthouse-mobile/lighthouse.json");$found=true;break;}}} if(!$found){fwrite(STDERR,"No Lighthouse result found\n");touch("reports/lighthouse-mobile/no-lighthouse-report.txt");}'
+          php scripts/write-release-evidence-metadata.php lighthouse-mobile lighthouse-evidence reports/lighthouse-mobile ${{ job.status }} json:lighthouse.json
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()
         with:
@@ -484,11 +487,14 @@ jobs:
           WP_SITE_URL: http://localhost:8080
         run: npm run test:lighthouse:desktop
       - name: Finalize evidence
+        # Retain reports on failure so failed runs stay diagnosable; the
+        # release-evidence index still fails closed on the job result.
+        if: always()
         run: |
           # shellcheck disable=SC2016
           # PHP variables are intentionally protected from the shell.
-          php -r '$it=new RecursiveIteratorIterator(new RecursiveDirectoryIterator("reports/lighthouse/desktop")); foreach($it as $f){if($f->isFile()&&$f->getExtension()==="json"){$d=json_decode(file_get_contents($f->getPathname()),true);if(isset($d["lighthouseVersion"],$d["categories"])){copy($f->getPathname(),"reports/lighthouse-desktop/lighthouse.json");exit(0);}}}fwrite(STDERR,"No Lighthouse result found\n");exit(1);'
-          php scripts/write-release-evidence-metadata.php lighthouse-desktop lighthouse-desktop-evidence reports/lighthouse-desktop success json:lighthouse.json
+          php -r '$found=false; $it=new RecursiveIteratorIterator(new RecursiveDirectoryIterator("reports/lighthouse/desktop")); foreach($it as $f){if($f->isFile()&&$f->getExtension()==="json"){$d=json_decode(file_get_contents($f->getPathname()),true);if(isset($d["lighthouseVersion"],$d["categories"])){copy($f->getPathname(),"reports/lighthouse-desktop/lighthouse.json");$found=true;break;}}} if(!$found){fwrite(STDERR,"No Lighthouse result found\n");touch("reports/lighthouse-desktop/no-lighthouse-report.txt");}'
+          php scripts/write-release-evidence-metadata.php lighthouse-desktop lighthouse-desktop-evidence reports/lighthouse-desktop ${{ job.status }} json:lighthouse.json
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()
         with:

@@ -10,7 +10,7 @@
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
-const { okPaths, notFoundPaths, BASE_URL } = require('../lighthouserc.shared.cjs');
+const { okPaths, noindexPaths, notFoundPaths, BASE_URL } = require('../lighthouserc.shared.cjs');
 
 let failures = 0;
 
@@ -44,8 +44,35 @@ async function assertStatus(path, expected) {
   console.log(`ok ${url} (${response.status})`);
 }
 
+/**
+ * Intentionally non-indexable routes must keep their noindex robots
+ * directive; scoring them is a contract defect, removing the directive is
+ * not the fix.
+ */
+async function assertNoindex(path) {
+  const url = BASE_URL + path;
+  let response;
+  try {
+    response = await fetch(url);
+  } catch (error) {
+    console.error(`FAIL ${url} — request error: ${error.message}`);
+    failures += 1;
+    return;
+  }
+  const body = await response.text();
+  if (!/<meta\s+name=["']robots["']\s+content=["'][^"']*noindex/i.test(body)) {
+    console.error(`FAIL ${url} — expected a noindex robots directive, none found.`);
+    failures += 1;
+    return;
+  }
+  console.log(`ok ${url} (noindex)`);
+}
+
 for (const path of okPaths) {
   await assertStatus(path, 200);
+}
+for (const path of noindexPaths) {
+  await assertNoindex(path);
 }
 for (const path of notFoundPaths) {
   await assertStatus(path, 404);

@@ -266,7 +266,7 @@ final class Bootstrap {
 		return $attributes;
 	}
 
-	/** Build a Content Security Policy with nonce-based script/style allowance. */
+	/** Build a Content Security Policy with nonce-based script allowance. */
 	public static function content_security_policy(): string {
 		$nonce      = self::csp_nonce();
 		$report_uri = rest_url( 'longevity/v1/csp-report' );
@@ -274,9 +274,12 @@ final class Bootstrap {
 		$directives = array(
 			"default-src 'self'",
 			"script-src 'self' 'nonce-{$nonce}'",
-			"style-src 'self' 'nonce-{$nonce}'",
-			// WordPress core and block markup rely on inline style attributes.
+			// WordPress block themes emit core-generated inline <style> blocks
+			// without nonces; allowing inline styles is required for
+			// enforce-mode compatibility (styles cannot execute code).
+			"style-src 'self' 'unsafe-inline'",
 			"style-src-attr 'unsafe-inline'",
+			"worker-src 'self' blob:",
 			"img-src 'self' data: https:",
 			"font-src 'self' data:",
 			"connect-src 'self'",

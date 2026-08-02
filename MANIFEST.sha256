@@ -4,7 +4,7 @@ f47c059e7c00c6c18557084cfd9573197e795dc7b6d3969b945893cb686c66d2 *./.env.example
 ab784e205ddc66f723a611a866f1c48d930d3e0af446e65a33726c680321d86c *./.env.production.example
 8579dfc77acfbbc24ae474ae8a7397cf868c6fc0cfedd5d579714d004c7729e2 *./.gitattributes
 b37a107785de2cf26c10906292db47c266d668fdd3b131bd670645c424547852 *./.github/dependabot.yml
-5f35e811319f0c7957987dc86706eb83915d0855cec6895157b02aa2038cc2bb *./.github/workflows/ci.yml
+2933ced298f1dc1cc5e4c988378e4269d213d4a68fbc4a56d34f5d9ba03d37d2 *./.github/workflows/ci.yml
 c2911c77c7804b1482bbf1f0f2c5d0b0f34ca81aa51b8c71d083f84afdd7b473 *./.github/workflows/scheduled-content-validation.yml
 f62e0dfd685dcd1bc596336b1364fc4a1e1cf6ba892b4a449ed98637da4fb6b5 *./.github/workflows/security.yml
 8f15eb79e608a5ee4445cb0c6fe52c7a1d598bbd35216e993f1b4cb9913e65be *./.gitignore
@@ -247,7 +247,7 @@ b83bc73896abb9a39ff10873d1b075f680d7598515773a70a6c0110f53eccdbc *./docs/testing
 1cc756ba8de329077191f3d33b8f2761384b41587d88b9249233ddfb12c4c82e *./eslint.config.js
 46fdffe3aa23659f3f1cfc0d1aa2a0518aff852b6b98782ca85cc6e6206cdc6b *./lighthouserc.cjs
 480f16140635319499c2123756065de6ba6d275df79c0e701884873a27e474fd *./lighthouserc.desktop.cjs
-5792ada5d8c43c1ef64a510d2a2557da1adcefffcd4ac572c9d7e49f511c6f29 *./lighthouserc.shared.cjs
+447d64cf4f734a1265e575da0fbfd99b6192a619028ca3babbc8a790eb4d25a9 *./lighthouserc.shared.cjs
 9447d2299312b00b25a3214d7fcaab49e6f16000ff1b8135b7a46f772da5f16d *./Makefile
 3fd4e85097a27d71bd818bb849e3fa3d7f3586aa4474108d60a6493c23d001fc *./opencode.jsonc
 b867e094694d2ce6f5f7f07297042109b8f4e97d4eb1175111d50ee4b73daf15 *./operations/90-day-roadmap.md
@@ -295,7 +295,7 @@ b6a9a07fd110664bca9a517ab94ba7114ea0b419e59ea740d22483f3eca41a5a *./scripts/cron
 76f717be8886f84fd12664cfb79e9aa556d17046739c0f791b755ae11f5b9ca8 *./scripts/export-test-data.py
 d885e4ca622ac902db3018de1181ee7c6222effb367ea64eea1af1a33e266a80 *./scripts/generate-dependency-sbom.php
 a6ed5bc52f4d92fbb18cd10fcb9717f8c3d20c79d66d44d16cb01de37831e89b *./scripts/generate-release-evidence.sh
-1bb22096b48162fe3bf02729ffec6046bea42ed5cc07e92d9131717d5dcdf059 *./scripts/lighthouse-preflight.mjs
+e87e35eaf5d0b2dac2fed81b3c5c3d8538bd3b248d27f7b2e1e0f4d245c26e7b *./scripts/lighthouse-preflight.mjs
 2f907ac8e982f57952ef47746254fb902aa96a5ca341b75de58fcad9c498bbd7 *./scripts/merge-codeql-sarif.php
 3ece357410ef7960b0cf5aa2afaa25c3231dc0a41b141b361f4a2adbdcf638f5 *./scripts/p0-3-baseline-screenshots.mjs
 88e18c462ca55282a9be7ab0342828537aaaaf637deab04d936a9eb8ae800193 *./scripts/populate-trust-pages.php
@@ -510,7 +510,7 @@ be5b44cfb569519be73a5fb13535e4b4237577027cf240f722f008ace1eba867 *./wp-content/m
 92f5450de21d24ed3f4465c78e717e2ca2a8f969b11523ab62df1ad97b4bd28e *./wp-content/mu-plugins/longevity-core/blocks/test-results/block.json
 3dbe30d242128f9c968d0da9acdef633e8cf325bfd1d243bd2f2944d4f063af8 *./wp-content/mu-plugins/longevity-core/blocks/topic-directory/block.json
 6bdd2d60e29e26346b321f468de2265e3dc9103ac2408d26e2d9fcf1b53a8be1 *./wp-content/mu-plugins/longevity-core/blocks/trust-summary/block.json
-e7eb64f6af1c435d6c508f393a186ee17113b2d93eaeb468598a9071d5923cf8 *./wp-content/mu-plugins/longevity-core/bootstrap.php
+cef6f98500b8f1576693fd416e05b5da2e0dcfdef14ccc44add3030f79776c4a *./wp-content/mu-plugins/longevity-core/bootstrap.php
 245ef10acc5fecf5f7ca3b85e94cdb2f472d6220c89b3e95a61980032cf5a568 *./wp-content/mu-plugins/longevity-core/class-admin-assets.php
 6733c5925de977ea2858ccaa160d08ad6555e4be8bf2c748cc89ff7a52c61079 *./wp-content/mu-plugins/longevity-core/class-admin-ui.php
 2cdbed705ded5a87799621ad15be4bf712efc0eaee31f4f2f0deb1c57b7899f5 *./wp-content/mu-plugins/longevity-core/class-advisory-lock.php
@@ -570,7 +570,7 @@ bd48c24ce4500e60d2524571756787283f0d3fbfa50b116331309c09773f0cd1 *./wp-content/p
 bd48c24ce4500e60d2524571756787283f0d3fbfa50b116331309c09773f0cd1 *./wp-content/themes/index.php
 63948152bf34fcb00285c6725c4d34bcf37f00c90270a22eba7af4467053a256 *./wp-content/themes/longevity-starter/assets/css/consumer-lab.css
 e836032e898c7167cf2741ba36132a95c39d460070f7e09ccc3bb6e94322d3bd *./wp-content/themes/longevity-starter/assets/js/site-ui.js
-dc690749dd5e9bb61fa0cac51613b5a830b55319a688138b973e3cd27e2e24ba *./wp-content/themes/longevity-starter/functions.php
+c6aa6675a8453d5ac1131bd9f7f73cbc721abe42b85161d94a66c107ff9dbf24 *./wp-content/themes/longevity-starter/functions.php
 fa9ced06bc17f41a39e0964ac8c2377e7b6fb110a873855c3b4092d840882683 *./wp-content/themes/longevity-starter/parts/footer.html
 91da3ea7cc23f213f5d6ba5e5087d416cc31accfff9ba034b3565ca7a35d25b2 *./wp-content/themes/longevity-starter/parts/header.html
 b556c1e7b4be572d1d849faa4016ac8f2cd46f249b8d0e9ee47cfbe6640b3fa5 *./wp-content/themes/longevity-starter/patterns/article-introduction.php
