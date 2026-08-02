@@ -638,6 +638,8 @@ jobs:
           exit-code: 1
           format: json
           output: reports/supply-chain/trivy.json
+      - name: Normalize empty trivy results
+        run: jq '.Results = (.Results // [])' reports/supply-chain/trivy.json > reports/supply-chain/trivy.tmp && mv reports/supply-chain/trivy.tmp reports/supply-chain/trivy.json
       - name: Finalize evidence
         run: php scripts/write-release-evidence-metadata.php security-supply-chain supply-chain-evidence reports/supply-chain success spdx-json:sbom.spdx.json json:licenses.json json:scan-metadata.json json:composer-audit.json json:npm-audit.json json:trufflehog.json json:trivy.json
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
