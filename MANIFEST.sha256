@@ -7,7 +7,7 @@ b37a107785de2cf26c10906292db47c266d668fdd3b131bd670645c424547852 *./.github/depe
 7ecad9c1419b4123e6b724037970b2a4c69c1a3bb90d0addc74b893147d7c787 *./.github/workflows/ci.yml
 c2911c77c7804b1482bbf1f0f2c5d0b0f34ca81aa51b8c71d083f84afdd7b473 *./.github/workflows/scheduled-content-validation.yml
 f62e0dfd685dcd1bc596336b1364fc4a1e1cf6ba892b4a449ed98637da4fb6b5 *./.github/workflows/security.yml
-92c2384c236c6a0c7c50e79a2075f19c260a6bec1869ce6bec7632892f0ae06b *./.gitignore
+8f15eb79e608a5ee4445cb0c6fe52c7a1d598bbd35216e993f1b4cb9913e65be *./.gitignore
 cfa2d75ad28f3e20e39f11a15277753a396d2fea81caf1094bf9eb31a2bd1c7c *./.npmrc
 396a27c4750af851492403954b6f45b9c2e47351cb39271db8414d814cd26655 *./.stylelintrc.json
 2d2390a7e56522803c0904d33fd8de203d414808d41fd7d11ce107da259ee9c3 *./AGENTS.md
@@ -506,6 +506,7 @@ ed0891395db6ac7478330153506212f927f69f3da02d93840b9e02860282a18c *./wp-content/m
 4cf418ab907681a322af7080a679dd9a0f9dbc03795c4e2d6c55942f383fc047 *./wp-content/mu-plugins/longevity-core/blocks/source-list/block.json
 fb5186a198411da39942315beb28a9e77af8d3a7ac62ab6285388a11cb5391a7 *./wp-content/mu-plugins/longevity-core/blocks/table-of-contents/block.json
 be5b44cfb569519be73a5fb13535e4b4237577027cf240f722f008ace1eba867 *./wp-content/mu-plugins/longevity-core/blocks/test-method/block.json
+92f5450de21d24ed3f4465c78e717e2ca2a8f969b11523ab62df1ad97b4bd28e *./wp-content/mu-plugins/longevity-core/blocks/test-results/block.json
 3dbe30d242128f9c968d0da9acdef633e8cf325bfd1d243bd2f2944d4f063af8 *./wp-content/mu-plugins/longevity-core/blocks/topic-directory/block.json
 6bdd2d60e29e26346b321f468de2265e3dc9103ac2408d26e2d9fcf1b53a8be1 *./wp-content/mu-plugins/longevity-core/blocks/trust-summary/block.json
 436b742c6b83cf8f27fd7cf02c6ecef7c876c6709531370dbeda3ab7f3fa2b16 *./wp-content/mu-plugins/longevity-core/bootstrap.php

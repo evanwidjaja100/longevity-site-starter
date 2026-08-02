@@ -8,11 +8,11 @@
 vendor/
 node_modules/
 .phpunit.cache/
-coverage/
-playwright-report/
-test-results/
-reports/
-build/
+/coverage/
+/playwright-report/
+/test-results/
+/reports/
+/build/
 .DS_Store
 *.log
 wp-content/uploads/*
