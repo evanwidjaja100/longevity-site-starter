@@ -260,8 +260,17 @@ jobs:
           RECORD_ID=$(docker compose run --rm wpcli wp post meta get "$REVIEW_ID" test_record_id --allow-root)
           echo "RECORD_ID=$RECORD_ID"
           docker compose run --rm wpcli wp post meta list "$RECORD_ID" --fields=meta_key,meta_value --allow-root | grep -E 'approval_status|approval_snapshot_hash|protocol_version|public_test_results' || true
-          docker compose run --rm wpcli wp eval 'echo "RENDER_METHOD=" . strlen(\Longevity\Core\Public_Rankings::render_test_method((int) get_page_by_path("reviews/test-valid-review", OBJECT, "review")->ID)) . PHP_EOL; echo "RENDER_RESULTS=" . strlen(\Longevity\Core\Public_Rankings::render_test_results((int) get_page_by_path("reviews/test-valid-review", OBJECT, "review")->ID)) . PHP_EOL;' --allow-root
-          curl -s http://localhost:8080/reviews/test-valid-review/ | grep -o -E 'longevity-(test-results|test-method|review-score-card|product-summary)' | sort | uniq -c || true
+          docker compose run --rm wpcli wp eval 'echo "RESULTS_LEN=" . strlen(\Longevity\Core\Public_Rankings::render_test_results('"$REVIEW_ID"')) . PHP_EOL; echo "METHOD_LEN=" . strlen(\Longevity\Core\Public_Rankings::render_test_method('"$REVIEW_ID"')) . PHP_EOL;' --allow-root
+          docker compose run --rm wpcli wp eval 'var_export(\Longevity\Core\Approval_Repository::current('"$REVIEW_ID"', "testing")); echo PHP_EOL;' --allow-root
+          docker compose run --rm wpcli wp eval 'var_dump(WP_Block_Type_Registry::get_instance()->is_registered("longevity/test-results")); var_dump(WP_Block_Type_Registry::get_instance()->is_registered("longevity/test-method"));' --allow-root
+          curl -s http://localhost:8080/reviews/test-valid-review/ -o /tmp/page.html
+          echo "RAW section grep:"
+          grep -o -E 'longevity-(test-results|test-method|review-score-card|product-summary)' /tmp/page.html | sort | uniq -c || true
+          echo "RAW block comment grep:"
+          grep -c 'wp:longevity/test-results' /tmp/page.html || echo "NO_RESULTS_BLOCK_COMMENT"
+          grep -c 'wp:longevity/test-method' /tmp/page.html || echo "NO_METHOD_BLOCK_COMMENT"
+          echo "Render debug log:"
+          curl -s http://localhost:8080/wp-content/render-debug.log | tail -n 30 || true
       - run: npx playwright install --with-deps chromium
       - name: Initialize evidence directory
         run: mkdir -p reports/playwright-chromium
