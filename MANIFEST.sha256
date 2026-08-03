@@ -4,7 +4,7 @@ f47c059e7c00c6c18557084cfd9573197e795dc7b6d3969b945893cb686c66d2 *./.env.example
 ab784e205ddc66f723a611a866f1c48d930d3e0af446e65a33726c680321d86c *./.env.production.example
 8579dfc77acfbbc24ae474ae8a7397cf868c6fc0cfedd5d579714d004c7729e2 *./.gitattributes
 b37a107785de2cf26c10906292db47c266d668fdd3b131bd670645c424547852 *./.github/dependabot.yml
-ef01ee95be051e954125f99bd9bfc4e968b5347503a012556b32dfcffdd0a3c5 *./.github/workflows/ci.yml
+77ae554adf195fda54290c9927416ae6bae175c6120727c7302b0933958876f2 *./.github/workflows/ci.yml
 c2911c77c7804b1482bbf1f0f2c5d0b0f34ca81aa51b8c71d083f84afdd7b473 *./.github/workflows/scheduled-content-validation.yml
 f62e0dfd685dcd1bc596336b1364fc4a1e1cf6ba892b4a449ed98637da4fb6b5 *./.github/workflows/security.yml
 8f15eb79e608a5ee4445cb0c6fe52c7a1d598bbd35216e993f1b4cb9913e65be *./.gitignore
@@ -13,7 +13,7 @@ cfa2d75ad28f3e20e39f11a15277753a396d2fea81caf1094bf9eb31a2bd1c7c *./.npmrc
 2d2390a7e56522803c0904d33fd8de203d414808d41fd7d11ce107da259ee9c3 *./AGENTS.md
 cf959aa3bcd6daf2f2a051458a8a0d5ebafb41b69069a6cbef19e06475632463 *./compose.yaml
 28e58d12ac53bd4320519f343ff3a9d1db6909f15d080c03447473e9c3a294a2 *./composer.json
-5b2377b9a63ada5f82ac2a87972cd50c64501430ec4c0141e009727ff4ad72a0 *./composer.lock
+240ea2757740e3f6db46212ebae2cd0e92a5f229cca5728857cb0ccb9947b3ba *./composer.lock
 af08fcf5d1cb826d1898a66f43770bc62c73a7ee410431d21e1fd5e6bb5c872e *./config/content-schema/editorial-meta.schema.json
 27a89c0da59a0f18c807b64f218e4b31a98ecf410587f02f58b74702f0c9a410 *./config/environments/production.example.php
 24e3d4b74f3c630f15afda85cf1c444696b8c1519dcbfc2515624da59098095f *./config/release-required-jobs.json
@@ -270,8 +270,8 @@ ad341a34c736a6deee2183d14fa038cde1931e13f0e15aa4529e8bac5d499b6d *./operations/r
 71a79fd4d770c4a061003e7aa0fbe80a9ff9c8fb411d9d42b8dff5a825337970 *./operations/usability-review-plan.md
 289ebb2e278406e6d06036046f31c493e4865e32bea9d0cfe836fc3d05ea93e6 *./ops/monitoring/alert-rules.yml
 503f3669e561155a9f98116e058ea7ddcf874eed803d0c155562e7ea621bd547 *./ops/monitoring/prometheus-scrape.yml
-932d925bd29cd33c274b38d33f79044a714069342864d4c2dd8fe700867045a6 *./package.json
-b9cda2faff197ce7934308f0389999ba6bcbde098734aef945d1f8eb8542af62 *./package-lock.json
+91fb5c88c4db8ad830be0445df0c5f55dda9d1847b9d858ff8b417226e620b7c *./package.json
+74feddc5a192a8bd44e8b2fb5777b0c2a1d71102330323ed8f31f23b1110b183 *./package-lock.json
 e53f2be527ffda6e7160d1dba100efd0d5d5bb05e583a44212c2685a25f79c61 *./phpcs.xml.dist
 e57e4847627fb0c6ea710a4d5e988923a04e71aba574a96e45823eb735f8f707 *./phpstan.neon.dist
 0189f4dec3a74d3543511e06e8e2692326e1e229e5ce9f06ead87d7e6320c0fa *./phpunit.xml.dist
