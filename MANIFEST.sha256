@@ -330,7 +330,7 @@ b5fdb21e25103d6ac23fcd28ae5f77b940551b1fd7ae12c7c13b80e316a35f16 *./tests/e2e/bo
 6265fd95820d1ffd39dd7270bbbb199822e2ecb0d1a3cf5a9df6d4d5c67f9862 *./tests/e2e/core.spec.js
 af0009d24b2922b9898b19d84b39fb82f44afbb7449fdc2fa6919ba6f10c996d *./tests/e2e/critical-cross-browser.spec.js
 442027a28ea82d79ae8153729f09fe4d8e29ae3e4410ef5d59722ccca5288e22 *./tests/e2e/debug.spec.js
-04dd558063b3d28d1ca73adb2c99d1143bdc32ca2503f7e059acff743156bf55 *./tests/e2e/internal-links.spec.js
+b2f84649fc1fb93ca85bf0b6dac6cc3832bf51656d04c4b129cb194359cffe93 *./tests/e2e/internal-links.spec.js
 8f5caf3fc36110dec5a5db4410a7c62ba9a68bee6b549a1f7a44ecc8eb5ebac3 *./tests/e2e/page-readiness.spec.js
 4ffd1578397b2e7fd839208c03e8bcb0bca76d794d8efd15c5e03c00d881981a *./tests/e2e/production-readiness-audit.spec.js
 bed0156e33afb7779775cf3b7cde308c21b8807fe41fd11d0a3a083e02660a08 *./tests/e2e/rest-public-boundary.spec.js

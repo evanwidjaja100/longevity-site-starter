@@ -105,7 +105,6 @@ test.describe('runtime internal link crawl', () => {
             if (location) {
               redirectCount = 1;
               const redirectUrl = new URL(location, process.env.WP_SITE_URL || 'http://localhost:8080');
-              finalUrl = normalizePath(redirectUrl.pathname);
 
               const followResponse = await page.request.get(redirectUrl.pathname + redirectUrl.search, { maxRedirects: 5, timeout: 10000 });
               status = followResponse.status();
