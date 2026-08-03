@@ -270,8 +270,8 @@ ad341a34c736a6deee2183d14fa038cde1931e13f0e15aa4529e8bac5d499b6d *./operations/r
 71a79fd4d770c4a061003e7aa0fbe80a9ff9c8fb411d9d42b8dff5a825337970 *./operations/usability-review-plan.md
 289ebb2e278406e6d06036046f31c493e4865e32bea9d0cfe836fc3d05ea93e6 *./ops/monitoring/alert-rules.yml
 503f3669e561155a9f98116e058ea7ddcf874eed803d0c155562e7ea621bd547 *./ops/monitoring/prometheus-scrape.yml
-932d925bd29cd33c274b38d33f79044a714069342864d4c2dd8fe700867045a6 *./package.json
-b9cda2faff197ce7934308f0389999ba6bcbde098734aef945d1f8eb8542af62 *./package-lock.json
+91fb5c88c4db8ad830be0445df0c5f55dda9d1847b9d858ff8b417226e620b7c *./package.json
+74feddc5a192a8bd44e8b2fb5777b0c2a1d71102330323ed8f31f23b1110b183 *./package-lock.json
 e53f2be527ffda6e7160d1dba100efd0d5d5bb05e583a44212c2685a25f79c61 *./phpcs.xml.dist
 e57e4847627fb0c6ea710a4d5e988923a04e71aba574a96e45823eb735f8f707 *./phpstan.neon.dist
 0189f4dec3a74d3543511e06e8e2692326e1e229e5ce9f06ead87d7e6320c0fa *./phpunit.xml.dist
