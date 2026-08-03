@@ -11,22 +11,27 @@ defined( 'ABSPATH' ) || exit;
 
 /** Registers editor blocks that share the public component renderer. */
 final class Blocks {
-	/** @var array<string, string> */
+	/**
+	 * Block slug to shared public component renderer callback map.
+	 *
+	 * @var array<string, array{0:string,1:string}>
+	 */
 	private const RENDERERS = array(
-		'article-meta'      => 'render_article_meta',
-		'trust-summary'     => 'render_trust_summary',
-		'reviewer-card'     => 'render_reviewer_card',
-		'source-list'       => 'render_source_list',
-		'table-of-contents' => 'render_table_of_contents',
-		'review-score'      => 'render_review_score',
-		'review-decision'   => 'render_review_decision',
-		'test-method'       => 'render_test_method',
-		'corrections'       => 'render_corrections',
-		'related-content'   => 'render_related_content',
-		'content-card-meta' => 'render_content_card_meta',
-		'breadcrumbs'       => 'render_breadcrumbs',
-		'product-report-summary' => 'render_product_report_summary',
-		'test-results'      => 'render_test_results',
+		'article-meta'           => array( Public_Trust::class, 'render_article_meta' ),
+		'trust-summary'          => array( Public_Trust::class, 'render_trust_summary' ),
+		'reviewer-card'          => array( Public_Trust::class, 'render_reviewer_card' ),
+		'source-list'            => array( Public_Rankings::class, 'render_source_list' ),
+		'table-of-contents'      => array( Public_Content::class, 'render_table_of_contents' ),
+		'review-score'           => array( Public_Rankings::class, 'render_review_score' ),
+		'review-decision'        => array( Public_Rankings::class, 'render_review_decision' ),
+		'test-method'            => array( Public_Rankings::class, 'render_test_method' ),
+		'corrections'            => array( Public_Content::class, 'render_corrections' ),
+		'related-content'        => array( Public_Content::class, 'render_related_content' ),
+		'content-card-meta'      => array( Public_Content::class, 'render_content_card_meta' ),
+		'breadcrumbs'            => array( Public_Nav::class, 'render_breadcrumbs' ),
+		'product-report-summary' => array( Public_Rankings::class, 'render_product_report_summary' ),
+		'test-results'           => array( Public_Rankings::class, 'render_test_results' ),
+		'claim-evidence-matrix'  => array( Public_Rankings::class, 'render_claim_evidence_matrix' ),
 	);
 
 	/** Register blocks on init. */
@@ -50,7 +55,7 @@ final class Blocks {
 					'render_callback' => static function ( array $attributes, string $content, \WP_Block $block ) use ( $method ): string {
 						unset( $attributes, $content );
 						$post_id = isset( $block->context['postId'] ) ? (int) $block->context['postId'] : (int) get_the_ID();
-						return Public_Components::$method( $post_id );
+						return $method[0]::{$method[1]}( $post_id );
 					},
 				)
 			);
@@ -58,19 +63,27 @@ final class Blocks {
 
 		register_block_type(
 			LONGEVITY_CORE_PATH . 'blocks/search-filters',
-			array( 'render_callback' => static fn() => Public_Components::render_search_filters() )
+			array( 'render_callback' => static fn() => Public_Content::render_search_filters() )
 		);
 		register_block_type(
 			LONGEVITY_CORE_PATH . 'blocks/author-profile',
-			array( 'render_callback' => static fn() => Public_Components::render_author_profile() )
+			array( 'render_callback' => static fn() => Public_Content::render_author_profile() )
+		);
+		register_block_type(
+			LONGEVITY_CORE_PATH . 'blocks/topic-directory',
+			array( 'render_callback' => static fn() => Public_Content::render_topic_directory() )
+		);
+		register_block_type(
+			LONGEVITY_CORE_PATH . 'blocks/guide-directory',
+			array( 'render_callback' => static fn() => Public_Content::render_guide_directory() )
 		);
 		register_block_type(
 			LONGEVITY_CORE_PATH . 'blocks/ranking-directory',
-			array( 'render_callback' => static fn() => Public_Components::render_ranking_directory() )
+			array( 'render_callback' => static fn() => Public_Rankings::render_ranking_directory() )
 		);
 		register_block_type(
 			LONGEVITY_CORE_PATH . 'blocks/ranking-list',
-			array( 'render_callback' => static fn() => Public_Components::render_ranking_list() )
+			array( 'render_callback' => static fn() => Public_Rankings::render_ranking_list() )
 		);
 	}
 }

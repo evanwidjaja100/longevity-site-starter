@@ -1,17 +1,35 @@
 .env
 .env.local
 .env.*.local
+.env.ci
 !.env.example
-!.env.ci
+!.env.ci.template
+!.env.production.example
 vendor/
 node_modules/
 .phpunit.cache/
-coverage/
-playwright-report/
-test-results/
-reports/
-build/
+/coverage/
+/playwright-report/
+/test-results/
+/reports/
+/build/
 .DS_Store
 *.log
 wp-content/uploads/*
 !wp-content/uploads/.gitkeep
+
+# Database dumps and archives must never be committed — see docs/operations/backup-and-restore.md
+*.sql
+*.sql.gz
+*.tgz
+*.tar.gz
+
+# Generated / session artifacts — never track
+/repomix-output.md
+/report.md
+/longevity-evidence-lab-ai-implementation-plan.md
+/source/
+/data/
+
+# Agent harness — local tooling, not part of the repo
+/.opencode/

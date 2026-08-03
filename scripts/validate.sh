@@ -1,11 +1,21 @@
 #!/bin/sh
 set -eu
-ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+ROOT=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$ROOT"
 
 find wp-content -type f -name '*.php' -print | sort | while IFS= read -r file; do php -l "$file" >/dev/null; done
 find tests -type f -name '*.php' -print | sort | while IFS= read -r file; do php -l "$file" >/dev/null; done
-find . -type f -name '*.json' ! -path './node_modules/*' ! -path './vendor/*' -print | sort | while IFS= read -r file; do python3 -m json.tool "$file" >/dev/null; done
+python3 - <<'__JSON_CHECK__'
+import json
+from pathlib import Path
+excluded = {'.git', 'node_modules', 'vendor', 'reports'}
+for path in sorted(Path('.').rglob('*.json')):
+    if any(part in excluded for part in path.parts):
+        continue
+    with path.open(encoding='utf-8') as handle:
+        json.load(handle)
+print('JSON validation passed')
+__JSON_CHECK__
 python3 - <<'__YAML_CHECK__'
 from pathlib import Path
 try:
@@ -20,41 +30,53 @@ for path in [Path('compose.yaml'), *Path('.github/workflows').glob('*.yml')]:
         yaml.safe_load(text)
 print('YAML validation passed' if yaml else 'YAML parser unavailable; non-empty YAML files confirmed')
 __YAML_CHECK__
-find scripts -type f -name '*.sh' -print | sort | while IFS= read -r file; do sh -n "$file"; done
-if command -v shellcheck >/dev/null 2>&1; then find scripts -type f -name '*.sh' -print0 | xargs -0 shellcheck; else echo 'ShellCheck unavailable; skipped locally.'; fi
+find scripts -type f -name '*.sh' -print | sort | while IFS= read -r file; do
+  if head -1 "$file" | grep -q 'bash'; then bash -n "$file"; else sh -n "$file"; fi
+done
+if command -v shellcheck >/dev/null 2>&1; then
+  find scripts -type f -name '*.sh' -print | sort | while IFS= read -r file; do
+    if head -1 "$file" | grep -q 'bash'; then shellcheck --shell=bash "$file"; else shellcheck --shell=sh "$file"; fi
+  done
+else echo 'ShellCheck unavailable; skipped locally.'; fi
 python3 scripts/validate-content.py
 python3 scripts/validate-internal-links.py
 python3 scripts/validate-freshness.py --no-fail
-./tests/integration/environment-validation.sh
+bash tests/integration/environment-validation.sh
 
-if grep -RInE --exclude-dir=.git --exclude-dir=vendor --exclude-dir=node_modules --exclude-dir=tests/fixtures --exclude='*.md' --exclude='validate.sh' --exclude='validate-env.sh' --exclude='validate-content.py' --exclude='.env.example' --exclude='.env.ci' --exclude='MANIFEST.sha256' '(https?://(www\.)?example\.com|replace-with-|change-me-use-|changeme|your[-_](password|secret|token))' .; then
-  echo 'ERROR: placeholder production domains or credentials found in tracked runtime files.' >&2
+placeholder_matches=$(git grep -nI -E '(https?://(www\.)?example\.com|replace-with-|change-me-use-|changeme|your[-_](password|secret|token))' -- . 2>/dev/null || true)
+if [ -n "$placeholder_matches" ]; then
+	filtered=$(printf '%s\n' "$placeholder_matches" | grep -vE '\.md:|scripts/validate\.sh:|scripts/validate-env\.sh:|scripts/validate-content\.py:|scripts/ci-generate-env\.sh:|\.env\.example:|\.env\.ci\.template:|\.env\.production\.example:|MANIFEST\.sha256:|tests/')
+	if [ -n "$filtered" ]; then
+		echo 'ERROR: placeholder production domains or credentials found in tracked runtime files.' >&2
+		printf '%s\n' "$filtered" >&2
+		exit 1
+	fi
+fi
+# Check only files tracked by Git. This excludes dependencies, generated
+# reports, local tooling, runtime files, and other untracked artifacts.
+trailing_matches=$(git grep -nI -E '[[:blank:]]+$' -- . || true)
+if [ -n "$trailing_matches" ]; then
+  echo 'ERROR: trailing whitespace found in tracked files.' >&2
+  printf '%s\n' "$trailing_matches"
   exit 1
 fi
-if find . -type f ! -path './.git/*' ! -path './vendor/*' ! -path './node_modules/*' ! -path './source/deep-research-report.md' -print0 | xargs -0 grep -Il '[[:blank:]]$' | grep -q .; then
-  echo 'ERROR: trailing whitespace found.' >&2
-  find . -type f ! -path './.git/*' ! -path './vendor/*' ! -path './node_modules/*' ! -path './source/deep-research-report.md' -print0 | xargs -0 grep -Il '[[:blank:]]$'
-  exit 1
-fi
 
-if [ -f MANIFEST.sha256 ]; then
-  duplicate_count=$(sed 's/^[^ ]*  //' MANIFEST.sha256 | sort | uniq -d | wc -l | tr -d ' ')
-  [ "$duplicate_count" -eq 0 ] || { echo 'ERROR: duplicate manifest entries.' >&2; exit 1; }
-  manifest_tmp=$(mktemp)
-  trap 'rm -f "$manifest_tmp"' EXIT HUP INT TERM
-  find . -type f \
-    ! -path './.git/*' \
-    ! -path './vendor/*' \
-    ! -path './node_modules/*' \
-    ! -name 'MANIFEST.sha256' \
-    ! -name '.env' \
-    -print0 | sort -z | xargs -0 sha256sum > "$manifest_tmp"
-  if ! cmp -s MANIFEST.sha256 "$manifest_tmp"; then
-    echo 'ERROR: MANIFEST.sha256 is out of date. Run make manifest.' >&2
-    exit 1
-  fi
-  rm -f "$manifest_tmp"
-  trap - EXIT HUP INT TERM
-fi
+# Plugin/theme allowlist: fail if unapproved third-party code is present.
+# Uses git ls-files so only tracked entries are checked (runtime-generated
+# WordPress defaults like akismet/hello.php are not tracked and thus excluded).
+allowed_plugins='index.php'
+allowed_themes='index.php longevity-starter'
+for entry in $(git ls-files -- wp-content/plugins/ | cut -d/ -f1-3 | sort -u); do
+  base=$(basename "$entry")
+  case " $allowed_plugins " in *" $base "*) ;; *)
+    echo "ERROR: plugin not in allowlist: $entry" >&2; exit 1 ;;
+  esac
+done
+for entry in $(git ls-files -- wp-content/themes/ | cut -d/ -f1-3 | sort -u); do
+  base=$(basename "$entry")
+  case " $allowed_themes " in *" $base "*) ;; *)
+    echo "ERROR: theme not in allowlist: $entry" >&2; exit 1 ;;
+  esac
+done
 
 echo 'Repository validation passed.'

@@ -590,12 +590,37 @@
 }
 
 @media (width <= 700px) {
+	html {
+		overflow-x: clip;
+	}
+
+	body {
+		overflow-x: clip;
+	}
+
 	.longevity-quick-strip nav {
 		padding-inline: 1rem;
 	}
 
 	.longevity-header-row {
+		flex-wrap: wrap !important;
 		min-height: 4rem;
+	}
+
+	.longevity-header-row > .wp-block-group,
+	.longevity-brand-lockup,
+	.longevity-primary-nav,
+	.longevity-footer-grid > * {
+		min-width: 0;
+	}
+
+	.longevity-header-actions {
+		flex: 1 1 100%;
+		flex-wrap: wrap;
+		gap: 0.25rem;
+		justify-content: flex-end;
+		max-width: 100%;
+		min-width: 0;
 	}
 
 	.longevity-brand-lockup .wp-block-site-title {
@@ -603,12 +628,18 @@
 		max-width: 8rem;
 	}
 
-	.longevity-header-actions {
-		gap: 0.25rem;
-	}
-
+	/* Keep the textual label in the accessibility tree at mobile widths:
+	   visually hidden instead of display:none so the button keeps its name. */
 	.longevity-search-trigger span:last-child {
-		display: none;
+		border: 0;
+		clip: rect(0, 0, 0, 0);
+		height: 1px;
+		margin: -1px;
+		overflow: hidden;
+		padding: 0;
+		position: absolute;
+		white-space: nowrap;
+		width: 1px;
 	}
 
 	.longevity-search-trigger {
@@ -706,6 +737,10 @@
 
 	.longevity-footer-intro {
 		grid-column: auto;
+	}
+
+	.longevity-footer-intro h2 {
+		max-width: 100%;
 	}
 
 	.longevity-ranking-filters {

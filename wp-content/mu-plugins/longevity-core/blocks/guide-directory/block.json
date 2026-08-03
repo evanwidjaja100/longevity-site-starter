@@ -1,0 +1,13 @@
+{
+  "$schema": "https://schemas.wp.org/trunk/block.json",
+  "apiVersion": 3,
+  "name": "longevity/guide-directory",
+  "version": "1.0.0",
+  "title": "Guide directory",
+  "description": "Evidence guide archive with topic filter and sort controls",
+  "category": "theme",
+  "icon": "book",
+  "textdomain": "longevity-core",
+  "supports": { "html": false },
+  "editorScript": "longevity-core-blocks"
+}

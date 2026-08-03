@@ -15,7 +15,7 @@ This repository preserves WordPress as the CMS, a custom block theme as the pres
 - Modular `longevity-core` MU plugin with explicit editorial metadata, roles and capabilities, publication gates, audit events, private claim/source/protocol/test/correction/affiliate registries, medical-review attestation, versioned scoring, conservative schema, privacy-aware analytics, REST health/readiness endpoints, and WP-CLI import/export commands.
 - Accessible `longevity-starter` block theme with post and review discovery, trust summaries, reviewer scope, limitations, disclosures, testing methods, correction history, responsive tables, keyboard focus, reduced-motion behavior, and print styles.
 - Trust-first launch calendar, internal-link map, editorial templates, evidence and AI governance, and category-specific testing protocols.
-- Docker development stack, environment validation, bootstrap, smoke, backup/restore examples, and portability guidance for staging, managed WordPress, and VPS hosting.
+- Docker development stack, environment validation, bootstrap, smoke, backup/restore examples, and delivery guidance for managed WordPress hosting (the only supported production topology per ADR 0015).
 - CI, security and scheduled freshness workflows; PHP, front-end, content, integration and browser-test scaffolding; manifest integrity and static validation.
 
 ## Requirements
@@ -24,10 +24,10 @@ For the complete local workflow:
 
 - Docker Engine with the Docker Compose plugin
 - GNU Make
-- PHP 8.1 or later
+- PHP 8.3 or later
 - Python 3.10 or later
 - Composer 2
-- Node.js 20 or later and npm
+- Node.js 22 or later and npm
 
 Static validation can run without Docker. A dependency-free PHP unit fallback is included for environments without Composer.
 
@@ -54,6 +54,8 @@ make test           # PHP fallback/PHPUnit plus content tests
 make test-e2e       # Playwright against a running site
 make docker-config  # Docker Compose interpolation and schema check
 make manifest       # regenerate MANIFEST.sha256 after intentional changes
+make release-artifact SHA=<full-commit-sha> # deterministic managed-host package from Git
+make verify-release-artifact SHA=<full-commit-sha> # archive policy + isolated double build
 ```
 
 Install development dependencies with:
@@ -113,7 +115,7 @@ The renderer adds sponsored, nofollow and noopener relationship attributes. It d
 
 ## Production deployment
 
-Docker Compose is intended for development, staging, and as a transparent VPS reference—not as a turnkey production platform. Production requires HTTPS, external secrets, least-privilege accounts, MFA where available, off-site encrypted backups, tested restoration, SMTP/DNS authentication, WAF/rate limiting, current dependencies, central logs, uptime/error monitoring, and a real cron strategy.
+Docker Compose is intended for development and pre-delivery verification only. Production delivery is managed WordPress hosting only (ADR 0015): promote the verified first-party release artifact per `docs/operations/managed-wordpress-deployment.md`. Production requires HTTPS, external secrets, least-privilege accounts, MFA where available, off-site encrypted backups, tested restoration, SMTP/DNS authentication, WAF/rate limiting, current dependencies, central logs, uptime/error monitoring, and a real cron strategy.
 
 Managed hosts must support MU plugins and the required custom capabilities and private post types. Critical editorial data remains independent of the theme. Review the deployment and security documents under `docs/operations/` before launch.
 
@@ -130,3 +132,8 @@ Docker, full WordPress integration, Composer-based PHPCS/PHPStan/PHPUnit, and br
 ## Safety and scope
 
 This platform publishes general educational information. It must not present individualized medical advice, diagnosis, guaranteed longevity outcomes, disease treatment or prevention, unsupported dosage recommendations, fabricated testing, or popular “biohacks” as proven. Human review, transparent uncertainty, claim-level traceability, commercial independence, and visible corrections are release requirements—not optional decoration.
+## Production Readiness v2 enforcement status
+
+The current enforcement layer adds explicit metadata write policies, independent reviewer verification, immutable approval snapshots, stale-state invalidation, an allowlisted REST projection, deployable scoring configuration, fair freshness scans, append-only governance audit events, and privacy-safe contact controls.
+
+These controls are **implemented in code**, but production launch remains **NO-GO** until they are applied to the authoritative Git checkout, both lockfiles are committed, Composer/Docker/browser suites pass from a clean checkout, production-like staging evidence exists, and the required human governance and external-control approvals are recorded. See `docs/testing/production-readiness-v2-baseline.md` and `docs/testing/production-readiness-v2-implementation-report.md`.

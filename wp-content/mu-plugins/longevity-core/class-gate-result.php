@@ -13,37 +13,88 @@ defined( 'ABSPATH' ) || exit;
  * Collects publication readiness outcomes.
  */
 final class Gate_Result {
-	/** @var array<int, array<string, string>> */
+	/**
+	 * Blocking readiness failures that prevent publication.
+	 *
+	 * @var array<int, array<string, string>>
+	 */
 	private array $blocking = array();
 
-	/** @var array<int, array<string, string>> */
+	/**
+	 * Non-blocking readiness warnings.
+	 *
+	 * @var array<int, array<string, string>>
+	 */
 	private array $warnings = array();
 
-	/** @var array<int, array<string, string>> */
+	/**
+	 * Checks that passed.
+	 *
+	 * @var array<int, array<string, string>>
+	 */
 	private array $passed = array();
 
-	/** @var array<int, array<string, string>> */
+	/**
+	 * Checks that did not apply to this post.
+	 *
+	 * @var array<int, array<string, string>>
+	 */
 	private array $not_applicable = array();
 
-	/** Add a blocking result. */
+	private const BUCKETS = array(
+		'block' => 'blocking',
+		'warn'  => 'warnings',
+		'pass'  => 'passed',
+		'skip'  => 'not_applicable',
+	);
+
+	/**
+	 * Append an outcome record to the bucket for a category.
+	 *
+	 * @param string $category Bucket selector: block, warn, pass, or skip.
+	 * @param string $code     Machine-readable check identifier.
+	 * @param string $message  Human-readable outcome description.
+	 */
+	private function push( string $category, string $code, string $message ): void {
+		$prop            = self::BUCKETS[ $category ];
+		$this->{$prop}[] = array(
+			'code'    => $code,
+			'message' => $message,
+		);
+	}
+
+	/**
+	 * Record a blocking failure.
+	 *
+	 * @param string $code    Machine-readable check identifier.
+	 * @param string $message Human-readable failure description.
+	 */
 	public function block( string $code, string $message ): void {
-		$this->blocking[] = array( 'code' => $code, 'message' => $message );
-	}
-
-	/** Add a warning result. */
+		$this->push( 'block', $code, $message ); }
+	/**
+	 * Record a non-blocking warning.
+	 *
+	 * @param string $code    Machine-readable check identifier.
+	 * @param string $message Human-readable warning description.
+	 */
 	public function warn( string $code, string $message ): void {
-		$this->warnings[] = array( 'code' => $code, 'message' => $message );
-	}
-
-	/** Add a passed result. */
+		$this->push( 'warn', $code, $message ); }
+	/**
+	 * Record a passed check.
+	 *
+	 * @param string $code    Machine-readable check identifier.
+	 * @param string $message Human-readable outcome description.
+	 */
 	public function pass( string $code, string $message ): void {
-		$this->passed[] = array( 'code' => $code, 'message' => $message );
-	}
-
-	/** Add a non-applicable result. */
+		$this->push( 'pass', $code, $message ); }
+	/**
+	 * Record a check that did not apply.
+	 *
+	 * @param string $code    Machine-readable check identifier.
+	 * @param string $message Human-readable outcome description.
+	 */
 	public function skip( string $code, string $message ): void {
-		$this->not_applicable[] = array( 'code' => $code, 'message' => $message );
-	}
+		$this->push( 'skip', $code, $message ); }
 
 	/** Whether publication is blocked. */
 	public function is_blocked(): bool {

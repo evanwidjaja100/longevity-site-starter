@@ -26,3 +26,11 @@
 - [ ] No health-sensitive personal data appears in analytics parameters
 - [ ] Mobile, keyboard, contrast, broken-link, and structured-data checks passed
 - [ ] Rollback owner and decision path documented
+## Production Readiness v2 final go/no-go
+
+- [ ] P0 enforcement phases are merged in the authoritative repository and clean-checkout CI is green.
+- [ ] No stale, legacy-unbound, or status-only approval is accepted as current.
+- [ ] Production-like staging completes all high-risk workflow scenarios with synthetic data.
+- [ ] Protected readiness contains no unresolved internal `blocked` check and external controls have operator evidence.
+- [ ] Restore and rollback drills succeed, with measured recovery evidence.
+- [ ] Editorial, medical, testing, commercial, privacy/legal, technical, and operational owners sign the launch decision.

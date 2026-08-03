@@ -4,7 +4,10 @@
  * Slug: longevity-starter/article-trust
  * Categories: featured, text
  * Inserter: true
+ *
+ * @package LongevityStarter
  */
+
 ?>
 <!-- wp:longevity/article-meta /-->
 <!-- wp:longevity/trust-summary /-->

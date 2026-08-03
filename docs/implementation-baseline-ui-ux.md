@@ -1,6 +1,6 @@
 # UI/UX Implementation Baseline
 
-Baseline date: 2026-07-14  
+Baseline date: 2026-07-14
 Repository root: `D:\Desktop\test\longevity-site-starter`
 
 ## Scope reviewed

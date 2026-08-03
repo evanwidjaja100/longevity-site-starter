@@ -8,7 +8,7 @@ Longevity Evidence Lab is a WordPress-based evidence and consumer-testing public
 - **Longevity Core MU plugin:** content types, metadata, roles, publication gates, claim and source registries, medical review, test protocols, scoring, corrections, affiliate controls, schema, analytics, REST health checks, and WP-CLI utilities.
 - **Longevity Starter block theme:** accessible templates and trust components. It contains no authoritative editorial state.
 - **Structured repository content:** launch calendar, briefs, protocols, governance documents, and operational checklists.
-- **Docker development stack:** MySQL, WordPress, and WP-CLI. Production deployment can use a managed host or a hardened VPS without changing the content model.
+- **Docker development stack:** MySQL, WordPress, and WP-CLI. Docker is for local development and disposable CI only; production runs on a managed WordPress host without changing the content model.
 
 ## Trust boundary
 Only authenticated users with explicit capabilities may complete review states, change disclosures, approve tests, override gates, or publish. Public templates read approved state; they do not infer completion. No code fabricates reviewers, credentials, citations, measurements, or testing periods.
@@ -25,5 +25,5 @@ Only authenticated users with explicit capabilities may complete review states, 
 
 ## Consumer Lab ranking flow
 
-`Rankings` sits between WordPress records and every public ordered representation. Dynamic blocks delegate to `Public_Components`, which asks `Rankings` for eligible reviews and category aggregates. Structured observations flow from a private approved `lel_test_record` through the bounded public-result sanitizer; raw operational fields never cross that boundary. The block theme renders the result server-side and uses JavaScript only for search-dialog enhancement.
+`Rankings` sits between WordPress records and every public ordered representation. Dynamic blocks delegate to domain presentation classes (`Public_Rankings`, `Public_Content`, `Public_Nav`, `Public_Trust`, `Public_Contact`), which ask `Rankings` for eligible reviews and category aggregates. Structured observations flow from a private approved `lel_test_record` through the bounded public-result sanitizer; raw operational fields never cross that boundary. The block theme renders the result server-side and uses JavaScript only for search-dialog enhancement.
 Critical data is stored through WordPress APIs in posts, users, and post metadata. The theme can be replaced without losing governance records. The MU plugin can be copied to managed WordPress hosts that permit MU plugins. Host-specific caching, WAF, SMTP, backups, and observability remain external adapters.

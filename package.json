@@ -4,25 +4,41 @@
   "scripts": {
     "lint": "npm run lint:css && npm run lint:js",
     "lint:css": "stylelint wp-content/themes/longevity-starter/**/*.css",
-    "lint:js": "eslint wp-content/mu-plugins/longevity-core/assets/**/*.js tests/e2e/**/*.js",
-    "test:e2e": "playwright test tests/e2e/core.spec.js",
+    "lint:js": "eslint wp-content/mu-plugins/longevity-core/assets/**/*.js wp-content/themes/longevity-starter/assets/js/**/*.js tests/e2e/**/*.js eslint.config.js playwright.config.js",
+    "test:e2e": "playwright test tests/e2e/core.spec.js tests/e2e/seo.spec.js tests/e2e/bootstrap.spec.js tests/e2e/routes.spec.js tests/e2e/page-readiness.spec.js tests/e2e/contact-form.spec.js tests/e2e/analytics.spec.js tests/e2e/authorization.spec.js tests/e2e/rest-public-boundary.spec.js tests/e2e/production-readiness-audit.spec.js tests/e2e/internal-links.spec.js tests/e2e/accessibility.spec.js",
+    "test:e2e:functional": "playwright test tests/e2e/core.spec.js tests/e2e/seo.spec.js tests/e2e/bootstrap.spec.js tests/e2e/routes.spec.js tests/e2e/page-readiness.spec.js tests/e2e/contact-form.spec.js tests/e2e/analytics.spec.js tests/e2e/authorization.spec.js tests/e2e/rest-public-boundary.spec.js tests/e2e/production-readiness-audit.spec.js tests/e2e/internal-links.spec.js",
+    "test:e2e:all": "playwright test",
+    "test:e2e:debug": "playwright test tests/e2e/debug.spec.js",
+    "test:load": "k6 run tests/load/k6-scenario.js",
     "test:a11y": "playwright test tests/e2e/accessibility.spec.js",
     "test:visual": "playwright test tests/e2e/visual.spec.js",
-    "test:lighthouse": "lhci autorun --config=lighthouserc.cjs"
+    "test:seo": "playwright test tests/e2e/seo.spec.js",
+    "test:routes": "playwright test tests/e2e/routes.spec.js",
+    "test:page-readiness": "playwright test tests/e2e/page-readiness.spec.js",
+    "test:bootstrap": "playwright test tests/e2e/bootstrap.spec.js",
+    "test:lighthouse": "node scripts/lighthouse-preflight.mjs && lhci autorun --config=lighthouserc.cjs",
+    "audit:locked": "npm audit --audit-level=high",
+    "test:lighthouse:desktop": "node scripts/lighthouse-preflight.mjs && lhci autorun --config=lighthouserc.desktop.cjs"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.10.0",
-    "@eslint/js": "^9.0.0",
+    "@eslint/js": "^10.0.1",
     "@lhci/cli": "^0.15.1",
     "@playwright/test": "^1.50.0",
-    "eslint": "^9.0.0",
+    "eslint": "^10.8.0",
     "stylelint": "^16.0.0",
     "stylelint-config-standard": "^38.0.0"
   },
   "overrides": {
+    "@paulirish/trace_engine": {
+      "legacy-javascript": "0.0.1",
+      "third-party-web": "0.29.2"
+    },
     "inquirer": "^9.3.8",
+    "fast-uri": "^3.1.4",
     "tmp": "^0.2.6",
-    "uuid": "^11.1.1"
+    "uuid": "^11.1.1",
+    "chrome-launcher": "^1.2.0"
   },
   "type": "module"
 }

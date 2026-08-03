@@ -27,20 +27,28 @@ final class ReviewMethodologyTest extends TestCase {
 	}
 
 	public function test_sanitizes_bounded_public_results(): void {
-		$rows = Review_Methodology::sanitize_public_results(
+		$projection = Review_Methodology::sanitize_public_results(
 			array(
 				array( 'label' => '<b>Battery</b>', 'observed_value' => '6.2', 'unit' => 'days', 'status' => 'meets', 'note' => '<script>alert(1)</script>Documented.', 'display_order' => 20, 'private_note' => 'must disappear' ),
 				array( 'label' => 'Broken', 'observed_value' => 'x', 'status' => 'invented' ),
 			)
 		);
-		self::assertCount( 1, $rows );
-		self::assertSame( 'Battery', $rows[0]['label'] );
-		self::assertSame( 'alert(1)Documented.', $rows[0]['note'] );
-		self::assertArrayNotHasKey( 'private_note', $rows[0] );
+		self::assertCount( 1, $projection['rows'] );
+		self::assertSame( 'Battery', $projection['rows'][0]['label'] );
+		self::assertSame( 'alert(1)Documented.', $projection['rows'][0]['note'] );
+		self::assertArrayNotHasKey( 'private_note', $projection['rows'][0] );
 	}
 
 	public function test_public_results_are_limited_to_thirty_rows(): void {
 		$input = array_fill( 0, 40, array( 'label' => 'Metric', 'observed_value' => 'Value', 'status' => 'informational' ) );
-		self::assertCount( 30, Review_Methodology::sanitize_public_results( $input ) );
+		self::assertCount( 30, Review_Methodology::sanitize_public_results( $input )['rows'] );
+	}
+
+	public function test_sanitizing_stored_public_results_is_idempotent(): void {
+		$stored = Review_Methodology::sanitize_public_results(
+			array( array( 'label' => 'Battery', 'observed_value' => '6.2', 'status' => 'meets' ) )
+		);
+
+		self::assertSame( $stored, Review_Methodology::sanitize_public_results( $stored ) );
 	}
 }

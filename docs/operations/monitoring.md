@@ -1,5 +1,164 @@
 # Monitoring
 
-Monitor HTTP availability, TLS expiry, PHP/WordPress errors, failed cron, backup completion, disk/database growth, unusual authentication activity, mail delivery, and dependency advisories. The public health endpoint reports only non-sensitive service state.
+**Owner:** Operations
+**Last reviewed:** 2026-07-30
 
-Editorial monitoring includes overdue reviews, stale evidence cutoffs, unresolved corrections, unapproved affiliate relationships, missing test evidence, and repeated override use. Alerts should identify the record and action needed without including sensitive health information.
+## Application health endpoint (liveness)
+
+The longevity-core MU plugin exposes a public **liveness** endpoint:
+
+```
+GET /wp-json/longevity/v1/health
+```
+
+Response (200 OK):
+```json
+{ "status": "ok" }
+```
+
+This endpoint requires no authentication and exposes only non-sensitive service state. It confirms the application process is running and can serve HTTP. Use it for external uptime monitoring and load-balancer health checks.
+
+**Note:** This is a liveness check only. For full operational readiness (database, migrations, queue, audit), use the protected `longevity/v1/system-readiness` endpoint (requires `approve_publication` + `view_operational_readiness` capabilities).
+
+Expected check (every 5 minutes, external):
+```bash
+curl -sf https://longevityevidencelab.com/wp-json/longevity/v1/health | grep -q '"status":"ok"'
+```
+
+## Operational status page
+
+A capability-protected admin page at `Tools → Longevity status` (`/wp-admin/tools.php?page=lel-operational-status`) displays:
+
+- Last freshness audit timestamp and report summary
+- Next scheduled freshness run
+- Current freshness lock status (locked = job running)
+- Last error message, if any
+
+Accessible to users with `approve_publication` capability.
+
+## Freshness audit monitoring
+
+The daily cron job (`Freshness::run()`) audits articles for:
+
+- Overdue `next_review_date`
+- Missing or stale `evidence_cutoff_date`
+- Content_summary, limitations, or original_contributions needing refresh
+
+Results are stored in the `lel_last_freshness_report` option and reported by the status page. An operationally useful alert should be configured:
+
+```bash
+# Example: check if last freshness report indicates failures
+wp option get lel_freshness_last_error
+```
+
+If the cron fails, a structured `freshness_cycle_failed` event is logged (see below) and the error code is stored in the `lel_freshness_last_error` option.
+
+## Structured log monitoring
+
+In development, `WP_DEBUG_LOG` outputs to `wp-content/debug.log`. In production, configure a centralized log aggregator or use the managed host's log stream.
+
+Service-level events are emitted by the `Logger` class as a single-line, machine-parseable record with the `[longevity]` prefix followed by a JSON object:
+
+```
+[longevity] {"ts":"2026-07-23T09:15:04+00:00","level":"error","event":"audit_write_failure","request_id":"a1b2...","context":{...}}
+```
+
+Each record carries `level` (`debug`/`info`/`warning`/`error`), a stable `event` name, and a `request_id` that correlates the log line with rows in the `wp_lel_audit_events` table (the audit log shares the same request id). Configure the aggregator to index on `event` and `request_id`.
+
+Key `event` names to alert on:
+- `audit_write_failure` (error): an append-only audit write failed; approvals/verifications roll back fail-closed.
+- `migration_failed` (error): a schema migration aborted.
+- `freshness_cycle_failed` (error): the freshness cron cycle threw; see `context.error_code`.
+- `invalidation_job_failed` (error): a cache-invalidation job permanently failed after retries.
+- `invalidation_fallback_failure` (warning): the synchronous fallback purge failed.
+- `csp_violation` (warning): a Content-Security-Policy report was received.
+
+To surface warnings/errors from the raw stream: `grep '"level":"error"' wp-content/debug.log` (or the equivalent aggregator query).
+
+## Editorial monitoring (weekly review)
+
+| Check | Tool / Query |
+|---|---|
+| Overdue reviews | `wp longevity freshness --report` |
+| Articles approaching next_review_date | Freshness audit report |
+| Unresolved corrections | `wp post list --post_type=lel_correction --post_status=pending` |
+| Unapproved affiliate relationships | `wp post list --post_type=lel_affiliate --post_status=draft` |
+| Missing testing evidence | `wp longevity readiness <post_id>` |
+| Repeated publication overrides | Audit log custom table: `SELECT * FROM wp_lel_audit_events WHERE event_type = 'publication_gate_override'` |
+| Stale evidence cutoffs | Freshness audit `_lel_freshness_due_fields` meta |
+
+## Uptime and infrastructure
+
+For managed WordPress hosting, the host typically provides:
+- Uptime monitoring (external probe every 5 minutes)
+- Load and database health dashboards
+- CDN cache hit ratio
+- TLS certificate auto-renewal and expiry alerts
+
+The managed host is the only supported production target. Any alternate
+topology requires a new architecture decision record before implementation.
+
+## Metrics and alerting
+
+The plugin exposes Prometheus text-format (`0.0.4`) metrics for an external, authenticated collector:
+
+- **Pull (REST):** `GET /wp-json/longevity/v1/metrics` — gated by the `view_operational_readiness` capability. Scrape with an external authenticated collector (see `ops/monitoring/prometheus-scrape.yml`, `basic_auth`). Returns `Content-Type: text/plain; version=0.0.4`.
+
+Exposed series (catalog generated from `class-metrics.php`; a doc/code mismatch is a defect):
+
+| Metric | Type | Meaning |
+|---|---|---|
+| `lel_audit_write_failures_total` | counter | Append-only audit write failures |
+| `lel_csp_violations_total` | counter | CSP violation reports received (sampled) |
+| `lel_invalidation_fallback_failures_total` | counter | Synchronous fallback purge failures |
+| `lel_publication_lock_failures_total` | counter | Publication lock acquisition failures |
+| `lel_rankings_cache_rejected_total` | counter | Cached ranking IDs rejected by live eligibility revalidation |
+| `lel_affiliate_dependency_edges` | gauge | Materialized affiliate dependency edges; `-1` when the index is unavailable |
+| `lel_affiliate_unresolved_destinations` | gauge | Destinations with no registry match in the last completed backfill; `-1` before any backfill |
+| `lel_affiliate_ambiguous_destinations` | gauge | Destinations matching multiple registry rows; `-1` before any backfill |
+| `lel_affiliate_broad_fallbacks` | gauge | Parents bound to every registry row after failed edge extraction; `-1` before any backfill |
+| `lel_dependency_backfill_pending` | gauge | `1` while the current-generation dependency backfill is incomplete |
+| `lel_csp_mode_state{mode}` | gauge | One-hot effective CSP delivery mode |
+| `lel_csp_mode_explicit` | gauge | `1` when `LEL_CSP_MODE` is explicitly configured |
+| `lel_build_info{environment,source_sha,artifact_sha256}` | gauge | Immutable deployed build identity (`1`) |
+| `lel_readiness_check_state{check,state}` | gauge | Per-check readiness one-hot: exactly one state is `1` per check |
+| `lel_readiness_overall` | gauge | Overall readiness: `1` ok, `0.5` degraded, `0` blocked |
+| `lel_readiness_overall_state{state}` | gauge | Overall readiness one-hot |
+
+Counter values are lifetime totals persisted in `wp_options`; alert on them
+with reset-aware `increase()` windows, never with `> 0` on the raw lifetime
+value, so a single historical increment cannot page forever.
+
+Alert rules ship in `ops/monitoring/alert-rules.yml` (load into Prometheus). Each alert carries a `runbook` annotation pointing at the dedicated runbook under `operations/runbooks/` (or `docs/operations/incident-response.md` for general triage). `LongevityReadinessBlocked` should inhibit `LongevityReadinessDegraded` via Alertmanager (see the inhibition contract comment in the rules file). To fan out firing alerts to a chat channel, point Alertmanager's webhook receiver at `scripts/alert-notify.sh` (reads Alertmanager JSON on stdin, forwards to `ALERT_WEBHOOK_URL`).
+
+## Backup monitoring
+
+See `docs/operations/backup-and-restore.md` for backup verification steps.
+
+After each backup run, verify:
+1. Backup file exists and size is non-zero
+2. SHA256 checksum matches recorded value
+3. Database dump opens cleanly (`mysql < dump.sql` in isolated env)
+4. File archive extracts without errors
+
+## Related
+
+- `content/evidence/freshness-register.csv` — freshness audit output
+- `docs/operations/backup-and-restore.md` — backup verification
+- `docs/operations/incident-response.md` — escalation paths
+- Script: `wp longevity freshness --report` — CLI freshness check
+## Protected readiness and freshness metrics
+
+Use the authenticated `longevity/v1/system-readiness` endpoint for database, migration, packaged scoring configuration, freshness heartbeat/cycle, cron heartbeat, audit table, approval table, publication lock, invalidation queue, uploads, and contact-mail configuration checks. Backup timestamp, restore drill, and external mail delivery use structured JSON evidence (set via `wp longevity evidence set --type=<type> --result=ok ...`) and remain `unknown_external` until an operator supplies valid evidence.
+
+Freshness monitoring records `last_run_at`, `last_success_at`, cycle start/completion, processed count, eligible total, due total, remaining estimate, lock age, and last error code. Alert on stale heartbeat, expired lock, or a cycle that does not eventually complete.
+
+## CSP violation monitoring
+
+When Content-Security-Policy is in Report-Only or Enforce mode, browser violation reports are sent to:
+
+```
+POST /wp-json/longevity/v1/csp-report
+```
+
+Violations are logged as structured `csp_violation` warning events via the `Logger` class (see Structured log monitoring above) and counted in the `lel_csp_violation_count` option. Monitor this counter in staging to resolve violations before enabling enforcement in production.

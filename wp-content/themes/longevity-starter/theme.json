@@ -72,7 +72,7 @@
     "custom": {
       "radius": { "small": "4px", "card": "8px", "large": "12px", "pill": "999px" },
       "shadow": { "subtle": "0 0.3rem 1.2rem rgba(21, 48, 66, 0.07)" },
-      "measure": { "article": "72ch", "compact": "60ch" }
+      "measure": { "article": "72ch", "compact": "60ch", "text": "68ch" }
     }
   },
   "styles": {

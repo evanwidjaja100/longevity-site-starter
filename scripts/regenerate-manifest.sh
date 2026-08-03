@@ -1,12 +1,15 @@
-#!/bin/sh
-set -eu
-ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+#!/usr/bin/env bash
+set -euo pipefail
+ROOT=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$ROOT"
-find . -type f \
-  ! -path './.git/*' \
-  ! -path './vendor/*' \
-  ! -path './node_modules/*' \
-  ! -name 'MANIFEST.sha256' \
-  ! -name '.env' \
-  -print0 | sort -z | xargs -0 sha256sum > MANIFEST.sha256
+tmp=$(mktemp)
+trap 'rm -f "$tmp"' EXIT
+bash scripts/release-file-list.sh | while IFS= read -r -d '' file; do
+  if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    git show ":$file" | sha256sum | awk -v path="$file" '{print $1 " *./" path}'
+  else
+    sha256sum "$file"
+  fi
+done > "$tmp"
+sed 's#  # *./#' "$tmp" > MANIFEST.sha256
 printf 'Manifest regenerated with %s entries.\n' "$(wc -l < MANIFEST.sha256 | tr -d ' ')"

@@ -1,0 +1,13 @@
+{
+  "$schema": "https://schemas.wp.org/trunk/block.json",
+  "apiVersion": 3,
+  "name": "longevity/topic-directory",
+  "version": "1.0.0",
+  "title": "Topic directory",
+  "description": "Evidence topic directory with guide counts and review counts",
+  "category": "theme",
+  "icon": "category",
+  "textdomain": "longevity-core",
+  "supports": { "html": false },
+  "editorScript": "longevity-core-blocks"
+}

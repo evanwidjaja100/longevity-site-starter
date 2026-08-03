@@ -6,6 +6,7 @@ use PHPUnit\Framework\TestCase;
 final class PublicationGatesTest extends TestCase {
 	private function validContext(): array {
 		return array(
+			'as_of_date' => '2026-07-21',
 			'post_type' => 'post',
 			'content' => 'Complete educational content.',
 			'author_present' => true,
@@ -15,6 +16,7 @@ final class PublicationGatesTest extends TestCase {
 			'next_content_review_date' => '2027-01-14',
 			'commercial_relationship' => 'none',
 			'editorial_approval_status' => 'ready',
+			'editorial_approval_current' => true,
 			'material_health_claims' => false,
 			'medical_review_required' => false,
 			'testing_required' => false,
@@ -40,6 +42,13 @@ final class PublicationGatesTest extends TestCase {
 		$result = Publication_Gates::evaluate_values( $context );
 		self::assertTrue( $result->is_blocked() );
 		self::assertContains( 'missing_summary', array_column( $result->blocking(), 'code' ) );
+	}
+
+	public function test_expired_next_review_date_blocks_publication(): void {
+		$context = $this->validContext();
+		$context['next_content_review_date'] = '2026-07-21';
+		$result = Publication_Gates::evaluate_values( $context );
+		self::assertContains( 'next_review_due', array_column( $result->blocking(), 'code' ) );
 	}
 
 	public function test_material_health_claims_require_verified_claims_and_fact_check(): void {
@@ -69,6 +78,17 @@ final class PublicationGatesTest extends TestCase {
 		$context['test_record_valid'] = false;
 		$result = Publication_Gates::evaluate_values( $context );
 		self::assertContains( 'test_record_invalid', array_column( $result->blocking(), 'code' ) );
+	}
+
+	public function test_future_checked_date_is_rejected(): void {
+		$context = $this->validContext();
+		$context['post_type'] = 'review';
+		$context['tested_product_model'] = 'Specific Model';
+		$context['comparison_set'] = 'Defined comparison set';
+		$context['price_region'] = 'US';
+		$context['price_checked_date'] = '2026-07-22';
+		$result = Publication_Gates::evaluate_values( $context );
+		self::assertContains( 'price_checked_date_invalid', array_column( $result->blocking(), 'code' ) );
 	}
 
 	public function test_review_score_must_recalculate_from_dimensions(): void {

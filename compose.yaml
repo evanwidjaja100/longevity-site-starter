@@ -1,8 +1,9 @@
+# Local development and disposable CI only; not a production topology.
 name: longevity-site
 
 services:
   db:
-    image: mysql:8.4
+    image: mysql@sha256:62fb722c78b24245ddff1796a0fcee4a49cc5b87e0aaaf20c92d1da9e0a2497b # mysql:8.0
     restart: unless-stopped
     environment:
       MYSQL_DATABASE: ${WORDPRESS_DB_NAME}
@@ -18,13 +19,16 @@ services:
       test: ["CMD-SHELL", "MYSQL_PWD=$$MYSQL_ROOT_PASSWORD mysqladmin ping -h 127.0.0.1 -u root --silent"]
       interval: 10s
       timeout: 5s
-      retries: 12
-      start_period: 30s
+      retries: 18
+      start_period: 180s
     security_opt:
       - no-new-privileges:true
 
   wordpress:
-    image: wordpress:7.0.1-php8.3-apache
+    build:
+      context: .
+      dockerfile: docker/development/Dockerfile
+    image: longevity-wordpress:dev
     restart: unless-stopped
     depends_on:
       db:
@@ -64,7 +68,10 @@ services:
       - no-new-privileges:true
 
   wpcli:
-    image: wordpress:cli-php8.3
+    build:
+      context: .
+      dockerfile: docker/development/Dockerfile.wpcli
+    image: longevity-wpcli:dev
     depends_on:
       db:
         condition: service_healthy
@@ -91,26 +98,54 @@ services:
       - ./scripts:/scripts:ro
       - ./content:/project-content:ro
       - ./policies:/project-policies:ro
+      - ./config:/project-config:ro
+      - ./docker/my.cnf:/root/.my.cnf:ro
     security_opt:
       - no-new-privileges:true
 
   wpcron:
-    image: wordpress:cli-php8.3
+    build:
+      context: .
+      dockerfile: docker/development/Dockerfile.wpcli
+    image: longevity-wpcli:dev
     profiles: ["cron"]
     depends_on:
       wordpress:
         condition: service_healthy
     working_dir: /var/www/html
-    entrypoint: ["sh", "-c"]
-    command: ["while true; do wp cron event run --due-now --allow-root || true; sleep 300; done"]
+    entrypoint: ["sh", "/scripts/cron-wrapper.sh"]
     environment:
       WORDPRESS_DB_HOST: db:3306
       WORDPRESS_DB_NAME: ${WORDPRESS_DB_NAME}
       WORDPRESS_DB_USER: ${WORDPRESS_DB_USER}
       WORDPRESS_DB_PASSWORD: ${WORDPRESS_DB_PASSWORD}
+      LEL_CRON_FAILURE_THRESHOLD: ${LEL_CRON_FAILURE_THRESHOLD:-5}
+      LEL_CRON_SLEEP_INTERVAL: ${LEL_CRON_SLEEP_INTERVAL:-300}
     volumes:
       - wordpress_data:/var/www/html
       - ./wp-content:/var/www/html/wp-content
+      - ./scripts:/scripts:ro
+    security_opt:
+      - no-new-privileges:true
+
+  test-runner:
+    image: php@sha256:2a3f699b6cb31e5638c5432e4d37d4047853ba6351a692c91e0a073af00a55cc # php:8.3-cli
+    profiles: ["test"]
+    working_dir: /workspace
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      WORDPRESS_DB_HOST: db:3306
+      WORDPRESS_DB_NAME: ${WORDPRESS_DB_NAME:-longevity}
+      WORDPRESS_DB_USER: ${WORDPRESS_DB_USER:-longevity_app}
+      WORDPRESS_DB_PASSWORD: ${WORDPRESS_DB_PASSWORD}
+      PHP_VERSION: 8.3
+    volumes:
+      - .:/workspace:ro
+      - ./reports:/workspace/reports:rw
+    entrypoint: ["sh", "-c"]
+    command: ["echo 'test-runner container ready. Use: docker compose run --rm --profile test test-runner php /workspace/tests/php/run-unit-tests.php'"]
     security_opt:
       - no-new-privileges:true
 

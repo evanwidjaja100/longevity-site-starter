@@ -1,0 +1,258 @@
+{
+  "schema_version": 1,
+  "description": "Canonical route-state contract (PRV3-BOOT-01). Single source of truth for route existence, default WordPress status after a clean canonical bootstrap, and per-environment public visibility. PHP registry: wp-content/mu-plugins/longevity-core/class-routes.php. Bootstrap: wp longevity bootstrap all. Contract test: tests/php/RouteContractTest.php. Consumers: tests/e2e/support/route-expectations.js, tests/load/k6-scenario.js, lighthouserc.shared.cjs, scripts/create-test-fixtures.php.",
+  "modes": {
+    "production": "Only routes published through named human approval are public. bootstrap_status is the safe default; ci_fixture_public has no effect.",
+    "ci_fixture": "Guarded synthetic projection for local/CI browser, accessibility, Lighthouse, and load tests. Pages with ci_fixture_public=true are published by scripts/create-test-fixtures.php through the real approval gates; it refuses to run outside local/development/test environments."
+  },
+  "pages": {
+    "home": {
+      "slug": "home",
+      "path": "/",
+      "name": "Home",
+      "type": "page",
+      "bootstrap_status": "publish",
+      "ci_fixture_public": true,
+      "indexable": true,
+      "trust_page": false,
+      "production_publication": ["canonical_bootstrap"]
+    },
+    "start_here": {
+      "slug": "start-here",
+      "path": "/start-here/",
+      "name": "Start Here",
+      "type": "page",
+      "bootstrap_status": "publish",
+      "ci_fixture_public": true,
+      "indexable": true,
+      "trust_page": false,
+      "production_publication": ["canonical_bootstrap"]
+    },
+    "guides": {
+      "slug": "guides",
+      "path": "/guides/",
+      "name": "Guides",
+      "type": "page",
+      "bootstrap_status": "draft",
+      "ci_fixture_public": false,
+      "indexable": true,
+      "trust_page": false,
+      "production_publication": ["editorial_lead"]
+    },
+    "topics": {
+      "slug": "topics",
+      "path": "/topics/",
+      "name": "Topics",
+      "type": "page",
+      "bootstrap_status": "draft",
+      "ci_fixture_public": true,
+      "indexable": true,
+      "trust_page": false,
+      "production_publication": ["editorial_lead"]
+    },
+    "reviews": {
+      "slug": "reviews",
+      "path": "/reviews/",
+      "name": "Consumer Lab",
+      "type": "archive",
+      "bootstrap_status": "none",
+      "ci_fixture_public": true,
+      "indexable": false,
+      "trust_page": false,
+      "production_publication": ["post_type_archive"]
+    },
+    "evidence_methodology": {
+      "slug": "evidence-methodology",
+      "path": "/evidence-methodology/",
+      "name": "Evidence Methodology",
+      "type": "page",
+      "bootstrap_status": "draft",
+      "ci_fixture_public": false,
+      "indexable": true,
+      "trust_page": true,
+      "production_publication": ["editorial_lead", "medical_reviewer"]
+    },
+    "testing_methodology": {
+      "slug": "testing-methodology",
+      "path": "/testing-methodology/",
+      "name": "Testing Methodology",
+      "type": "page",
+      "bootstrap_status": "draft",
+      "ci_fixture_public": true,
+      "indexable": true,
+      "trust_page": true,
+      "production_publication": ["product_testing_lead", "editorial_lead"]
+    },
+    "editorial_policy": {
+      "slug": "editorial-policy",
+      "path": "/editorial-policy/",
+      "name": "Editorial Policy",
+      "type": "page",
+      "bootstrap_status": "draft",
+      "ci_fixture_public": true,
+      "indexable": true,
+      "trust_page": true,
+      "production_publication": ["editorial_lead"]
+    },
+    "corrections": {
+      "slug": "corrections",
+      "path": "/corrections/",
+      "name": "Corrections",
+      "type": "page",
+      "bootstrap_status": "draft",
+      "ci_fixture_public": true,
+      "indexable": true,
+      "trust_page": true,
+      "production_publication": ["editorial_lead"]
+    },
+    "affiliate_disclosure": {
+      "slug": "affiliate-disclosure",
+      "path": "/affiliate-disclosure/",
+      "name": "Affiliate Disclosure",
+      "type": "page",
+      "bootstrap_status": "draft",
+      "ci_fixture_public": true,
+      "indexable": true,
+      "trust_page": true,
+      "production_publication": ["commercial_disclosure_reviewer", "privacy_legal_approver"]
+    },
+    "medical_disclaimer": {
+      "slug": "medical-disclaimer",
+      "path": "/medical-disclaimer/",
+      "name": "Medical Disclaimer",
+      "type": "page",
+      "bootstrap_status": "draft",
+      "ci_fixture_public": true,
+      "indexable": true,
+      "trust_page": true,
+      "production_publication": ["medical_reviewer", "privacy_legal_approver"]
+    },
+    "about": {
+      "slug": "about",
+      "path": "/about/",
+      "name": "About",
+      "type": "page",
+      "bootstrap_status": "draft",
+      "ci_fixture_public": true,
+      "indexable": true,
+      "trust_page": true,
+      "production_publication": ["editorial_lead"]
+    },
+    "contact": {
+      "slug": "contact",
+      "path": "/contact/",
+      "name": "Contact",
+      "type": "page",
+      "bootstrap_status": "draft",
+      "ci_fixture_public": false,
+      "indexable": true,
+      "trust_page": true,
+      "production_publication": ["operations_owner", "privacy_legal_approver"]
+    },
+    "privacy": {
+      "slug": "privacy",
+      "path": "/privacy/",
+      "name": "Privacy",
+      "type": "page",
+      "bootstrap_status": "draft",
+      "ci_fixture_public": false,
+      "indexable": true,
+      "trust_page": true,
+      "production_publication": ["privacy_legal_approver"]
+    },
+    "terms": {
+      "slug": "terms",
+      "path": "/terms/",
+      "name": "Terms",
+      "type": "page",
+      "bootstrap_status": "draft",
+      "ci_fixture_public": false,
+      "indexable": true,
+      "trust_page": true,
+      "production_publication": ["privacy_legal_approver"]
+    },
+    "ai_assist_disclosure": {
+      "slug": "ai-assisted-work-disclosure",
+      "path": "/ai-assisted-work-disclosure/",
+      "name": "AI-Assisted Work Disclosure",
+      "type": "page",
+      "bootstrap_status": "draft",
+      "ci_fixture_public": false,
+      "indexable": true,
+      "trust_page": true,
+      "production_publication": ["editorial_lead", "privacy_legal_approver"]
+    },
+    "source_registry": {
+      "slug": "source-registry",
+      "path": "/source-registry/",
+      "name": "Source Registry",
+      "type": "page",
+      "bootstrap_status": "draft",
+      "ci_fixture_public": false,
+      "indexable": true,
+      "trust_page": false,
+      "production_publication": ["source_registry_reviewer", "editorial_lead"]
+    }
+  },
+  "categories": {
+    "evidence": {
+      "slug": "evidence-literacy",
+      "path": "/category/evidence-literacy/",
+      "name": "Evidence Literacy",
+      "legacy_slugs": []
+    },
+    "sleep": {
+      "slug": "sleep",
+      "path": "/category/sleep/",
+      "name": "Sleep and Circadian Health",
+      "legacy_slugs": ["sleep-and-circadian-health"]
+    },
+    "movement": {
+      "slug": "movement",
+      "path": "/category/movement/",
+      "name": "Movement and Physical Capacity",
+      "legacy_slugs": ["movement-and-physical-capacity"]
+    },
+    "nutrition": {
+      "slug": "nutrition",
+      "path": "/category/nutrition/",
+      "name": "Nutrition and Healthy Aging",
+      "legacy_slugs": ["nutrition-and-healthy-aging"]
+    },
+    "wearables": {
+      "slug": "wearables",
+      "path": "/category/wearables/",
+      "name": "Wearables and Consumer Measurement",
+      "legacy_slugs": ["wearables-and-consumer-measurement"]
+    },
+    "supplements": {
+      "slug": "supplements",
+      "path": "/category/supplements/",
+      "name": "Supplements and High-Uncertainty Interventions",
+      "legacy_slugs": ["supplements-and-high-uncertainty-interventions"]
+    },
+    "consumer_lab": {
+      "slug": "consumer-lab",
+      "path": "/category/consumer-lab/",
+      "name": "Consumer Lab",
+      "legacy_slugs": []
+    }
+  },
+  "search": {
+    "path": "/?s=",
+    "indexable": false
+  },
+  "ci_fixture_content": {
+    "description": "Synthetic, watermarked fixture records published only by scripts/create-test-fixtures.php in guarded local/CI environments. Never present in staging, production, or release artifacts.",
+    "published_paths": [
+      "/test-evidence-guide/",
+      "/test-medically-reviewed-article/",
+      "/reviews/test-valid-review/",
+      "/reviews/test-alpha-review/",
+      "/reviews/test-zeta-review/"
+    ],
+    "blocked_paths": [
+      "/reviews/test-blocked-review/"
+    ]
+  }
+}

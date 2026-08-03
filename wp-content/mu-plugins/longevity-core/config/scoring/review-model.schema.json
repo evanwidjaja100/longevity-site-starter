@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://longevityevidencelab.example/schemas/review-model.schema.json",
+  "title": "Longevity Evidence Lab review scoring model",
+  "type": "object",
+  "required": ["version", "minimum_meaningful_difference", "rules"],
+  "additionalProperties": true,
+  "properties": {
+    "version": {
+      "type": "string",
+      "pattern": "^[0-9A-Za-z][0-9A-Za-z._-]{0,39}$"
+    },
+    "minimum_meaningful_difference": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 5
+    },
+    "rules": {
+      "type": "object"
+    }
+  }
+}

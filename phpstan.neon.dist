@@ -1,9 +1,19 @@
+includes:
+  - vendor/szepeviktor/phpstan-wordpress/extension.neon
+
 parameters:
+  # Current level: 5. Plan: raise to 6 once WordPress stubs are fully resolved
+  # and remaining type-narrowing issues are addressed.
   level: 5
+  treatPhpDocTypesAsCertain: false
   paths:
     - wp-content/mu-plugins/longevity-core
     - wp-content/themes/longevity-starter/functions.php
+    - scripts
   excludePaths:
     - vendor
   scanFiles:
     - wp-content/mu-plugins/longevity-core.php
+    - tests/php/stubs/wp-cli-stub.php
+  bootstrapFiles:
+    - tests/phpstan-bootstrap.php

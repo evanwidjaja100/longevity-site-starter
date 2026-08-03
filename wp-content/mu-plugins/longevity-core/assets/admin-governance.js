@@ -14,16 +14,87 @@
         });
       });
     };
+
+    const createResultRow = (index) => {
+      const tr = document.createElement('tr');
+      tr.dataset.lelResultRow = '';
+
+      const cells = [
+        { tag: 'input', attrs: { type: 'text', 'aria-label': 'Metric' } },
+        { tag: 'input', attrs: { type: 'text', 'aria-label': 'Observed value' } },
+        { tag: 'input', attrs: { type: 'text', 'aria-label': 'Unit' } },
+        { tag: 'input', attrs: { type: 'text', 'aria-label': 'Reference label' } },
+        { tag: 'input', attrs: { type: 'text', 'aria-label': 'Reference value' } },
+        {
+          tag: 'select',
+          attrs: { 'aria-label': 'Status' },
+          options: [
+            { value: 'meets', label: 'Meets reference' },
+            { value: 'partially_meets', label: 'Partially meets' },
+            { value: 'does_not_meet', label: 'Does not meet' },
+            { value: 'informational', label: 'Informational', selected: true },
+            { value: 'not_applicable', label: 'Not applicable' },
+          ],
+        },
+        { tag: 'textarea', attrs: { rows: '2', 'aria-label': 'Interpretation note' } },
+        { tag: 'input', attrs: { type: 'number', min: '0', max: '999', value: String((index + 1) * 10), 'aria-label': 'Display order' } },
+      ];
+
+      cells.forEach((cell) => {
+        const td = document.createElement('td');
+        const el = document.createElement(cell.tag);
+        Object.entries(cell.attrs).forEach(([k, v]) => el.setAttribute(k, v));
+        if (cell.options) {
+          cell.options.forEach((opt) => {
+            const o = document.createElement('option');
+            o.value = opt.value;
+            o.textContent = opt.label;
+            if (opt.selected) o.selected = true;
+            el.appendChild(o);
+          });
+        }
+        td.appendChild(el);
+        tr.appendChild(td);
+      });
+
+      const actions = document.createElement('td');
+      const upBtn = document.createElement('button');
+      upBtn.type = 'button';
+      upBtn.className = 'button-link';
+      upBtn.dataset.lelResultUp = '';
+      upBtn.setAttribute('aria-label', 'Move row up');
+      upBtn.textContent = '\u2191';
+
+      const downBtn = document.createElement('button');
+      downBtn.type = 'button';
+      downBtn.className = 'button-link';
+      downBtn.dataset.lelResultDown = '';
+      downBtn.setAttribute('aria-label', 'Move row down');
+      downBtn.textContent = '\u2193';
+
+      const removeBtn = document.createElement('button');
+      removeBtn.type = 'button';
+      removeBtn.className = 'button-link-delete';
+      removeBtn.dataset.lelRemoveResult = '';
+      removeBtn.textContent = 'Remove';
+
+      actions.appendChild(upBtn);
+      actions.appendChild(document.createTextNode(' '));
+      actions.appendChild(downBtn);
+      actions.appendChild(document.createTextNode(' '));
+      actions.appendChild(removeBtn);
+      tr.appendChild(actions);
+
+      return tr;
+    };
+
     resultsEditor.addEventListener('click', (event) => {
       const row = event.target.closest('[data-lel-result-row]');
       if (event.target.closest('[data-lel-add-result]')) {
         const index = resultRows.children.length;
-        const next = document.createElement('tr');
-        next.dataset.lelResultRow = '';
-        next.innerHTML = `<td><input type="text" aria-label="Metric"></td><td><input type="text" aria-label="Observed value"></td><td><input type="text" aria-label="Unit"></td><td><input type="text" aria-label="Reference label"></td><td><input type="text" aria-label="Reference value"></td><td><select aria-label="Status"><option value="meets">Meets reference</option><option value="partially_meets">Partially meets</option><option value="does_not_meet">Does not meet</option><option value="informational" selected>Informational</option><option value="not_applicable">Not applicable</option></select></td><td><textarea rows="2" aria-label="Interpretation note"></textarea></td><td><input type="number" min="0" max="999" value="${(index + 1) * 10}" aria-label="Display order"></td><td><button type="button" class="button-link" data-lel-result-up aria-label="Move row up">↑</button> <button type="button" class="button-link" data-lel-result-down aria-label="Move row down">↓</button> <button type="button" class="button-link-delete" data-lel-remove-result>Remove</button></td>`;
-        resultRows.appendChild(next);
+        resultRows.appendChild(createResultRow(index));
         reindexResults();
-        next.querySelector('input').focus();
+        resultRows.lastElementChild.querySelector('input').focus();
       } else if (row && event.target.closest('[data-lel-remove-result]')) {
         row.remove();
         reindexResults();
@@ -88,6 +159,42 @@
     });
   };
 
+  const createDimensionRow = (index) => {
+    const tr = document.createElement('tr');
+    tr.dataset.lelScoreRow = '';
+
+    const cells = [
+      { id: `lel-dimension-name-${index}`, label: 'Dimension name', tag: 'input', attrs: { type: 'text' } },
+      { id: `lel-dimension-score-${index}`, label: 'Dimension score', tag: 'input', attrs: { type: 'number', min: '0', max: '5', step: '0.1' } },
+      { id: `lel-dimension-weight-${index}`, label: 'Dimension weight', tag: 'input', attrs: { type: 'number', min: '0', max: '100', step: '0.1' } },
+    ];
+
+    cells.forEach((cell) => {
+      const td = document.createElement('td');
+      const label = document.createElement('label');
+      label.className = 'screen-reader-text';
+      label.htmlFor = cell.id;
+      label.textContent = cell.label;
+      const input = document.createElement(cell.tag);
+      input.id = cell.id;
+      Object.entries(cell.attrs).forEach(([k, v]) => input.setAttribute(k, v));
+      td.appendChild(label);
+      td.appendChild(input);
+      tr.appendChild(td);
+    });
+
+    const actions = document.createElement('td');
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'button-link-delete';
+    removeBtn.dataset.lelRemoveDimension = '';
+    removeBtn.textContent = 'Remove';
+    actions.appendChild(removeBtn);
+    tr.appendChild(actions);
+
+    return tr;
+  };
+
   const calculate = () => {
     let weight = 0;
     let calculated = 0;
@@ -119,13 +226,10 @@
     }
     if (event.target.closest('[data-lel-add-dimension]')) {
       const index = rows.querySelectorAll('[data-lel-score-row]').length;
-      const row = document.createElement('tr');
-      row.dataset.lelScoreRow = '';
-      row.innerHTML = `<td><label class="screen-reader-text" for="lel-dimension-name-${index}">Dimension name</label><input id="lel-dimension-name-${index}" type="text"></td><td><label class="screen-reader-text" for="lel-dimension-score-${index}">Dimension score</label><input id="lel-dimension-score-${index}" type="number" min="0" max="5" step="0.1"></td><td><label class="screen-reader-text" for="lel-dimension-weight-${index}">Dimension weight</label><input id="lel-dimension-weight-${index}" type="number" min="0" max="100" step="0.1"></td><td><button type="button" class="button-link-delete" data-lel-remove-dimension>Remove</button></td>`;
-      rows.appendChild(row);
+      rows.appendChild(createDimensionRow(index));
       reindex();
       calculate();
-      row.querySelector('input').focus();
+      rows.lastElementChild.querySelector('input').focus();
     }
   });
 

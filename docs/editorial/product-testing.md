@@ -11,3 +11,8 @@ Hands-on claims require a separate approved test record linked to a versioned pr
 Scoring dimensions and weights are defined before testing and weights must total 100%. Preserve raw scores. The final score is reproducible; confidence is reported separately as High, Moderate, Low, or Preliminary. Missing evidence lowers confidence. Commercial relationships cannot change scoring, and manual overrides require a reason.
 
 Informal consumer testing must not be described as clinical validation. No article may claim a test duration, measurement, product unit, firmware version, or result that did not occur.
+## Production Readiness v2 protocol and record approval
+
+Protocol preparation, test-record entry, and approval are separate responsibilities. A protocol author cannot approve the same protocol. Protocol approval is bound to a canonical hash of its material fields; later protocol edits mark it stale. A test-record approver cannot be the record author, submitter, or listed tester, and test-record approval is likewise bound to its exact material state.
+
+A public review can claim testing, show public results, calculate a score, or enter rankings only when the linked protocol and test record are current, independently approved, semantically date-valid, and compatible with the packaged scoring-model version. Raw observations, evidence references, device identifiers, private test metadata, and approval internals remain private.

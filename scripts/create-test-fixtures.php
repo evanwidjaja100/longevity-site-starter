@@ -4,10 +4,13 @@
  *
  * All identities, products, sources, and URLs are explicitly synthetic and use
  * reserved example domains. This file must never be used for production data.
+ *
+ * @package LongevityCore
  */
 
-if ( 'production' === wp_get_environment_type() ) {
-	WP_CLI::error( 'Synthetic fixtures must never run in production.' );
+$lel_fixture_environment = wp_get_environment_type();
+if ( ! in_array( $lel_fixture_environment, array( 'local', 'development' ), true ) ) {
+	WP_CLI::error( sprintf( 'Synthetic fixtures refuse to run in the "%s" environment. Only local and development environments may host the CI fixture projection; staging and production must never contain synthetic records.', $lel_fixture_environment ) );
 }
 
 $today       = gmdate( 'Y-m-d' );
@@ -23,11 +26,63 @@ if ( ! $author ) {
 	$author = get_user_by( 'id', $author_id );
 }
 $author->set_role( 'lel_writer' );
-wp_update_user( array( 'ID' => $author->ID, 'display_name' => '[TEST] Synthetic Author', 'description' => 'Synthetic author profile for local and CI route testing only.' ) );
+wp_update_user(
+	array(
+		'ID'           => $author->ID,
+		'display_name' => '[TEST] Synthetic Author',
+		'description'  => 'Synthetic author profile for local and CI route testing only.',
+	)
+);
 
-/** Find or create a named post. */
+/**
+ * Find or create a synthetic actor and grant only the requested fixture capabilities.
+ *
+ * @param string $login        Synthetic user login.
+ * @param string $email        Synthetic email on a reserved example domain.
+ * @param string $display_name Clearly labeled synthetic display name.
+ * @param string $role         Role slug to assign.
+ * @param array  $capabilities Additional capabilities to grant.
+ * @return WP_User The found or created synthetic user.
+ */
+function lel_fixture_user( string $login, string $email, string $display_name, string $role, array $capabilities = array() ): WP_User {
+	$user = get_user_by( 'login', $login );
+	if ( ! $user ) {
+		$user_id = wp_create_user( $login, wp_generate_password( 32, true, true ), $email );
+		if ( is_wp_error( $user_id ) ) {
+			WP_CLI::error( $user_id->get_error_message() );
+		}
+		$user = get_user_by( 'id', $user_id );
+	}
+	$user->set_role( $role );
+	foreach ( $capabilities as $capability ) {
+		$user->add_cap( $capability );
+	}
+	wp_update_user(
+		array(
+			'ID'           => $user->ID,
+			'display_name' => $display_name,
+		)
+	);
+	return $user;
+}
+
+$fact_checker        = lel_fixture_user( 'lel_synthetic_fact_checker', 'fact-checker@example.invalid', '[TEST] Synthetic Fact Checker', 'lel_fact_checker' );
+$tester              = lel_fixture_user( 'lel_synthetic_tester', 'tester@example.invalid', '[TEST] Synthetic Product Tester', 'lel_product_tester' );
+$test_approver       = lel_fixture_user( 'lel_synthetic_test_approver', 'test-approver@example.invalid', '[TEST] Synthetic Test Approver', 'subscriber', array( 'approve_test_records' ) );
+$commercial_approver = lel_fixture_user( 'lel_synthetic_commercial_approver', 'commercial-approver@example.invalid', '[TEST] Synthetic Commercial Approver', 'subscriber', array( 'approve_commercial_disclosure' ) );
+
+/**
+ * Find or create a named post.
+ *
+ * @param string $type      Post type slug.
+ * @param string $slug      Post slug used for idempotent lookup.
+ * @param string $title     Post title.
+ * @param string $content   Post content.
+ * @param int    $author_id Author user ID.
+ * @return int The created or updated post ID.
+ */
 function lel_fixture_post( string $type, string $slug, string $title, string $content, int $author_id ): int {
-	$found = get_posts(
+	$found   = get_posts(
 		array(
 			'post_type'      => $type,
 			'post_status'    => 'any',
@@ -47,36 +102,85 @@ function lel_fixture_post( string $type, string $slug, string $title, string $co
 		'post_excerpt' => 'Synthetic local/CI fixture used to verify the public experience and governance controls.',
 		'post_author'  => $author_id,
 	);
-	$result = $post_id ? wp_update_post( $data, true ) : wp_insert_post( $data, true );
+	$result  = $post_id ? wp_update_post( $data, true ) : wp_insert_post( $data, true );
 	if ( is_wp_error( $result ) ) {
 		WP_CLI::error( $result->get_error_message() );
 	}
 	return (int) $result;
 }
 
-/** Apply a metadata map. */
+/**
+ * Apply a metadata map.
+ *
+ * @param int   $post_id Target post ID.
+ * @param array $values  Map of meta keys to values.
+ */
 function lel_fixture_meta( int $post_id, array $values ): void {
-	foreach ( $values as $key => $value ) {
-		update_post_meta( $post_id, $key, $value );
+	\Longevity\Core\Meta_Authorization::enter_trusted_scope();
+	try {
+		foreach ( $values as $key => $value ) {
+			update_post_meta( $post_id, $key, $value );
+		}
+	} finally {
+		\Longevity\Core\Meta_Authorization::exit_trusted_scope();
 	}
 }
 
-/** Common publication metadata for synthetic public fixtures. */
+/**
+ * Common publication metadata for synthetic public fixtures.
+ *
+ * @param string $today       Current UTC date in Y-m-d format.
+ * @param string $next_review Next scheduled content-review date in Y-m-d format.
+ * @return array Publication metadata map.
+ */
 function lel_fixture_public_meta( string $today, string $next_review ): array {
 	return array(
-		'content_summary'              => 'A synthetic page for exercising editorial metadata and public trust components.',
-		'content_scope'                => 'Local and CI rendering behavior only.',
-		'content_limitations'          => 'This is test data, not health guidance, product advice, or real evidence.',
-		'original_contribution'        => 'Automated verification of templates, structured metadata, and publication controls.',
-		'commercial_relationship'      => 'none',
-		'affiliate_disclosure_status'  => 'not_required',
-		'editorial_approval_status'    => 'ready',
-		'correction_status'            => 'none',
-		'last_material_update'         => $today,
-		'next_content_review_date'     => $next_review,
-		'region_scope'                 => 'Synthetic test environment',
-		'uncertainty_statement_present'=> true,
+		'content_summary'               => 'A synthetic page for exercising editorial metadata and public trust components.',
+		'content_scope'                 => 'Local and CI rendering behavior only.',
+		'content_limitations'           => 'This is test data, not health guidance, product advice, or real evidence.',
+		'original_contribution'         => 'Automated verification of templates, structured metadata, and publication controls.',
+		'commercial_relationship'       => 'none',
+		'affiliate_disclosure_status'   => 'not_required',
+		'editorial_approval_status'     => 'editorial_review',
+		'correction_status'             => 'none',
+		'last_material_update'          => $today,
+		'next_content_review_date'      => $next_review,
+		'region_scope'                  => 'Synthetic test environment',
+		'uncertainty_statement_present' => true,
 	);
+}
+
+/**
+ * Create or refresh a content approval through the same immutable service used in production.
+ *
+ * @param int    $post_id  Target post ID.
+ * @param string $type     Approval type slug.
+ * @param int    $actor_id Approving user ID.
+ * @param array  $payload  Optional approval payload.
+ */
+function lel_fixture_approve( int $post_id, string $type, int $actor_id, array $payload = array() ): void {
+	if ( \Longevity\Core\Approval_Service::is_current( $post_id, $type ) ) {
+		$projection = array(
+			'editorial'  => array( 'editorial_approval_status' => 'ready' ),
+			'fact_check' => array(
+				'fact_check_status' => 'complete',
+				'fact_checked_by'   => $actor_id,
+				'fact_checked_date' => gmdate( 'Y-m-d' ),
+			),
+			'medical'    => array(
+				'medical_review_status'   => 'complete',
+				'medical_review_attested' => true,
+				'medical_review_date'     => gmdate( 'Y-m-d' ),
+			),
+			'testing'    => array( 'testing_status' => 'approved' ),
+			'commercial' => array( 'affiliate_disclosure_status' => 'approved' ),
+		);
+		lel_fixture_meta( $post_id, $projection[ $type ] ?? array() );
+		return;
+	}
+	if ( ! \Longevity\Core\Approval_Service::approve( $post_id, $type, $actor_id, $payload ) ) {
+		WP_CLI::error( sprintf( 'Synthetic %s approval failed for post %d.', $type, $post_id ) );
+	}
 }
 
 $category = get_term_by( 'slug', 'evidence-literacy', 'category' );
@@ -113,10 +217,10 @@ lel_fixture_meta(
 		array(
 			'evidence_grade'           => 'U',
 			'evidence_grade_rationale' => 'Unrated synthetic data used only to test the evidence-grade interface.',
-			'evidence_cutoff_date'      => $today,
-			'fact_check_status'         => 'not_required',
-			'medical_review_status'     => 'not_required',
-			'testing_status'            => 'not_required',
+			'evidence_cutoff_date'     => $today,
+			'fact_check_status'        => 'not_required',
+			'medical_review_status'    => 'not_required',
+			'testing_status'           => 'not_required',
 		)
 	)
 );
@@ -142,30 +246,38 @@ lel_fixture_meta(
 		'publication_date'    => $today,
 		'accessed_date'       => $today,
 		'evidence_grade'      => 'U',
-		'verified_by'         => (string) $admin_id,
-		'verification_date'   => $today,
-		'verification_status' => 'verified',
+		'verification_status' => 'not_verified',
 		'recheck_date'        => $next_review,
 	)
 );
-
-$reviewer = get_user_by( 'login', 'lel_synthetic_reviewer' );
-if ( ! $reviewer ) {
-	$reviewer_id = wp_create_user( 'lel_synthetic_reviewer', wp_generate_password( 32, true, true ), 'reviewer@example.invalid' );
-	if ( is_wp_error( $reviewer_id ) ) {
-		WP_CLI::error( $reviewer_id->get_error_message() );
-	}
-	$reviewer = get_user_by( 'id', $reviewer_id );
+if ( ! \Longevity\Core\Claims::verify( $claim_id, $fact_checker->ID ) ) {
+	WP_CLI::error( 'Synthetic interface claim could not be independently verified.' );
 }
-$reviewer->set_role( 'lel_medical_reviewer' );
-wp_update_user( array( 'ID' => $reviewer->ID, 'display_name' => '[TEST] Synthetic Reviewer' ) );
-update_user_meta( $reviewer->ID, 'professional_credentials', 'Synthetic credential for automated interface testing only; not a real clinician.' );
-update_user_meta( $reviewer->ID, 'credential_verification_status', 'verified' );
-update_user_meta( $reviewer->ID, 'credential_verification_date', $today );
-update_user_meta( $reviewer->ID, 'review_scope', 'Synthetic test records only.' );
-update_user_meta( $reviewer->ID, 'conflict_disclosure', 'Synthetic identity; no real-world professional relationship.' );
 
-$medical_id = lel_fixture_post( 'post', 'test-medically-reviewed-article', '[TEST] Medical review workflow', $article_content, $author->ID );
+$reviewer = lel_fixture_user( 'lel_synthetic_reviewer', 'reviewer@example.invalid', '[TEST] Synthetic Reviewer', 'lel_medical_reviewer' );
+update_user_meta( $reviewer->ID, 'professional_credentials', 'Synthetic credential for automated interface testing only; not a real clinician.' );
+update_user_meta( $reviewer->ID, 'review_scope', 'full_article' );
+update_user_meta( $reviewer->ID, 'jurisdictions', 'Synthetic test environment' );
+update_user_meta( $reviewer->ID, 'conflict_disclosure', 'Synthetic identity; no real-world professional relationship.' );
+if ( ! \Longevity\Core\Reviewer_Credentials::is_valid_for( $reviewer->ID, 'full_article', 'Synthetic test environment', $today ) ) {
+	$verified = \Longevity\Core\Reviewer_Credentials::verify(
+		$reviewer->ID,
+		array(
+			'credential_verification_date'         => $today,
+			'credential_expiration_date'           => gmdate( 'Y-m-d', strtotime( '+365 days' ) ),
+			'credential_verification_evidence_ref' => 'synthetic-ci-reference',
+			'verified_professional_credentials'    => 'Synthetic credential for automated interface testing only; not a real clinician.',
+			'verified_review_scope'                => 'full_article',
+			'verified_jurisdictions'               => 'Synthetic test environment',
+		),
+		$admin_id
+	);
+	if ( ! $verified ) {
+		WP_CLI::error( 'Synthetic reviewer credentials could not be independently verified.' );
+	}
+}
+
+$medical_id       = lel_fixture_post( 'post', 'test-medically-reviewed-article', '[TEST] Medical review workflow', $article_content, $author->ID );
 $medical_claim_id = lel_fixture_post( 'lel_claim', 'test-medical-claim', '[TEST] Medical workflow claim', '', $admin_id );
 lel_fixture_meta(
 	$medical_claim_id,
@@ -176,126 +288,160 @@ lel_fixture_meta(
 		'source_type'         => 'Synthetic test record',
 		'source_title'        => 'Reserved example source for medical workflow testing',
 		'source_url'          => 'https://example.invalid/test-medical-source',
-		'verification_status' => 'verified',
-		'verified_by'         => (string) $admin_id,
-		'verification_date'   => $today,
+		'verification_status' => 'not_verified',
 	)
 );
+if ( ! \Longevity\Core\Claims::verify( $medical_claim_id, $fact_checker->ID ) ) {
+	WP_CLI::error( 'Synthetic medical claim could not be independently verified.' );
+}
 lel_fixture_meta(
 	$medical_id,
 	array_merge(
 		lel_fixture_public_meta( $today, $next_review ),
 		array(
-			'material_health_claims'          => true,
-			'fact_check_status'                => 'complete',
-			'fact_checked_by'                  => $admin_id,
-			'fact_checked_date'                => $today,
-			'next_fact_check_date'             => $next_review,
-			'medical_review_required'          => true,
-			'medical_review_status'            => 'complete',
-			'medical_reviewer_user_id'         => $reviewer->ID,
-			'medical_reviewer_credentials'     => 'Synthetic credential for automated interface testing only.',
-			'medical_review_scope'             => 'full_article',
-			'medical_review_sections'          => 'All synthetic sections.',
-			'medical_review_limitations'       => 'No real medical assertions were reviewed.',
-			'medical_review_conflicts'         => 'Synthetic identity; no real conflicts.',
-			'medical_review_revision_status'   => 'not_applicable',
-			'medical_review_date'              => $today,
-			'next_medical_review_date'         => $next_review,
-			'medical_review_version'           => 'test-1.0',
-			'medical_review_attested'          => true,
-			'testing_status'                   => 'not_required',
+			'material_health_claims'         => true,
+			'fact_check_status'              => 'in_progress',
+			'next_fact_check_date'           => $next_review,
+			'medical_review_required'        => true,
+			'medical_review_status'          => 'assigned',
+			'medical_reviewer_user_id'       => $reviewer->ID,
+			'medical_review_scope'           => 'full_article',
+			'medical_review_sections'        => 'All synthetic sections.',
+			'medical_review_limitations'     => 'No real medical assertions were reviewed.',
+			'medical_review_conflicts'       => 'Synthetic identity; no real conflicts.',
+			'medical_review_revision_status' => 'not_applicable',
+			'next_medical_review_date'       => $next_review,
+			'medical_review_version'         => 'test-1.0',
+			'medical_review_attested'        => false,
+			'testing_status'                 => 'not_required',
 		)
 	)
 );
 
-$protocol_id = lel_fixture_post( 'lel_protocol', 'test-wearable-protocol', '[TEST] Wearable protocol', '', $admin_id );
+$protocol_id = lel_fixture_post( 'lel_protocol', 'test-wearable-protocol', '[TEST] Wearable protocol', '', $tester->ID );
 lel_fixture_meta(
 	$protocol_id,
 	array(
-		'protocol_id'                      => 'TEST-WEARABLE',
-		'protocol_version'                 => '1.0',
-		'product_category'                 => 'Synthetic wearable',
-		'effective_date'                   => '2025-01-01',
-		'minimum_test_duration'            => 'Three synthetic sessions',
-		'required_observations'            => 'Rendering and state checks only.',
-		'required_comparison_methods'      => 'Synthetic comparison fixture.',
-		'required_environmental_conditions'=> 'Local or CI runtime.',
-		'required_disclosure_fields'       => 'Synthetic product and acquisition labels.',
+		'protocol_id'                       => 'TEST-WEARABLE',
+		'protocol_version'                  => '1.0',
+		'product_category'                  => 'Synthetic wearable',
+		'effective_date'                    => '2025-01-01',
+		'minimum_test_duration'             => 'Three synthetic sessions',
+		'required_observations'             => 'Rendering and state checks only.',
+		'required_comparison_methods'       => 'Synthetic comparison fixture.',
+		'required_environmental_conditions' => 'Local or CI runtime.',
+		'required_disclosure_fields'        => 'Synthetic product and acquisition labels.',
+		'scoring_dimensions'                => array(
+			array(
+				'name'   => 'Interface verification',
+				'score'  => 4.0,
+				'weight' => 100.0,
+			),
+		),
 		'known_limitations'                 => 'No physical product was tested.',
-		'protocol_reviewer_user_id'         => $admin_id,
-		'approval_date'                     => '2025-01-01',
-		'approval_status'                   => 'approved',
+		'approval_status'                   => 'pending',
 	)
 );
+if ( ! \Longevity\Core\Review_Methodology::approve_protocol( $protocol_id, $test_approver->ID ) ) {
+	WP_CLI::error( 'Synthetic protocol could not be independently approved.' );
+}
 
-$record_id = lel_fixture_post( 'lel_test_record', 'test-wearable-record', '[TEST] Wearable test record', '', $admin_id );
+$record_id = lel_fixture_post( 'lel_test_record', 'test-wearable-record', '[TEST] Wearable test record', '', $tester->ID );
 lel_fixture_meta(
 	$record_id,
 	array(
-		'product_name'       => 'Example Device TEST-1',
-		'unit_identifier'    => 'SYNTHETIC-UNIT-001',
-		'acquisition_method' => 'purchased',
-		'tester_user_ids'    => (string) $admin_id,
-		'test_start_date'    => '2025-02-01',
-		'test_end_date'      => '2025-02-03',
-		'protocol_id'        => 'TEST-WEARABLE',
-		'protocol_version'   => '1.0',
-		'raw_observations'   => 'Synthetic observations for template verification only.',
-		'measurement_equipment'=> 'No physical equipment; software fixture.',
-		'failures'           => 'None recorded in the synthetic run.',
-		'deviations'         => 'Physical testing not applicable.',
-		'comparison_devices' => 'Example Comparator TEST-2.',
-		'environment'        => 'Local Docker environment.',
-		'evidence_references'=> 'https://example.invalid/test-method',
-		'public_test_results'=> array(
-			array( 'label' => 'Battery duration', 'observed_value' => '6.2', 'unit' => 'days', 'reference_label' => 'Synthetic reference', 'reference_value' => '7 days', 'status' => 'partially_meets', 'note' => 'Synthetic observation for interface testing only.', 'display_order' => 10 ),
-			array( 'label' => 'Data export', 'observed_value' => 'Available', 'unit' => '', 'reference_label' => '', 'reference_value' => '', 'status' => 'informational', 'note' => 'No real account or export was used.', 'display_order' => 20 ),
+		'product_name'          => 'Example Device TEST-1',
+		'unit_identifier'       => 'SYNTHETIC-UNIT-001',
+		'acquisition_method'    => 'purchased',
+		'tester_user_ids'       => (string) $tester->ID,
+		'submitted_by'          => $tester->ID,
+		'submitted_at'          => gmdate( DATE_ATOM ),
+		'test_start_date'       => '2025-02-01',
+		'test_end_date'         => '2025-02-03',
+		'protocol_id'           => 'TEST-WEARABLE',
+		'protocol_version'      => '1.0',
+		'raw_observations'      => 'Synthetic observations for template verification only.',
+		'measurement_equipment' => 'No physical equipment; software fixture.',
+		'failures'              => 'None recorded in the synthetic run.',
+		'deviations'            => 'Physical testing not applicable.',
+		'comparison_devices'    => 'Example Comparator TEST-2.',
+		'environment'           => 'Local Docker environment.',
+		'evidence_references'   => 'https://example.invalid/test-method',
+		'public_test_results'   => array(
+			array(
+				'label'           => 'Battery duration',
+				'observed_value'  => '6.2',
+				'unit'            => 'days',
+				'reference_label' => 'Synthetic reference',
+				'reference_value' => '7 days',
+				'status'          => 'partially_meets',
+				'note'            => 'Synthetic observation for interface testing only.',
+				'display_order'   => 10,
+			),
+			array(
+				'label'           => 'Data export',
+				'observed_value'  => 'Available',
+				'unit'            => '',
+				'reference_label' => '',
+				'reference_value' => '',
+				'status'          => 'informational',
+				'note'            => 'No real account or export was used.',
+				'display_order'   => 20,
+			),
 		),
-		'conflicts'          => 'Synthetic test data only.',
-		'approval_status'    => 'approved',
-		'approved_by'        => $admin_id,
-		'approval_date'      => $today,
+		'conflicts'             => 'Synthetic test data only.',
+		'approval_status'       => 'pending',
 	)
 );
+if ( ! \Longevity\Core\Review_Methodology::valid_test_record( $record_id, '1.0' ) && ! \Longevity\Core\Review_Methodology::approve_test_record( $record_id, $test_approver->ID ) ) {
+	WP_CLI::error( 'Synthetic test record could not be independently approved.' );
+}
 
 $review_content = '<!-- wp:paragraph --><p><strong>Synthetic product review:</strong> no physical product, purchase, endorsement, or recommendation is represented.</p><!-- /wp:paragraph --><!-- wp:heading --><h2>Decision context</h2><!-- /wp:heading --><p>This local fixture verifies that the decision summary appears before commercial actions and that score confidence remains distinct from the score.</p><!-- wp:heading --><h2>Method</h2><!-- /wp:heading --><p>The linked approved record and matching protocol version are synthetic. The interface must say what was and was not tested.</p><!-- wp:heading --><h2>Limitations</h2><!-- /wp:heading --><p>No physical performance, price, durability, accuracy, or health outcome was measured.</p>';
 $review_id      = lel_fixture_post( 'review', 'test-valid-review', '[TEST] Valid review workflow', $review_content, $author->ID );
 $dimensions     = array(
-	array( 'name' => 'Interface clarity', 'score' => 4.0, 'weight' => 50.0 ),
-	array( 'name' => 'Metadata completeness', 'score' => 3.6, 'weight' => 50.0 ),
+	array(
+		'name'   => 'Interface clarity',
+		'score'  => 4.0,
+		'weight' => 50.0,
+	),
+	array(
+		'name'   => 'Metadata completeness',
+		'score'  => 3.6,
+		'weight' => 50.0,
+	),
 );
 lel_fixture_meta(
 	$review_id,
 	array_merge(
 		lel_fixture_public_meta( $today, $next_review ),
 		array(
-			'testing_required'          => true,
-			'testing_status'            => 'complete',
-			'testing_start_date'        => '2025-02-01',
-			'testing_end_date'          => '2025-02-03',
-			'testing_duration'          => 'Three synthetic sessions',
-			'testing_methodology_url'   => 'https://example.invalid/test-method',
-			'testing_protocol_version'  => '1.0',
-			'test_record_id'            => $record_id,
-			'product_acquisition_method'=> 'purchased',
-			'review_score'              => 3.8,
-			'review_score_version'      => '1.0',
-			'review_score_confidence'   => 'Low confidence',
-			'review_score_dimensions'   => $dimensions,
-			'best_for'                  => 'Testing the complete review interface.',
-			'not_for'                   => 'Any real purchase or health decision.',
-			'tested_product_model'      => 'Example Device TEST-1',
-			'product_brand'             => '[TEST] Example Labs',
-			'product_variant'           => 'Synthetic blue',
-			'product_price_amount'      => 199.00,
-			'product_price_currency'    => 'USD',
-			'price_checked_date'        => $today,
-			'price_region'              => 'Synthetic US market',
-			'comparison_set'            => 'Example Comparator TEST-2',
-			'major_failures'            => 'No physical product was tested.',
-			'fact_check_status'         => 'not_required',
-			'medical_review_status'     => 'not_required',
+			'testing_required'           => true,
+			'testing_status'             => 'complete',
+			'testing_start_date'         => '2025-02-01',
+			'testing_end_date'           => '2025-02-03',
+			'testing_duration'           => 'Three synthetic sessions',
+			'testing_methodology_url'    => 'https://example.invalid/test-method',
+			'testing_protocol_version'   => '1.0',
+			'test_record_id'             => $record_id,
+			'product_acquisition_method' => 'purchased',
+			'review_score'               => 3.8,
+			'review_score_version'       => \Longevity\Core\Review_Methodology::model_version(),
+			'review_score_confidence'    => 'Low confidence',
+			'review_score_dimensions'    => $dimensions,
+			'best_for'                   => 'Testing the complete review interface.',
+			'not_for'                    => 'Any real purchase or health decision.',
+			'tested_product_model'       => 'Example Device TEST-1',
+			'product_brand'              => '[TEST] Example Labs',
+			'product_variant'            => 'Synthetic blue',
+			'product_price_amount'       => 199.00,
+			'product_price_currency'     => 'USD',
+			'price_checked_date'         => $today,
+			'price_region'               => 'Synthetic US market',
+			'comparison_set'             => 'Example Comparator TEST-2',
+			'major_failures'             => 'No physical product was tested.',
+			'fact_check_status'          => 'not_required',
+			'medical_review_status'      => 'not_required',
 		)
 	)
 );
@@ -313,68 +459,188 @@ $merchant_id = lel_fixture_post( 'lel_affiliate', 'test-approved-merchant', '[TE
 lel_fixture_meta(
 	$merchant_id,
 	array(
-		'merchant_id'                => 'TEST-MERCHANT',
-		'merchant_name'              => '[TEST] Example Merchant',
-		'merchant_domain'            => 'merchant.example.invalid',
-		'program_name'               => '[TEST] Synthetic affiliate program',
-		'relationship_status'        => 'active',
-		'effective_date'             => '2025-01-01',
-		'disclosure_language'        => 'Synthetic affiliate relationship for local and CI testing only.',
-		'editorial_independence_note'=> 'The synthetic relationship cannot alter score or order.',
-		'owner_user_id'              => $admin_id,
-		'last_verified_date'         => $today,
+		'merchant_id'                 => 'TEST-MERCHANT',
+		'merchant_name'               => '[TEST] Example Merchant',
+		'merchant_domain'             => 'merchant.example.invalid',
+		'program_name'                => '[TEST] Synthetic affiliate program',
+		'relationship_status'         => 'active',
+		'effective_date'              => '2025-01-01',
+		'disclosure_language'         => 'Synthetic affiliate relationship for local and CI testing only.',
+		'editorial_independence_note' => 'The synthetic relationship cannot alter score or order.',
+		'owner_user_id'               => $admin_id,
+		'last_verified_date'          => $today,
 	)
 );
 
-/** Create another approved synthetic test record for ranking coverage. */
-function lel_fixture_test_record( string $slug, string $product, int $admin_id, string $today, array $results ): int {
-	$record = lel_fixture_post( 'lel_test_record', $slug, '[TEST] ' . $product . ' test record', '', $admin_id );
+/**
+ * Create another approved synthetic test record for ranking coverage.
+ *
+ * @param string $slug        Post slug for the test record.
+ * @param string $product     Synthetic product name.
+ * @param int    $tester_id   Tester user ID.
+ * @param int    $approver_id Approving user ID.
+ * @param string $today       Current UTC date in Y-m-d format.
+ * @param array  $results     Public test-result rows.
+ * @return int The approved test-record post ID.
+ */
+function lel_fixture_test_record( string $slug, string $product, int $tester_id, int $approver_id, string $today, array $results ): int {
+	$record = lel_fixture_post( 'lel_test_record', $slug, '[TEST] ' . $product . ' test record', '', $tester_id );
 	lel_fixture_meta(
 		$record,
 		array(
-			'product_name' => $product, 'unit_identifier' => strtoupper( $slug ), 'acquisition_method' => 'purchased', 'tester_user_ids' => (string) $admin_id,
-			'test_start_date' => '2025-02-01', 'test_end_date' => '2025-02-03', 'protocol_id' => 'TEST-WEARABLE', 'protocol_version' => '1.0',
-			'raw_observations' => 'Synthetic observations for interface verification only.', 'public_test_results' => $results, 'measurement_equipment' => 'No physical equipment; software fixture.',
-			'failures' => 'Synthetic record only.', 'deviations' => 'Physical testing not applicable.', 'comparison_devices' => 'Example Comparator TEST-2.', 'environment' => 'Local Docker environment.',
-			'evidence_references' => 'https://example.invalid/test-method', 'conflicts' => 'Synthetic test data only.', 'approval_status' => 'approved', 'approved_by' => $admin_id, 'approval_date' => $today,
+			'product_name'          => $product,
+			'unit_identifier'       => strtoupper( $slug ),
+			'acquisition_method'    => 'purchased',
+			'tester_user_ids'       => (string) $tester_id,
+			'submitted_by'          => $tester_id,
+			'submitted_at'          => gmdate( DATE_ATOM ),
+			'test_start_date'       => '2025-02-01',
+			'test_end_date'         => '2025-02-03',
+			'protocol_id'           => 'TEST-WEARABLE',
+			'protocol_version'      => '1.0',
+			'raw_observations'      => 'Synthetic observations for interface verification only.',
+			'public_test_results'   => $results,
+			'measurement_equipment' => 'No physical equipment; software fixture.',
+			'failures'              => 'Synthetic record only.',
+			'deviations'            => 'Physical testing not applicable.',
+			'comparison_devices'    => 'Example Comparator TEST-2.',
+			'environment'           => 'Local Docker environment.',
+			'evidence_references'   => 'https://example.invalid/test-method',
+			'conflicts'             => 'Synthetic test data only.',
+			'approval_status'       => 'pending',
 		)
 	);
+	if ( ! \Longevity\Core\Review_Methodology::valid_test_record( $record, '1.0' ) && ! \Longevity\Core\Review_Methodology::approve_test_record( $record, $approver_id ) ) {
+		WP_CLI::error( sprintf( 'Synthetic test record %d could not be independently approved.', $record ) );
+	}
 	return $record;
 }
 
-$record_two = lel_fixture_test_record(
+$record_two   = lel_fixture_test_record(
 	'test-device-two-record',
 	'Example Device TEST-2',
-	$admin_id,
+	$tester->ID,
+	$test_approver->ID,
 	$today,
-	array( array( 'label' => 'Sync reliability', 'observed_value' => '9', 'unit' => 'of 10 sessions', 'reference_label' => 'Synthetic target', 'reference_value' => '9 of 10', 'status' => 'meets', 'note' => 'Synthetic result.', 'display_order' => 10 ) )
+	array(
+		array(
+			'label'           => 'Sync reliability',
+			'observed_value'  => '9',
+			'unit'            => 'of 10 sessions',
+			'reference_label' => 'Synthetic target',
+			'reference_value' => '9 of 10',
+			'status'          => 'meets',
+			'note'            => 'Synthetic result.',
+			'display_order'   => 10,
+		),
+	)
 );
 $record_three = lel_fixture_test_record(
 	'test-device-three-record',
 	'Example Device TEST-3',
-	$admin_id,
+	$tester->ID,
+	$test_approver->ID,
 	$today,
-	array( array( 'label' => 'Export format', 'observed_value' => 'CSV', 'unit' => '', 'reference_label' => '', 'reference_value' => '', 'status' => 'informational', 'note' => 'Synthetic result.', 'display_order' => 10 ) )
+	array(
+		array(
+			'label'           => 'Export format',
+			'observed_value'  => 'CSV',
+			'unit'            => '',
+			'reference_label' => '',
+			'reference_value' => '',
+			'status'          => 'informational',
+			'note'            => 'Synthetic result.',
+			'display_order'   => 10,
+		),
+	)
 );
 
 $shared_review_meta = array_merge(
 	lel_fixture_public_meta( $today, $next_review ),
 	array(
-		'testing_required' => true, 'testing_status' => 'complete', 'testing_start_date' => '2025-02-01', 'testing_end_date' => '2025-02-03', 'testing_duration' => 'Three synthetic sessions',
-		'testing_methodology_url' => 'https://example.invalid/test-method', 'testing_protocol_version' => '1.0', 'product_acquisition_method' => 'purchased',
-		'review_score_version' => '1.0', 'best_for' => 'Automated ranking-interface verification.', 'not_for' => 'Any real purchase or health decision.',
-		'comparison_set' => 'Example Comparator TEST-2', 'major_failures' => 'No physical product was tested.', 'fact_check_status' => 'not_required', 'medical_review_status' => 'not_required',
-		'product_brand' => '[TEST] Example Labs', 'price_checked_date' => $today, 'price_region' => 'Synthetic US market', 'product_price_currency' => 'USD',
+		'testing_required'           => true,
+		'testing_status'             => 'complete',
+		'testing_start_date'         => '2025-02-01',
+		'testing_end_date'           => '2025-02-03',
+		'testing_duration'           => 'Three synthetic sessions',
+		'testing_methodology_url'    => 'https://example.invalid/test-method',
+		'testing_protocol_version'   => '1.0',
+		'product_acquisition_method' => 'purchased',
+		'review_score_version'       => \Longevity\Core\Review_Methodology::model_version(),
+		'best_for'                   => 'Automated ranking-interface verification.',
+		'not_for'                    => 'Any real purchase or health decision.',
+		'comparison_set'             => 'Example Comparator TEST-2',
+		'major_failures'             => 'No physical product was tested.',
+		'fact_check_status'          => 'not_required',
+		'medical_review_status'      => 'not_required',
+		'product_brand'              => '[TEST] Example Labs',
+		'price_checked_date'         => $today,
+		'price_region'               => 'Synthetic US market',
+		'product_price_currency'     => 'USD',
 	)
 );
 
-$review_two = lel_fixture_post( 'review', 'test-alpha-review', '[TEST] Alpha product report', $review_content . '\n[affiliate_link url="https://merchant.example.invalid/product" label="View synthetic merchant"]', $author->ID );
-$dimensions_two = array( array( 'name' => 'Interface clarity', 'score' => 4.6, 'weight' => 50.0 ), array( 'name' => 'Metadata completeness', 'score' => 4.2, 'weight' => 50.0 ) );
-lel_fixture_meta( $review_two, array_merge( $shared_review_meta, array( 'test_record_id' => $record_two, 'review_score' => 4.4, 'review_score_dimensions' => $dimensions_two, 'review_score_confidence' => 'High confidence', 'tested_product_model' => 'Example Device TEST-2', 'product_variant' => 'Synthetic small', 'product_price_amount' => 249.00, 'commercial_relationship' => 'affiliate', 'affiliate_disclosure_required' => true, 'affiliate_disclosure_status' => 'complete', 'affiliate_registry_verified' => true ) ) );
+$review_two     = lel_fixture_post( 'review', 'test-alpha-review', '[TEST] Alpha product report', $review_content . '\n[affiliate_link url="https://merchant.example.invalid/product" label="View synthetic merchant"]', $author->ID );
+$dimensions_two = array(
+	array(
+		'name'   => 'Interface clarity',
+		'score'  => 4.6,
+		'weight' => 50.0,
+	),
+	array(
+		'name'   => 'Metadata completeness',
+		'score'  => 4.2,
+		'weight' => 50.0,
+	),
+);
+lel_fixture_meta(
+	$review_two,
+	array_merge(
+		$shared_review_meta,
+		array(
+			'test_record_id'                => $record_two,
+			'review_score'                  => 4.4,
+			'review_score_dimensions'       => $dimensions_two,
+			'review_score_confidence'       => 'High confidence',
+			'tested_product_model'          => 'Example Device TEST-2',
+			'product_variant'               => 'Synthetic small',
+			'product_price_amount'          => 249.00,
+			'commercial_relationship'       => 'affiliate',
+			'affiliate_disclosure_required' => true,
+			'affiliate_disclosure_status'   => 'draft',
+			'affiliate_registry_verified'   => true,
+		)
+	)
+);
 
-$review_three = lel_fixture_post( 'review', 'test-zeta-review', '[TEST] Zeta product report', $review_content, $author->ID );
-$dimensions_three = array( array( 'name' => 'Interface clarity', 'score' => 4.2, 'weight' => 50.0 ), array( 'name' => 'Metadata completeness', 'score' => 4.0, 'weight' => 50.0 ) );
-lel_fixture_meta( $review_three, array_merge( $shared_review_meta, array( 'test_record_id' => $record_three, 'review_score' => 4.1, 'review_score_dimensions' => $dimensions_three, 'review_score_confidence' => 'Preliminary', 'tested_product_model' => 'Example Device TEST-3', 'product_variant' => 'Synthetic large', 'product_price_amount' => 149.00 ) ) );
+$review_three     = lel_fixture_post( 'review', 'test-zeta-review', '[TEST] Zeta product report', $review_content, $author->ID );
+$dimensions_three = array(
+	array(
+		'name'   => 'Interface clarity',
+		'score'  => 4.2,
+		'weight' => 50.0,
+	),
+	array(
+		'name'   => 'Metadata completeness',
+		'score'  => 4.0,
+		'weight' => 50.0,
+	),
+);
+lel_fixture_meta(
+	$review_three,
+	array_merge(
+		$shared_review_meta,
+		array(
+			'test_record_id'          => $record_three,
+			'review_score'            => 4.1,
+			'review_score_dimensions' => $dimensions_three,
+			'review_score_confidence' => 'Preliminary',
+			'tested_product_model'    => 'Example Device TEST-3',
+			'product_variant'         => 'Synthetic large',
+			'product_price_amount'    => 149.00,
+		)
+	)
+);
 
 if ( $category ) {
 	wp_set_post_terms( $review_two, array( (int) $category->term_id ), 'category' );
@@ -387,11 +653,11 @@ lel_fixture_meta(
 	array_merge(
 		lel_fixture_public_meta( $today, $next_review ),
 		array(
-			'testing_required'         => true,
-			'testing_status'           => 'not_started',
-			'tested_product_model'     => 'Example Incomplete Device',
-			'comparison_set'           => 'No completed comparison.',
-			'editorial_approval_status'=> 'testing_incomplete',
+			'testing_required'          => true,
+			'testing_status'            => 'not_started',
+			'tested_product_model'      => 'Example Incomplete Device',
+			'comparison_set'            => 'No completed comparison.',
+			'editorial_approval_status' => 'testing_incomplete',
 		)
 	)
 );
@@ -418,17 +684,115 @@ lel_fixture_meta(
 	)
 );
 
+// Create all final workflow states through immutable approval services. Approval order is material.
+lel_fixture_approve( $article_id, 'editorial', $admin_id );
+lel_fixture_approve( $medical_id, 'fact_check', $fact_checker->ID, array( 'claims' => 1 ) );
+lel_fixture_approve(
+	$medical_id,
+	'medical',
+	$reviewer->ID,
+	array(
+		'scope'   => 'full_article',
+		'version' => 'test-1.0',
+	)
+);
+lel_fixture_approve( $medical_id, 'editorial', $admin_id );
+
+foreach ( array( $review_id, $review_two, $review_three ) as $tested_review_id ) {
+	lel_fixture_approve( $tested_review_id, 'testing', $test_approver->ID );
+}
+lel_fixture_approve( $review_two, 'commercial', $commercial_approver->ID );
+foreach ( array( $review_id, $review_two, $review_three ) as $tested_review_id ) {
+	lel_fixture_approve( $tested_review_id, 'editorial', $admin_id );
+}
+
 foreach ( array( $article_id, $medical_id, $review_id, $review_two, $review_three ) as $public_id ) {
-	$result = wp_update_post( array( 'ID' => $public_id, 'post_status' => 'publish' ), true );
+	$result = wp_update_post(
+		array(
+			'ID'          => $public_id,
+			'post_status' => 'publish',
+		),
+		true
+	);
 	if ( is_wp_error( $result ) || 'publish' !== get_post_status( $public_id ) ) {
 		WP_CLI::error( sprintf( 'Synthetic fixture %d did not pass its publication gates.', $public_id ) );
 	}
 }
 
-wp_update_post( array( 'ID' => $blocked_id, 'post_status' => 'publish' ) );
+wp_update_post(
+	array(
+		'ID'          => $blocked_id,
+		'post_status' => 'publish',
+	)
+);
 if ( 'publish' === get_post_status( $blocked_id ) ) {
 	WP_CLI::error( 'The intentionally incomplete review bypassed publication controls.' );
 }
+
+// --- CI-only public route projection (PRV3-BOOT-03) ---------------------
+// Publishes exactly the draft pages that config/routes.json flags as
+// ci_fixture_public, through the real trust-page approval gate, so browser,
+// accessibility, Lighthouse, and load tests see a deterministic public route
+// set on a clean database. Pages are watermarked with _lel_ci_fixture_published
+// so the projection stays detectable and can never be mistaken for a human
+// production publication.
+
+$lel_contract_path = file_exists( '/project-config/routes.json' )
+	? '/project-config/routes.json'
+	: dirname( __DIR__ ) . '/config/routes.json';
+if ( ! is_readable( $lel_contract_path ) ) {
+	WP_CLI::error( 'Route-state contract config/routes.json is not readable; refusing to guess the public route projection.' );
+}
+$lel_route_contract = json_decode( (string) file_get_contents( $lel_contract_path ), true );
+if ( ! is_array( $lel_route_contract ) || empty( $lel_route_contract['pages'] ) ) {
+	WP_CLI::error( 'Route-state contract config/routes.json is invalid.' );
+}
+
+$trust_approver = lel_fixture_user( 'lel_synthetic_trust_approver', 'trust-approver@example.invalid', '[TEST] Synthetic Trust Page Approver', 'subscriber', array( 'approve_trust_pages' ) );
+
+foreach ( $lel_route_contract['pages'] as $lel_route_key => $lel_route_page ) {
+	if ( 'page' !== ( $lel_route_page['type'] ?? '' ) || empty( $lel_route_page['ci_fixture_public'] ) ) {
+		continue;
+	}
+	$lel_page = get_page_by_path( (string) $lel_route_page['slug'], OBJECT, 'page' );
+	if ( ! $lel_page instanceof WP_Post ) {
+		WP_CLI::error( sprintf( 'Contract route "%s" (/%s/) is missing after bootstrap; run wp longevity bootstrap all first.', $lel_route_key, $lel_route_page['slug'] ) );
+	}
+	if ( 'publish' === $lel_page->post_status ) {
+		continue;
+	}
+	if ( ! empty( $lel_route_page['trust_page'] ) && null === \Longevity\Core\Trust_Pages::approve( (int) $lel_page->ID, (int) $trust_approver->ID ) ) {
+		WP_CLI::error( sprintf( 'Synthetic trust-page approval failed for "%s"; the projection must pass the real gate, not bypass it.', $lel_route_key ) );
+	}
+	$lel_publish_result = wp_update_post(
+		array(
+			'ID'          => $lel_page->ID,
+			'post_status' => 'publish',
+		),
+		true
+	);
+	if ( is_wp_error( $lel_publish_result ) || 'publish' !== get_post_status( $lel_page->ID ) ) {
+		WP_CLI::error( sprintf( 'Contract route "%s" did not pass its publication gates in fixture mode.', $lel_route_key ) );
+	}
+	lel_fixture_meta( (int) $lel_page->ID, array( '_lel_ci_fixture_published' => '1' ) );
+	\Longevity\Core\Meta_Authorization::enter_trusted_scope();
+	try {
+		delete_post_meta( (int) $lel_page->ID, '_longevity_noindex' );
+	} finally {
+		\Longevity\Core\Meta_Authorization::exit_trusted_scope();
+	}
+	WP_CLI::log( sprintf( 'Published CI fixture projection for "%s" (/%s/).', $lel_route_key, $lel_route_page['slug'] ) );
+}
+
+// bootstrap.sh sets blog_public=0 as a safety default so a fresh site is never
+// indexed. CI fixture mode must mirror production-with-indexing-enabled:
+// with blog_public=1 WordPress's own noindex logic (drafts, reviews archive,
+// search, per-page _longevity_noindex) becomes the only noindex source, which
+// is exactly what production-readiness-audit.spec.js verifies. This file is
+// refused by the environment guard above on staging/production, so the
+// projection can never enable indexing there.
+update_option( 'blog_public', 1 );
+WP_CLI::log( 'Enabled search-engine visibility for the CI fixture projection (blog_public=1).' );
 
 flush_rewrite_rules( false );
 WP_CLI::success( 'Synthetic local/CI fixtures are ready; the incomplete review remained blocked.' );

@@ -9,3 +9,13 @@
 - [ ] SMTP, WAF/CDN, uptime monitoring, error monitoring, real cron, and privacy consent are configured externally.
 - [ ] No placeholder content, credentials, reviewer identity, test data, price, or citation remains.
 - [ ] Rollback owner and release decision are recorded.
+## Production Readiness v2 enforcement
+
+- [ ] `composer.lock` and `package-lock.json` are tracked and locked installs pass from a clean checkout.
+- [ ] Explicit metadata authorization attacks fail through classic, REST, CLI, and service paths.
+- [ ] Reviewer self-verification and prohibited same-person approvals fail.
+- [ ] Approval snapshot creation and automatic stale invalidation pass against real WordPress.
+- [ ] Anonymous REST and schema responses contain only the approved projection.
+- [ ] Scoring config, approval table, audit table, freshness cycle, and cron heartbeat pass protected readiness.
+- [ ] Mobile/desktop Lighthouse, Linux visual, Chromium, Firefox, WebKit, axe, reflow, zoom, keyboard, and screen-reader evidence is retained.
+- [ ] Backup restore and code rollback are rehearsed; external controls and human approvals are explicitly verified.

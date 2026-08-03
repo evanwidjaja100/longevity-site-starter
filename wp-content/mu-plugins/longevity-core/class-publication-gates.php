@@ -13,18 +13,38 @@ defined( 'ABSPATH' ) || exit;
 final class Publication_Gates {
 	private const TRANSIENT_PREFIX = 'lel_gate_notice_';
 
+	/**
+	 * Authorized correlations awaiting WordPress's actual transition hook.
+	 *
+	 * @var array<int, string>
+	 */
+	private static array $pending_overrides = array();
+
+	/**
+	 * Prevent nested compensation transitions from finalizing the original intent twice.
+	 *
+	 * @var bool
+	 */
+	private static bool $compensating = false;
+
 	/** Register hooks. */
 	public static function init(): void {
+		register_shutdown_function( array( Publication_Lock::class, 'release_all' ) );
 		add_filter( 'wp_insert_post_data', array( self::class, 'enforce_classic_publish' ), 99, 2 );
 		add_filter( 'rest_pre_insert_post', array( self::class, 'enforce_rest_publish' ), 99, 2 );
 		add_filter( 'rest_pre_insert_review', array( self::class, 'enforce_rest_publish' ), 99, 2 );
 		add_action( 'admin_notices', array( self::class, 'admin_notice' ) );
 		add_action( 'transition_post_status', array( self::class, 'log_status_transition' ), 10, 3 );
-		add_action( 'save_post_post', array( self::class, 'persist_override_audit' ), 100, 3 );
-		add_action( 'save_post_review', array( self::class, 'persist_override_audit' ), 100, 3 );
+		add_action( 'transition_post_status', array( self::class, 'finalize_override' ), 999, 3 );
+		add_action( 'wp_after_insert_post', array( self::class, 'release_after_post_update' ), 999, 1 );
 	}
 
-	/** Evaluate a post from persisted WordPress state. */
+	/**
+	 * Evaluate a post from persisted WordPress state.
+	 *
+	 * @param int   $post_id Post ID to evaluate.
+	 * @param array $overrides Prospective field and metadata overrides.
+	 */
 	public static function evaluate( int $post_id, array $overrides = array() ): Gate_Result {
 		$post = get_post( $post_id );
 		if ( ! $post ) {
@@ -33,36 +53,56 @@ final class Publication_Gates {
 			return $result;
 		}
 
-		$context = array(
-			'post_type'                     => $post->post_type,
-			'content'                       => $post->post_content,
-			'author_present'                => (int) $post->post_author > 0,
-			'featured_image_alt_present'    => self::featured_image_alt_present( $post_id ),
-			'claim_count'                   => Claims::count_for_post( $post_id ),
-			'verified_claim_count'          => Claims::count_for_post( $post_id, 'verified' ),
+		$prospective = self::prospective_state( $overrides );
+		$context     = array(
+			'post_type'                  => $post->post_type,
+			'content'                    => $post->post_content,
+			'author_present'             => (int) ( $prospective['post_author'] ?? $post->post_author ) > 0,
+			'featured_image_alt_present' => self::featured_image_alt_present( $post_id, $prospective['featured_image_id'] ?? null ),
+			'claim_count'                => Claims::count_for_post( $post_id ),
+			'verified_claim_count'       => Claims::count_for_post( $post_id, 'verified' ),
 		);
 		foreach ( Meta_Registry::definitions() as $key => $definition ) {
 			$context[ $key ] = get_post_meta( $post_id, $key, true );
 		}
-		$context['source_count'] = self::source_count_for_post( $post_id );
-		$context                 = array_merge( $context, $overrides );
-		$context['affiliate_links_present'] = Affiliate_Registry::content_has_affiliate_link( (string) $context['content'] );
+		$context['source_count']                = self::source_count_for_post( $post_id );
+		$context                                = array_merge( $context, $overrides );
+		$context['affiliate_links_present']     = Affiliate_Registry::content_has_affiliate_link( (string) $context['content'] );
 		$context['affiliate_registry_verified'] = Affiliate_Registry::all_destinations_registered( (string) $context['content'] );
-		$context['test_record_valid'] = Review_Methodology::valid_test_record(
+		$context['test_record_valid']           = Review_Methodology::valid_test_record(
 			(int) ( $context['test_record_id'] ?? 0 ),
 			(string) ( $context['testing_protocol_version'] ?? '' )
 		);
-		$context['medical_reviewer_valid'] = self::reviewer_is_valid( $context );
+		$context['medical_reviewer_valid']      = self::reviewer_is_valid( $context );
+		foreach ( array( 'fact_check', 'medical', 'testing', 'commercial', 'editorial' ) as $approval_type ) {
+			$context[ $approval_type . '_approval_current' ] = $prospective
+				? Approval_Service::is_current_for_state( $post_id, $approval_type, $prospective )
+				: Approval_Service::is_current( $post_id, $approval_type );
+		}
+		$scoring_status                 = Runtime_Config::scoring_model_status();
+		$context['scoring_model_valid'] = ! empty( $scoring_status['valid'] );
 
-		return self::evaluate_values( $context );
+		$result = self::evaluate_values( $context );
+		if ( ! empty( $overrides['__governance_request_denied'] ) ) {
+			$result->block( 'governed_metadata_unauthorized', __( 'The request included governed metadata that this channel cannot write.', 'longevity-core' ) );
+		}
+		return $result;
 	}
 
-	/** Pure readiness evaluation for testability. */
+	/**
+	 * Pure readiness evaluation for testability.
+	 *
+	 * @param array $context Resolved gate evaluation context values.
+	 */
 	public static function evaluate_values( array $context ): Gate_Result {
 		$result = new Gate_Result();
+		$today  = Date_Validator::is_valid( (string) ( $context['as_of_date'] ?? '' ) ) ? (string) $context['as_of_date'] : Date_Validator::today();
 		self::required_text_check( $result, $context, 'content_summary', 'missing_summary', __( 'Add a concise content summary or direct answer.', 'longevity-core' ) );
 		self::required_text_check( $result, $context, 'content_limitations', 'missing_limitations', __( 'Add a meaningful limitations and uncertainty section.', 'longevity-core' ) );
 		self::required_text_check( $result, $context, 'next_content_review_date', 'missing_next_review', __( 'Set the next content review date.', 'longevity-core' ) );
+		if ( ! empty( $context['next_content_review_date'] ) && ! self::is_date_relative( (string) $context['next_content_review_date'], $today, true ) ) {
+			$result->block( 'next_review_due', __( 'Set the next content review date to a valid future date.', 'longevity-core' ) );
+		}
 
 		if ( empty( $context['author_present'] ) ) {
 			$result->block( 'missing_author', __( 'Assign an accountable author.', 'longevity-core' ) );
@@ -80,8 +120,10 @@ final class Publication_Gates {
 		$editorial_state = (string) ( $context['editorial_approval_status'] ?? '' );
 		if ( ! in_array( $editorial_state, array( 'ready', 'published' ), true ) ) {
 			$result->block( 'editorial_approval_incomplete', __( 'Move the editorial workflow to Ready for publication before publishing.', 'longevity-core' ) );
+		} elseif ( empty( $context['editorial_approval_current'] ) ) {
+			$result->block( 'editorial_approval_stale', __( 'Editorial approval is missing or no longer matches the current content and dependent approvals.', 'longevity-core' ) );
 		} else {
-			$result->pass( 'editorial_approval_complete', __( 'Editorial approval is complete.', 'longevity-core' ) );
+			$result->pass( 'editorial_approval_complete', __( 'Editorial approval is current.', 'longevity-core' ) );
 		}
 
 		$content = (string) ( $context['content'] ?? '' );
@@ -95,11 +137,18 @@ final class Publication_Gates {
 		if ( $material_claims ) {
 			if ( 'complete' !== ( $context['fact_check_status'] ?? '' ) ) {
 				$result->block( 'fact_check_incomplete', __( 'Complete fact-checking for material health claims.', 'longevity-core' ) );
+			} elseif ( empty( $context['fact_check_approval_current'] ) ) {
+				$result->block( 'fact_check_stale', __( 'Fact-check approval is missing or stale for the current claim and source state.', 'longevity-core' ) );
 			} else {
-				$result->pass( 'fact_check_complete', __( 'Fact-checking is complete.', 'longevity-core' ) );
+				$result->pass( 'fact_check_complete', __( 'Fact-checking is complete and current.', 'longevity-core' ) );
 			}
 			if ( empty( $context['fact_checked_by'] ) || empty( $context['fact_checked_date'] ) ) {
 				$result->block( 'fact_check_identity_missing', __( 'Record the fact checker and completion date.', 'longevity-core' ) );
+			} elseif ( ! self::is_date_relative( (string) $context['fact_checked_date'], $today, false ) ) {
+				$result->block( 'fact_check_date_invalid', __( 'The fact-check completion date must be a valid date no later than today.', 'longevity-core' ) );
+			}
+			if ( ! self::is_date_relative( (string) ( $context['next_fact_check_date'] ?? '' ), $today, true ) ) {
+				$result->block( 'next_fact_check_due', __( 'Set the next fact-check date to a valid future date.', 'longevity-core' ) );
 			}
 			if ( empty( $context['claim_count'] ) ) {
 				$result->block( 'claims_missing', __( 'Register each material claim and its source.', 'longevity-core' ) );
@@ -129,6 +178,12 @@ final class Publication_Gates {
 					$result->block( 'medical_' . $field, sprintf( /* translators: %s: metadata field */ __( 'Complete required medical-review field: %s.', 'longevity-core' ), $field ) );
 				}
 			}
+			if ( ! empty( $context['medical_review_date'] ) && ! self::is_date_relative( (string) $context['medical_review_date'], $today, false ) ) {
+				$result->block( 'medical_review_date_invalid', __( 'The medical-review date must be a valid date no later than today.', 'longevity-core' ) );
+			}
+			if ( ! self::is_date_relative( (string) ( $context['next_medical_review_date'] ?? '' ), $today, true ) ) {
+				$result->block( 'next_medical_review_due', __( 'Set the next medical-review date to a valid future date.', 'longevity-core' ) );
+			}
 			if ( 'claim_ids' === ( $context['medical_review_scope'] ?? '' ) && empty( $context['medical_review_claim_ids'] ) ) {
 				$result->block( 'medical_claim_ids_missing', __( 'List the exact claim IDs covered by a claim-scoped medical review.', 'longevity-core' ) );
 			}
@@ -137,8 +192,10 @@ final class Publication_Gates {
 			}
 			if ( empty( $context['medical_review_attested'] ) ) {
 				$result->block( 'medical_attestation_missing', __( 'The authenticated reviewer must complete the review attestation.', 'longevity-core' ) );
+			} elseif ( empty( $context['medical_approval_current'] ) ) {
+				$result->block( 'medical_review_stale', __( 'Medical approval is missing or stale for the current reviewed state.', 'longevity-core' ) );
 			} else {
-				$result->pass( 'medical_review_complete', __( 'Scoped medical review and attestation are complete.', 'longevity-core' ) );
+				$result->pass( 'medical_review_complete', __( 'Scoped medical review and attestation are complete and current.', 'longevity-core' ) );
 			}
 			if ( 'required' === ( $context['medical_review_revision_status'] ?? '' ) || 'in_progress' === ( $context['medical_review_revision_status'] ?? '' ) ) {
 				$result->block( 'medical_revisions_open', __( 'Resolve required medical-review revisions.', 'longevity-core' ) );
@@ -150,11 +207,18 @@ final class Publication_Gates {
 		if ( ! empty( $context['testing_required'] ) ) {
 			if ( ! in_array( (string) ( $context['testing_status'] ?? '' ), array( 'complete', 'approved' ), true ) ) {
 				$result->block( 'testing_incomplete', __( 'Complete and approve the required product test.', 'longevity-core' ) );
+			} elseif ( empty( $context['testing_approval_current'] ) ) {
+				$result->block( 'testing_stale', __( 'Testing approval is missing or stale for the current test record and scoring inputs.', 'longevity-core' ) );
 			}
 			foreach ( array( 'testing_start_date', 'testing_end_date', 'testing_protocol_version', 'testing_methodology_url', 'product_acquisition_method' ) as $field ) {
 				if ( empty( $context[ $field ] ) ) {
 					$result->block( 'testing_' . $field, sprintf( /* translators: %s: metadata field */ __( 'Complete required testing field: %s.', 'longevity-core' ), $field ) );
 				}
+			}
+			$testing_start = (string) ( $context['testing_start_date'] ?? '' );
+			$testing_end   = (string) ( $context['testing_end_date'] ?? '' );
+			if ( ! Date_Validator::is_valid( $testing_start ) || ! self::is_date_relative( $testing_end, $today, false ) || Date_Validator::compare( $testing_end, $testing_start ) < 0 ) {
+				$result->block( 'testing_dates_invalid', __( 'Testing dates must be valid, completed, and ordered from start to end.', 'longevity-core' ) );
 			}
 			if ( empty( $context['test_record_valid'] ) ) {
 				$result->block( 'test_record_invalid', __( 'Link an approved test record using the same protocol version.', 'longevity-core' ) );
@@ -169,6 +233,8 @@ final class Publication_Gates {
 		if ( $affiliate_present ) {
 			if ( ! in_array( (string) ( $context['affiliate_disclosure_status'] ?? '' ), array( 'approved', 'complete' ), true ) ) {
 				$result->block( 'affiliate_disclosure_incomplete', __( 'Approve the affiliate disclosure before publication.', 'longevity-core' ) );
+			} elseif ( empty( $context['commercial_approval_current'] ) ) {
+				$result->block( 'affiliate_disclosure_stale', __( 'Commercial approval is missing or stale for the current destinations and disclosure state.', 'longevity-core' ) );
 			}
 			if ( empty( $context['affiliate_registry_verified'] ) ) {
 				$result->block( 'affiliate_registry_unverified', __( 'Verify every affiliate destination in the affiliate registry.', 'longevity-core' ) );
@@ -189,8 +255,14 @@ final class Publication_Gates {
 			if ( $score > 0 && empty( $context['review_score_version'] ) ) {
 				$result->block( 'score_version_missing', __( 'Record the scoring-model version for any review score.', 'longevity-core' ) );
 			}
+			if ( $score > 0 && ! empty( $context['review_score_version'] ) && ! Review_Methodology::score_version_matches( (string) $context['review_score_version'] ) ) {
+				$result->block( 'score_version_mismatch', __( 'The recorded scoring-model version does not match the installed model.', 'longevity-core' ) );
+			}
 			if ( $score > 0 && empty( $context['review_score_confidence'] ) ) {
 				$result->block( 'score_confidence_missing', __( 'Record confidence separately from the review score.', 'longevity-core' ) );
+			}
+			if ( $score > 0 && empty( $context['scoring_model_valid'] ) ) {
+				$result->block( 'scoring_model_unavailable', __( 'The configured scoring model is unavailable or invalid; public scores fail closed.', 'longevity-core' ) );
 			}
 			if ( $score > 0 ) {
 				$dimensions = $context['review_score_dimensions'] ?? array();
@@ -212,6 +284,11 @@ final class Publication_Gates {
 			if ( ! empty( $context['price_region'] ) && empty( $context['price_checked_date'] ) ) {
 				$result->block( 'price_date_missing', __( 'Add a checked date for regional price claims.', 'longevity-core' ) );
 			}
+			foreach ( array( 'price_checked_date', 'warranty_checked_date', 'return_policy_checked_date', 'privacy_policy_checked_date' ) as $checked_field ) {
+				if ( ! empty( $context[ $checked_field ] ) && ! self::is_date_relative( (string) $context[ $checked_field ], $today, false ) ) {
+					$result->block( $checked_field . '_invalid', __( 'Review fact-check dates must be valid dates no later than today.', 'longevity-core' ) );
+				}
+			}
 		}
 
 		if ( ! empty( $context['evidence_grade'] ) ) {
@@ -220,6 +297,8 @@ final class Publication_Gates {
 			}
 			if ( empty( $context['evidence_cutoff_date'] ) ) {
 				$result->block( 'evidence_cutoff_missing', __( 'Record the evidence cutoff date.', 'longevity-core' ) );
+			} elseif ( ! self::is_date_relative( (string) $context['evidence_cutoff_date'], $today, false ) ) {
+				$result->block( 'evidence_cutoff_invalid', __( 'The evidence cutoff must be a valid date no later than today.', 'longevity-core' ) );
 			} else {
 				$result->pass( 'evidence_metadata_complete', __( 'Evidence grade metadata is present.', 'longevity-core' ) );
 			}
@@ -246,7 +325,59 @@ final class Publication_Gates {
 		return $result;
 	}
 
-	/** Enforce classic-editor publishing by preserving content as a draft. */
+	/**
+	 * Compute the prospective combined hash for a post with pending changes.
+	 *
+	 * @param int   $post_id Post ID being evaluated.
+	 * @param array $prospective Prospective post state from overrides.
+	 */
+	private static function prospective_hash( int $post_id, array $prospective ): string {
+		return (string) Approval_Fingerprint::build( $post_id, 'editorial', $prospective )['combined_hash'];
+	}
+
+	/**
+	 * Verify editorial approval covers the prospective state (DB + pending changes).
+	 *
+	 * @param int   $post_id Post ID being evaluated.
+	 * @param array $prospective Prospective post state to verify.
+	 */
+	private static function prospective_state_matches_approval( int $post_id, array $prospective ): bool {
+		return Approval_Service::is_current_for_state( $post_id, 'editorial', $prospective );
+	}
+
+	/**
+	 * Convert gate overrides into the canonical state used by every approval.
+	 *
+	 * @param array $overrides Gate overrides supplied by the caller.
+	 */
+	private static function prospective_state( array $overrides ): array {
+		$state = array();
+		foreach ( array( 'post_title', 'post_excerpt', 'post_content', 'post_author', 'featured_image_id' ) as $key ) {
+			if ( array_key_exists( $key, $overrides ) ) {
+				$state[ $key ] = $overrides[ $key ];
+			}
+		}
+		if ( ! array_key_exists( 'post_content', $state ) && array_key_exists( 'content', $overrides ) ) {
+			$state['post_content'] = $overrides['content'];
+		}
+		$meta = array();
+		foreach ( Meta_Registry::definitions() as $key => $definition ) {
+			if ( array_key_exists( $key, $overrides ) ) {
+				$meta[ $key ] = $overrides[ $key ];
+			}
+		}
+		if ( ! empty( $meta ) ) {
+			$state['meta'] = $meta;
+		}
+		return $state;
+	}
+
+	/**
+	 * Enforce classic-editor publishing by preserving content as a draft.
+	 *
+	 * @param array $data Sanitized post data about to be saved.
+	 * @param array $postarr Raw post array submitted to WordPress.
+	 */
 	public static function enforce_classic_publish( array $data, array $postarr ): array {
 		if ( ! in_array( $data['post_type'] ?? '', array( 'post', 'review' ), true ) || ! in_array( $data['post_status'] ?? '', array( 'publish', 'future', 'private' ), true ) ) {
 			return $data;
@@ -257,24 +388,87 @@ final class Publication_Gates {
 			self::set_notice( array( __( 'Save the draft and complete editorial metadata before first publication.', 'longevity-core' ) ) );
 			return $data;
 		}
-		$overrides = self::classic_request_overrides( $post_id );
-		$overrides['content'] = $data['post_content'] ?? '';
-		$result = self::evaluate( $post_id, $overrides );
-		if ( ! $result->is_blocked() ) {
+		if ( ! Publication_Lock::acquire( $post_id ) ) {
+			$data['post_status'] = 'draft';
+			self::set_notice( array( __( 'Publication is temporarily blocked while governance state is being checked.', 'longevity-core' ) ) );
 			return $data;
 		}
-		if ( self::override_allowed_from_request() ) {
-			set_transient( 'lel_override_' . $post_id . '_' . get_current_user_id(), sanitize_textarea_field( wp_unslash( $_POST['longevity_override_reason'] ) ), MINUTE_IN_SECONDS );
+		$overrides                 = array_merge( self::postarr_meta_overrides( $postarr ), self::classic_request_overrides( $post_id ) );
+		$overrides['content']      = wp_unslash( (string) ( $data['post_content'] ?? '' ) );
+		$overrides['post_title']   = wp_unslash( (string) ( $data['post_title'] ?? '' ) );
+		$overrides['post_excerpt'] = wp_unslash( (string) ( $data['post_excerpt'] ?? '' ) );
+		$overrides['post_author']  = wp_unslash( (string) ( $data['post_author'] ?? '' ) );
+		$featured_image_id         = self::classic_featured_image( $postarr );
+		if ( null !== $featured_image_id ) {
+			$overrides['featured_image_id'] = $featured_image_id;
+		}
+		$prospective = self::prospective_state( $overrides );
+		$result      = self::evaluate( $post_id, $overrides );
+		$matches     = self::prospective_state_matches_approval( $post_id, $prospective );
+		$blocked     = $result->is_blocked() || ! $matches;
+		if ( ! $blocked ) {
 			return $data;
 		}
+		if ( $matches && self::override_allowed_from_request() ) {
+			// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Nonce verified in override_allowed_from_request() before this override branch runs.
+			$reason          = isset( $_POST['longevity_override_reason'] ) ? sanitize_textarea_field( wp_unslash( $_POST['longevity_override_reason'] ) ) : '';
+			$correlation_id  = self::classic_correlation_id();
+			$previous_status = get_post_status( $post_id );
+			$previous_status = is_string( $previous_status ) && '' !== $previous_status ? $previous_status : 'draft';
+			$state           = self::authorize_override( $post_id, $previous_status, (string) $data['post_status'], self::prospective_hash( $post_id, $prospective ), $reason, 'classic', true, $correlation_id );
+			if ( Override_Intent::STATE_AUTHORIZED === $state ) {
+				return $data;
+			}
+			$intent = Override_Intent::intent( $correlation_id );
+			if ( $intent && in_array( (string) $intent['state'], array( Override_Intent::STATE_APPLIED, Override_Intent::STATE_FAILED, Override_Intent::STATE_COMPENSATED ), true ) ) {
+				Publication_Lock::release( $post_id );
+				$data['post_status'] = $previous_status;
+				return $data;
+			}
+			// Fail-closed: the override could not be durably audited and recorded.
+			Publication_Lock::release( $post_id );
+			$data['post_status'] = 'draft';
+			self::set_notice( array( __( 'Publication override refused: the override could not be durably recorded. Nothing was published.', 'longevity-core' ) ) );
+			Audit_Log::record(
+				'publication_blocked',
+				'post',
+				$post_id,
+				array(
+					'channel'        => 'classic',
+					'blocking_codes' => 'override_authorization_failed',
+				),
+				get_current_user_id(),
+				'classic'
+			);
+			return $data;
+		}
+		Publication_Lock::release( $post_id );
 		$data['post_status'] = 'draft';
-		self::set_notice( array_column( $result->blocking(), 'message' ) );
+		$codes               = $result->is_blocked() ? array_column( $result->blocking(), 'code' ) : array( 'prospective_fingerprint_mismatch' );
+		self::set_notice( $result->is_blocked() ? array_column( $result->blocking(), 'message' ) : array( __( 'Publication blocked: the content or metadata has changed since the last editorial approval.', 'longevity-core' ) ) );
+		Audit_Log::record(
+			'publication_blocked',
+			'post',
+			$post_id,
+			array(
+				'channel'        => 'classic',
+				'blocking_codes' => implode( ',', $codes ),
+			),
+			get_current_user_id(),
+			'classic'
+		);
 		return $data;
 	}
 
-	/** Enforce REST/block-editor publishing with a structured error. */
+	/**
+	 * Enforce REST/block-editor publishing with a structured error.
+	 *
+	 * @param \stdClass        $prepared_post Post object prepared for insertion.
+	 * @param \WP_REST_Request $request Incoming REST request.
+	 */
 	public static function enforce_rest_publish( $prepared_post, \WP_REST_Request $request ) {
-		$status = (string) ( $prepared_post->post_status ?? $request->get_param( 'status' ) );
+		$status_param = $request->get_param( 'status' );
+		$status       = (string) ( null !== $status_param ? $status_param : ( $prepared_post->post_status ?? '' ) );
 		if ( ! in_array( $status, array( 'publish', 'future', 'private' ), true ) ) {
 			return $prepared_post;
 		}
@@ -282,35 +476,158 @@ final class Publication_Gates {
 		if ( $post_id <= 0 ) {
 			return new \WP_Error( 'lel_gate_new_post', __( 'Save the draft before attempting first publication.', 'longevity-core' ), array( 'status' => 400 ) );
 		}
-		$overrides = array( 'content' => (string) ( $prepared_post->post_content ?? '' ) );
+		if ( ! Publication_Lock::acquire( $post_id ) ) {
+			return new \WP_Error( 'lel_publication_lock_unavailable', __( 'Publication is temporarily blocked while governance state is being checked.', 'longevity-core' ), array( 'status' => 409 ) );
+		}
+		$overrides = array(
+			'content'      => (string) ( $prepared_post->post_content ?? '' ),
+			'post_title'   => (string) ( $prepared_post->post_title ?? '' ),
+			'post_excerpt' => (string) ( $prepared_post->post_excerpt ?? '' ),
+			'post_author'  => (int) ( $prepared_post->post_author ?? 0 ),
+		);
+		if ( null !== $request->get_param( 'featured_media' ) ) {
+			$overrides['featured_image_id'] = absint( $request->get_param( 'featured_media' ) );
+		}
 		$meta = $request->get_param( 'meta' );
 		if ( is_array( $meta ) ) {
 			$definitions = Meta_Registry::definitions();
 			foreach ( $meta as $key => $value ) {
-				if ( isset( $definitions[ $key ] ) && Meta_Registry::authorize( $key, $post_id, get_current_user_id() ) ) {
+				if ( isset( $definitions[ $key ] ) && Meta_Authorization::can_write( $key, $post_id, get_current_user_id(), 'rest' ) ) {
 					$overrides[ $key ] = Meta_Registry::sanitize_by_key( $key, $value );
+				} elseif ( isset( $definitions[ $key ] ) ) {
+					$overrides['__governance_request_denied'] = true;
 				}
 			}
 		}
-		$result = self::evaluate( $post_id, $overrides );
-		if ( ! $result->is_blocked() ) {
+		$prospective = self::prospective_state( $overrides );
+		$result      = self::evaluate( $post_id, $overrides );
+		$matches     = self::prospective_state_matches_approval( $post_id, $prospective );
+		$blocked     = $result->is_blocked() || ! $matches;
+		if ( ! $blocked ) {
 			return $prepared_post;
 		}
 		$reason = sanitize_textarea_field( (string) $request->get_param( 'longevity_override_reason' ) );
-		if ( current_user_can( 'approve_publication_override' ) && '' !== $reason ) {
-			set_transient( 'lel_override_' . $post_id . '_' . get_current_user_id(), $reason, MINUTE_IN_SECONDS );
-			return $prepared_post;
+		if ( $matches && current_user_can( 'approve_publication_override' ) && '' !== $reason ) {
+			$correlation_param = $request->get_param( 'longevity_override_correlation_id' );
+			$correlation_id    = sanitize_text_field( (string) ( is_string( $correlation_param ) && '' !== $correlation_param ? $correlation_param : Logger::request_id() ) );
+			$previous_status   = get_post_status( $post_id );
+			$previous_status   = is_string( $previous_status ) && '' !== $previous_status ? $previous_status : 'draft';
+			$state             = self::authorize_override( $post_id, $previous_status, $status, self::prospective_hash( $post_id, $prospective ), $reason, 'rest', true, $correlation_id );
+			if ( Override_Intent::STATE_AUTHORIZED === $state ) {
+				return $prepared_post;
+			}
+			$intent = Override_Intent::intent( $correlation_id );
+			if ( $intent && in_array( (string) $intent['state'], array( Override_Intent::STATE_APPLIED, Override_Intent::STATE_FAILED, Override_Intent::STATE_COMPENSATED ), true ) ) {
+				Publication_Lock::release( $post_id );
+				return new \WP_Error(
+					'lel_override_already_finalized',
+					__( 'This publication override has already been finalized.', 'longevity-core' ),
+					array(
+						'status'         => 409,
+						'override_state' => (string) $intent['state'],
+					)
+				);
+			}
+			// Fail-closed: the override could not be durably audited and recorded.
+			Publication_Lock::release( $post_id );
+			Audit_Log::record(
+				'publication_blocked',
+				'post',
+				$post_id,
+				array(
+					'channel'        => 'rest',
+					'blocking_codes' => 'override_authorization_failed',
+				),
+				get_current_user_id(),
+				'rest'
+			);
+			return new \WP_Error(
+				'lel_override_refused',
+				__( 'Publication override refused: the override could not be durably recorded. Nothing was published.', 'longevity-core' ),
+				array( 'status' => 503 )
+			);
 		}
+		Publication_Lock::release( $post_id );
+		$codes = $result->is_blocked() ? array_column( $result->blocking(), 'code' ) : array( 'prospective_fingerprint_mismatch' );
+		Audit_Log::record(
+			'publication_blocked',
+			'post',
+			$post_id,
+			array(
+				'channel'        => 'rest',
+				'blocking_codes' => implode( ',', $codes ),
+			),
+			get_current_user_id(),
+			'rest'
+		);
 		return new \WP_Error(
 			'lel_publication_blocked',
-			__( 'Publication readiness checks failed.', 'longevity-core' ),
-			array( 'status' => 400, 'readiness' => $result->to_array() )
+			__( 'Publication readiness checks failed. Contact an editor for details.', 'longevity-core' ),
+			array( 'status' => 400 )
 		);
 	}
 
+	/**
+	 * Release the publication lock after WordPress has saved the post.
+	 *
+	 * @param int $post_id Post ID that was saved.
+	 */
+	public static function release_after_post_update( int $post_id ): void {
+		Publication_Lock::release( $post_id );
+	}
+
+	/**
+	 * Finalize an authorized intent only after WordPress reports the real status transition.
+	 *
+	 * @param string   $new_status New post status after the transition.
+	 * @param string   $old_status Previous post status before the transition.
+	 * @param \WP_Post $post Post being transitioned.
+	 */
+	public static function finalize_override( string $new_status, string $old_status, \WP_Post $post ): void {
+		if ( self::$compensating || ! isset( self::$pending_overrides[ $post->ID ] ) ) {
+			return;
+		}
+		$correlation_id = self::$pending_overrides[ $post->ID ];
+		$intent         = Override_Intent::intent( $correlation_id );
+		$state          = Override_Intent::finalize( $correlation_id, $post->ID, $new_status, $old_status );
+		if ( Override_Intent::STATE_FAILED === $state && $intent ) {
+			$previous_status = (string) $intent['previous_status'];
+			if ( $new_status === $previous_status ) {
+				Override_Intent::compensate( $correlation_id, $post->ID, $new_status );
+			} elseif ( function_exists( 'wp_update_post' ) ) {
+				self::$compensating      = true;
+				$compensation_lock_level = false;
+				try {
+					// Keep one re-entrant level for the outer save while the nested
+					// compensation save releases its own level.
+					$compensation_lock_level = Publication_Lock::acquire( $post->ID );
+					$restored                = wp_update_post(
+						array(
+							'ID'          => $post->ID,
+							'post_status' => $previous_status,
+						),
+						true
+					);
+					if ( ! is_wp_error( $restored ) ) {
+						$compensation_lock_level = false;
+						Override_Intent::compensate( $correlation_id, $post->ID, $previous_status );
+					}
+				} finally {
+					if ( $compensation_lock_level ) {
+						Publication_Lock::release( $post->ID );
+					}
+					self::$compensating = false;
+				}
+			}
+		}
+		unset( self::$pending_overrides[ $post->ID ] );
+	}
+
+
+
 	/** Display a one-use gate notice. */
 	public static function admin_notice(): void {
-		$user_id = get_current_user_id();
+		$user_id  = get_current_user_id();
 		$messages = get_transient( self::TRANSIENT_PREFIX . $user_id );
 		if ( ! is_array( $messages ) || empty( $messages ) ) {
 			return;
@@ -323,41 +640,47 @@ final class Publication_Gates {
 		echo '</ul></div>';
 	}
 
-	/** Log status changes. */
+	/**
+	 * Log status changes.
+	 *
+	 * @param string   $new_status New post status after the transition.
+	 * @param string   $old_status Previous post status before the transition.
+	 * @param \WP_Post $post Post being transitioned.
+	 */
 	public static function log_status_transition( string $new_status, string $old_status, \WP_Post $post ): void {
 		if ( $new_status === $old_status || ! in_array( $post->post_type, array( 'post', 'review' ), true ) ) {
 			return;
 		}
-		self::log_event( $post->ID, 'status_changed', array( 'from' => $old_status, 'to' => $new_status ) );
-	}
-
-	/** Persist an override audit event. */
-	public static function persist_override_audit( int $post_id, \WP_Post $post, bool $update ): void {
-		unset( $post, $update );
-		$key = 'lel_override_' . $post_id . '_' . get_current_user_id();
-		$reason = get_transient( $key );
-		if ( ! is_string( $reason ) || '' === $reason ) {
-			return;
-		}
-		delete_transient( $key );
-		self::log_event( $post_id, 'publication_override_used', array( 'reason' => $reason ) );
-	}
-
-	/** Append a bounded, non-sensitive audit record. */
-	public static function log_event( int $post_id, string $event, array $details = array() ): void {
-		$log = get_post_meta( $post_id, '_longevity_audit_log', true );
-		$log = is_array( $log ) ? $log : array();
-		$log[] = array(
-			'event'   => sanitize_key( $event ),
-			'user_id' => get_current_user_id(),
-			'time'    => gmdate( DATE_ATOM ),
-			'details' => array_map( static fn( $value ) => sanitize_textarea_field( (string) $value ), $details ),
+		self::log_event(
+			$post->ID,
+			'status_changed',
+			array(
+				'from' => $old_status,
+				'to'   => $new_status,
+			)
 		);
-		$log = array_slice( $log, -100 );
-		update_post_meta( $post_id, '_longevity_audit_log', $log );
 	}
 
-	/** Add a required text check. */
+	/**
+	 * Persist a non-sensitive append-only governance event.
+	 *
+	 * @param int    $post_id Post the event relates to.
+	 * @param string $event Machine-readable event key.
+	 * @param array  $details Non-sensitive event context.
+	 */
+	public static function log_event( int $post_id, string $event, array $details = array() ): void {
+		Audit_Log::record( $event, 'post', $post_id, $details, get_current_user_id(), 'workflow' );
+	}
+
+	/**
+	 * Add a required text check.
+	 *
+	 * @param Gate_Result $result Gate result to record the outcome on.
+	 * @param array       $context Evaluation context to read from.
+	 * @param string      $field Context key holding the required text.
+	 * @param string      $code Blocking code emitted when the field is empty.
+	 * @param string      $message Message shown when the field is empty.
+	 */
 	private static function required_text_check( Gate_Result $result, array $context, string $field, string $code, string $message ): void {
 		if ( '' === trim( (string) ( $context[ $field ] ?? '' ) ) ) {
 			$result->block( $code, $message );
@@ -366,27 +689,173 @@ final class Publication_Gates {
 		}
 	}
 
-	/** Read authorized metadata submitted by the classic editor for same-request evaluation. */
+	/**
+	 * Whether a value is a valid date relative to the reference (future or non-future).
+	 *
+	 * @param string $value Date string to validate.
+	 * @param string $today Reference date to compare against.
+	 * @param bool   $future Whether the value must be after the reference.
+	 */
+	private static function is_date_relative( string $value, string $today, bool $future ): bool {
+		if ( ! Date_Validator::is_valid( $value ) ) {
+			return false;
+		}
+		$cmp = Date_Validator::compare( $value, $today );
+		return $future ? $cmp > 0 : $cmp <= 0;
+	}
+
+	/**
+	 * Include metadata that WordPress will write after the post data filter.
+	 *
+	 * @param array $postarr Raw post array submitted to WordPress.
+	 */
+	private static function postarr_meta_overrides( array $postarr ): array {
+		$input       = isset( $postarr['meta_input'] ) && is_array( $postarr['meta_input'] ) ? $postarr['meta_input'] : array();
+		$overrides   = array();
+		$definitions = Meta_Registry::definitions();
+		foreach ( $input as $key => $value ) {
+			if ( ! isset( $definitions[ $key ] ) ) {
+				continue;
+			}
+			$overrides[ $key ] = Meta_Registry::sanitize_by_key( $key, $value );
+			if ( self::service_only_meta( $key, $overrides[ $key ] ) ) {
+				$overrides['__governance_request_denied'] = true;
+			}
+		}
+		return $overrides;
+	}
+
+	/**
+	 * Read a classic request's prospective featured-image relationship.
+	 *
+	 * @param array $postarr Raw post array submitted to WordPress.
+	 */
+	private static function classic_featured_image( array $postarr ): ?int {
+		if ( isset( $postarr['meta_input'] ) && is_array( $postarr['meta_input'] ) && array_key_exists( '_thumbnail_id', $postarr['meta_input'] ) ) {
+			return absint( $postarr['meta_input']['_thumbnail_id'] );
+		}
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Runs inside wp_insert_post_data during a classic-editor save; WordPress core verifies the edit-form nonce upstream.
+		return array_key_exists( '_thumbnail_id', $_POST ) ? absint( wp_unslash( $_POST['_thumbnail_id'] ) ) : null;
+	}
+
+	/**
+	 * Read authorized metadata submitted by the classic editor for same-request evaluation.
+	 *
+	 * @param int $post_id Post being saved.
+	 */
 	private static function classic_request_overrides( int $post_id ): array {
 		if ( empty( $_POST['longevity_editorial_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['longevity_editorial_nonce'] ) ), 'longevity_save_editorial' ) ) {
 			return array();
 		}
 		$overrides   = array();
 		$definitions = Meta_Registry::definitions();
+		$present     = isset( $_POST['lel_present'] ) && is_array( $_POST['lel_present'] ) ? array_map( 'sanitize_text_field', wp_unslash( $_POST['lel_present'] ) ) : array();
 		foreach ( $definitions as $key => $definition ) {
-			if ( ! Meta_Registry::authorize( $key, $post_id, get_current_user_id() ) ) {
+			if ( empty( $present[ $key ] ) ) {
 				continue;
 			}
-			if ( 'boolean' === $definition['type'] ) {
-				$overrides[ $key ] = isset( $_POST[ $key ] );
-			} elseif ( isset( $_POST[ $key ] ) ) {
-				$overrides[ $key ] = Meta_Registry::sanitize_by_key( $key, wp_unslash( $_POST[ $key ] ) );
+			if ( ! Meta_Authorization::can_write( $key, $post_id, get_current_user_id(), 'classic' ) ) {
+				$overrides['__governance_request_denied'] = true;
+				continue;
+			}
+			if ( self::service_only_meta( $key, isset( $_POST[ $key ] ) ? sanitize_text_field( wp_unslash( $_POST[ $key ] ) ) : '' ) ) {
+				continue;
+			}
+			if ( isset( $_POST[ $key ] ) ) {
+				$overrides[ $key ] = Meta_Registry::sanitize_by_key( $key, wp_unslash( $_POST[ $key ] ) ); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Sanitized by Meta_Registry::sanitize_by_key() per the registered meta definition.
+			}
+		}
+		if ( in_array( 'review_score_dimensions', array_keys( $present ), true ) && isset( $_POST['review_score_dimensions_rows'] ) && is_array( $_POST['review_score_dimensions_rows'] ) ) {
+			if ( Meta_Authorization::can_write( 'review_score_dimensions', $post_id, get_current_user_id(), 'classic' ) && Meta_Authorization::can_write( 'review_score', $post_id, get_current_user_id(), 'classic' ) ) {
+				$dimensions                           = Review_Methodology::sanitize_dimensions( wp_unslash( $_POST['review_score_dimensions_rows'] ) ); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Sanitized by Review_Methodology::sanitize_dimensions().
+				$overrides['review_score_dimensions'] = $dimensions;
+				try {
+					$overrides['review_score'] = Review_Methodology::calculate_score( $dimensions )['score'];
+				} catch ( \InvalidArgumentException $exception ) {
+					unset( $exception );
+				}
 			}
 		}
 		return $overrides;
 	}
 
-	/** Store a user-scoped notice. */
+	/**
+	 * Values that are projected only by an approval service, never by a request.
+	 *
+	 * @param string $key Metadata key being written.
+	 * @param mixed  $value Proposed metadata value.
+	 */
+	public static function service_only_meta( string $key, $value ): bool {
+		$value = is_scalar( $value ) ? (string) $value : '';
+		$final = array(
+			'fact_check_status'           => array( 'complete' ),
+			'medical_review_status'       => array( 'complete' ),
+			'testing_status'              => array( 'approved' ),
+			'affiliate_disclosure_status' => array( 'approved', 'complete' ),
+			'editorial_approval_status'   => array( 'ready', 'published' ),
+		);
+		return ( 'medical_review_attested' === $key && '1' === $value ) || ( isset( $final[ $key ] ) && in_array( $value, $final[ $key ], true ) );
+	}
+
+	/**
+	 * Create or replay a durable authorization and remember it for post-transition finalization.
+	 *
+	 * @param int    $post_id Post being published.
+	 * @param string $previous_status Status before the override.
+	 * @param string $requested_status Status the caller intends to set.
+	 * @param string $fingerprint Prospective editorial approval fingerprint.
+	 * @param string $reason Reviewer-supplied override reason.
+	 * @param string $channel Origin channel (classic or rest).
+	 * @param bool   $nonce_verified Whether the request nonce was verified.
+	 * @param string $correlation_id Idempotency correlation ID.
+	 */
+	private static function authorize_override( int $post_id, string $previous_status, string $requested_status, string $fingerprint, string $reason, string $channel, bool $nonce_verified, string $correlation_id ): string {
+		$user_id          = get_current_user_id();
+		$current_approval = Approval_Repository::current( $post_id, 'editorial' );
+		$approval_state   = wp_json_encode(
+			array(
+				'id'            => (int) ( $current_approval['id'] ?? 0 ),
+				'status'        => (string) ( $current_approval['approval_status'] ?? '' ),
+				'combined_hash' => (string) ( $current_approval['combined_hash'] ?? '' ),
+			)
+		);
+		$state            = Override_Intent::authorize(
+			$correlation_id,
+			array(
+				'post_id'             => $post_id,
+				'previous_status'     => $previous_status,
+				'requested_status'    => $requested_status,
+				'user_id'             => $user_id,
+				'capability_snapshot' => array( 'approve_publication_override' => current_user_can( 'approve_publication_override' ) ),
+				'nonce_verified'      => $nonce_verified,
+				'reason'              => $reason,
+				'fingerprint'         => $fingerprint,
+				'approval_state'      => $approval_state,
+				'channel'             => $channel,
+				'source_sha'          => defined( 'LEL_RELEASE_SHA' ) ? (string) LEL_RELEASE_SHA : 'unavailable',
+				'plugin_version'      => defined( 'LONGEVITY_CORE_VERSION' ) ? (string) LONGEVITY_CORE_VERSION : 'unknown',
+			)
+		);
+		if ( Override_Intent::STATE_AUTHORIZED === $state && Override_Intent::authorizes_transition( $correlation_id, $post_id ) ) {
+			self::$pending_overrides[ $post_id ] = $correlation_id;
+		} elseif ( Override_Intent::STATE_AUTHORIZED === $state ) {
+			return Override_Intent::STATE_FAILED;
+		}
+		return $state;
+	}
+
+	/** Stable idempotency key supplied by the classic caller, or this request's correlation ID. */
+	private static function classic_correlation_id(): string {
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Only reached from the enforce_classic_publish override branch after override_allowed_from_request() verifies the nonce.
+		$value = isset( $_POST['longevity_override_correlation_id'] ) ? sanitize_text_field( wp_unslash( $_POST['longevity_override_correlation_id'] ) ) : Logger::request_id();
+		return sanitize_text_field( (string) $value );
+	}
+
+	/**
+	 * Store a user-scoped notice.
+	 *
+	 * @param array $messages Notice messages to store.
+	 */
 	private static function set_notice( array $messages ): void {
 		set_transient( self::TRANSIENT_PREFIX . get_current_user_id(), array_values( array_unique( array_map( 'sanitize_text_field', $messages ) ) ), MINUTE_IN_SECONDS );
 	}
@@ -399,38 +868,42 @@ final class Publication_Gates {
 		return wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['longevity_editorial_nonce'] ) ), 'longevity_save_editorial' );
 	}
 
-	/** Verify reviewer identity and credentials. */
+	/**
+	 * Verify reviewer identity and credentials.
+	 *
+	 * @param array $context Evaluation context holding reviewer fields.
+	 */
 	private static function reviewer_is_valid( array $context ): bool {
 		$user_id = (int) ( $context['medical_reviewer_user_id'] ?? 0 );
-		if ( $user_id <= 0 || ! user_can( $user_id, 'complete_medical_review' ) ) {
-			return false;
-		}
-		$status      = get_user_meta( $user_id, 'credential_verification_status', true );
-		$credentials = get_user_meta( $user_id, 'professional_credentials', true );
-		return 'verified' === $status && '' !== trim( (string) $credentials );
+		return Reviewer_Credentials::is_valid_for(
+			$user_id,
+			(string) ( $context['medical_review_scope'] ?? '' ),
+			(string) ( $context['region_scope'] ?? '' )
+		);
 	}
 
-	/** Check featured image alternative text only when an image exists. */
-	private static function featured_image_alt_present( int $post_id ): bool {
-		$thumbnail_id = get_post_thumbnail_id( $post_id );
+	/**
+	 * Check featured image alternative text only when an image exists.
+	 *
+	 * @param int  $post_id Post whose featured image is checked.
+	 * @param ?int $prospective_thumbnail_id Prospective thumbnail ID, or null to use the saved one.
+	 */
+	private static function featured_image_alt_present( int $post_id, ?int $prospective_thumbnail_id = null ): bool {
+		$thumbnail_id = null === $prospective_thumbnail_id ? get_post_thumbnail_id( $post_id ) : $prospective_thumbnail_id;
 		if ( ! $thumbnail_id ) {
 			return true;
 		}
 		return '' !== trim( (string) get_post_meta( $thumbnail_id, '_wp_attachment_image_alt', true ) );
 	}
 
-	/** Count source records linked through claims. */
+	/**
+	 * Count source records linked through claims.
+	 *
+	 * @param int $post_id Post whose linked sources are counted.
+	 */
 	private static function source_count_for_post( int $post_id ): int {
-		$claims = get_posts(
-			array(
-				'post_type'      => 'lel_claim',
-				'post_status'    => 'any',
-				'posts_per_page' => -1,
-				'fields'         => 'ids',
-				'meta_key'       => 'post_id',
-				'meta_value'     => $post_id,
-			)
-		);
+		// Complete retrieval: a capped page could hide missing sources on claim 201+.
+		$claims     = Governed_Query::ids_by_meta( array( 'lel_claim' ), 'post_id', (string) $post_id );
 		$source_ids = array();
 		foreach ( $claims as $claim_id ) {
 			$source_id = get_post_meta( $claim_id, 'source_id', true );

@@ -1,70 +1,758 @@
 name: CI
+
 on:
   push:
+    branches: [main, develop]
   pull_request:
+    branches: [main]
+
 permissions:
   contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PHP_VERSION: '8.3'
+  NODE_VERSION: '22'
+
 jobs:
-  validate:
+  clean-build:
+    name: Clean build and discovery
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      EVIDENCE_ACTION_SHAS: 'actions/checkout@11d5960a326750d5838078e36cf38b85af677262 shivammathur/setup-php@b604ade2a87db23f8871b7182e69ec5e75effb45 actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
     steps:
-      - uses: actions/checkout@v4
-      - uses: shivammathur/setup-php@v2
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Initialize evidence directory
+        run: mkdir -p reports/clean-build
+      - uses: shivammathur/setup-php@b604ade2a87db23f8871b7182e69ec5e75effb45 # v2
         with:
-          php-version: '8.3'
-          coverage: none
-      - uses: actions/setup-python@v5
+          php-version: ${{ env.PHP_VERSION }}
+          coverage: pcov
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
-          python-version: '3.12'
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
+          node-version: ${{ env.NODE_VERSION }}
           cache: npm
-      - run: sudo apt-get update && sudo apt-get install -y shellcheck
-      - run: composer validate --strict
-      - run: composer install --no-interaction --prefer-dist
+      - name: Verify locked dependency state
+        run: bash scripts/verify-dependency-state.sh
+      - name: Install exact dependencies
+        run: |
+          composer validate --strict
+          composer install --no-interaction --prefer-dist --no-progress
+          npm ci
+      - name: Verify release manifest
+        run: bash scripts/verify-manifest.sh
+      - name: Verify critical test discovery
+        run: php scripts/verify-test-discovery.php
+      - name: Run dependency-free security fallback
+        run: php tests/php/run-unit-tests.php
+      - name: PHPUnit with coverage
+        run: composer test -- --coverage-clover=coverage.xml --coverage-text
+      - name: Check coverage threshold
+        run: |
+          # shellcheck disable=SC2016
+          # PHP variables are intentionally protected from the shell.
+          COVERAGE=$(php -r '
+            $doc = @simplexml_load_file("coverage.xml");
+            if ( ! $doc || ! isset($doc->project->metrics) ) { fwrite(STDERR, "coverage.xml missing or unreadable\n"); exit(1); }
+            $m = $doc->project->metrics;
+            $total = (int) $m["statements"];
+            $covered = (int) $m["coveredstatements"];
+            if ( $total <= 0 ) { fwrite(STDERR, "coverage data is empty: zero total statements\n"); exit(1); }
+            echo round($covered / $total * 100, 2);
+          ')
+          echo "Coverage: ${COVERAGE}%"
+          THRESHOLD=${COVERAGE_THRESHOLD:-30}
+          if (( $(echo "$COVERAGE < $THRESHOLD" | bc -l) )); then
+            echo "Coverage ${COVERAGE}% is below threshold ${THRESHOLD}%"
+            exit 1
+          fi
+      - name: Finalize evidence
+        run: |
+          cp coverage.xml reports/clean-build/coverage.xml
+          php scripts/write-release-evidence-metadata.php clean-build clean-build-evidence reports/clean-build success clover:coverage.xml
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: clean-build-evidence
+          path: reports/clean-build/
+          if-no-files-found: error
+
+  quality-php:
+    name: PHP quality
+    needs: clean-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      EVIDENCE_ACTION_SHAS: 'actions/checkout@11d5960a326750d5838078e36cf38b85af677262 shivammathur/setup-php@b604ade2a87db23f8871b7182e69ec5e75effb45'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Initialize evidence directory
+        run: mkdir -p reports/php-quality
+      - uses: shivammathur/setup-php@b604ade2a87db23f8871b7182e69ec5e75effb45 # v2
+        with:
+          php-version: ${{ env.PHP_VERSION }}
+          coverage: pcov
+      - run: composer install --no-interaction --prefer-dist --no-progress
+      - name: ShellCheck
+        run: shellcheck scripts/*.sh tests/integration/*.sh
+      - name: PHP syntax
+        run: find wp-content/mu-plugins/longevity-core wp-content/themes/longevity-starter scripts tests/php -name '*.php' -print0 | xargs -0 -n1 php -l
+      - run: composer phpcs -- --report-checkstyle=reports/php-quality/phpcs-checkstyle.xml
+      - run: composer phpstan
+      - name: PHPUnit authoritative suite
+        run: composer test -- --coverage-clover=coverage.xml --coverage-text --log-junit reports/php-quality/phpunit-junit.xml
+      - name: Copy coverage into evidence
+        run: cp coverage.xml reports/php-quality/coverage.xml
+      - name: Check coverage threshold
+        run: |
+          # shellcheck disable=SC2016
+          # PHP variables are intentionally protected from the shell.
+          COVERAGE=$(php -r '
+            $doc = @simplexml_load_file("coverage.xml");
+            if ( ! $doc || ! isset($doc->project->metrics) ) { fwrite(STDERR, "coverage.xml missing or unreadable\n"); exit(1); }
+            $m = $doc->project->metrics;
+            $total = (int) $m["statements"];
+            $covered = (int) $m["coveredstatements"];
+            if ( $total <= 0 ) { fwrite(STDERR, "coverage data is empty: zero total statements\n"); exit(1); }
+            echo round($covered / $total * 100, 2);
+          ')
+          echo "Coverage: ${COVERAGE}%"
+          THRESHOLD=${COVERAGE_THRESHOLD:-30}
+          if (( $(echo "$COVERAGE < $THRESHOLD" | bc -l) )); then
+            echo "Coverage ${COVERAGE}% is below threshold ${THRESHOLD}%"
+            exit 1
+          fi
+      - run: composer audit --locked
+      - name: Finalize evidence
+        run: php scripts/write-release-evidence-metadata.php quality-php php-quality-evidence reports/php-quality success junit:phpunit-junit.xml checkstyle:phpcs-checkstyle.xml
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: php-quality-evidence
+          path: reports/php-quality/
+          if-no-files-found: error
+
+  quality-frontend:
+    name: Frontend quality
+    needs: clean-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      EVIDENCE_ACTION_SHAS: 'actions/checkout@11d5960a326750d5838078e36cf38b85af677262 actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Initialize evidence directory
+        run: mkdir -p reports/frontend-quality
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
       - run: npm ci
-      - run: make validate
-      - run: composer lint
-      - run: composer test
       - run: npm run lint
-      - run: docker compose config --quiet
-  wordpress-smoke:
+      - name: Generate substantive lint reports
+        run: |
+          npx eslint wp-content/mu-plugins/longevity-core/assets/**/*.js wp-content/themes/longevity-starter/assets/js/**/*.js tests/e2e/**/*.js eslint.config.js playwright.config.js -f json -o reports/frontend-quality/eslint.json
+          npx stylelint 'wp-content/themes/longevity-starter/**/*.css' --formatter json --output-file reports/frontend-quality/stylelint.json
+      - run: npm audit --audit-level=high
+      - name: Finalize evidence
+        run: php scripts/write-release-evidence-metadata.php quality-frontend frontend-quality-evidence reports/frontend-quality success json:eslint.json json:stylelint.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: frontend-quality-evidence
+          path: reports/frontend-quality/
+          if-no-files-found: error
+
+  content-and-config:
+    name: Content and configuration
+    needs: clean-build
     runs-on: ubuntu-latest
-    needs: validate
+    timeout-minutes: 15
+    env:
+      EVIDENCE_ACTION_SHAS: 'actions/checkout@11d5960a326750d5838078e36cf38b85af677262'
     steps:
-      - uses: actions/checkout@v4
-      - run: cp .env.ci .env
-      - run: docker compose up -d db wordpress
-      - run: docker compose run --rm --entrypoint sh wpcli /scripts/bootstrap.sh
-      - run: ./scripts/smoke-test.sh
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Initialize evidence directory
+        run: mkdir -p reports/content-config
+      - name: Run and retain content/config validation output
+        run: |
+          {
+            bash scripts/ci-generate-env.sh
+            bash scripts/validate.sh
+            python3 scripts/validate-content.py
+            python3 scripts/validate-internal-links.py
+            python3 scripts/validate-freshness.py
+            docker compose config --quiet
+            bash scripts/verify-manifest.sh
+            bash scripts/verify-docs-consistency.sh
+          } 2>&1 | tee reports/content-config/validation.log
+      - name: Finalize evidence
+        run: php scripts/write-release-evidence-metadata.php content-and-config content-config-evidence reports/content-config success text:validation.log
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: content-config-evidence
+          path: reports/content-config/
+          if-no-files-found: error
+
+  wordpress-integration:
+    name: WordPress integration
+    needs: [quality-php, content-and-config]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      EVIDENCE_ACTION_SHAS: 'actions/checkout@11d5960a326750d5838078e36cf38b85af677262'
+      EVIDENCE_CONTAINER_IMAGES: 'mysql@sha256:62fb722c78b24245ddff1796a0fcee4a49cc5b87e0aaaf20c92d1da9e0a2497b longevity-wordpress:dev longevity-wpcli:dev'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Initialize evidence directory
+        run: mkdir -p reports/wordpress-integration
+      - run: bash scripts/ci-generate-env.sh
+      - name: Start WordPress
+        run: docker compose up -d db wordpress
+      - name: Bootstrap and smoke test
+        run: |
+          bash scripts/ci-setup.sh
+          bash scripts/smoke-test.sh
+      - name: Integration contracts
+        run: |
+          { for script in tests/integration/*.sh; do bash "$script"; done; } 2>&1 | tee reports/wordpress-integration/integration.log
+      - name: Finalize evidence
+        run: php scripts/write-release-evidence-metadata.php wordpress-integration wordpress-integration-evidence reports/wordpress-integration success text:integration.log
+      - name: Capture Docker logs
+        if: failure()
+        run: docker compose logs --no-color > docker-integration.log
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: wordpress-integration-evidence
+          path: reports/wordpress-integration/
+          if-no-files-found: error
       - if: always()
         run: docker compose down -v
-  browser-tests:
+
+  playwright-chromium:
+    name: Playwright Chromium
+    needs: [quality-frontend, wordpress-integration]
     runs-on: ubuntu-latest
-    needs: validate
+    timeout-minutes: 30
+    env:
+      EVIDENCE_ACTION_SHAS: 'actions/checkout@11d5960a326750d5838078e36cf38b85af677262 actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
+      EVIDENCE_CONTAINER_IMAGES: 'mysql@sha256:62fb722c78b24245ddff1796a0fcee4a49cc5b87e0aaaf20c92d1da9e0a2497b longevity-wordpress:dev longevity-wpcli:dev'
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
-          node-version: '22'
+          node-version: ${{ env.NODE_VERSION }}
           cache: npm
-      - run: cp .env.ci .env
-      - run: npm ci
-      - run: npx playwright install --with-deps chromium
+      - run: bash scripts/ci-generate-env.sh && npm ci
       - run: docker compose up -d db wordpress
-      - run: docker compose run --rm --entrypoint sh wpcli /scripts/bootstrap.sh
-      - run: docker compose run --rm --entrypoint sh wpcli /scripts/create-test-fixtures.sh
-      - run: npm run test:e2e
-      - run: npm run test:a11y
-      - run: npm run test:lighthouse
-      - if: failure()
-        uses: actions/upload-artifact@v4
+      - run: bash scripts/ci-setup.sh
+      - run: npx playwright install --with-deps chromium
+      - name: Initialize evidence directory
+        run: mkdir -p reports/playwright-chromium
+      - name: Core, routes, SEO, contact, a11y and security contracts
+        env:
+          WP_SITE_URL: http://localhost:8080
+          E2E_CONTACT_ENABLED: '1'
+          PLAYWRIGHT_JUNIT_OUTPUT_FILE: reports/playwright-chromium/playwright-junit.xml
+        run: npm run test:e2e:functional -- --project=chromium --reporter=list,junit
+      - name: Finalize evidence
+        run: php scripts/write-release-evidence-metadata.php playwright-chromium playwright-chromium-evidence reports/playwright-chromium success junit:playwright-junit.xml
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
         with:
-          name: browser-diagnostics
-          path: |
-            reports/
-            test-results/
-          if-no-files-found: ignore
+          name: playwright-chromium-evidence
+          path: reports/playwright-chromium/
+          if-no-files-found: error
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: playwright-chromium-artifacts
+          path: reports/playwright-artifacts/
+          if-no-files-found: warn
       - if: always()
         run: docker compose down -v
+
+  load-smoke:
+    name: Load smoke (k6)
+    needs: [quality-frontend, wordpress-integration]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      EVIDENCE_ACTION_SHAS: 'actions/checkout@11d5960a326750d5838078e36cf38b85af677262 actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
+      EVIDENCE_CONTAINER_IMAGES: 'mysql@sha256:62fb722c78b24245ddff1796a0fcee4a49cc5b87e0aaaf20c92d1da9e0a2497b longevity-wordpress:dev longevity-wpcli:dev grafana/k6:2.1.0@sha256:65c920dc067d5e2e00befbf982af6ad6ad0117034e8b1c65817c7975c52d4669'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: bash scripts/ci-generate-env.sh && npm ci
+      - run: docker compose up -d db wordpress
+      - run: bash scripts/ci-setup.sh
+      - name: Initialize evidence directory
+        run: mkdir -p reports/load-smoke && chmod -R a+rwX reports
+      - name: k6 candidate smoke gate (blocking; threshold failure fails this job)
+        env:
+          WP_SITE_URL: http://localhost:8080
+        run: |
+          docker run --rm --network host \
+            -e WP_SITE_URL=http://localhost:8080 \
+            -v "$PWD:/work" -w /work \
+            grafana/k6:2.1.0@sha256:65c920dc067d5e2e00befbf982af6ad6ad0117034e8b1c65817c7975c52d4669 \
+            run --summary-export=reports/load-smoke/k6-summary.json tests/load/k6-scenario.js
+      - name: Finalize evidence
+        run: php scripts/write-release-evidence-metadata.php load-smoke load-smoke-evidence reports/load-smoke success json:k6-summary.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: load-smoke-evidence
+          path: reports/load-smoke/
+          if-no-files-found: error
+      - if: always()
+        run: docker compose down -v
+
+  accessibility:
+    name: Accessibility (axe-core)
+    needs: [quality-frontend, wordpress-integration]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      EVIDENCE_ACTION_SHAS: 'actions/checkout@11d5960a326750d5838078e36cf38b85af677262 actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
+      EVIDENCE_CONTAINER_IMAGES: 'mysql@sha256:62fb722c78b24245ddff1796a0fcee4a49cc5b87e0aaaf20c92d1da9e0a2497b longevity-wordpress:dev longevity-wpcli:dev'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Initialize evidence directory
+        run: mkdir -p reports/accessibility
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: bash scripts/ci-generate-env.sh && npm ci
+      - run: docker compose up -d db wordpress
+      - run: bash scripts/ci-setup.sh
+      - run: npx playwright install --with-deps chromium
+      - name: WCAG 2.1 AA accessibility suite
+        env:
+          WP_SITE_URL: http://localhost:8080
+          PLAYWRIGHT_JUNIT_OUTPUT_FILE: reports/accessibility/playwright-junit.xml
+        run: npm run test:a11y -- --project=chromium --reporter=list,junit
+      - name: Finalize evidence
+        run: php scripts/write-release-evidence-metadata.php accessibility accessibility-evidence reports/accessibility success junit:playwright-junit.xml
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: accessibility-evidence
+          path: reports/accessibility/
+          if-no-files-found: error
+      - if: always()
+        run: docker compose down -v
+
+  playwright-cross-browser:
+    name: Critical Firefox and WebKit
+    needs: [quality-frontend, wordpress-integration]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      EVIDENCE_ACTION_SHAS: 'actions/checkout@11d5960a326750d5838078e36cf38b85af677262 actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
+      EVIDENCE_CONTAINER_IMAGES: 'mysql@sha256:62fb722c78b24245ddff1796a0fcee4a49cc5b87e0aaaf20c92d1da9e0a2497b longevity-wordpress:dev longevity-wpcli:dev'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: bash scripts/ci-generate-env.sh && npm ci
+      - run: docker compose up -d db wordpress
+      - run: bash scripts/ci-setup.sh
+      - run: npx playwright install --with-deps firefox webkit
+      - name: Initialize evidence directory
+        run: mkdir -p reports/playwright-cross-browser
+      - env:
+          WP_SITE_URL: http://localhost:8080
+          PLAYWRIGHT_JUNIT_OUTPUT_FILE: reports/playwright-cross-browser/playwright-junit.xml
+        run: npx playwright test tests/e2e/critical-cross-browser.spec.js --project=firefox-critical --project=webkit-critical --reporter=list,junit
+      - name: Finalize evidence
+        run: php scripts/write-release-evidence-metadata.php playwright-cross-browser playwright-cross-browser-evidence reports/playwright-cross-browser success junit:playwright-junit.xml
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: playwright-cross-browser-evidence
+          path: reports/playwright-cross-browser/
+          if-no-files-found: error
+      - if: always()
+        run: docker compose down -v
+
+  visual-linux:
+    name: Linux visual regression (baseline-gated)
+    # Enable only after reviewed Linux snapshots exist in the pinned container.
+    if: ${{ vars.LEL_LINUX_VISUAL_BASELINES_READY == 'true' }}
+    needs: [quality-frontend, wordpress-integration]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      EVIDENCE_ACTION_SHAS: 'actions/checkout@11d5960a326750d5838078e36cf38b85af677262'
+      EVIDENCE_CONTAINER_IMAGES: 'mysql@sha256:62fb722c78b24245ddff1796a0fcee4a49cc5b87e0aaaf20c92d1da9e0a2497b longevity-wordpress:dev longevity-wpcli:dev mcr.microsoft.com/playwright@sha256:5b8f294aff9041b7191c34a4bab3ac270157a28774d4b0660e9743297b697e48'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Initialize evidence directory
+        run: mkdir -p reports/visual-linux
+      - run: bash scripts/ci-generate-env.sh
+      - run: docker compose up -d db wordpress
+      - run: bash scripts/ci-setup.sh
+      - name: Run visual suite in version-pinned Playwright image
+        run: |
+          docker run --rm --network host \
+            -e WP_SITE_URL=http://localhost:8080 \
+            -e PLAYWRIGHT_JUNIT_OUTPUT_FILE=reports/visual-linux/playwright-junit.xml \
+            -v "$PWD:/work" -w /work \
+            mcr.microsoft.com/playwright@sha256:5b8f294aff9041b7191c34a4bab3ac270157a28774d4b0660e9743297b697e48 \
+            sh -lc 'npm ci && npx playwright test tests/e2e/visual.spec.js --project=chromium --reporter=list,junit'
+      - name: Finalize evidence
+        run: php scripts/write-release-evidence-metadata.php visual-linux visual-linux-evidence reports/visual-linux success junit:playwright-junit.xml
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: visual-linux-evidence
+          path: reports/visual-linux/
+          if-no-files-found: error
+      - if: always()
+        run: docker compose down -v
+
+  lighthouse-mobile:
+    name: Lighthouse mobile
+    needs: [quality-frontend, wordpress-integration]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      EVIDENCE_ACTION_SHAS: 'actions/checkout@11d5960a326750d5838078e36cf38b85af677262 actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
+      EVIDENCE_CONTAINER_IMAGES: 'mysql@sha256:62fb722c78b24245ddff1796a0fcee4a49cc5b87e0aaaf20c92d1da9e0a2497b longevity-wordpress:dev longevity-wpcli:dev'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: bash scripts/ci-generate-env.sh && npm ci
+      - run: docker compose up -d db wordpress
+      - run: bash scripts/ci-setup.sh
+      - name: Initialize evidence directory
+        run: mkdir -p reports/lighthouse-mobile
+      - env:
+          WP_SITE_URL: http://localhost:8080
+        run: npm run test:lighthouse
+      - name: Finalize evidence
+        # Retain reports on failure so failed runs stay diagnosable; the
+        # release-evidence index still fails closed on the job result.
+        if: always()
+        run: |
+          # shellcheck disable=SC2016
+          # PHP variables are intentionally protected from the shell.
+          php -r '$found=false; $it=new RecursiveIteratorIterator(new RecursiveDirectoryIterator("reports/lighthouse/mobile")); foreach($it as $f){if($f->isFile()&&$f->getExtension()==="json"){$d=json_decode(file_get_contents($f->getPathname()),true);if(isset($d["lighthouseVersion"],$d["categories"])){copy($f->getPathname(),"reports/lighthouse-mobile/lighthouse.json");$found=true;break;}}} if(!$found){fwrite(STDERR,"No Lighthouse result found\n");touch("reports/lighthouse-mobile/no-lighthouse-report.txt");}'
+          php scripts/write-release-evidence-metadata.php lighthouse-mobile lighthouse-evidence reports/lighthouse-mobile ${{ job.status }} json:lighthouse.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: lighthouse-evidence
+          path: reports/lighthouse-mobile/
+          if-no-files-found: error
+      - if: always()
+        run: docker compose down -v
+
+  lighthouse-desktop:
+    name: Lighthouse desktop
+    needs: [quality-frontend, wordpress-integration]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      EVIDENCE_ACTION_SHAS: 'actions/checkout@11d5960a326750d5838078e36cf38b85af677262 actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
+      EVIDENCE_CONTAINER_IMAGES: 'mysql@sha256:62fb722c78b24245ddff1796a0fcee4a49cc5b87e0aaaf20c92d1da9e0a2497b longevity-wordpress:dev longevity-wpcli:dev'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: bash scripts/ci-generate-env.sh && npm ci
+      - run: docker compose up -d db wordpress
+      - run: bash scripts/ci-setup.sh
+      - name: Initialize evidence directory
+        run: mkdir -p reports/lighthouse-desktop
+      - env:
+          WP_SITE_URL: http://localhost:8080
+        run: npm run test:lighthouse:desktop
+      - name: Finalize evidence
+        # Retain reports on failure so failed runs stay diagnosable; the
+        # release-evidence index still fails closed on the job result.
+        if: always()
+        run: |
+          # shellcheck disable=SC2016
+          # PHP variables are intentionally protected from the shell.
+          php -r '$found=false; $it=new RecursiveIteratorIterator(new RecursiveDirectoryIterator("reports/lighthouse/desktop")); foreach($it as $f){if($f->isFile()&&$f->getExtension()==="json"){$d=json_decode(file_get_contents($f->getPathname()),true);if(isset($d["lighthouseVersion"],$d["categories"])){copy($f->getPathname(),"reports/lighthouse-desktop/lighthouse.json");$found=true;break;}}} if(!$found){fwrite(STDERR,"No Lighthouse result found\n");touch("reports/lighthouse-desktop/no-lighthouse-report.txt");}'
+          php scripts/write-release-evidence-metadata.php lighthouse-desktop lighthouse-desktop-evidence reports/lighthouse-desktop ${{ job.status }} json:lighthouse.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: lighthouse-desktop-evidence
+          path: reports/lighthouse-desktop/
+          if-no-files-found: error
+      - if: always()
+        run: docker compose down -v
+
+  release-artifact:
+    name: First-party release artifact
+    needs: [quality-php, quality-frontend, content-and-config]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      EVIDENCE_ACTION_SHAS: 'actions/checkout@11d5960a326750d5838078e36cf38b85af677262'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Initialize evidence directory
+        run: mkdir -p reports/release-artifact
+      - name: Build first-party release artifact
+        run: bash scripts/build-release-artifact.sh "$GITHUB_SHA"
+      - name: Verify artifact and reproducibility
+        run: |
+          cp "build/release/longevity-release-${GITHUB_SHA}.tar.gz" reports/release-artifact/release.tar.gz
+          sed 's/longevity-release-[a-f0-9]*\.tar\.gz/release.tar.gz/' "build/release/longevity-release-${GITHUB_SHA}.tar.gz.sha256" > reports/release-artifact/release.tar.gz.sha256
+          bash scripts/verify-release-artifact.sh reports/release-artifact/release.tar.gz "$GITHUB_SHA" reports/release-artifact/release-verification.json reports/release-artifact/release.tar.gz.sha256
+          bash scripts/verify-release-reproducibility.sh "$GITHUB_SHA" reports/release-artifact/reproducibility.json
+          php scripts/write-release-evidence-metadata.php release-artifact release-artifact reports/release-artifact success json:release-verification.json json:reproducibility.json archive:release.tar.gz sha256:release.tar.gz.sha256
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: release-artifact
+          path: reports/release-artifact/
+          if-no-files-found: error
+
+  codeql:
+    name: CodeQL
+    runs-on: ubuntu-latest
+    env:
+      EVIDENCE_ACTION_SHAS: 'actions/checkout@11d5960a326750d5838078e36cf38b85af677262 github/codeql-action@d03f4cc0498d5a63039d157eb274d9c2fc50f17a'
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Initialize evidence directory
+        run: mkdir -p reports/codeql
+      - uses: github/codeql-action/init@d03f4cc0498d5a63039d157eb274d9c2fc50f17a # v3.37.1
+        with:
+          languages: javascript-typescript, python
+          queries: security-and-quality
+      - uses: github/codeql-action/analyze@d03f4cc0498d5a63039d157eb274d9c2fc50f17a # v3.37.1
+        with:
+          output: reports/codeql/raw
+      - name: Finalize evidence
+        run: |
+          php scripts/merge-codeql-sarif.php
+          php scripts/write-release-evidence-metadata.php codeql codeql-evidence reports/codeql success sarif:codeql.sarif
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: codeql-evidence
+          path: reports/codeql/
+          if-no-files-found: error
+
+  php-sast:
+    name: PHP SAST (Psalm taint analysis)
+    needs: clean-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      EVIDENCE_ACTION_SHAS: 'actions/checkout@11d5960a326750d5838078e36cf38b85af677262 shivammathur/setup-php@b604ade2a87db23f8871b7182e69ec5e75effb45'
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Initialize evidence directory
+        run: mkdir -p reports/php-sast
+      - uses: shivammathur/setup-php@b604ade2a87db23f8871b7182e69ec5e75effb45 # v2
+        with:
+          php-version: ${{ env.PHP_VERSION }}
+          coverage: none
+      - run: composer install --no-interaction --prefer-dist --no-progress
+      - name: Detection capability proof (fixture must be flagged)
+        run: bash scripts/verify-sast-detection.sh
+      - name: Psalm taint analysis (first-party code)
+        run: ./vendor/bin/psalm --taint-analysis --no-progress --no-cache --report=reports/php-sast/psalm.sarif
+      - name: Finalize evidence
+        run: php scripts/write-release-evidence-metadata.php php-sast php-sast-evidence reports/php-sast success sarif:psalm.sarif json:detection-proof.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: php-sast-evidence
+          path: reports/php-sast/
+          if-no-files-found: error
+
+  security-supply-chain:
+    name: Supply-chain and secret guards
+    needs: clean-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      EVIDENCE_ACTION_SHAS: 'actions/checkout@11d5960a326750d5838078e36cf38b85af677262 shivammathur/setup-php@b604ade2a87db23f8871b7182e69ec5e75effb45 actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25'
+      EVIDENCE_CONTAINER_IMAGES: 'ghcr.io/trufflesecurity/trufflehog:3.95.9'
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+      - name: Initialize evidence directory
+        run: mkdir -p reports/supply-chain
+      - uses: shivammathur/setup-php@b604ade2a87db23f8871b7182e69ec5e75effb45 # v2
+        with:
+          php-version: ${{ env.PHP_VERSION }}
+          coverage: none
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: composer install --no-interaction --prefer-dist --no-progress
+      - run: npm ci
+      - name: Record dependency scan start
+        run: echo "DEPENDENCY_SCAN_UTC=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_ENV"
+      - name: Dependency advisories
+        run: |
+          composer audit --locked --format=json > reports/supply-chain/composer-audit.json
+          npm audit --audit-level=high --json > reports/supply-chain/npm-audit.json
+      - name: Lockfile SBOM and license policy
+        run: php scripts/generate-dependency-sbom.php reports/supply-chain/sbom.spdx.json reports/supply-chain/licenses.json reports/supply-chain/scan-metadata.json
+      - name: TruffleHog secret scan with retained scanner output
+        run: |
+          docker run --rm -v "$PWD:/repo" ghcr.io/trufflesecurity/trufflehog:3.95.9 \
+            git file:///repo --fail --no-update --json --only-verified --results=verified,unknown \
+            | jq -s '.' > reports/supply-chain/trufflehog.json
+      - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: config
+          scan-ref: compose.yaml
+          severity: HIGH,CRITICAL
+          exit-code: 1
+          format: json
+          output: reports/supply-chain/trivy.json
+      - name: Normalize empty trivy results
+        run: jq '.Results = (.Results // [])' reports/supply-chain/trivy.json > reports/supply-chain/trivy.tmp && mv reports/supply-chain/trivy.tmp reports/supply-chain/trivy.json
+      - name: Finalize evidence
+        run: php scripts/write-release-evidence-metadata.php security-supply-chain supply-chain-evidence reports/supply-chain success spdx-json:sbom.spdx.json json:licenses.json json:scan-metadata.json json:composer-audit.json json:npm-audit.json json:trufflehog.json json:trivy.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: supply-chain-evidence
+          path: reports/supply-chain/
+          if-no-files-found: error
+
+  dependency-review:
+    name: Dependency review
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      EVIDENCE_ACTION_SHAS: 'actions/checkout@11d5960a326750d5838078e36cf38b85af677262 actions/dependency-review-action@2031cfc080254a8a887f58cffee85186f0e49e48'
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Initialize evidence directory
+        run: mkdir -p reports/dependency-review
+      - id: dependency-review
+        uses: actions/dependency-review-action@2031cfc080254a8a887f58cffee85186f0e49e48 # v4
+        with:
+          fail-on-severity: high
+      - name: Finalize evidence
+        env:
+          DEPENDENCY_CHANGES: ${{ steps.dependency-review.outputs.dependency-changes }}
+        run: |
+          printf '%s\n' "$DEPENDENCY_CHANGES" | jq -e 'if type == "array" then . else error("dependency changes output is not an array") end' > reports/dependency-review/dependency-review.json
+          php scripts/write-release-evidence-metadata.php dependency-review dependency-review-evidence reports/dependency-review success json:dependency-review.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: dependency-review-evidence
+          path: reports/dependency-review/
+          if-no-files-found: error
+
+  release-evidence:
+    name: Release evidence index
+    if: always()
+    needs:
+      - clean-build
+      - quality-php
+      - quality-frontend
+      - content-and-config
+      - wordpress-integration
+      - playwright-chromium
+      - accessibility
+      - playwright-cross-browser
+      - visual-linux
+      - lighthouse-mobile
+      - lighthouse-desktop
+      - release-artifact
+      - codeql
+      - php-sast
+      - security-supply-chain
+      - dependency-review
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        if: always()
+        with:
+          path: reports/upstream
+      - name: Record upstream job outcomes
+        run: |
+          mkdir -p reports
+          cat > reports/ci-job-results.json <<'JSON'
+          {
+            "schema_version": 1,
+            "commit_sha": "${{ github.sha }}",
+            "workflow_run_id": "${{ github.run_id }}",
+            "jobs": {
+            "clean-build": "${{ needs.clean-build.result }}",
+            "quality-php": "${{ needs.quality-php.result }}",
+            "quality-frontend": "${{ needs.quality-frontend.result }}",
+            "content-and-config": "${{ needs.content-and-config.result }}",
+            "wordpress-integration": "${{ needs.wordpress-integration.result }}",
+            "playwright-chromium": "${{ needs.playwright-chromium.result }}",
+            "accessibility": "${{ needs.accessibility.result }}",
+            "playwright-cross-browser": "${{ needs.playwright-cross-browser.result }}",
+            "visual-linux": "${{ needs.visual-linux.result }}",
+            "lighthouse-mobile": "${{ needs.lighthouse-mobile.result }}",
+            "lighthouse-desktop": "${{ needs.lighthouse-desktop.result }}",
+            "release-artifact": "${{ needs.release-artifact.result }}",
+            "codeql": "${{ needs.codeql.result }}",
+            "php-sast": "${{ needs.php-sast.result }}",
+            "security-supply-chain": "${{ needs.security-supply-chain.result }}",
+            "dependency-review": "${{ needs.dependency-review.result }}"
+            }
+          }
+          JSON
+      - run: bash scripts/generate-release-evidence.sh "${{ github.sha }}"
+      - name: Attest release evidence index
+        if: github.event_name == 'push'
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2.4.0
+        with:
+          subject-path: |
+            reports/release/${{ github.sha }}/evidence-index.json
+            reports/release/${{ github.sha }}/SHA256SUMS
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: release-evidence-index
+          path: |
+            reports/ci-job-results.json
+            reports/release/
+          if-no-files-found: error

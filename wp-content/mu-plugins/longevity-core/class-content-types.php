@@ -40,22 +40,23 @@ final class Content_Types {
 		self::register_private_type( 'lel_claim', __( 'Claims', 'longevity-core' ), __( 'Claim', 'longevity-core' ), 'dashicons-yes-alt', 'manage_claims' );
 		self::register_private_type( 'lel_source', __( 'Sources', 'longevity-core' ), __( 'Source', 'longevity-core' ), 'dashicons-book-alt', 'manage_claims' );
 		self::register_private_type( 'lel_protocol', __( 'Test Protocols', 'longevity-core' ), __( 'Test Protocol', 'longevity-core' ), 'dashicons-clipboard', 'manage_test_protocols' );
-		self::register_private_type( 'lel_test_record', __( 'Test Records', 'longevity-core' ), __( 'Test Record', 'longevity-core' ), 'dashicons-chart-line', 'manage_test_protocols' );
+		self::register_private_type( 'lel_test_record', __( 'Test Records', 'longevity-core' ), __( 'Test Record', 'longevity-core' ), 'dashicons-chart-line', 'manage_test_records' );
 		self::register_private_type( 'lel_correction', __( 'Corrections', 'longevity-core' ), __( 'Correction', 'longevity-core' ), 'dashicons-undo', 'manage_corrections' );
 		self::register_private_type( 'lel_affiliate', __( 'Affiliate Registry', 'longevity-core' ), __( 'Affiliate Merchant', 'longevity-core' ), 'dashicons-money-alt', 'manage_affiliate_registry' );
+		self::register_private_type( 'longevity_message', __( 'Messages', 'longevity-core' ), __( 'Message', 'longevity-core' ), 'dashicons-email-alt', 'manage_options' );
 
 		$statuses = array(
-			'lel_assigned'          => __( 'Assigned', 'longevity-core' ),
-			'lel_researching'       => __( 'Researching', 'longevity-core' ),
-			'lel_editorial_review'  => __( 'Editorial review', 'longevity-core' ),
-			'lel_fact_check'        => __( 'Fact-check', 'longevity-core' ),
-			'lel_medical_review'    => __( 'Medical review', 'longevity-core' ),
-			'lel_testing_incomplete'=> __( 'Testing incomplete', 'longevity-core' ),
-			'lel_commercial_review' => __( 'Commercial review', 'longevity-core' ),
-			'lel_ready'             => __( 'Ready for publication', 'longevity-core' ),
-			'lel_update_due'        => __( 'Update due', 'longevity-core' ),
-			'lel_correction_pending'=> __( 'Correction pending', 'longevity-core' ),
-			'lel_archived'          => __( 'Archived', 'longevity-core' ),
+			'lel_assigned'           => __( 'Assigned', 'longevity-core' ),
+			'lel_researching'        => __( 'Researching', 'longevity-core' ),
+			'lel_editorial_review'   => __( 'Editorial review', 'longevity-core' ),
+			'lel_fact_check'         => __( 'Fact-check', 'longevity-core' ),
+			'lel_medical_review'     => __( 'Medical review', 'longevity-core' ),
+			'lel_testing_incomplete' => __( 'Testing incomplete', 'longevity-core' ),
+			'lel_commercial_review'  => __( 'Commercial review', 'longevity-core' ),
+			'lel_ready'              => __( 'Ready for publication', 'longevity-core' ),
+			'lel_update_due'         => __( 'Update due', 'longevity-core' ),
+			'lel_correction_pending' => __( 'Correction pending', 'longevity-core' ),
+			'lel_archived'           => __( 'Archived', 'longevity-core' ),
 		);
 
 		foreach ( $statuses as $key => $label ) {
@@ -68,22 +69,33 @@ final class Content_Types {
 					'protected'                 => true,
 					'show_in_admin_status_list' => true,
 					'show_in_admin_all_list'    => true,
-					'label_count'               => _n_noop( $label . ' <span class="count">(%s)</span>', $label . ' <span class="count">(%s)</span>', 'longevity-core' ),
+					'label_count'               => _n_noop( $label . ' <span class="count">(%s)</span>', $label . ' <span class="count">(%s)</span>', 'longevity-core' ), // phpcs:ignore WordPress.WP.I18n.NonSingularStringLiteralSingular, WordPress.WP.I18n.NonSingularStringLiteralPlural -- Internal editorial status labels are generated from the status map; the dynamic prefix cannot be a literal.
 				)
 			);
 		}
 	}
 
-	/** Register an administrative CPT. */
+	/**
+	 * Register an administrative CPT.
+	 *
+	 * @param string $post_type  Post type key.
+	 * @param string $plural     Plural display label.
+	 * @param string $singular   Singular display label.
+	 * @param string $icon       Dashicon name for the menu.
+	 * @param string $capability Capability required to manage the type.
+	 */
 	private static function register_private_type( string $post_type, string $plural, string $singular, string $icon, string $capability ): void {
 		register_post_type(
 			$post_type,
 			array(
-				'labels'              => array( 'name' => $plural, 'singular_name' => $singular ),
+				'labels'              => array(
+					'name'          => $plural,
+					'singular_name' => $singular,
+				),
 				'public'              => false,
 				'publicly_queryable'  => false,
 				'show_ui'             => true,
-				'show_in_rest'        => true,
+				'show_in_rest'        => false,
 				'exclude_from_search' => true,
 				'menu_icon'           => $icon,
 				'supports'            => array( 'title', 'editor', 'author', 'revisions', 'custom-fields' ),

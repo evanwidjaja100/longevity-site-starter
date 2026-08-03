@@ -13,44 +13,7 @@ defined( 'ABSPATH' ) || exit;
 final class Schema {
 	/** Register hooks. */
 	public static function init(): void {
-		add_action( 'wp_head', array( self::class, 'output_social_meta' ), 5 );
 		add_action( 'wp_head', array( self::class, 'output' ), 30 );
-	}
-
-	/** Output conservative social metadata when no supported SEO provider owns it. */
-	public static function output_social_meta(): void {
-		if ( self::seo_provider_owns_schema() ) {
-			return;
-		}
-		$post_id     = is_singular() ? get_queried_object_id() : 0;
-		$title       = $post_id ? get_the_title( $post_id ) : wp_get_document_title();
-		$url         = $post_id ? get_permalink( $post_id ) : home_url( '/' );
-		$description = $post_id ? trim( (string) get_the_excerpt( $post_id ) ) : '';
-		if ( '' === $description && $post_id ) {
-			$description = trim( (string) get_post_meta( $post_id, 'content_summary', true ) );
-		}
-		if ( '' === $description ) {
-			$description = (string) get_bloginfo( 'description' );
-		}
-		$type  = is_singular( array( 'post', 'review' ) ) ? 'article' : 'website';
-		$image = $post_id ? wp_get_attachment_image_url( get_post_thumbnail_id( $post_id ), 'full' ) : '';
-		$tags  = array(
-			array( 'property' => 'og:title', 'content' => $title ),
-			array( 'property' => 'og:description', 'content' => $description ),
-			array( 'property' => 'og:url', 'content' => $url ),
-			array( 'property' => 'og:type', 'content' => $type ),
-			array( 'name' => 'twitter:card', 'content' => $image ? 'summary_large_image' : 'summary' ),
-			array( 'name' => 'twitter:title', 'content' => $title ),
-			array( 'name' => 'twitter:description', 'content' => $description ),
-		);
-		if ( $image ) {
-			$tags[] = array( 'property' => 'og:image', 'content' => $image );
-			$tags[] = array( 'name' => 'twitter:image', 'content' => $image );
-		}
-		foreach ( $tags as $tag ) {
-			$attribute = isset( $tag['property'] ) ? 'property="' . esc_attr( $tag['property'] ) . '"' : 'name="' . esc_attr( $tag['name'] ) . '"';
-			echo '<meta ' . $attribute . ' content="' . esc_attr( wp_strip_all_tags( (string) $tag['content'] ) ) . '">' . "\n";
-		}
 	}
 
 	/** Output the JSON-LD graph. */
@@ -62,8 +25,13 @@ final class Schema {
 		if ( empty( $graph ) ) {
 			return;
 		}
-		$schema = array( '@context' => 'https://schema.org', '@graph' => $graph );
-		echo '<script type="application/ld+json">' . wp_json_encode( $schema, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ) . '</script>' . "\n";
+		$schema     = array(
+			'@context' => 'https://schema.org',
+			'@graph'   => $graph,
+		);
+		$nonce      = Bootstrap::csp_nonce();
+		$nonce_attr = '' !== $nonce ? ' nonce="' . esc_attr( $nonce ) . '"' : '';
+		echo '<script type="application/ld+json"' . $nonce_attr . '>' . wp_json_encode( $schema, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ) . '</script>' . "\n"; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- JSON-LD payload is produced by wp_json_encode().
 	}
 
 	/** Build a graph for the current request. */
@@ -84,12 +52,12 @@ final class Schema {
 				static fn( $value ) => ! empty( $value )
 			),
 			array(
-				'@type'     => 'WebSite',
-				'@id'       => $website_id,
-				'url'       => $home,
-				'name'      => get_bloginfo( 'name' ),
-				'inLanguage'=> get_bloginfo( 'language' ),
-				'publisher' => array( '@id' => $org_id ),
+				'@type'      => 'WebSite',
+				'@id'        => $website_id,
+				'url'        => $home,
+				'name'       => get_bloginfo( 'name' ),
+				'inLanguage' => get_bloginfo( 'language' ),
+				'publisher'  => array( '@id' => $org_id ),
 			),
 		);
 
@@ -100,29 +68,64 @@ final class Schema {
 		if ( is_post_type_archive( 'review' ) ) {
 			$items = array();
 			foreach ( Rankings::directory() as $index => $group ) {
-				$items[] = array( '@type' => 'ListItem', 'position' => $index + 1, 'name' => $group['term']->name, 'url' => get_category_link( $group['term']->term_id ) );
+				$items[] = array(
+					'@type'    => 'ListItem',
+					'position' => $index + 1,
+					'name'     => $group['term']->name,
+					'url'      => get_category_link( $group['term']->term_id ),
+				);
 			}
-			$collection = array( '@type' => 'CollectionPage', '@id' => get_post_type_archive_link( 'review' ) . '#collection', 'url' => get_post_type_archive_link( 'review' ), 'name' => __( 'Consumer Lab rankings', 'longevity-core' ), 'isPartOf' => array( '@id' => $website_id ) );
+			$collection = array(
+				'@type'    => 'CollectionPage',
+				'@id'      => get_post_type_archive_link( 'review' ) . '#collection',
+				'url'      => get_post_type_archive_link( 'review' ),
+				'name'     => __( 'Consumer Lab rankings', 'longevity-core' ),
+				'isPartOf' => array( '@id' => $website_id ),
+			);
 			if ( $items ) {
-				$collection['mainEntity'] = array( '@type' => 'ItemList', 'itemListElement' => $items );
+				$collection['mainEntity'] = array(
+					'@type'           => 'ItemList',
+					'itemListElement' => $items,
+				);
 			}
 			$graph[] = $collection;
 		}
 		if ( is_category() ) {
-			$term = get_queried_object();
+			$term   = get_queried_object();
 			$ranked = $term instanceof \WP_Term ? Rankings::reviews( (int) $term->term_id ) : array();
 			if ( $ranked ) {
 				$items = array();
 				foreach ( $ranked as $index => $review ) {
-					$items[] = array( '@type' => 'ListItem', 'position' => $index + 1, 'name' => get_the_title( $review ), 'url' => get_permalink( $review ) );
+					$items[] = array(
+						'@type'    => 'ListItem',
+						'position' => $index + 1,
+						'name'     => get_the_title( $review ),
+						'url'      => get_permalink( $review ),
+					);
 				}
-				$graph[] = array( '@type' => 'CollectionPage', '@id' => get_category_link( $term->term_id ) . '#ranking', 'url' => get_category_link( $term->term_id ), 'name' => $term->name . ' ' . __( 'Consumer Lab ranking', 'longevity-core' ), 'mainEntity' => array( '@type' => 'ItemList', 'itemListElement' => $items ), 'isPartOf' => array( '@id' => $website_id ) );
+				$graph[] = array(
+					'@type'      => 'CollectionPage',
+					'@id'        => get_category_link( $term->term_id ) . '#ranking',
+					'url'        => get_category_link( $term->term_id ),
+					'name'       => $term->name . ' ' . __( 'Consumer Lab ranking', 'longevity-core' ),
+					'mainEntity' => array(
+						'@type'           => 'ItemList',
+						'itemListElement' => $items,
+					),
+					'isPartOf'   => array( '@id' => $website_id ),
+				);
 			}
 		}
 		return $graph;
 	}
 
-	/** Build page, article, author, reviewer, breadcrumb, and optional review entities. */
+	/**
+	 * Build page, article, author, reviewer, breadcrumb, and optional review entities.
+	 *
+	 * @param int    $post_id    Queried post ID to describe.
+	 * @param string $org_id     Organization schema node identifier (URI).
+	 * @param string $website_id WebSite schema node identifier (URI).
+	 */
 	private static function singular_graph( int $post_id, string $org_id, string $website_id ): array {
 		$post = get_post( $post_id );
 		if ( ! $post ) {
@@ -137,17 +140,17 @@ final class Schema {
 		if ( '' === $description ) {
 			$description = (string) get_post_meta( $post_id, 'content_summary', true );
 		}
-		$graph = array();
+		$graph   = array();
 		$graph[] = array_filter(
 			array(
-				'@type'      => 'WebPage',
-				'@id'        => $page_id,
-				'url'        => $url,
-				'name'       => get_the_title( $post_id ),
-				'description'=> $description,
-				'isPartOf'   => array( '@id' => $website_id ),
-				'breadcrumb' => array( '@id' => $breadcrumb ),
-				'inLanguage' => get_bloginfo( 'language' ),
+				'@type'       => 'WebPage',
+				'@id'         => $page_id,
+				'url'         => $url,
+				'name'        => get_the_title( $post_id ),
+				'description' => $description,
+				'isPartOf'    => array( '@id' => $website_id ),
+				'breadcrumb'  => array( '@id' => $breadcrumb ),
+				'inLanguage'  => get_bloginfo( 'language' ),
 			),
 			static fn( $value ) => ! empty( $value )
 		);
@@ -158,7 +161,7 @@ final class Schema {
 		}
 
 		$author_user_id = (int) $post->post_author;
-		$graph[] = array_filter(
+		$graph[]        = array_filter(
 			array(
 				'@type'       => 'Person',
 				'@id'         => $author_id,
@@ -206,7 +209,13 @@ final class Schema {
 		return $graph;
 	}
 
-	/** Build a review entity only for a specific product with real score/method metadata. */
+	/**
+	 * Build a review entity only for a specific product with real score/method metadata.
+	 *
+	 * @param int    $post_id    Reviewed post ID.
+	 * @param string $article_id Article schema node identifier (URI).
+	 * @param string $url        Canonical post permalink.
+	 */
 	private static function review_schema( int $post_id, string $article_id, string $url ): ?array {
 		$model      = trim( (string) get_post_meta( $post_id, 'tested_product_model', true ) );
 		$score      = (float) get_post_meta( $post_id, 'review_score', true );
@@ -216,7 +225,10 @@ final class Schema {
 		$record_id  = (int) get_post_meta( $post_id, 'test_record_id', true );
 		$dimensions = get_post_meta( $post_id, 'review_score_dimensions', true );
 		$disclosure = (string) get_post_meta( $post_id, 'affiliate_disclosure_status', true );
-		if ( ! Rankings::is_eligible( $post_id ) || '' === $model || $score <= 0 || '' === $version || '' === $confidence || ! in_array( $test_state, array( 'complete', 'approved' ), true ) || ! Review_Methodology::valid_test_record( $record_id, (string) get_post_meta( $post_id, 'testing_protocol_version', true ) ) ) {
+		if ( ! Runtime_Config::scoring_model_status()['valid'] || ! Review_Methodology::score_version_matches( $version ) || ! Approval_Service::is_current( $post_id, 'testing' ) || ! Rankings::is_eligible( $post_id ) || '' === $model || $score <= 0 || '' === $version || '' === $confidence || ! in_array( $test_state, array( 'complete', 'approved' ), true ) || ! Review_Methodology::valid_test_record( $record_id, (string) get_post_meta( $post_id, 'testing_protocol_version', true ) ) ) {
+			return null;
+		}
+		if ( ! Review_Methodology::dimensions_match_protocol( $record_id, is_array( $dimensions ) ? $dimensions : array() ) ) {
 			return null;
 		}
 		if ( ! in_array( get_post_meta( $post_id, 'commercial_relationship', true ), array( '', 'none' ), true ) && ! in_array( $disclosure, array( 'approved', 'complete' ), true ) ) {
@@ -239,7 +251,7 @@ final class Schema {
 				'@id'   => $product_id,
 				'name'  => $model,
 			),
-			'review' => array(
+			'review'  => array(
 				'@type'        => 'Review',
 				'@id'          => $review_id,
 				'itemReviewed' => array( '@id' => $product_id ),
@@ -255,18 +267,21 @@ final class Schema {
 		);
 	}
 
-	/** Build reviewer person entity only for completed scoped review. */
+	/**
+	 * Build reviewer person entity only for completed scoped review.
+	 *
+	 * @param int    $post_id Reviewed post ID.
+	 * @param string $url     Canonical post permalink.
+	 */
 	private static function reviewer_schema( int $post_id, string $url ): ?array {
-		if ( 'complete' !== get_post_meta( $post_id, 'medical_review_status', true ) ) {
+		if ( ! Approval_Service::is_current( $post_id, 'medical' ) ) {
 			return null;
 		}
-		$user_id = (int) get_post_meta( $post_id, 'medical_reviewer_user_id', true );
-		if ( $user_id <= 0 ) {
-			return null;
-		}
-		$name = get_the_author_meta( 'display_name', $user_id );
-		$credentials = get_user_meta( $user_id, 'professional_credentials', true );
-		if ( 'verified' !== get_user_meta( $user_id, 'credential_verification_status', true ) || '' === trim( (string) $name ) || '' === trim( (string) $credentials ) ) {
+		$user_id     = (int) get_post_meta( $post_id, 'medical_reviewer_user_id', true );
+		$snapshot    = $user_id > 0 ? Reviewer_Credentials::public_snapshot( $user_id ) : array();
+		$name        = (string) ( $snapshot['display_name'] ?? '' );
+		$credentials = (string) ( $snapshot['credentials'] ?? '' );
+		if ( '' === trim( $name ) || '' === trim( $credentials ) ) {
 			return null;
 		}
 		return array(
@@ -283,28 +298,55 @@ final class Schema {
 		);
 	}
 
-	/** Build breadcrumbs from visible navigation facts. */
+	/**
+	 * Build breadcrumbs from visible navigation facts.
+	 *
+	 * @param int    $post_id Post ID whose breadcrumb trail is built.
+	 * @param string $id      Breadcrumb schema node identifier (URI).
+	 */
 	private static function breadcrumb_schema( int $post_id, string $id ): array {
-		$visible = Public_Components::breadcrumb_items( $post_id );
+		$visible = Public_Nav::breadcrumb_items( $post_id );
 		$items   = array();
 		foreach ( $visible as $index => $item ) {
-			$items[] = array( '@type' => 'ListItem', 'position' => $index + 1, 'name' => $item['name'], 'item' => $item['url'] ?: get_permalink( $post_id ) );
+			$items[] = array(
+				'@type'    => 'ListItem',
+				'position' => $index + 1,
+				'name'     => $item['name'],
+				'item'     => $item['url'] ? $item['url'] : get_permalink( $post_id ),
+			);
 		}
-		return array( '@type' => 'BreadcrumbList', '@id' => $id, 'itemListElement' => $items );
+		return array(
+			'@type'           => 'BreadcrumbList',
+			'@id'             => $id,
+			'itemListElement' => $items,
+		);
 	}
 
-	/** Get visible article sections. */
+	/**
+	 * Get visible article sections.
+	 *
+	 * @param int $post_id Post ID whose categories are listed.
+	 */
 	private static function article_sections( int $post_id ): array {
 		return array_values( array_map( static fn( $term ) => $term->name, get_the_category( $post_id ) ) );
 	}
 
-	/** Get image schema from a real featured image. */
+	/**
+	 * Get image schema from a real featured image.
+	 *
+	 * @param int $post_id Post ID whose featured image is used.
+	 */
 	private static function image_schema( int $post_id ): ?array {
 		$image = wp_get_attachment_image_src( get_post_thumbnail_id( $post_id ), 'full' );
 		if ( ! $image ) {
 			return null;
 		}
-		return array( '@type' => 'ImageObject', 'url' => $image[0], 'width' => $image[1], 'height' => $image[2] );
+		return array(
+			'@type'  => 'ImageObject',
+			'url'    => $image[0],
+			'width'  => $image[1],
+			'height' => $image[2],
+		);
 	}
 
 	/** Get site logo schema when configured. */
@@ -314,7 +356,12 @@ final class Schema {
 		if ( ! $image ) {
 			return null;
 		}
-		return array( '@type' => 'ImageObject', 'url' => $image[0], 'width' => $image[1], 'height' => $image[2] );
+		return array(
+			'@type'  => 'ImageObject',
+			'url'    => $image[0],
+			'width'  => $image[1],
+			'height' => $image[2],
+		);
 	}
 
 	/** Detect supported SEO providers that already produce equivalent schema. */

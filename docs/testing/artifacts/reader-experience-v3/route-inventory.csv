@@ -1,0 +1,27 @@
+route_key,path,resource_type,bootstrap_status,anonymous_status,indexation,linked_from_header,linked_from_footer,linked_from_home,expected_launch_state,notes
+home,/,page,publish,200,indexable,yes,yes,yes,launched
+start_here,/start-here/,page,publish,200,indexable,yes,yes,yes,launched
+guides,/guides/,page,draft,404 (anonymous),noindex,no,no,no,human_approval
+topics,/topics/,page,draft,404 (anonymous),noindex,no,no,no,human_approval
+reviews,/reviews/,page,—,200,noindex,yes (conditional),yes (conditional),conditional,Phase_6_gate
+evidence_methodology,/evidence-methodology/,page,draft,404 (anonymous),noindex,no,no,no,human_approval
+testing_methodology,/testing-methodology/,page,draft,404 (anonymous),noindex,no,no,no,human_approval
+editorial_policy,/editorial-policy/,page,draft,404 (anonymous),noindex,no,no,no,human_approval
+corrections,/corrections/,page,draft,404 (anonymous),noindex,no,no,no,human_approval
+affiliate_disclosure,/affiliate-disclosure/,page,draft,404 (anonymous),noindex,no,no,no,human_approval
+medical_disclaimer,/medical-disclaimer/,page,draft,404 (anonymous),noindex,no,no,no,human_approval
+about,/about/,page,draft,404 (anonymous),noindex,no,no,no,human_approval
+contact,/contact/,page,draft,404 (anonymous),noindex,no,no,no,human_approval
+privacy,/privacy/,page,draft,404 (anonymous),noindex,no,no,no,human_approval
+terms,/terms/,page,draft,404 (anonymous),noindex,no,no,no,human_approval
+ai_assist_disclosure,/ai-assisted-work-disclosure/,page,draft,404 (anonymous),noindex,no,no,no,human_approval
+source_registry,/source-registry/,page,draft,404 (anonymous),noindex,no,no,no,human_approval
+category_evidence,/category/evidence-literacy/,category,publish,200,indexable,yes (topics),yes (topics),yes (topics),launched
+category_sleep,/category/sleep/,category,publish,200,indexable,yes (topics),yes (topics),yes (topics),launched
+category_movement,/category/movement/,category,publish,200,indexable,yes (topics),yes (topics),yes (topics),launched
+category_nutrition,/category/nutrition/,category,publish,200,indexable,yes (topics),yes (topics),yes (topics),launched
+category_wearables,/category/wearables/,category,publish,200,indexable,yes (topics),yes (topics),yes (topics),launched
+category_supplements,/category/supplements/,category,publish,200,indexable,yes (topics),yes (topics),yes (topics),launched
+category_consumer_lab,/category/consumer-lab/,category,publish,200,indexable,conditional,conditional,conditional,Phase_6_gate
+search,/?s=,search,always,200,noindex,no,no,no,always
+404,/nonexistent,error,always,404,noindex,n/a,n/a,n/a,always

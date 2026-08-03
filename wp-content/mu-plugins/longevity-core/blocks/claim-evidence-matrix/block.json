@@ -1,0 +1,13 @@
+{
+  "$schema": "https://schemas.wp.org/trunk/block.json",
+  "apiVersion": 3,
+  "name": "longevity/claim-evidence-matrix",
+  "version": "1.0.0",
+  "title": "Claim evidence matrix",
+  "description": "Verified material claims with evidence grading and source links",
+  "category": "theme",
+  "icon": "list-view",
+  "textdomain": "longevity-core",
+  "supports": { "html": false },
+  "editorScript": "longevity-core-blocks"
+}

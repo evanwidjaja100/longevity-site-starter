@@ -19,46 +19,102 @@ final class Affiliate_Registry {
 	/** Register registry metadata. */
 	public static function register_meta(): void {
 		$fields = array(
-			'merchant_id'              => 'text',
-			'merchant_name'            => 'text',
-			'merchant_domain'          => 'text',
-			'program_name'             => 'text',
-			'relationship_status'      => 'status',
-			'effective_date'           => 'date',
-			'expiration_date'          => 'date',
-			'disclosure_language'      => 'textarea',
+			'merchant_id'                 => 'text',
+			'merchant_name'               => 'text',
+			'merchant_domain'             => 'text',
+			'program_name'                => 'text',
+			'relationship_status'         => 'status',
+			'effective_date'              => 'date',
+			'expiration_date'             => 'date',
+			'disclosure_language'         => 'textarea',
 			'editorial_independence_note' => 'textarea',
-			'owner_user_id'            => 'absint',
-			'last_verified_date'       => 'date',
+			'owner_user_id'               => 'absint',
+			'last_verified_date'          => 'date',
+			'allow_subdomains'            => 'boolean',
 		);
 		foreach ( $fields as $key => $rule ) {
 			register_post_meta(
 				'lel_affiliate',
 				$key,
 				array(
-					'type'              => 'absint' === $rule ? 'integer' : 'string',
+					'type'              => 'boolean' === $rule ? 'boolean' : ( 'absint' === $rule ? 'integer' : 'string' ),
 					'single'            => true,
-					'show_in_rest'      => true,
-					'sanitize_callback' => static function ( $value ) use ( $rule ) {
-						if ( 'status' === $rule ) {
-							$value = sanitize_key( (string) $value );
-							return in_array( $value, array( 'active', 'paused', 'expired', 'terminated' ), true ) ? $value : 'paused';
-						}
-						return Meta_Registry::sanitize_value( $rule, $value );
-					},
-					'auth_callback'     => static fn() => current_user_can( 'manage_affiliate_registry' ),
+					'show_in_rest'      => false,
+					'sanitize_callback' => static fn( $value ) => Meta_Registry::sanitize_value( $rule, $value ),
+					'auth_callback'     => static fn() => current_user_can( 'manage_affiliate_relationships' ),
 				)
 			);
 		}
 	}
 
-	/** Whether content contains an affiliate shortcode or sponsored link marker. */
+	/**
+	 * Whether content contains an affiliate shortcode or sponsored link marker.
+	 *
+	 * @param string $content Post content to scan.
+	 */
 	public static function content_has_affiliate_link( string $content ): bool {
-		return has_shortcode( $content, 'affiliate_link' ) || false !== stripos( $content, 'rel="sponsored' ) || false !== stripos( $content, "rel='sponsored" );
+		if ( has_shortcode( $content, 'affiliate_link' ) ) {
+			return true;
+		}
+		$hrefs = self::sponsored_anchor_hrefs( $content );
+		if ( null === $hrefs ) {
+			// Parser failure: treat the content as affiliate-bearing so the
+			// affiliate publication gates apply and fail closed downstream.
+			return true;
+		}
+		return array() !== $hrefs;
 	}
 
-	/** Verify every affiliate destination present in content against an active registry record. */
+	/**
+	 * Verify every affiliate destination present in content against an active registry record.
+	 *
+	 * @param string $content Post content to scan.
+	 */
 	public static function all_destinations_registered( string $content ): bool {
+		$destinations = self::destinations_in_content( $content );
+		if ( null === $destinations ) {
+			return false;
+		}
+		foreach ( $destinations as $url ) {
+			if ( ! self::find_by_url( $url ) ) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	/**
+	 * Return relationship owners associated with active destinations in content.
+	 *
+	 * @param string $content Post content to scan.
+	 */
+	public static function relationship_owners_for_content( string $content ): array {
+		$owners       = array();
+		$destinations = self::destinations_in_content( $content );
+		if ( null === $destinations ) {
+			return array();
+		}
+		foreach ( $destinations as $url ) {
+			$merchant = self::find_by_url( $url );
+			if ( $merchant ) {
+				$owner = (int) get_post_meta( $merchant->ID, 'owner_user_id', true );
+				if ( $owner > 0 ) {
+					$owners[] = $owner;
+				}
+			}
+		}
+		return array_values( array_unique( $owners ) );
+	}
+
+	/**
+	 * Extract every affiliate destination in content without truncation.
+	 *
+	 * @param string $content Post content to scan.
+	 * @return array<int, string>|null Complete list of raw destinations, or
+	 *                                 null when extraction failed and callers
+	 *                                 must fail closed.
+	 */
+	private static function destinations_in_content( string $content ): ?array {
 		$urls = array();
 		if ( preg_match_all( '/' . get_shortcode_regex( array( 'affiliate_link' ) ) . '/s', $content, $matches, PREG_SET_ORDER ) ) {
 			foreach ( $matches as $match ) {
@@ -68,43 +124,274 @@ final class Affiliate_Registry {
 				}
 			}
 		}
-		if ( preg_match_all( '/<a\b(?=[^>]*\brel=["\'][^"\']*sponsored[^"\']*["\'])(?=[^>]*\bhref=["\']([^"\']+)["\'])[^>]*>/i', $content, $matches ) ) {
-			$urls = array_merge( $urls, $matches[1] );
-		}
-		$urls = array_values( array_unique( array_filter( array_map( 'esc_url_raw', $urls ) ) ) );
-		if ( empty( $urls ) ) {
-			return true;
-		}
-		foreach ( $urls as $url ) {
-			if ( ! self::find_by_url( $url ) ) {
-				return false;
-			}
-		}
-		return true;
-	}
-
-	/** Find an active merchant registry record by URL host. */
-	public static function find_by_url( string $url ): ?\WP_Post {
-		$host = strtolower( (string) wp_parse_url( $url, PHP_URL_HOST ) );
-		$host = preg_replace( '/^www\./', '', $host );
-		if ( '' === $host ) {
+		$hrefs = self::sponsored_anchor_hrefs( $content );
+		if ( null === $hrefs ) {
 			return null;
 		}
-		$posts = get_posts(
+		return array_values( array_unique( array_merge( $urls, $hrefs ) ) );
+	}
+
+	/**
+	 * Extract the href of every sponsored-marked anchor using the WordPress
+	 * HTML API. A sponsored anchor without a usable href yields an empty
+	 * string so validation fails closed instead of silently skipping it.
+	 *
+	 * @param string $content Post content to scan.
+	 * @return array<int, string>|null Hrefs, or null when parsing failed.
+	 */
+	private static function sponsored_anchor_hrefs( string $content ): ?array {
+		if ( '' === $content || false === stripos( $content, '<a' ) ) {
+			return array();
+		}
+		if ( ! class_exists( '\WP_HTML_Tag_Processor' ) ) {
+			Logger::error( 'affiliate_anchor_parser_unavailable', array() );
+			return null;
+		}
+		try {
+			$processor = new \WP_HTML_Tag_Processor( $content );
+			$hrefs     = array();
+			while ( $processor->next_tag( array( 'tag_name' => 'a' ) ) ) {
+				$rel = $processor->get_attribute( 'rel' );
+				if ( ! is_string( $rel ) ) {
+					continue;
+				}
+				$rel_tokens = preg_split( '/\s+/', strtolower( trim( $rel ) ) );
+				$tokens     = $rel_tokens ? $rel_tokens : array();
+				if ( ! in_array( 'sponsored', $tokens, true ) ) {
+					continue;
+				}
+				$href    = $processor->get_attribute( 'href' );
+				$hrefs[] = is_string( $href ) ? $href : '';
+			}
+			return $hrefs;
+		} catch ( \Throwable $error ) {
+			Logger::error( 'affiliate_anchor_parse_failed', array( 'message' => substr( $error->getMessage(), 0, 160 ) ) );
+			return null;
+		}
+	}
+
+	/**
+	 * Resolve content destinations to exact registry dependency edges.
+	 *
+	 * Matching is purely structural (domain + subdomain policy) and ignores
+	 * lifecycle eligibility: an inactive or expired merchant that a parent
+	 * still links to must remain a dependency so status changes invalidate it.
+	 *
+	 * @param string          $content      Post content to scan.
+	 * @param array<int, int> $merchant_ids Candidate registry record IDs.
+	 * @return array{edges: array<int, int>, unresolved: int, ambiguous: int}|null
+	 *         Null when extraction failed and callers must bind conservatively.
+	 */
+	public static function resolve_merchant_edges( string $content, array $merchant_ids ): ?array {
+		$destinations = self::destinations_in_content( $content );
+		if ( null === $destinations ) {
+			return null;
+		}
+		$edges      = array();
+		$unresolved = 0;
+		$ambiguous  = 0;
+		foreach ( $destinations as $url ) {
+			$destination = self::normalize_destination( $url );
+			if ( null === $destination ) {
+				++$unresolved;
+				continue;
+			}
+			$matches = array();
+			foreach ( $merchant_ids as $merchant_id ) {
+				if ( self::merchant_matches_host( (int) $merchant_id, $destination['host'] ) ) {
+					$matches[] = (int) $merchant_id;
+				}
+			}
+			if ( array() === $matches ) {
+				++$unresolved;
+				continue;
+			}
+			if ( count( $matches ) > 1 ) {
+				++$ambiguous;
+			}
+			$edges = array_merge( $edges, $matches );
+		}
+		$edges = array_values( array_unique( $edges ) );
+		sort( $edges, SORT_NUMERIC );
+		return array(
+			'edges'      => $edges,
+			'unresolved' => $unresolved,
+			'ambiguous'  => $ambiguous,
+		);
+	}
+
+	/**
+	 * Whether a registry record's domain policy covers a normalized host.
+	 *
+	 * @param int    $merchant_id Affiliate registry record ID.
+	 * @param string $host        Normalized destination host.
+	 */
+	public static function merchant_matches_host( int $merchant_id, string $host ): bool {
+		$registered = self::normalize_domain( (string) get_post_meta( $merchant_id, 'merchant_domain', true ) );
+		if ( '' === $registered || '' === $host ) {
+			return false;
+		}
+		if ( $host === $registered ) {
+			return true;
+		}
+		return (bool) get_post_meta( $merchant_id, 'allow_subdomains', true ) && str_ends_with( $host, '.' . $registered );
+	}
+
+	/**
+	 * Find an eligible merchant registry record by normalized destination; ambiguity fails closed.
+	 *
+	 * @param string $url Raw affiliate destination URL.
+	 */
+	public static function find_by_url( string $url ): ?\WP_Post {
+		$destination = self::normalize_destination( $url );
+		if ( null === $destination ) {
+			return null;
+		}
+		$matches = array();
+		foreach ( self::active_merchant_ids() as $post_id ) {
+			$record = array(
+				'merchant_domain'     => (string) get_post_meta( $post_id, 'merchant_domain', true ),
+				'relationship_status' => (string) get_post_meta( $post_id, 'relationship_status', true ),
+				'effective_date'      => (string) get_post_meta( $post_id, 'effective_date', true ),
+				'expiration_date'     => (string) get_post_meta( $post_id, 'expiration_date', true ),
+				'last_verified_date'  => (string) get_post_meta( $post_id, 'last_verified_date', true ),
+				'allow_subdomains'    => (bool) get_post_meta( $post_id, 'allow_subdomains', true ),
+			);
+			if ( self::relationship_is_eligible( $record, $url ) ) {
+				$matches[] = $post_id;
+			}
+		}
+		if ( 1 !== count( $matches ) ) {
+			if ( count( $matches ) > 1 ) {
+				Logger::error(
+					'affiliate_registry_conflict',
+					array(
+						'host'    => $destination['host'],
+						'matches' => count( $matches ),
+					)
+				);
+			}
+			return null;
+		}
+		$post = get_post( $matches[0] );
+		return ( $post instanceof \WP_Post ) ? $post : null;
+	}
+
+	/**
+	 * Complete deterministic projection of active registry record IDs.
+	 *
+	 * Loads IDs only (no full-object hydration) so the whole registry is
+	 * always evaluated; there is no prefix cap.
+	 *
+	 * @return array<int, int>
+	 */
+	private static function active_merchant_ids(): array {
+		$ids = get_posts(
 			array(
 				'post_type'      => 'lel_affiliate',
 				'post_status'    => 'any',
-				'posts_per_page' => 1,
+				'posts_per_page' => -1,
+				'fields'         => 'ids',
+				'orderby'        => 'ID',
+				'order'          => 'ASC',
+				'no_found_rows'  => true,
 				'meta_query'     => array(
-					array( 'key' => 'merchant_domain', 'value' => $host ),
-					array( 'key' => 'relationship_status', 'value' => 'active' ),
-				),
+					array(
+						'key'   => 'relationship_status',
+						'value' => 'active',
+					),
+				), // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query
 			)
 		);
-		return $posts ? $posts[0] : null;
+		return array_map( 'intval', $ids );
 	}
 
-	/** Render a safe, instrumented affiliate link. */
+	/**
+	 * Normalize and reject unsafe affiliate destinations.
+	 *
+	 * @param string $url Raw affiliate destination URL.
+	 */
+	public static function normalize_destination( string $url ): ?array {
+		$parts = wp_parse_url( trim( $url ) );
+		if ( ! is_array( $parts ) || ! isset( $parts['scheme'], $parts['host'] ) ) {
+			return null;
+		}
+		$scheme = strtolower( (string) $parts['scheme'] );
+		if ( ! in_array( $scheme, array( 'http', 'https' ), true ) || isset( $parts['user'] ) || isset( $parts['pass'] ) ) {
+			return null;
+		}
+		$port = isset( $parts['port'] ) ? (int) $parts['port'] : ( 'https' === $scheme ? 443 : 80 );
+		if ( ! in_array( $port, array( 80, 443 ), true ) ) {
+			return null;
+		}
+		$host = self::normalize_domain( (string) $parts['host'] );
+		return '' === $host ? null : array(
+			'scheme' => $scheme,
+			'host'   => $host,
+			'port'   => $port,
+		);
+	}
+
+	/**
+	 * Evaluate dates, verification recency and exact/subdomain policy.
+	 *
+	 * @param array<string, mixed> $record Registry record metadata to evaluate.
+	 * @param string               $url    Raw affiliate destination URL.
+	 * @param string|null          $today  Comparison date (Y-m-d), or null for today.
+	 */
+	public static function relationship_is_eligible( array $record, string $url, ?string $today = null ): bool {
+		$destination = self::normalize_destination( $url );
+		$today       = $today ? $today : Date_Validator::today();
+		if ( null === $destination || ! Date_Validator::is_valid( $today ) || 'active' !== ( $record['relationship_status'] ?? '' ) ) {
+			return false;
+		}
+		$effective = (string) ( $record['effective_date'] ?? '' );
+		$expires   = (string) ( $record['expiration_date'] ?? '' );
+		$verified  = (string) ( $record['last_verified_date'] ?? '' );
+		if ( ! Date_Validator::is_valid( $effective ) || Date_Validator::compare( $effective, $today ) > 0 ) {
+			return false;
+		}
+		if ( '' !== $expires && ( ! Date_Validator::is_valid( $expires ) || Date_Validator::compare( $expires, $today ) < 0 ) ) {
+			return false;
+		}
+		$max_age = min( 1095, max( 1, (int) get_option( 'lel_affiliate_verification_max_age_days', 365 ) ) );
+		if ( ! Date_Validator::is_valid( $verified ) || strtotime( $verified . ' 00:00:00 UTC' ) < strtotime( $today . ' 00:00:00 UTC' ) - ( $max_age * DAY_IN_SECONDS ) ) {
+			return false;
+		}
+		$registered = self::normalize_domain( (string) ( $record['merchant_domain'] ?? '' ) );
+		if ( '' === $registered ) {
+			return false;
+		}
+		if ( $destination['host'] === $registered ) {
+			return true;
+		}
+		return ! empty( $record['allow_subdomains'] ) && str_ends_with( $destination['host'], '.' . $registered );
+	}
+
+	/**
+	 * Canonical ASCII domain with harmless presentation variants removed.
+	 *
+	 * @param string $domain Domain name to normalize.
+	 */
+	public static function normalize_domain( string $domain ): string {
+		$domain = strtolower( rtrim( trim( $domain ), '.' ) );
+		$domain = preg_replace( '/^www\./', '', $domain );
+		if ( function_exists( 'idn_to_ascii' ) ) {
+			$ascii = idn_to_ascii( $domain, IDNA_DEFAULT, defined( 'INTL_IDNA_VARIANT_UTS46' ) ? INTL_IDNA_VARIANT_UTS46 : 0 );
+			if ( false !== $ascii ) {
+				$domain = strtolower( $ascii );
+			}
+		}
+		return preg_match( '/^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/', $domain ) ? $domain : '';
+	}
+
+	/**
+	 * Render a safe, instrumented affiliate link.
+	 *
+	 * @param string $url       Affiliate destination URL.
+	 * @param string $label     Visible link text.
+	 * @param string $placement Placement key for click instrumentation.
+	 */
 	public static function render_link( string $url, string $label, string $placement = 'article' ): string {
 		$url = esc_url( $url );
 		if ( '' === $url ) {
@@ -125,7 +412,7 @@ final class Affiliate_Registry {
 			'data-placement' => sanitize_key( $placement ),
 			'data-merchant'  => sanitize_text_field( (string) get_post_meta( $merchant->ID, 'merchant_id', true ) ),
 		);
-		$html = '';
+		$html       = '';
 		foreach ( $attributes as $name => $value ) {
 			$html .= sprintf( ' %s="%s"', esc_attr( $name ), esc_attr( $value ) );
 		}
