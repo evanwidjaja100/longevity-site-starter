@@ -13,7 +13,7 @@ cfa2d75ad28f3e20e39f11a15277753a396d2fea81caf1094bf9eb31a2bd1c7c *./.npmrc
 2d2390a7e56522803c0904d33fd8de203d414808d41fd7d11ce107da259ee9c3 *./AGENTS.md
 cf959aa3bcd6daf2f2a051458a8a0d5ebafb41b69069a6cbef19e06475632463 *./compose.yaml
 28e58d12ac53bd4320519f343ff3a9d1db6909f15d080c03447473e9c3a294a2 *./composer.json
-5b2377b9a63ada5f82ac2a87972cd50c64501430ec4c0141e009727ff4ad72a0 *./composer.lock
+240ea2757740e3f6db46212ebae2cd0e92a5f229cca5728857cb0ccb9947b3ba *./composer.lock
 af08fcf5d1cb826d1898a66f43770bc62c73a7ee410431d21e1fd5e6bb5c872e *./config/content-schema/editorial-meta.schema.json
 27a89c0da59a0f18c807b64f218e4b31a98ecf410587f02f58b74702f0c9a410 *./config/environments/production.example.php
 24e3d4b74f3c630f15afda85cf1c444696b8c1519dcbfc2515624da59098095f *./config/release-required-jobs.json
