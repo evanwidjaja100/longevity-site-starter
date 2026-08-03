@@ -74,7 +74,7 @@ jobs:
         run: |
           cp coverage.xml reports/clean-build/coverage.xml
           php scripts/write-release-evidence-metadata.php clean-build clean-build-evidence reports/clean-build success clover:coverage.xml
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
           name: clean-build-evidence
@@ -129,7 +129,7 @@ jobs:
       - run: composer audit --locked
       - name: Finalize evidence
         run: php scripts/write-release-evidence-metadata.php quality-php php-quality-evidence reports/php-quality success junit:phpunit-junit.xml checkstyle:phpcs-checkstyle.xml
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
           name: php-quality-evidence
@@ -160,7 +160,7 @@ jobs:
       - run: npm audit --audit-level=high
       - name: Finalize evidence
         run: php scripts/write-release-evidence-metadata.php quality-frontend frontend-quality-evidence reports/frontend-quality success json:eslint.json json:stylelint.json
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
           name: frontend-quality-evidence
@@ -192,7 +192,7 @@ jobs:
           } 2>&1 | tee reports/content-config/validation.log
       - name: Finalize evidence
         run: php scripts/write-release-evidence-metadata.php content-and-config content-config-evidence reports/content-config success text:validation.log
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
           name: content-config-evidence
@@ -226,7 +226,7 @@ jobs:
       - name: Capture Docker logs
         if: failure()
         run: docker compose logs --no-color > docker-integration.log
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
           name: wordpress-integration-evidence
@@ -263,13 +263,13 @@ jobs:
         run: npm run test:e2e:functional -- --project=chromium --reporter=list,junit
       - name: Finalize evidence
         run: php scripts/write-release-evidence-metadata.php playwright-chromium playwright-chromium-evidence reports/playwright-chromium success junit:playwright-junit.xml
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
           name: playwright-chromium-evidence
           path: reports/playwright-chromium/
           if-no-files-found: error
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
           name: playwright-chromium-artifacts
@@ -308,7 +308,7 @@ jobs:
             run --summary-export=reports/load-smoke/k6-summary.json tests/load/k6-scenario.js
       - name: Finalize evidence
         run: php scripts/write-release-evidence-metadata.php load-smoke load-smoke-evidence reports/load-smoke success json:k6-summary.json
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
           name: load-smoke-evidence
@@ -344,7 +344,7 @@ jobs:
         run: npm run test:a11y -- --project=chromium --reporter=list,junit
       - name: Finalize evidence
         run: php scripts/write-release-evidence-metadata.php accessibility accessibility-evidence reports/accessibility success junit:playwright-junit.xml
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
           name: accessibility-evidence
@@ -379,7 +379,7 @@ jobs:
         run: npx playwright test tests/e2e/critical-cross-browser.spec.js --project=firefox-critical --project=webkit-critical --reporter=list,junit
       - name: Finalize evidence
         run: php scripts/write-release-evidence-metadata.php playwright-cross-browser playwright-cross-browser-evidence reports/playwright-cross-browser success junit:playwright-junit.xml
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
           name: playwright-cross-browser-evidence
@@ -415,7 +415,7 @@ jobs:
             sh -lc 'npm ci && npx playwright test tests/e2e/visual.spec.js --project=chromium --reporter=list,junit'
       - name: Finalize evidence
         run: php scripts/write-release-evidence-metadata.php visual-linux visual-linux-evidence reports/visual-linux success junit:playwright-junit.xml
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
           name: visual-linux-evidence
@@ -455,7 +455,7 @@ jobs:
           # PHP variables are intentionally protected from the shell.
           php -r '$found=false; $it=new RecursiveIteratorIterator(new RecursiveDirectoryIterator("reports/lighthouse/mobile")); foreach($it as $f){if($f->isFile()&&$f->getExtension()==="json"){$d=json_decode(file_get_contents($f->getPathname()),true);if(isset($d["lighthouseVersion"],$d["categories"])){copy($f->getPathname(),"reports/lighthouse-mobile/lighthouse.json");$found=true;break;}}} if(!$found){fwrite(STDERR,"No Lighthouse result found\n");touch("reports/lighthouse-mobile/no-lighthouse-report.txt");}'
           php scripts/write-release-evidence-metadata.php lighthouse-mobile lighthouse-evidence reports/lighthouse-mobile ${{ job.status }} json:lighthouse.json
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
           name: lighthouse-evidence
@@ -495,7 +495,7 @@ jobs:
           # PHP variables are intentionally protected from the shell.
           php -r '$found=false; $it=new RecursiveIteratorIterator(new RecursiveDirectoryIterator("reports/lighthouse/desktop")); foreach($it as $f){if($f->isFile()&&$f->getExtension()==="json"){$d=json_decode(file_get_contents($f->getPathname()),true);if(isset($d["lighthouseVersion"],$d["categories"])){copy($f->getPathname(),"reports/lighthouse-desktop/lighthouse.json");$found=true;break;}}} if(!$found){fwrite(STDERR,"No Lighthouse result found\n");touch("reports/lighthouse-desktop/no-lighthouse-report.txt");}'
           php scripts/write-release-evidence-metadata.php lighthouse-desktop lighthouse-desktop-evidence reports/lighthouse-desktop ${{ job.status }} json:lighthouse.json
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
           name: lighthouse-desktop-evidence
@@ -524,7 +524,7 @@ jobs:
           bash scripts/verify-release-artifact.sh reports/release-artifact/release.tar.gz "$GITHUB_SHA" reports/release-artifact/release-verification.json reports/release-artifact/release.tar.gz.sha256
           bash scripts/verify-release-reproducibility.sh "$GITHUB_SHA" reports/release-artifact/reproducibility.json
           php scripts/write-release-evidence-metadata.php release-artifact release-artifact reports/release-artifact success json:release-verification.json json:reproducibility.json archive:release.tar.gz sha256:release.tar.gz.sha256
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: release-artifact
           path: reports/release-artifact/
@@ -553,7 +553,7 @@ jobs:
         run: |
           php scripts/merge-codeql-sarif.php
           php scripts/write-release-evidence-metadata.php codeql codeql-evidence reports/codeql success sarif:codeql.sarif
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
           name: codeql-evidence
@@ -584,7 +584,7 @@ jobs:
         run: ./vendor/bin/psalm --taint-analysis --no-progress --no-cache --report=reports/php-sast/psalm.sarif
       - name: Finalize evidence
         run: php scripts/write-release-evidence-metadata.php php-sast php-sast-evidence reports/php-sast success sarif:psalm.sarif json:detection-proof.json
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
           name: php-sast-evidence
@@ -642,7 +642,7 @@ jobs:
         run: jq '.Results = (.Results // [])' reports/supply-chain/trivy.json > reports/supply-chain/trivy.tmp && mv reports/supply-chain/trivy.tmp reports/supply-chain/trivy.json
       - name: Finalize evidence
         run: php scripts/write-release-evidence-metadata.php security-supply-chain supply-chain-evidence reports/supply-chain success spdx-json:sbom.spdx.json json:licenses.json json:scan-metadata.json json:composer-audit.json json:npm-audit.json json:trufflehog.json json:trivy.json
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
           name: supply-chain-evidence
@@ -673,7 +673,7 @@ jobs:
         run: |
           printf '%s\n' "$DEPENDENCY_CHANGES" | jq -e 'if type == "array" then . else error("dependency changes output is not an array") end' > reports/dependency-review/dependency-review.json
           php scripts/write-release-evidence-metadata.php dependency-review dependency-review-evidence reports/dependency-review success json:dependency-review.json
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
           name: dependency-review-evidence
@@ -748,7 +748,7 @@ jobs:
           subject-path: |
             reports/release/${{ github.sha }}/evidence-index.json
             reports/release/${{ github.sha }}/SHA256SUMS
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
           name: release-evidence-index
