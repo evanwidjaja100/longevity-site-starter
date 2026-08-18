@@ -21,7 +21,7 @@
     "test:lighthouse:desktop": "node scripts/lighthouse-preflight.mjs && lhci autorun --config=lighthouserc.desktop.cjs"
   },
   "devDependencies": {
-    "@axe-core/playwright": "^4.10.0",
+    "@axe-core/playwright": "^4.13.0",
     "@eslint/js": "^10.0.1",
     "@lhci/cli": "^0.15.1",
     "@playwright/test": "^1.62.1",
