@@ -25,7 +25,7 @@ jobs:
     env:
       EVIDENCE_ACTION_SHAS: 'actions/checkout@11d5960a326750d5838078e36cf38b85af677262 shivammathur/setup-php@b604ade2a87db23f8871b7182e69ec5e75effb45 actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Initialize evidence directory
         run: mkdir -p reports/clean-build
       - uses: shivammathur/setup-php@b604ade2a87db23f8871b7182e69ec5e75effb45 # v2
@@ -89,7 +89,7 @@ jobs:
     env:
       EVIDENCE_ACTION_SHAS: 'actions/checkout@11d5960a326750d5838078e36cf38b85af677262 shivammathur/setup-php@b604ade2a87db23f8871b7182e69ec5e75effb45'
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Initialize evidence directory
         run: mkdir -p reports/php-quality
       - uses: shivammathur/setup-php@b604ade2a87db23f8871b7182e69ec5e75effb45 # v2
@@ -144,7 +144,7 @@ jobs:
     env:
       EVIDENCE_ACTION_SHAS: 'actions/checkout@11d5960a326750d5838078e36cf38b85af677262 actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Initialize evidence directory
         run: mkdir -p reports/frontend-quality
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
@@ -175,7 +175,7 @@ jobs:
     env:
       EVIDENCE_ACTION_SHAS: 'actions/checkout@11d5960a326750d5838078e36cf38b85af677262'
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Initialize evidence directory
         run: mkdir -p reports/content-config
       - name: Run and retain content/config validation output
@@ -208,7 +208,7 @@ jobs:
       EVIDENCE_ACTION_SHAS: 'actions/checkout@11d5960a326750d5838078e36cf38b85af677262'
       EVIDENCE_CONTAINER_IMAGES: 'mysql@sha256:62fb722c78b24245ddff1796a0fcee4a49cc5b87e0aaaf20c92d1da9e0a2497b longevity-wordpress:dev longevity-wpcli:dev'
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Initialize evidence directory
         run: mkdir -p reports/wordpress-integration
       - run: bash scripts/ci-generate-env.sh
@@ -244,7 +244,7 @@ jobs:
       EVIDENCE_ACTION_SHAS: 'actions/checkout@11d5960a326750d5838078e36cf38b85af677262 actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
       EVIDENCE_CONTAINER_IMAGES: 'mysql@sha256:62fb722c78b24245ddff1796a0fcee4a49cc5b87e0aaaf20c92d1da9e0a2497b longevity-wordpress:dev longevity-wpcli:dev'
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -287,7 +287,7 @@ jobs:
       EVIDENCE_ACTION_SHAS: 'actions/checkout@11d5960a326750d5838078e36cf38b85af677262 actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
       EVIDENCE_CONTAINER_IMAGES: 'mysql@sha256:62fb722c78b24245ddff1796a0fcee4a49cc5b87e0aaaf20c92d1da9e0a2497b longevity-wordpress:dev longevity-wpcli:dev grafana/k6:2.1.0@sha256:65c920dc067d5e2e00befbf982af6ad6ad0117034e8b1c65817c7975c52d4669'
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -326,7 +326,7 @@ jobs:
       EVIDENCE_ACTION_SHAS: 'actions/checkout@11d5960a326750d5838078e36cf38b85af677262 actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
       EVIDENCE_CONTAINER_IMAGES: 'mysql@sha256:62fb722c78b24245ddff1796a0fcee4a49cc5b87e0aaaf20c92d1da9e0a2497b longevity-wordpress:dev longevity-wpcli:dev'
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Initialize evidence directory
         run: mkdir -p reports/accessibility
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
@@ -362,7 +362,7 @@ jobs:
       EVIDENCE_ACTION_SHAS: 'actions/checkout@11d5960a326750d5838078e36cf38b85af677262 actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
       EVIDENCE_CONTAINER_IMAGES: 'mysql@sha256:62fb722c78b24245ddff1796a0fcee4a49cc5b87e0aaaf20c92d1da9e0a2497b longevity-wordpress:dev longevity-wpcli:dev'
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -399,7 +399,7 @@ jobs:
       EVIDENCE_ACTION_SHAS: 'actions/checkout@11d5960a326750d5838078e36cf38b85af677262'
       EVIDENCE_CONTAINER_IMAGES: 'mysql@sha256:62fb722c78b24245ddff1796a0fcee4a49cc5b87e0aaaf20c92d1da9e0a2497b longevity-wordpress:dev longevity-wpcli:dev mcr.microsoft.com/playwright@sha256:5b8f294aff9041b7191c34a4bab3ac270157a28774d4b0660e9743297b697e48'
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Initialize evidence directory
         run: mkdir -p reports/visual-linux
       - run: bash scripts/ci-generate-env.sh
@@ -433,7 +433,7 @@ jobs:
       EVIDENCE_ACTION_SHAS: 'actions/checkout@11d5960a326750d5838078e36cf38b85af677262 actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
       EVIDENCE_CONTAINER_IMAGES: 'mysql@sha256:62fb722c78b24245ddff1796a0fcee4a49cc5b87e0aaaf20c92d1da9e0a2497b longevity-wordpress:dev longevity-wpcli:dev'
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -473,7 +473,7 @@ jobs:
       EVIDENCE_ACTION_SHAS: 'actions/checkout@11d5960a326750d5838078e36cf38b85af677262 actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
       EVIDENCE_CONTAINER_IMAGES: 'mysql@sha256:62fb722c78b24245ddff1796a0fcee4a49cc5b87e0aaaf20c92d1da9e0a2497b longevity-wordpress:dev longevity-wpcli:dev'
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -512,7 +512,7 @@ jobs:
     env:
       EVIDENCE_ACTION_SHAS: 'actions/checkout@11d5960a326750d5838078e36cf38b85af677262'
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Initialize evidence directory
         run: mkdir -p reports/release-artifact
       - name: Build first-party release artifact
@@ -539,7 +539,7 @@ jobs:
       contents: read
       security-events: write
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Initialize evidence directory
         run: mkdir -p reports/codeql
       - uses: github/codeql-action/init@b7351df727350dca84cb9d725d57dcf5bc82ba26 # v3.37.1
@@ -570,7 +570,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Initialize evidence directory
         run: mkdir -p reports/php-sast
       - uses: shivammathur/setup-php@b604ade2a87db23f8871b7182e69ec5e75effb45 # v2
@@ -602,7 +602,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
       - name: Initialize evidence directory
@@ -660,7 +660,7 @@ jobs:
       contents: read
       pull-requests: read
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Initialize evidence directory
         run: mkdir -p reports/dependency-review
       - id: dependency-review
@@ -707,7 +707,7 @@ jobs:
       id-token: write
       attestations: write
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         if: always()
         with:
