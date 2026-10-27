@@ -18,7 +18,7 @@
         "phpstan/phpstan": "^2.0",
         "phpunit/phpunit": "^10.5",
         "szepeviktor/phpstan-wordpress": "^2.0",
-        "vimeo/psalm": "6.16.1",
+        "vimeo/psalm": "6.20.1",
         "wp-coding-standards/wpcs": "3.4.1"
     },
     "config": {
